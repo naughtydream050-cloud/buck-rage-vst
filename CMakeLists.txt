@@ -13,6 +13,8 @@ juce_add_plugin(BuckRage
     PRODUCT_NAME "BUCK RAGE"
 )
 
+juce_generate_juce_header(BuckRage)
+
 juce_add_binary_data(BuckRageAssets
     SOURCES
         Resources/background_buck_rage.png
