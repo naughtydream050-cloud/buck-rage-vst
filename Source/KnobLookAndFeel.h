@@ -5,7 +5,7 @@
  * BUCK RAGE - SilverKnobLAF v2.2
  * Stitch [MainKnob_PerfectCircle] — squareBounds + constexpr palette + ScopedSaveState rotation
  * Zero-Bug-Watch: CONFIRMED 9/10 [Claude direct review]
- * Fix v2.2: ScopedSaveState+AffineTransform → knobImg+dot unified rotation (IMG_7279 asset)
+ * Fix v2.2: ScopedSaveState+AffineTransform -> knobImg+dot unified rotathion (IMG_7279 asset)
  */
 class SilverKnobLAF : public juce::LookAndFeel_V4
 {
@@ -60,7 +60,7 @@ public:
         };
 
         if (knobImg.isValid()) {
-            // v2.2 FIX: ScopedSaveState + AffineTransform → knobImg+dot unified rotation
+            // v2.2 FIX: ScopedSaveState + AffineTransform -> knobImg+dot unified rotation
             const float rotCtx = startAng + sliderPos * (endAng - startAng);
             Graphics::ScopedSaveState savedState(g);
             g.addTransform(AffineTransform::rotation(rotCtx, cx, cy));
