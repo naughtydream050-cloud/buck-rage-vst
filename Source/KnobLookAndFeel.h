@@ -3,9 +3,9 @@
 
 /**
  * BUCK RAGE - SilverKnobLAF v2.2
- * Stitch [MainKnob_PerfectCircle] — squareBounds + constexpr palette + ScopedSaveState rotation
+ * Stitch [MainKnob_PerfectCircle] - squareBounds + constexpr palette + ScopedSaveState rotation
  * Zero-Bug-Watch: CONFIRMED 9/10 [Claude direct review]
- * Fix v2.2: ScopedSaveState+AffineTransform -> knobImg+dot unified rotathion (IMG_7279 asset)
+     * Fix v2.2: ScopedSaveState+AffineTransform -> knobImg+dot unified rotation (IMG_7279 asset)
  */
 class SilverKnobLAF : public juce::LookAndFeel_V4
 {
@@ -37,8 +37,8 @@ public:
     void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
                           float sliderPos, float startAng, float endAng,
                           juce::Slider&) override
-    {
-        using namespace juce;
+{
+            using namespace juce;
         const auto  raw  = Rectangle<float>((float)x, (float)y, (float)width, (float)height);
         const float side = jmin(raw.getWidth(), raw.getHeight()) * kSideRatio;
         const auto  sq   = raw.withSizeKeepingCentre(side, side);
@@ -65,7 +65,7 @@ public:
             Graphics::ScopedSaveState savedState(g);
             g.addTransform(AffineTransform::rotation(rotCtx, cx, cy));
             g.drawImage(knobImg, sq.getX(), sq.getY(), sq.getWidth(), sq.getHeight(),
-                        0.f, 0.f, (float)knobImg.getWidth(), (float)knobImg.getHeight());
+                                        0.f, 0.f, (float)knobImg.getWidth(), (float)knobImg.getHeight());
             const float dist = side * kInnerRatio * kDotDistRatio;
             const float py   = cy - dist;  // 12 o'clock in rotated context
             g.setColour(Colour(kColGlow));
@@ -86,4 +86,24 @@ public:
 
         const float inner = side * kInnerRatio;
         const auto  inR   = raw.withSizeKeepingCentre(inner, inner);
-        ColourGradient grad(Colour(kColHigh), inR.
+        ColourGradient grad(Colour(kColHigh), inR.getCentreX(), inR.getCentreY(),
+                            Colour(kColLow),  inR.getRight(),   inR.getBottom(), true);
+        grad.addColour(kGStop1, Colour(kColMid1));
+        grad.addColour(kGStop2, Colour(kColMid2));
+        g.setGradientFill(grad);
+        g.fillEllipse(inR);
+
+        g.setColour(Colours::white.withAlpha(0.08f));
+        const float r = inner * 0.5f;
+        for (int i = 0; i < kHairlines; ++i) {
+            const float a = (float)i * MathConstants<float>::twoPi / (float)kHairlines;
+            g.drawLine(cx, cy, cx+r*std::cos(a), cy+r*std::sin(a), 0.6f);
+        }
+        g.setColour(Colours::black.withAlpha(0.5f));
+        g.drawEllipse(inR, 1.5f);
+        drawDot(inner * kDotDistRatio);
+}
+
+private:
+    juce::Image knobImg;
+};
