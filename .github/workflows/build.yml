@@ -26,3 +26,21 @@ jobs:
           name: BUCK-RAGE-VST3-Windows
           path: build/**/*.vst3
           if-no-files-found: warn
+
+      - name: Post artifact URL to Job Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## ✅ Build #${{ github.run_number }} Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Download VST3" >> $GITHUB_STEP_SUMMARY
+          echo "[⬇️ BUCK-RAGE-VST3-Windows](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Run | \`#${{ github.run_number }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Triggered by | \`${{ github.actor }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> スマホからでも上記リンクを開くと artifact が一覧表示される" >> $GITHUB_STEP_SUMMARY
