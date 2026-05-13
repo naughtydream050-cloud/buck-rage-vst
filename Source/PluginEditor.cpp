@@ -1,54 +1,100 @@
 #include "PluginEditor.h"
-#include <BinaryData.h>
+#include "GeneratedLayout.h"
 
-BuckRageEditor::BuckRageEditor(BuckRageProcessor& p)
-    : AudioProcessorEditor(&p), proc(p),
-      buckAttach(p.apvts, "buck", buckKnob),
-      rageAttach(p.apvts, "rage", rageKnob)
+#if __has_include(<BinaryData.h>)
+ #include <BinaryData.h>
+ #define RUDE_HYPE_HAS_BINARY_DATA 1
+#else
+ #define RUDE_HYPE_HAS_BINARY_DATA 0
+#endif
+
+namespace
 {
-    setSize(992, 496);
+constexpr auto kExternalReferenceImagePath = "C:/Users/razor/Downloads/S__45752322.jpg";
 
-    {
-        int sz = 0;
-        auto* data = BinaryData::getNamedResource("background_buck_rage_png", sz);
-        if (data)
-            bgImage = juce::ImageCache::getFromMemory(data, sz);
-    }
-
-    for (auto* k : { &buckKnob, &rageKnob })
-    {
-        k->setSliderStyle(juce::Slider::RotaryVerticalDrag);
-        k->setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-        k->setLookAndFeel(&knobLAF);
-        addAndMakeVisible(k);
-    }
-
-    startTimerHz(30);
+juce::Image loadBinaryImage(const char* name)
+{
+#if RUDE_HYPE_HAS_BINARY_DATA
+    int size = 0;
+    if (auto* data = BinaryData::getNamedResource(name, size))
+        return juce::ImageCache::getFromMemory(data, size);
+#else
+    juce::ignoreUnused(name);
+#endif
+    return {};
 }
 
-BuckRageEditor::~BuckRageEditor()
+juce::Image loadReferenceFaceplate()
 {
-    buckKnob.setLookAndFeel(nullptr);
-    rageKnob.setLookAndFeel(nullptr);
+    if (auto image = loadBinaryImage("faceplate_rude_hype_png"); image.isValid())
+        return image;
+
+    return juce::ImageFileFormat::loadFrom(juce::File(kExternalReferenceImagePath));
 }
 
-void BuckRageEditor::resized()
+juce::Image cropKnobFromFaceplate(const juce::Image& faceplate, juce::Rectangle<float> bounds)
 {
-    buckKnob.setBounds(98,  163, 155, 155);
-    rageKnob.setBounds(738, 163, 155, 155);
+    if (!faceplate.isValid())
+        return {};
+
+    return faceplate.getClippedImage(bounds.toNearestInt());
 }
 
-void BuckRageEditor::paint(juce::Graphics& g)
+void setupKnob(ImageKnobSlider& knob, juce::Image image)
 {
-    if (bgImage.isValid())
+    knob.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    knob.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    knob.setRotaryParameters(juce::degreesToRadians(RudeHypeGeneratedLayout::knobAngleStartDeg),
+                             juce::degreesToRadians(RudeHypeGeneratedLayout::knobAngleEndDeg),
+                             true);
+    knob.setAngleRange(RudeHypeGeneratedLayout::knobAngleStartDeg,
+                       RudeHypeGeneratedLayout::knobAngleEndDeg);
+    knob.setKnobImage(std::move(image));
+}
+}
+
+RudeHypeEditor::RudeHypeEditor(RudeHypeProcessor& p)
+    : AudioProcessorEditor(&p),
+      proc(p),
+      shoutAttach(p.apvts, "shout", shoutKnob),
+      burnAttach(p.apvts, "burn", burnKnob)
+{
+    setSize(static_cast<int>(RudeHypeGeneratedLayout::canvasWidth),
+            static_cast<int>(RudeHypeGeneratedLayout::canvasHeight));
+
+    faceplateImage = loadReferenceFaceplate();
+
+    auto shoutImage = loadBinaryImage("knob_shout_png");
+    if (!shoutImage.isValid())
+        shoutImage = cropKnobFromFaceplate(faceplateImage, RudeHypeGeneratedLayout::shoutBounds());
+
+    auto burnImage = loadBinaryImage("knob_burn_png");
+    if (!burnImage.isValid())
+        burnImage = cropKnobFromFaceplate(faceplateImage, RudeHypeGeneratedLayout::burnBounds());
+
+    setupKnob(shoutKnob, std::move(shoutImage));
+    setupKnob(burnKnob, std::move(burnImage));
+
+    addAndMakeVisible(shoutKnob);
+    addAndMakeVisible(burnKnob);
+}
+
+void RudeHypeEditor::resized()
+{
+    shoutKnob.setBounds(RudeHypeGeneratedLayout::shoutBounds().toNearestInt());
+    burnKnob.setBounds(RudeHypeGeneratedLayout::burnBounds().toNearestInt());
+}
+
+void RudeHypeEditor::paint(juce::Graphics& g)
+{
+    if (faceplateImage.isValid())
     {
-        g.drawImageAt(bgImage, 0, 0);
+        g.drawImageAt(faceplateImage, 0, 0);
+        return;
     }
-    else
-    {
-        g.fillAll(juce::Colour(0xff0a0a0a));
-        g.setColour(juce::Colours::red);
-        g.setFont(14.f);
-        g.drawText("BinaryData load failed", getLocalBounds(), juce::Justification::centred);
-    }
+
+    g.fillAll(juce::Colour(0xff11110f));
+    g.setColour(juce::Colours::red);
+    g.setFont(18.0f);
+    g.drawText("RUDE HYPE reference image load failed", getLocalBounds(), juce::Justification::centred);
 }
