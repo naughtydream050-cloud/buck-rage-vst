@@ -1,4 +1,4 @@
-name: Build BUCK RAGE
+name: Build RUDE HYPE
 
 on:
   push:
@@ -14,6 +14,12 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Toolchain check
+        shell: pwsh
+        run: |
+          cmake --version
+          if (!(Test-Path -LiteralPath "JUCE")) { throw "JUCE submodule is missing" }
+
       - name: Configure CMake
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
@@ -23,24 +29,44 @@ jobs:
       - name: Upload VST3
         uses: actions/upload-artifact@v4
         with:
-          name: BUCK-RAGE-VST3-Windows
+          name: RUDE-HYPE-VST3-Windows
           path: build/**/*.vst3
-          if-no-files-found: warn
+          if-no-files-found: error
 
-      - name: Post artifact URL to Job Summary
-        if: always()
+  build-macos-vst3:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Toolchain check
         shell: bash
         run: |
-          echo "## ✅ Build #${{ github.run_number }} Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Download VST3" >> $GITHUB_STEP_SUMMARY
-          echo "[⬇️ BUCK-RAGE-VST3-Windows](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Run | \`#${{ github.run_number }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Triggered by | \`${{ github.actor }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> スマホからでも上記リンクを開くと artifact が一覧表示される" >> $GITHUB_STEP_SUMMARY
+          set -euo pipefail
+          cmake --version
+          xcodebuild -version
+          xcode-select -p
+          test -d JUCE
+
+      - name: Configure CMake
+        shell: bash
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build VST3
+        shell: bash
+        run: cmake --build build --config Release --parallel
+
+      - name: Assert VST3 artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          find build -name "*.vst3" -print
+          test "$(find build -name "*.vst3" | wc -l | tr -d ' ')" -gt 0
+
+      - name: Upload macOS VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: RUDE-HYPE-VST3-macOS-arm64
+          path: build/**/*.vst3
+          if-no-files-found: error

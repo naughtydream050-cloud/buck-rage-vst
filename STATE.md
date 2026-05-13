@@ -1,10 +1,48 @@
 # RUDE HYPE State
 
+## 2026-05-14
+
+### Phase
+
+REAL_BUILD_HOST_VALIDATION_DSP_IMPLEMENTATION
+
+### Done
+
+- Promoted RUDE_HYPE development to `MCP + GPT consultation + GitHub Actions` collaboration mode.
+- Locked Codex role to implementation, MCP/GitHub Actions, harness, artifacts, and validation.
+- Locked GPT consultation role to design direction, DSP review, architecture review, Mac plugin strategy, and doctrine review.
+- Standardized `reports/latest/rude-hype-context-pack.json` as the preferred handoff payload.
+- Preserved image-first doctrine:
+  - faceplate PNG is visual truth.
+  - `ui/spec/ui-spec.json` is SSOT.
+  - `PluginEditor.cpp` is implementation consumer.
+  - image knobs rotate via `AffineTransform`.
+  - circular alpha is required.
+- Marked future Mac build strategy assumptions:
+  - GitHub Actions macOS runner.
+  - universal binary.
+  - codesign.
+  - notarization.
+  - AU validation.
+- GPT consultation approved staged Mac rollout with macOS VST3 first.
+- Added macOS VST3 GitHub Actions workflow draft.
+- Added `docs/mac-build-notes.md`.
+
+### Next Priority
+
+Run Windows + macOS VST3 CI, download artifacts, then host-validate the current melody-engine builds.
+
+### Known Issues
+
+- Live DAW screenshot and live audio review are still pending.
+- Mac build pipeline is implemented as a first-stage VST3 CI gate; AU/universal/codesign/notarization remain deferred.
+- Local CMake/MSBuild remain unavailable in the current shell, so GitHub Actions is the active build route.
+
 ## 2026-05-13
 
 ### Phase
 
-IMAGE_KNOB_AUTHORING -> LIVE_ARTIFACT_CAPTURE
+IMAGE_KNOB_AUTHORING -> BUCK_TRACK_MELODY_ENGINE
 
 ### Done
 
@@ -21,6 +59,16 @@ IMAGE_KNOB_AUTHORING -> LIVE_ARTIFACT_CAPTURE
 - Reworked the runtime JPEG crop fallback to create ARGB circular knob images.
 - Re-applied circular alpha masks to local knob PNG assets.
 - Added `validate_knob_alpha.mjs`.
+- GitHub Actions run `25799777671` passed after scale/alpha fixes.
+- Downloaded scale/alpha artifact to `reports/latest/rude-hype/rude-hype-vst3-scale-alpha.zip`.
+- Replaced the simple saturation/LPF DSP with a layered two-knob melody engine.
+- SHOUT now drives upper-mid excitation, micro motion, soft clipping, and width.
+- BURN now drives low-safe transistor saturation, wavefolding, downsample flavor, tape compression, and fizz.
+- Added `docs/dsp-preview-notes.md`.
+- Added `tools/validate_dsp_macro.mjs`.
+- DSP macro validation passed, score 10.
+- GitHub Actions run `25805504329` passed after BUCK TRACK MELODY ENGINE changes.
+- Downloaded melody-engine artifact to `reports/latest/rude-hype/rude-hype-vst3-melody-engine.zip`.
 
 ### Scores
 
@@ -28,11 +76,13 @@ IMAGE_KNOB_AUTHORING -> LIVE_ARTIFACT_CAPTURE
 - knob alpha: passed, score 10
 - hit-area alignment: passed, score 10
 - harness: ready, score 10
-- live build: passed via GitHub Actions
+- DSP macro: passed, score 10
+- live build: passed via GitHub Actions after BUCK TRACK MELODY ENGINE changes
+- live build: passed via GitHub Actions after scale/alpha fixes
 
 ### Next Priority
 
-Capture the real rendered plugin UI from a host and replace `ui/rendered/rendered.png`, then re-run screenshot diff and hit-area validation against the actual hosted VST3.
+Build the BUCK TRACK MELODY ENGINE revision, then host-test SHOUT/BURN with melody material and capture live UI evidence.
 
 ### Known Issues
 
