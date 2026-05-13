@@ -37,11 +37,22 @@ juce::Image cropKnobFromFaceplate(const juce::Image& faceplate, juce::Rectangle<
     if (!faceplate.isValid())
         return {};
 
-    return faceplate.getClippedImage(bounds.toNearestInt());
+    const auto cropBounds = bounds.toNearestInt();
+    const auto cropped = faceplate.getClippedImage(cropBounds).convertedToFormat(juce::Image::ARGB);
+    auto masked = juce::Image(juce::Image::ARGB, cropBounds.getWidth(), cropBounds.getHeight(), true);
+
+    juce::Graphics g(masked);
+    juce::Path circularMask;
+    circularMask.addEllipse(masked.getBounds().toFloat());
+    g.reduceClipRegion(circularMask);
+    g.drawImageAt(cropped, 0, 0);
+
+    return masked;
 }
 
 void setupKnob(ImageKnobSlider& knob, juce::Image image)
 {
+    knob.setOpaque(false);
     knob.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     knob.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     knob.setRotaryParameters(juce::degreesToRadians(RudeHypeGeneratedLayout::knobAngleStartDeg),
@@ -59,8 +70,8 @@ RudeHypeEditor::RudeHypeEditor(RudeHypeProcessor& p)
       shoutAttach(p.apvts, "shout", shoutKnob),
       burnAttach(p.apvts, "burn", burnKnob)
 {
-    setSize(static_cast<int>(RudeHypeGeneratedLayout::canvasWidth),
-            static_cast<int>(RudeHypeGeneratedLayout::canvasHeight));
+    setSize(static_cast<int>(std::round(RudeHypeGeneratedLayout::displayWidth)),
+            static_cast<int>(std::round(RudeHypeGeneratedLayout::displayHeight)));
 
     faceplateImage = loadReferenceFaceplate();
 
@@ -81,20 +92,20 @@ RudeHypeEditor::RudeHypeEditor(RudeHypeProcessor& p)
 
 void RudeHypeEditor::resized()
 {
-    shoutKnob.setBounds(RudeHypeGeneratedLayout::shoutBounds().toNearestInt());
-    burnKnob.setBounds(RudeHypeGeneratedLayout::burnBounds().toNearestInt());
+    shoutKnob.setBounds(RudeHypeGeneratedLayout::shoutDisplayBounds().toNearestInt());
+    burnKnob.setBounds(RudeHypeGeneratedLayout::burnDisplayBounds().toNearestInt());
 }
 
 void RudeHypeEditor::paint(juce::Graphics& g)
 {
     if (faceplateImage.isValid())
     {
-        g.drawImageAt(faceplateImage, 0, 0);
+        g.drawImage(faceplateImage, getLocalBounds().toFloat());
         return;
     }
 
     g.fillAll(juce::Colour(0xff11110f));
     g.setColour(juce::Colours::red);
     g.setFont(18.0f);
-    g.drawText("RUDE HYPE reference image load failed", getLocalBounds(), juce::Justification::centred);
+    g.drawText("RUDE HYPE BinaryData load failed", getLocalBounds(), juce::Justification::centred);
 }

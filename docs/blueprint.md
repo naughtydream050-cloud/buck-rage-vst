@@ -12,6 +12,8 @@ RUDE HYPE is a plugin project, separate from BUCK_RAGE and unrelated to SPEC AI 
 - The faceplate is image-first.
 - SHOUT and BURN use cropped knob images and rotate those images directly.
 - All hit targets are measured from the reference image.
+- The editor displays the full-resolution reference at `0.42` scale to match a natural VST host footprint.
+- Knob crops are internal square images, but their visible result must be circular RGBA.
 
 ## Harness Doctrine
 
@@ -20,6 +22,7 @@ RUDE HYPE is a plugin project, separate from BUCK_RAGE and unrelated to SPEC AI 
 - Pass only report summaries, spec snippets, and log tails to Codex or external LLM review.
 - Score UI with screenshot diff and hit-area validation instead of subjective visual judgment.
 - Treat live host capture as the final UI gate.
+- Validate knob alpha separately so rectangular crop regressions fail before subjective review.
 
 ## Current Build Route
 
