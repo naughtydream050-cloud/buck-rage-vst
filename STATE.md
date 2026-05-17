@@ -1,5 +1,68 @@
 # RUDE HYPE State
 
+## 2026-05-17
+
+### Phase
+
+MAC_DISTRIBUTION_AU_COMPATIBILITY_PIPELINE
+
+### Done
+
+- Started the Mac distribution and AU compatibility pipeline.
+- Used the existing GPT consultation result as the strategy guard: AU/universal/codesign/notarization must be gated behind bundle strategy and Apple credentials.
+- Confirmed the PR branch previously had Windows VST3 and macOS arm64 VST3 success.
+- Confirmed the GitHub PR did not contain distribution PNG assets under `Resources/`.
+- Confirmed local RUDE_HYPE PNG assets exist, but they were not pushed because giant binary transfer through LLM/MCP would violate the token policy.
+- Updated CMake:
+  - VST3 on all platforms.
+  - AU only on Apple platforms.
+  - macOS deployment target `11.0`.
+  - bundle id `com.naughtydream.rudehype`.
+  - conditional `RudeHypeAssets` BinaryData target when all three PNG resources exist.
+- Added `tools/ci/validate_mac_distribution.sh`:
+  - checks VST3 bundle presence.
+  - checks AU component presence.
+  - checks `arm64` and `x86_64` architecture output.
+  - checks source assets.
+  - checks embedded BinaryData resource symbols.
+  - emits `mac-distribution-report.json`.
+- Added `tools/ci/sign_and_notarize_mac.sh`:
+  - imports Developer ID certificate when secrets exist.
+  - signs VST3 and AU.
+  - submits notarization with notarytool.
+  - staples accepted bundles.
+  - emits `mac-signing-report.json`.
+  - skips safely when Apple secrets are missing.
+- Updated GitHub Actions:
+  - Windows VST3 artifact remains.
+  - Mac universal VST3/AU candidate build added.
+  - Mac validation report artifact added.
+  - optional sign/notarize step added.
+
+### Current Gate Status
+
+- Windows VST3: previously passed.
+- macOS arm64 VST3: previously passed.
+- macOS universal VST3/AU: pipeline added, CI result pending.
+- Resource embedding: pipeline added, but distribution PNG assets still need to be committed to repo.
+- Codesign: pipeline added, requires Apple Developer secrets.
+- Notarization: pipeline added, requires Apple Developer secrets.
+- Logic/AU validation: AU build path added, real validation still pending.
+
+### Known Issues
+
+- Full Mac distribution cannot be marked ready until `Resources/faceplate_rude_hype.png`, `Resources/knob_shout.png`, and `Resources/knob_burn.png` are committed as binary assets.
+- Apple Developer credentials are not present in the repo secrets yet.
+- Real DAW host validation is still pending.
+
+### Next Priority
+
+1. Commit binary PNG resources through a non-LLM-heavy route.
+2. Re-run GitHub Actions and confirm universal VST3/AU artifacts.
+3. Add Apple secrets and rerun sign/notarization.
+4. Validate AU in Logic or via `auval`.
+5. Capture Mac host screenshots for image-first UI evidence.
+
 ## 2026-05-14
 
 ### Phase
