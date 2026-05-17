@@ -2,11 +2,11 @@
 
 ## Phase
 
-REAL_BUILD_HOST_VALIDATION_DSP_IMPLEMENTATION
+MAC_DISTRIBUTION_AU_COMPATIBILITY_PIPELINE
 
 ## Goal
 
-Complete RUDE HYPE as an AI-collaborative image-first Buck saturation plugin: image-accurate UI, circular image knobs, Buck-style melody processing, and Windows/Mac delivery.
+Move RUDE HYPE from first-stage Windows/macOS VST3 build success toward a normal Mac plugin delivery path: universal VST3/AU, embedded image resources, optional Developer ID signing, optional notarization, and host validation.
 
 ## Current Status
 
@@ -15,31 +15,31 @@ Complete RUDE HYPE as an AI-collaborative image-first Buck saturation plugin: im
 - SHOUT and BURN knob images are cropped with circular alpha.
 - Plugin editor display scale is `0.42`, while source assets remain full resolution.
 - `ImageKnob.h` rotates the actual knob image via `AffineTransform::rotation`.
-- Runtime JPEG fallback now applies a circular ARGB mask before handing knob images to the UI.
+- Runtime JPEG fallback applies a circular ARGB mask before handing knob images to the UI.
 - Default parameter values are `0.5` so the reference orientation is preserved at startup.
-- Draft PR created: `https://github.com/naughtydream050-cloud/buck-rage-vst/pull/1`.
-- GitHub Actions build passed after scale/alpha fixes and produced `RUDE HYPE.vst3`.
-- Latest scale/alpha artifact downloaded to `reports/latest/rude-hype/rude-hype-vst3-scale-alpha.zip`.
-- Implemented SHOUT as an upper-mid forwardness macro.
-- Implemented BURN as a low-safe dirty saturation macro.
-- Added `docs/dsp-preview-notes.md`.
-- Added `tools/validate_dsp_macro.mjs`.
-- GitHub Actions run `25805504329` passed after BUCK TRACK MELODY ENGINE changes.
-- Latest melody-engine artifact downloaded to `reports/latest/rude-hype/rude-hype-vst3-melody-engine.zip`.
-- Development mode moved to `MCP + GPT consultation + GitHub Actions`.
-- Codex owns implementation, file edits, harness, Actions, artifacts, and validation.
-- GPT consultation owns DSP direction, architecture review, plugin identity, Mac distribution strategy, and doctrine review.
-- GPT consultation approved staged Mac rollout: macOS VST3 first, AU/universal/codesign/notarization later behind credential gates.
+- Draft PR: `https://github.com/naughtydream050-cloud/buck-rage-vst/pull/1`.
+- Windows VST3 build has passed in GitHub Actions.
+- macOS arm64 VST3 build has passed in GitHub Actions.
+- SHOUT is implemented as an upper-mid forwardness macro.
+- BURN is implemented as a low-safe dirty saturation macro.
+- Development mode is `MCP + GPT consultation + GitHub Actions`.
+- GPT consultation approved staged Mac rollout and requires gates for AU/universal/codesign/notarization.
+- CMake now builds VST3 on all platforms and AU on Apple platforms.
+- CMake now embeds `RudeHypeAssets` only when all distribution PNGs exist.
+- GitHub Actions now includes a Mac universal VST3/AU distribution candidate job.
+- Mac validation now emits `mac-distribution-report.json`.
+- Signing/notarization now emits `mac-signing-report.json` and skips safely until Apple secrets exist.
 
-## Next
+## Active Gates
 
-1. Run GitHub Actions Windows + macOS VST3 build.
-2. Download Windows and macOS VST3 artifacts.
-3. Install or load the latest `RUDE HYPE.vst3` in a VST3 host.
-4. Smoke-test SHOUT/BURN in a host with melody material.
-5. Confirm output is forward and dense without clipping explosion.
-6. Capture a real rendered plugin screenshot from the host.
-7. Re-run screenshot diff, hit-area, knob alpha, knob rotation, and DSP macro reports.
+1. Commit real PNG assets into `Resources/` so BinaryData can embed the faceplate and circular knobs.
+2. Confirm GitHub Actions universal VST3/AU build output.
+3. Confirm `file` output includes both `arm64` and `x86_64` for VST3 and AU binaries.
+4. Confirm `mac-distribution-report.json` has no missing asset failures.
+5. Add Apple Developer secrets when ready.
+6. Re-run signing/notarization and confirm codesign, notarytool, stapler, and spctl reports.
+7. Run AU validation and real Logic scan.
+8. Host-test FL Studio Mac, Ableton Live, Reaper, and Logic.
 
 ## Collaboration Contract
 
@@ -54,5 +54,5 @@ Complete RUDE HYPE as an AI-collaborative image-first Buck saturation plugin: im
 ## Token Policy
 
 - Do not send reference PNG/JPG repeatedly to LLMs.
-- Use `ui/spec/ui-spec.json` and compact report JSON.
+- Use `ui/spec/ui-spec.json`, compact report JSON, and log tails.
 - Avoid broad Markdown scans and JUCE vendor doc scans.
