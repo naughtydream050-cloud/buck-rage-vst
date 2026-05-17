@@ -33,8 +33,14 @@ jobs:
           path: build/**/*.vst3
           if-no-files-found: error
 
-  build-macos-vst3:
+  build-macos-distribution:
     runs-on: macos-14
+    env:
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      MAC_CERTIFICATE: ${{ secrets.MAC_CERTIFICATE }}
+      MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,26 +53,46 @@ jobs:
           cmake --version
           xcodebuild -version
           xcode-select -p
+          lipo -info /usr/bin/file || true
           test -d JUCE
 
-      - name: Configure CMake
+      - name: Configure universal VST3/AU
         shell: bash
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: >-
+          cmake -B build-mac-universal
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
 
-      - name: Build VST3
+      - name: Build universal VST3/AU
         shell: bash
-        run: cmake --build build --config Release --parallel
+        run: cmake --build build-mac-universal --config Release --parallel
 
-      - name: Assert VST3 artifact
+      - name: Validate unsigned distribution candidate
         shell: bash
-        run: |
-          set -euo pipefail
-          find build -name "*.vst3" -print
-          test "$(find build -name "*.vst3" | wc -l | tr -d ' ')" -gt 0
+        run: bash tools/ci/validate_mac_distribution.sh build-mac-universal reports/mac-distribution-report.json
 
-      - name: Upload macOS VST3
+      - name: Sign and notarize when Apple secrets are present
+        shell: bash
+        run: bash tools/ci/sign_and_notarize_mac.sh build-mac-universal reports/mac-signing-report.json
+
+      - name: Upload macOS universal VST3
         uses: actions/upload-artifact@v4
         with:
-          name: RUDE-HYPE-VST3-macOS-arm64
-          path: build/**/*.vst3
+          name: RUDE-HYPE-VST3-macOS-universal
+          path: build-mac-universal/**/*.vst3
+          if-no-files-found: error
+
+      - name: Upload macOS universal AU
+        uses: actions/upload-artifact@v4
+        with:
+          name: RUDE-HYPE-AU-macOS-universal
+          path: build-mac-universal/**/*.component
+          if-no-files-found: error
+
+      - name: Upload macOS validation reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: RUDE-HYPE-macOS-distribution-reports
+          path: reports/*.json
           if-no-files-found: error
