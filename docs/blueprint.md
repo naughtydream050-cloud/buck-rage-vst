@@ -48,7 +48,7 @@ Do not send GPT large images, broad Markdown scans, full generated headers, or f
 
 ## Harness Doctrine
 
-- Keep large reference images local.
+- Keep large reference images local unless they are explicitly committed as distribution assets.
 - Generate compact report JSON files for validation.
 - Pass only report summaries, spec snippets, and log tails to Codex or external LLM review.
 - Score UI with screenshot diff and hit-area validation instead of subjective visual judgment.
@@ -66,29 +66,47 @@ Do not send GPT large images, broad Markdown scans, full generated headers, or f
 
 ## Current Build Route
 
-Local toolchain discovery did not find CMake/MSBuild, so the active build route is GitHub Actions:
+GitHub Actions is the active build route:
 
-1. Push text-only RUDE HYPE build changes to Draft PR.
-2. Let GitHub Actions build the VST3.
-3. Download the artifact.
-4. Load `RUDE HYPE.vst3` in a local host.
-5. Capture the rendered UI.
-6. Re-run screenshot diff and gate reports.
+1. Windows VST3 build.
+2. macOS universal VST3/AU candidate build.
+3. Mac distribution validation report.
+4. Optional Developer ID signing when Apple secrets are present.
+5. Optional notarization and stapling when Apple secrets are present.
+6. Artifact upload for VST3, AU, and reports.
+7. Host validation on real DAWs.
 
-## Mac Build Strategy
+## Mac Distribution Strategy
 
-Future Mac plugin delivery assumes:
+The Mac pipeline is now explicit and gated:
 
-- GitHub Actions macOS runner.
-- first-stage macOS VST3 artifact on `macos-14`.
-- later universal binary.
-- later VST3 and AU outputs.
-- later codesign.
-- later notarization.
-- later AU validation.
+- build universal binaries with `CMAKE_OSX_ARCHITECTURES="arm64;x86_64"`.
+- build AU only on Apple platforms.
+- validate universal architecture with `file` output.
+- validate source asset presence.
+- validate embedded BinaryData symbols.
+- emit `mac-distribution-report.json`.
+- skip signing/notarization safely when Apple secrets are absent.
+- sign, notarize, staple, and assess when Apple secrets are present.
 
-Mac pipeline work must be reviewed through GPT consultation before implementation. The first consultation approved a staged rollout: VST3 on macOS first, then AU/universal/codesign/notarization only after stable bundle IDs, packaging, and Apple Developer credentials exist.
+## Distribution Resource Rule
 
-## Distribution Note
+A Mac-ready RUDE HYPE build must embed these assets:
 
-The current CI route avoids binary image payloads by loading `C:\Users\razor\Downloads\S__45752322.jpg` at runtime when embedded BinaryData is unavailable. This is acceptable for the lightweight validation loop, but a distribution-ready build should embed `faceplate_rude_hype.png`, `knob_shout.png`, and `knob_burn.png`.
+- `Resources/faceplate_rude_hype.png`
+- `Resources/knob_shout.png`
+- `Resources/knob_burn.png`
+
+The previous runtime fallback to `C:\Users\razor\Downloads\S__45752322.jpg` is allowed only for local lightweight validation. It is not a distribution strategy and must not be the final Mac path.
+
+## Release Readiness
+
+A PR can be treated as Mac distribution ready only when all are true:
+
+- Windows VST3 artifact exists.
+- macOS universal VST3 artifact exists.
+- macOS universal AU artifact exists.
+- `mac-distribution-report.json` has no missing asset or architecture failures.
+- `mac-signing-report.json` is passed, not skipped.
+- AU validation or Logic scan passes.
+- host screenshots confirm faceplate and circular knob alpha.
