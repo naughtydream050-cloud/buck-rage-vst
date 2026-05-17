@@ -1,5 +1,40 @@
 # RUDE HYPE State
 
+## 2026-05-17 - Resource Asset Commit
+
+### Phase
+
+RESOURCE_ASSET_COMMIT_MAC_EMBEDDING_VALIDATION
+
+### Done
+
+- Confirmed the Windows-validated RUDE HYPE image assets exist locally:
+  - `projects/RUDE_HYPE/Resources/faceplate_rude_hype.png`
+  - `projects/RUDE_HYPE/Resources/knob_shout.png`
+  - `projects/RUDE_HYPE/Resources/knob_burn.png`
+- Copied those exact PNG files into the GitHub PR repo `Resources/` directory.
+- Preserved the image-first rule:
+  - faceplate PNG remains visual truth.
+  - knob PNG files remain the rotating assets.
+  - JUCE still consumes BinaryData and does not repaint the texture.
+- Confirmed CMake already registers the assets through `RudeHypeAssets` when all three PNGs are present.
+
+### Expected Gate Change
+
+- `mac-distribution-report.json` should move from `blocked` to `passed` for:
+  - `source_assets_missing`
+  - `embedded_assets_missing`
+- Signing/notarization remains gated until Apple Developer secrets are configured.
+
+### Next Priority
+
+Re-run GitHub Actions and confirm regenerated artifacts:
+
+1. `RUDE-HYPE-VST3-Windows`
+2. `RUDE-HYPE-VST3-macOS-universal`
+3. `RUDE-HYPE-AU-macOS-universal`
+4. `RUDE-HYPE-macOS-distribution-reports`
+
 ## 2026-05-17
 
 ### Phase

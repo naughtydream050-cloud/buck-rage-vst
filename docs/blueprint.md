@@ -97,7 +97,7 @@ A Mac-ready RUDE HYPE build must embed these assets:
 - `Resources/knob_shout.png`
 - `Resources/knob_burn.png`
 
-The previous runtime fallback to `C:\Users\razor\Downloads\S__45752322.jpg` is allowed only for local lightweight validation. It is not a distribution strategy and must not be the final Mac path.
+These assets are the Git-managed copies of the Windows-validated RUDE HYPE UI images. The previous runtime fallback to `C:\Users\razor\Downloads\S__45752322.jpg` is allowed only for local lightweight validation. It is not a distribution strategy and must not be the final Mac path.
 
 ## Release Readiness
 
