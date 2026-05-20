@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "score": 10,
+  "checks": {
+    "noHeapAllocationInProcessBlock": true,
+    "denormalProtection": true,
+    "dcBlocker": true,
+    "outputCeiling": true
+  },
+  "findings": []
+}

@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "score": 10,
+  "knobs": [
+    {
+      "id": "DIRT",
+      "asset": "Resources/knob_dirt.png",
+      "png": {
+        "width": 224,
+        "height": 224,
+        "bitDepth": 8,
+        "colorType": 6,
+        "bytes": 70155,
+        "sha256": "76a4e775c313a85c2e9f2836f519674786ee83622fd76f242d4335871f1510b0"
+      },
+      "center": {
+        "x": 322,
+        "y": 568
+      },
+      "radius": 112,
+      "bounds": {
+        "x": 210,
+        "y": 456,
+        "width": 224,
+        "height": 224
+      }
+    },
+    {
+      "id": "CRUSH",
+      "asset": "Resources/knob_crush.png",
+      "png": {
+        "width": 224,
+        "height": 224,
+        "bitDepth": 8,
+        "colorType": 6,
+        "bytes": 70261,
+        "sha256": "b8861199b621717be5809ae3e966d101aef30f0751188cba8e2c9fb8b11cffb9"
+      },
+      "center": {
+        "x": 724,
+        "y": 568
+      },
+      "radius": 112,
+      "bounds": {
+        "x": 612,
+        "y": 456,
+        "width": 224,
+        "height": 224
+      }
+    },
+    {
+      "id": "WOBBLE",
+      "asset": "Resources/knob_wobble.png",
+      "png": {
+        "width": 224,
+        "height": 224,
+        "bitDepth": 8,
+        "colorType": 6,
+        "bytes": 70194,
+        "sha256": "2d99d06d582961c6350ada3a9e4f2dcabeb8f719c09852efa060e23b9a6502c8"
+      },
+      "center": {
+        "x": 1126,
+        "y": 568
+      },
+      "radius": 112,
+      "bounds": {
+        "x": 1014,
+        "y": 456,
+        "width": 224,
+        "height": 224
+      }
+    }
+  ],
+  "findings": []
+}

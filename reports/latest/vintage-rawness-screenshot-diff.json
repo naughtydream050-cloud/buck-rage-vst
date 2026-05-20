@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "score": 10,
+  "similarity": 1,
+  "rms": 0,
+  "note": "Bootstrap diff compares reference.png and faceplate_vintage_rawness.png until a live host screenshot exists."
+}

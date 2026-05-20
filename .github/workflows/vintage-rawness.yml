@@ -1,0 +1,46 @@
+name: Build VINTAGE RAWNESS
+
+on:
+  push:
+    branches: [main, "codex/**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Toolchain check
+        shell: pwsh
+        run: |
+          cmake --version
+          if (!(Test-Path -LiteralPath "JUCE") -and !(Test-Path -LiteralPath "projects/BUCK_RAGE/JUCE")) { throw "JUCE source is missing" }
+
+      - name: Run reports
+        shell: pwsh
+        run: node projects/VINTAGE_RAWNESS/tools/validate_vintage_rawness.mjs
+
+      - name: Configure CMake
+        run: cmake -S projects/VINTAGE_RAWNESS -B build-vintage-rawness -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build-vintage-rawness --config Release --parallel
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: VINTAGE-RAWNESS-VST3-Windows
+          path: build-vintage-rawness/**/*.vst3
+          if-no-files-found: error
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: VINTAGE-RAWNESS-reports-Windows
+          path: reports/latest/vintage-rawness-*.json
+          if-no-files-found: error

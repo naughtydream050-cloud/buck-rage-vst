@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "score": 10,
+  "canvas": {
+    "width": 1448,
+    "height": 1086,
+    "aspectRatio": 1.3333333333
+  },
+  "display": {
+    "scale": 0.5,
+    "width": 724,
+    "height": 543
+  },
+  "reference": {
+    "width": 1448,
+    "height": 1086,
+    "bitDepth": 8,
+    "colorType": 2,
+    "bytes": 2988694,
+    "sha256": "a98e911c7b0563af0ec0b7d3c8f90490aede7f523ff17925b9364f9545d20c4e"
+  },
+  "faceplate": {
+    "width": 1448,
+    "height": 1086,
+    "bitDepth": 8,
+    "colorType": 2,
+    "bytes": 2988694,
+    "sha256": "a98e911c7b0563af0ec0b7d3c8f90490aede7f523ff17925b9364f9545d20c4e"
+  },
+  "findings": []
+}
