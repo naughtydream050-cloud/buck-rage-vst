@@ -49,13 +49,32 @@ for asset in Resources/faceplate_rude_hype.png Resources/knob_shout.png Resource
   fi
 done
 
+binary_data_header="$(find "$build_dir" -path "*/juce_binarydata_RudeHypeAssets/JuceLibraryCode/BinaryData.h" -type f | head -n 1 || true)"
+binary_data_objects="$(find "$build_dir" -path "*/CMakeFiles/RudeHypeAssets.dir/*BinaryData*.o" -type f | wc -l | tr -d ' ')"
 embedded_assets="unknown"
-if [[ -n "$vst3_bundle" && -f "$vst3_bundle/Contents/MacOS/RUDE HYPE" ]]; then
-  if strings "$vst3_bundle/Contents/MacOS/RUDE HYPE" | grep -q "faceplate_rude_hype_png"; then
-    embedded_assets="present"
-  else
-    embedded_assets="missing"
-  fi
+if [[ -n "$binary_data_header" ]]; then
+  required_binary_names=(
+    "faceplate_rude_hype_png"
+    "knob_shout_png"
+    "knob_burn_png"
+  )
+  embedded_assets="present"
+  for binary_name in "${required_binary_names[@]}"; do
+    if ! grep -q "$binary_name" "$binary_data_header"; then
+      embedded_assets="missing"
+      notes+=("missing_binarydata_symbol=${binary_name}")
+    fi
+  done
+  notes+=("binarydata_header=${binary_data_header}")
+  notes+=("binarydata_objects=${binary_data_objects}")
+else
+  embedded_assets="missing"
+  notes+=("missing_binarydata_header")
+fi
+
+if [[ "$binary_data_objects" -lt 1 ]]; then
+  embedded_assets="missing"
+  notes+=("missing_binarydata_objects")
 fi
 
 if [[ "$asset_count" -lt 3 ]]; then
