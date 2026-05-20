@@ -1,4 +1,4 @@
-name: Build BUCK RAGE
+name: Build RUDE HYPE
 
 on:
   push:
@@ -14,6 +14,12 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Toolchain check
+        shell: pwsh
+        run: |
+          cmake --version
+          if (!(Test-Path -LiteralPath "JUCE")) { throw "JUCE submodule is missing" }
+
       - name: Configure CMake
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
@@ -23,24 +29,70 @@ jobs:
       - name: Upload VST3
         uses: actions/upload-artifact@v4
         with:
-          name: BUCK-RAGE-VST3-Windows
+          name: RUDE-HYPE-VST3-Windows
           path: build/**/*.vst3
-          if-no-files-found: warn
+          if-no-files-found: error
 
-      - name: Post artifact URL to Job Summary
-        if: always()
+  build-macos-distribution:
+    runs-on: macos-14
+    env:
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      MAC_CERTIFICATE: ${{ secrets.MAC_CERTIFICATE }}
+      MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Toolchain check
         shell: bash
         run: |
-          echo "## ✅ Build #${{ github.run_number }} Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Download VST3" >> $GITHUB_STEP_SUMMARY
-          echo "[⬇️ BUCK-RAGE-VST3-Windows](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Run | \`#${{ github.run_number }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Triggered by | \`${{ github.actor }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> スマホからでも上記リンクを開くと artifact が一覧表示される" >> $GITHUB_STEP_SUMMARY
+          set -euo pipefail
+          cmake --version
+          xcodebuild -version
+          xcode-select -p
+          lipo -info /usr/bin/file || true
+          test -d JUCE
+
+      - name: Configure universal VST3/AU
+        shell: bash
+        run: >-
+          cmake -B build-mac-universal
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+
+      - name: Build universal VST3/AU
+        shell: bash
+        run: cmake --build build-mac-universal --config Release --parallel
+
+      - name: Validate unsigned distribution candidate
+        shell: bash
+        run: bash tools/ci/validate_mac_distribution.sh build-mac-universal reports/mac-distribution-report.json
+
+      - name: Sign and notarize when Apple secrets are present
+        shell: bash
+        run: bash tools/ci/sign_and_notarize_mac.sh build-mac-universal reports/mac-signing-report.json
+
+      - name: Upload macOS universal VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: RUDE-HYPE-VST3-macOS-universal
+          path: build-mac-universal/**/*.vst3
+          if-no-files-found: error
+
+      - name: Upload macOS universal AU
+        uses: actions/upload-artifact@v4
+        with:
+          name: RUDE-HYPE-AU-macOS-universal
+          path: build-mac-universal/**/*.component
+          if-no-files-found: error
+
+      - name: Upload macOS validation reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: RUDE-HYPE-macOS-distribution-reports
+          path: reports/*.json
+          if-no-files-found: error

@@ -1,29 +1,28 @@
 #pragma once
 #include <JuceHeader.h>
+#include "ImageKnob.h"
 #include "PluginProcessor.h"
-#include "KnobLookAndFeel.h"
 
-class BuckRageEditor : public juce::AudioProcessorEditor,
-                       private juce::Timer
+class RudeHypeEditor final : public juce::AudioProcessorEditor
 {
 public:
-    explicit BuckRageEditor(BuckRageProcessor&);
-    ~BuckRageEditor() override;
+    explicit RudeHypeEditor(RudeHypeProcessor&);
+    ~RudeHypeEditor() override = default;
 
     void paint(juce::Graphics&) override;
     void resized() override;
 
 private:
-    void timerCallback() override {}
+    RudeHypeProcessor& proc;
 
-    BuckRageProcessor& proc;
-    SilverKnobLAF knobLAF;
+    ImageKnobSlider shoutKnob;
+    ImageKnobSlider burnKnob;
 
-    juce::Slider buckKnob, rageKnob;
     using Attach = juce::AudioProcessorValueTreeState::SliderAttachment;
-    Attach buckAttach, rageAttach;
+    Attach shoutAttach;
+    Attach burnAttach;
 
-    juce::Image bgImage;
+    juce::Image faceplateImage;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BuckRageEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RudeHypeEditor)
 };

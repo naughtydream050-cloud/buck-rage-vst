@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "plugin": "RUDE_HYPE",
+  "sourceOfTruth": "ui/spec/ui-spec.json",
+  "canvas": {
+    "width": 1592,
+    "height": 988,
+    "displayScale": 0.42,
+    "displayWidth": 668.64,
+    "displayHeight": 414.96,
+    "aspectRatio": 1.6113360324
+  },
+  "assets": {
+    "faceplate": {
+      "path": "Resources/faceplate_rude_hype.png",
+      "role": "full-ui-reference-background",
+      "intrinsicWidth": 1592,
+      "intrinsicHeight": 988
+    },
+    "shoutKnob": {
+      "path": "Resources/knob_shout.png",
+      "role": "rotating-image-knob",
+      "intrinsicWidth": 390,
+      "intrinsicHeight": 390,
+      "format": "RGBA PNG",
+      "alphaPolicy": "outside-circle-fully-transparent"
+    },
+    "burnKnob": {
+      "path": "Resources/knob_burn.png",
+      "role": "rotating-image-knob",
+      "intrinsicWidth": 382,
+      "intrinsicHeight": 382,
+      "format": "RGBA PNG",
+      "alphaPolicy": "outside-circle-fully-transparent"
+    }
+  },
+  "controls": [
+    {
+      "id": "SHOUT",
+      "parameterId": "shout",
+      "renderer": "image-knob",
+      "bounds": { "x": 205, "y": 378, "width": 390, "height": 390 },
+      "displayBounds": { "x": 86.1, "y": 158.76, "width": 163.8, "height": 163.8 },
+      "center": { "x": 400, "y": 573 },
+      "radius": 195,
+      "angleRange": { "startDeg": -150, "endDeg": 150, "rangeDeg": 300 },
+      "doctrine": ["perfect-circle", "rgba-alpha-mask", "image-knob-rotates-as-captured"]
+    },
+    {
+      "id": "BURN",
+      "parameterId": "burn",
+      "renderer": "image-knob",
+      "bounds": { "x": 1010, "y": 380, "width": 382, "height": 382 },
+      "displayBounds": { "x": 424.2, "y": 159.6, "width": 160.44, "height": 160.44 },
+      "center": { "x": 1201, "y": 571 },
+      "radius": 191,
+      "angleRange": { "startDeg": -150, "endDeg": 150, "rangeDeg": 300 },
+      "doctrine": ["perfect-circle", "rgba-alpha-mask", "image-knob-rotates-as-captured"]
+    }
+  ],
+  "generation": {
+    "pluginEditor": {
+      "setSize": { "width": 669, "height": 415 },
+      "displayScale": 0.42,
+      "strategy": "draw scaled full reference faceplate, then draw scaled rotating image knobs from circular-alpha crops"
+    }
+  },
+  "validation": {
+    "pluginEditorIsImplementationOnly": true,
+    "knobAlphaRequired": true,
+    "knobRotationRequired": true,
+    "screenshotDiffRequired": true
+  }
+}
