@@ -30,16 +30,19 @@ Move RUDE HYPE from first-stage Windows/macOS VST3 build success toward a normal
 - Mac validation now emits `mac-distribution-report.json`.
 - Signing/notarization now emits `mac-signing-report.json` and skips safely until Apple secrets exist.
 - Windows-validated PNG assets are being committed to `Resources/` so Mac VST3/AU bundles can embed the same faceplate and rotating knob images.
+- Windows-validated PNG assets are now committed and pushed to the PR branch.
+- GitHub Actions run `26140123700` passed with Windows VST3, macOS universal VST3, macOS universal AU, and macOS report artifacts.
+- `mac-distribution-report.json` passed with `distributionReady=true`, `embeddedAssets=present`, and `assetCount=3`.
+- macOS VST3 and AU binaries validate as universal `x86_64 + arm64`.
 
 ## Active Gates
 
-1. Confirm GitHub Actions universal VST3/AU build output after the asset commit.
-2. Confirm `file` output includes both `arm64` and `x86_64` for VST3 and AU binaries.
-3. Confirm `mac-distribution-report.json` has no missing asset or embedded asset failures.
-4. Add Apple Developer secrets when ready.
+1. Host-test the macOS universal VST3 in FL Studio Mac, Ableton Live, or Reaper.
+2. Host-test the macOS universal AU in Logic.
+3. Run AU validation and real Logic scan when a Mac host is available.
+4. Add Apple Developer secrets when ready for public distribution.
 5. Re-run signing/notarization and confirm codesign, notarytool, stapler, and spctl reports.
-6. Run AU validation and real Logic scan.
-7. Host-test FL Studio Mac, Ableton Live, Reaper, and Logic.
+6. Capture host screenshots to confirm faceplate rendering and circular knob alpha.
 
 ## Collaboration Contract
 

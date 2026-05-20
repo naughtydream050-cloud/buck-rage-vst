@@ -78,13 +78,13 @@ GitHub Actions is the active build route:
 
 ## Mac Distribution Strategy
 
-The Mac pipeline is now explicit and gated:
+The Mac pipeline is explicit and gated:
 
 - build universal binaries with `CMAKE_OSX_ARCHITECTURES="arm64;x86_64"`.
 - build AU only on Apple platforms.
 - validate universal architecture with `file` output.
 - validate source asset presence.
-- validate embedded BinaryData symbols.
+- validate generated BinaryData and compiled asset objects.
 - emit `mac-distribution-report.json`.
 - skip signing/notarization safely when Apple secrets are absent.
 - sign, notarize, staple, and assess when Apple secrets are present.
@@ -99,6 +99,8 @@ A Mac-ready RUDE HYPE build must embed these assets:
 
 These assets are the Git-managed copies of the Windows-validated RUDE HYPE UI images. The previous runtime fallback to `C:\Users\razor\Downloads\S__45752322.jpg` is allowed only for local lightweight validation. It is not a distribution strategy and must not be the final Mac path.
 
+GitHub Actions run `26140123700` passed resource embedding validation with `embeddedAssets=present`, `assetCount=3`, and universal VST3/AU outputs. The artifacts are test-distribution ready for Mac users who can install unsigned plugins. Public distribution still requires Developer ID signing, notarization, stapling, and host validation.
+
 ## Release Readiness
 
 A PR can be treated as Mac distribution ready only when all are true:
@@ -107,6 +109,6 @@ A PR can be treated as Mac distribution ready only when all are true:
 - macOS universal VST3 artifact exists.
 - macOS universal AU artifact exists.
 - `mac-distribution-report.json` has no missing asset or architecture failures.
-- `mac-signing-report.json` is passed, not skipped.
+- `mac-signing-report.json` is passed, not skipped, for public distribution.
 - AU validation or Logic scan passes.
 - host screenshots confirm faceplate and circular knob alpha.

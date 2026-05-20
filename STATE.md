@@ -35,6 +35,41 @@ Re-run GitHub Actions and confirm regenerated artifacts:
 3. `RUDE-HYPE-AU-macOS-universal`
 4. `RUDE-HYPE-macOS-distribution-reports`
 
+## 2026-05-20 - Resource Embedding Passed
+
+### Phase
+
+RESOURCE_ASSET_COMMIT_MAC_EMBEDDING_VALIDATION
+
+### Done
+
+- Pushed the Windows-validated RUDE HYPE PNG assets to the GitHub PR branch.
+- Fixed macOS resource embedding validation to check generated JUCE BinaryData and compiled asset objects instead of brittle final-binary string retention.
+- GitHub Actions run `26140123700` passed:
+  - Windows VST3 artifact uploaded.
+  - macOS universal VST3 artifact uploaded.
+  - macOS universal AU artifact uploaded.
+  - macOS distribution reports artifact uploaded.
+- macOS distribution validation passed:
+  - `distributionReady=true`
+  - `embeddedAssets=present`
+  - `assetCount=3`
+  - VST3 binary is universal `x86_64 + arm64`
+  - AU binary is universal `x86_64 + arm64`
+
+### Current Artifact Links
+
+- Windows VST3: `https://github.com/naughtydream050-cloud/buck-rage-vst/actions/runs/26140123700/artifacts/7100955034`
+- macOS universal VST3: `https://github.com/naughtydream050-cloud/buck-rage-vst/actions/runs/26140123700/artifacts/7100937555`
+- macOS universal AU: `https://github.com/naughtydream050-cloud/buck-rage-vst/actions/runs/26140123700/artifacts/7100937977`
+- macOS reports: `https://github.com/naughtydream050-cloud/buck-rage-vst/actions/runs/26140123700/artifacts/7100938163`
+
+### Known Issues
+
+- Apple Developer signing/notarization is still skipped because Apple secrets are not configured.
+- AU build exists, but Logic/auval host validation is not yet proven on a real Mac.
+- These artifacts are suitable for test distribution; final public Mac distribution still needs Developer ID signing, notarization, stapling, and host validation.
+
 ## 2026-05-17
 
 ### Phase
