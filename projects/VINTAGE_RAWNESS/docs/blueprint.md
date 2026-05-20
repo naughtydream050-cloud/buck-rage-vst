@@ -32,3 +32,5 @@ Tester packages will be created only after build artifacts exist:
 - `deliverables/VINTAGE_RAWNESS_MAC_FL_STUDIO_TEST/`
 
 Current local shell does not expose `cmake` or `msbuild`, so build artifacts must come from GitHub Actions or a shell with the JUCE/CMake/MSBuild toolchain on PATH.
+
+GitHub Actions run `26168487170` produced `VINTAGE-RAWNESS-VST3-Windows`. The next gate is FL Studio scan and live screenshot capture. macOS remains deferred.

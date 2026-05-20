@@ -23,10 +23,14 @@ Create a new image-first three-knob plugin with rotating DIRT/CRUSH/WOBBLE knobs
 - GitHub Actions workflow added for Windows VST3 first.
 - macOS VST3/AU is intentionally deferred until the Windows VST3, host UI capture, and local quality gates are stable.
 - Local build is blocked because `cmake` and `msbuild` are not visible in the current shell.
+- GitHub Actions Windows build passed on run `26168487170`.
+- Artifact `VINTAGE-RAWNESS-VST3-Windows` was generated and downloaded.
+- Local tester copy exists at `deliverables/VINTAGE_RAWNESS_WINDOWS_FL_STUDIO_TEST/VINTAGE RAWNESS.vst3`.
+- FL Studio 2025 was detected, but copying to `C:\Program Files\Common Files\VST3` is blocked by administrator permission.
 
 ## Next
 
-1. Run GitHub Actions for Windows VST3.
-2. Package the Windows tester deliverable after the artifact is produced.
+1. Install the VST3 into a FL Studio-scanned folder with administrator permission or add the tester folder as a custom plugin path.
+2. Run FL Studio plugin scan.
 3. Capture a live host screenshot and replace bootstrap screenshot diff with real rendered evidence.
 4. Revisit macOS VST3/AU after Windows host validation.

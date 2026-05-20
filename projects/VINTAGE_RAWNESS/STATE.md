@@ -28,11 +28,16 @@ VINTAGE_RAWNESS_IMAGE_FIRST_UI_ROTATING_KNOBS_BUILD_PIPELINE
   - `reports/latest/vintage-rawness-screenshot-diff.json`
 - Added GitHub Actions workflow for Windows VST3 first.
 - Deferred macOS VST3/AU until Windows host validation and live screenshot evidence are stable.
+- GitHub Actions run `26168487170` passed the Windows VST3 build.
+- Downloaded `VINTAGE-RAWNESS-VST3-Windows` artifact.
+- Verified extracted VST3 binary is non-empty: `6948352` bytes.
+- Copied the VST3 bundle into `deliverables/VINTAGE_RAWNESS_WINDOWS_FL_STUDIO_TEST/`.
+- Detected FL Studio 2025 at `C:\Program Files\Image-Line\FL Studio 2025\FL64.exe`.
 
 ### Known Issues
 
 - Local CMake/MSBuild are not visible in the current Windows shell.
-- GitHub Actions Windows build has not been run yet for VINTAGE RAWNESS.
 - macOS VST3/AU is intentionally deferred.
 - Live host screenshot validation is pending.
-- Tester packages are pending until build artifacts exist.
+- Common VST3 install is blocked by administrator permission in the current shell.
+- FL Studio scan is pending until the plugin is copied to a scanned folder or the tester folder is added as a custom path.

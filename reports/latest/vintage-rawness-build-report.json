@@ -1,0 +1,44 @@
+﻿{
+    "schemaVersion":  1,
+    "generatedAt":  "2026-05-20T14:27:06.5481067Z",
+    "project":  "projects/VINTAGE_RAWNESS",
+    "phase":  "WINDOWS_VST3_FIRST_TOKEN_SAFE_BUILD_LOOP",
+    "githubActions":  {
+                          "runId":  26168487170,
+                          "status":  "passed",
+                          "job":  "build-windows",
+                          "artifactName":  "VINTAGE-RAWNESS-VST3-Windows",
+                          "artifactId":  7112605376,
+                          "artifactDigest":  "sha256:a60f448ce53b123c2a1be204c1f8ffd6820168444ce84a2bc191b0c742fa6a45",
+                          "reportsArtifactName":  "VINTAGE-RAWNESS-reports-Windows",
+                          "reportsArtifactId":  7112605920
+                      },
+    "localArtifact":  {
+                          "zip":  "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\reports\\latest\\vintage-rawness\\VINTAGE-RAWNESS-VST3-Windows.zip",
+                          "extractedBundle":  "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\reports\\latest\\vintage-rawness\\artifact-windows\\VintageRawness_artefacts\\Release\\VST3\\VINTAGE RAWNESS.vst3",
+                          "binary":  "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\reports\\latest\\vintage-rawness\\artifact-windows\\VintageRawness_artefacts\\Release\\VST3\\VINTAGE RAWNESS.vst3\\Contents\\x86_64-win\\VINTAGE RAWNESS.vst3",
+                          "binaryBytes":  6948352
+                      },
+    "testerCopy":  {
+                       "path":  "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\deliverables\\VINTAGE_RAWNESS_WINDOWS_FL_STUDIO_TEST\\VINTAGE RAWNESS.vst3",
+                       "binaryBytes":  6948352
+                   },
+    "flStudio":  {
+                     "detected":  true,
+                     "path":  "C:\\Program Files\\Image-Line\\FL Studio 2025\\FL64.exe",
+                     "pluginManager":  "C:\\Program Files\\Image-Line\\FL Studio 2025\\System\\Tools\\Plugin Manager\\PluginManager.exe",
+                     "commonVst3Install":  "blocked-permission",
+                     "commonVst3Path":  "C:\\Program Files\\Common Files\\VST3\\VINTAGE RAWNESS.vst3",
+                     "hostValidation":  "blocked-install-permission"
+                 },
+    "julesSummary":  null,
+    "blockers":  [
+                     "Common VST3 install requires administrator permission or FL Studio custom plugin path scan.",
+                     "Live FL Studio scan and screenshot are pending."
+                 ],
+    "nextActions":  [
+                        "Install/copy VST3 to a FL Studio-scanned folder with admin permission or add tester folder as a custom plugin path.",
+                        "Run FL Studio plugin scan.",
+                        "Capture projects/VINTAGE_RAWNESS/ui/rendered/rendered.png and rerun screenshot diff."
+                    ]
+}
