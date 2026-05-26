@@ -27,10 +27,14 @@ Create a new image-first three-knob plugin with rotating DIRT/CRUSH/WOBBLE knobs
 - Artifact `VINTAGE-RAWNESS-VST3-Windows` was generated and downloaded.
 - Local tester copy exists at `deliverables/VINTAGE_RAWNESS_WINDOWS_FL_STUDIO_TEST/VINTAGE RAWNESS.vst3`.
 - FL Studio 2025 was detected, but copying to `C:\Program Files\Common Files\VST3` is blocked by administrator permission.
+- Preset button press feedback was strengthened after host review.
+- GitHub Actions Windows build passed again on run `26452410502`.
+- Updated tester zip now contains the press-feedback VST3 build.
 
 ## Next
 
-1. Install the VST3 into a FL Studio-scanned folder with administrator permission or add the tester folder as a custom plugin path.
-2. Run FL Studio plugin scan.
-3. Capture a live host screenshot and replace bootstrap screenshot diff with real rendered evidence.
-4. Revisit macOS VST3/AU after Windows host validation.
+1. Install the updated VST3 into a FL Studio-scanned folder with administrator permission or add the tester folder as a custom plugin path.
+2. Confirm preset buttons visibly depress on mouse down.
+3. Run FL Studio plugin scan.
+4. Capture a live host screenshot and replace bootstrap screenshot diff with real rendered evidence.
+5. Revisit macOS VST3/AU after Windows host validation.

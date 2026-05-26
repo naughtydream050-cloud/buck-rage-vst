@@ -1,27 +1,30 @@
 ﻿{
     "schemaVersion":  1,
-    "generatedAt":  "2026-05-20T14:27:06.5481067Z",
+    "generatedAt":  "2026-05-26T14:02:04.2980511Z",
     "project":  "projects/VINTAGE_RAWNESS",
     "phase":  "WINDOWS_VST3_FIRST_TOKEN_SAFE_BUILD_LOOP",
     "githubActions":  {
-                          "runId":  26168487170,
+                          "runId":  26452410502,
                           "status":  "passed",
                           "job":  "build-windows",
                           "artifactName":  "VINTAGE-RAWNESS-VST3-Windows",
-                          "artifactId":  7112605376,
-                          "artifactDigest":  "sha256:a60f448ce53b123c2a1be204c1f8ffd6820168444ce84a2bc191b0c742fa6a45",
+                          "artifactId":  7216509217,
+                          "artifactDigest":  "sha256:023cfabe9a5353fb95d9d0517ba884c3cc5c0bd3b82a05914384e12665b2a34c",
                           "reportsArtifactName":  "VINTAGE-RAWNESS-reports-Windows",
-                          "reportsArtifactId":  7112605920
+                          "reportsArtifactId":  7216509715,
+                          "change":  "preset button press feedback overlay"
                       },
     "localArtifact":  {
-                          "zip":  "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\reports\\latest\\vintage-rawness\\VINTAGE-RAWNESS-VST3-Windows.zip",
-                          "extractedBundle":  "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\reports\\latest\\vintage-rawness\\artifact-windows\\VintageRawness_artefacts\\Release\\VST3\\VINTAGE RAWNESS.vst3",
-                          "binary":  "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\reports\\latest\\vintage-rawness\\artifact-windows\\VintageRawness_artefacts\\Release\\VST3\\VINTAGE RAWNESS.vst3\\Contents\\x86_64-win\\VINTAGE RAWNESS.vst3",
-                          "binaryBytes":  6948352
+                          "zip":  "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\reports\\latest\\vintage-rawness\\VINTAGE-RAWNESS-VST3-Windows-preset-feedback.zip",
+                          "extractedBundle":  "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\reports\\latest\\vintage-rawness\\artifact-windows-preset-feedback\\VintageRawness_artefacts\\Release\\VST3\\VINTAGE RAWNESS.vst3",
+                          "binary":  "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\reports\\latest\\vintage-rawness\\artifact-windows-preset-feedback\\VintageRawness_artefacts\\Release\\VST3\\VINTAGE RAWNESS.vst3\\Contents\\x86_64-win\\VINTAGE RAWNESS.vst3",
+                          "binaryBytes":  6948864
                       },
     "testerCopy":  {
                        "path":  "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\deliverables\\VINTAGE_RAWNESS_WINDOWS_FL_STUDIO_TEST\\VINTAGE RAWNESS.vst3",
-                       "binaryBytes":  6948352
+                       "binaryBytes":  6948864,
+                       "zip":  "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\deliverables\\VINTAGE_RAWNESS_WINDOWS_FL_STUDIO_TEST.zip",
+                       "zipBytes":  4776695
                    },
     "flStudio":  {
                      "detected":  true,

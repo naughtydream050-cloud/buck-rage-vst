@@ -33,6 +33,9 @@ VINTAGE_RAWNESS_IMAGE_FIRST_UI_ROTATING_KNOBS_BUILD_PIPELINE
 - Verified extracted VST3 binary is non-empty: `6948352` bytes.
 - Copied the VST3 bundle into `deliverables/VINTAGE_RAWNESS_WINDOWS_FL_STUDIO_TEST/`.
 - Detected FL Studio 2025 at `C:\Program Files\Image-Line\FL Studio 2025\FL64.exe`.
+- Fixed preset button feedback so pressed buttons visibly sink with a darker inset and bottom highlight.
+- GitHub Actions run `26452410502` passed the updated Windows VST3 build.
+- Replaced the tester VST3 and zip with the updated artifact.
 
 ### Known Issues
 
@@ -41,3 +44,4 @@ VINTAGE_RAWNESS_IMAGE_FIRST_UI_ROTATING_KNOBS_BUILD_PIPELINE
 - Live host screenshot validation is pending.
 - Common VST3 install is blocked by administrator permission in the current shell.
 - FL Studio scan is pending until the plugin is copied to a scanned folder or the tester folder is added as a custom path.
+- Host confirmation of the new preset press motion is pending.
