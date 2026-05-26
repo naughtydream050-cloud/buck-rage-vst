@@ -23,13 +23,54 @@ public:
         if (!selected && !isMouseOverButton && !isButtonDown)
             return;
 
-        const auto bounds = getLocalBounds().toFloat().reduced(2.0f);
-        const auto alpha = selected ? 0.26f : (isButtonDown ? 0.18f : 0.12f);
-        g.setColour(juce::Colour::fromFloatRGBA(0.85f, 0.82f, 0.70f, alpha));
-        g.drawRoundedRectangle(bounds, 4.0f, selected ? 2.0f : 1.5f);
+        auto bounds = getLocalBounds().toFloat().reduced(kOuterInset);
+
+        if (isButtonDown)
+            bounds = bounds.translated(0.0f, kPressedOffsetY).reduced(kPressedInset);
+
+        const auto fillAlpha = isButtonDown ? kPressedFillAlpha : (selected ? kSelectedFillAlpha : kHoverFillAlpha);
+        const auto strokeAlpha = isButtonDown ? kPressedStrokeAlpha : (selected ? kSelectedStrokeAlpha : kHoverStrokeAlpha);
+
+        g.setColour(juce::Colour::fromFloatRGBA(0.08f, 0.07f, 0.06f, isButtonDown ? kPressedShadowAlpha : 0.0f));
+        if (isButtonDown)
+            g.fillRoundedRectangle(bounds.translated(0.0f, -kPressedOffsetY), kCornerRadius);
+
+        g.setColour(juce::Colour::fromFloatRGBA(0.86f, 0.82f, 0.68f, fillAlpha));
+        g.fillRoundedRectangle(bounds, kCornerRadius);
+
+        g.setColour(juce::Colour::fromFloatRGBA(0.92f, 0.88f, 0.70f, strokeAlpha));
+        g.drawRoundedRectangle(bounds, kCornerRadius, isButtonDown ? kPressedStrokeWidth : kStrokeWidth);
+
+        if (isButtonDown)
+        {
+            g.setColour(juce::Colour::fromFloatRGBA(0.0f, 0.0f, 0.0f, kPressedTopShadeAlpha));
+            g.drawLine(bounds.getX() + 4.0f, bounds.getY() + 2.0f,
+                       bounds.getRight() - 4.0f, bounds.getY() + 2.0f,
+                       kPressedStrokeWidth);
+            g.setColour(juce::Colour::fromFloatRGBA(1.0f, 0.94f, 0.76f, kPressedBottomHighlightAlpha));
+            g.drawLine(bounds.getX() + 4.0f, bounds.getBottom() - 2.0f,
+                       bounds.getRight() - 4.0f, bounds.getBottom() - 2.0f,
+                       kStrokeWidth);
+        }
     }
 
 private:
+    static constexpr float kOuterInset = 2.0f;
+    static constexpr float kPressedInset = 1.5f;
+    static constexpr float kPressedOffsetY = 1.5f;
+    static constexpr float kCornerRadius = 4.0f;
+    static constexpr float kStrokeWidth = 1.5f;
+    static constexpr float kPressedStrokeWidth = 2.0f;
+    static constexpr float kHoverFillAlpha = 0.10f;
+    static constexpr float kSelectedFillAlpha = 0.18f;
+    static constexpr float kPressedFillAlpha = 0.24f;
+    static constexpr float kHoverStrokeAlpha = 0.20f;
+    static constexpr float kSelectedStrokeAlpha = 0.34f;
+    static constexpr float kPressedStrokeAlpha = 0.46f;
+    static constexpr float kPressedShadowAlpha = 0.20f;
+    static constexpr float kPressedTopShadeAlpha = 0.28f;
+    static constexpr float kPressedBottomHighlightAlpha = 0.22f;
+
     bool selected { false };
 };
 
