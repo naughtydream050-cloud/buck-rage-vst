@@ -49,6 +49,14 @@ juce::Image cropKnobFromFaceplate(const juce::Image& faceplate, juce::Rectangle<
 
     return masked;
 }
+
+juce::Image cropButtonFromFaceplate(const juce::Image& faceplate, juce::Rectangle<float> bounds)
+{
+    if (!faceplate.isValid())
+        return {};
+
+    return faceplate.getClippedImage(bounds.toNearestInt()).convertedToFormat(juce::Image::ARGB);
+}
 }
 
 VintageRawnessEditor::VintageRawnessEditor(VintageRawnessProcessor& p)
@@ -83,6 +91,11 @@ VintageRawnessEditor::VintageRawnessEditor(VintageRawnessProcessor& p)
     preset2.onClick = [this] { applyPreset(1); };
     preset3.onClick = [this] { applyPreset(2); };
     preset4.onClick = [this] { applyPreset(3); };
+
+    preset1.setButtonImage(cropButtonFromFaceplate(faceplateImage, VintageRawnessGeneratedLayout::preset1Bounds()));
+    preset2.setButtonImage(cropButtonFromFaceplate(faceplateImage, VintageRawnessGeneratedLayout::preset2Bounds()));
+    preset3.setButtonImage(cropButtonFromFaceplate(faceplateImage, VintageRawnessGeneratedLayout::preset3Bounds()));
+    preset4.setButtonImage(cropButtonFromFaceplate(faceplateImage, VintageRawnessGeneratedLayout::preset4Bounds()));
 
     addAndMakeVisible(dirtKnob);
     addAndMakeVisible(crushKnob);

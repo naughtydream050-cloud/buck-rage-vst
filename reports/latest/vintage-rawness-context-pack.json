@@ -1,250 +1,243 @@
-﻿{
-    "schemaVersion":  1,
-    "generatedAt":  "2026-05-26T13:53:05.794Z",
-    "project":  "projects/VINTAGE_RAWNESS",
-    "purpose":  "Minimal handoff payload for image-first VINTAGE RAWNESS plugin work.",
-    "tokenPolicy":  {
-                        "sendThisFileInsteadOf":  [
-                                                      "large images",
-                                                      "full markdown scans",
-                                                      "full build logs"
-                                                  ],
-                        "localOnlyArtifacts":  [
-                                                   "projects/VINTAGE_RAWNESS/ui/reference/reference.png",
-                                                   "projects/VINTAGE_RAWNESS/ui/rendered/rendered.png"
-                                               ]
-                    },
-    "visualDoctrine":  {
-                           "mode":  "image-first",
-                           "ssot":  "ui/spec/ui-spec.json",
-                           "faceplate":  "Resources/faceplate_vintage_rawness.png",
-                           "rotatingAssets":  [
-                                                  "Resources/knob_dirt.png",
-                                                  "Resources/knob_crush.png",
-                                                  "Resources/knob_wobble.png"
-                                              ]
-                       },
-    "canvas":  {
-                   "width":  1448,
-                   "height":  1086,
-                   "aspectRatio":  1.3333333333
-               },
-    "display":  {
-                    "scale":  0.5,
-                    "width":  724,
-                    "height":  543
-                },
-    "knobs":  [
-                  {
-                      "id":  "DIRT",
-                      "parameterId":  "dirt",
-                      "asset":  "Resources/knob_dirt.png",
-                      "defaultValue":  0.3,
-                      "pointerAngleOffsetDeg":  -60,
-                      "bounds":  {
-                                     "x":  210,
-                                     "y":  456,
-                                     "width":  224,
-                                     "height":  224
-                                 },
-                      "ratioBounds":  {
-                                          "x":  0.145028,
-                                          "y":  0.41989,
-                                          "width":  0.154696,
-                                          "height":  0.206262
-                                      },
-                      "center":  {
-                                     "x":  322,
-                                     "y":  568
-                                 },
-                      "ratioCenter":  {
-                                          "x":  0.222376,
-                                          "y":  0.52302
-                                      },
-                      "radius":  112
-                  },
-                  {
-                      "id":  "CRUSH",
-                      "parameterId":  "crush",
-                      "asset":  "Resources/knob_crush.png",
-                      "defaultValue":  0.2,
-                      "pointerAngleOffsetDeg":  -90,
-                      "bounds":  {
-                                     "x":  612,
-                                     "y":  456,
-                                     "width":  224,
-                                     "height":  224
-                                 },
-                      "ratioBounds":  {
-                                          "x":  0.422652,
-                                          "y":  0.41989,
-                                          "width":  0.154696,
-                                          "height":  0.206262
-                                      },
-                      "center":  {
-                                     "x":  724,
-                                     "y":  568
-                                 },
-                      "ratioCenter":  {
-                                          "x":  0.5,
-                                          "y":  0.52302
-                                      },
-                      "radius":  112
-                  },
-                  {
-                      "id":  "WOBBLE",
-                      "parameterId":  "wobble",
-                      "asset":  "Resources/knob_wobble.png",
-                      "defaultValue":  0.1,
-                      "pointerAngleOffsetDeg":  -120,
-                      "bounds":  {
-                                     "x":  1014,
-                                     "y":  456,
-                                     "width":  224,
-                                     "height":  224
-                                 },
-                      "ratioBounds":  {
-                                          "x":  0.700276,
-                                          "y":  0.41989,
-                                          "width":  0.154696,
-                                          "height":  0.206262
-                                      },
-                      "center":  {
-                                     "x":  1126,
-                                     "y":  568
-                                 },
-                      "ratioCenter":  {
-                                          "x":  0.777624,
-                                          "y":  0.52302
-                                      },
-                      "radius":  112
-                  }
-              ],
-    "presetButtons":  [
-                          {
-                              "id":  "preset_vintage_hype",
-                              "label":  "Vintage Hype",
-                              "bounds":  {
-                                             "x":  178,
-                                             "y":  944,
-                                             "width":  270,
-                                             "height":  78
-                                         },
-                              "ratioBounds":  {
-                                                  "x":  0.122928,
-                                                  "y":  0.869245,
-                                                  "width":  0.186464,
-                                                  "height":  0.071823
-                                              },
-                              "values":  {
-                                             "dirt":  0.3,
-                                             "crush":  0.2,
-                                             "wobble":  0.1
-                                         }
-                          },
-                          {
-                              "id":  "preset_nasty_chain",
-                              "label":  "Nasty Chain",
-                              "bounds":  {
-                                             "x":  464,
-                                             "y":  944,
-                                             "width":  270,
-                                             "height":  78
-                                         },
-                              "ratioBounds":  {
-                                                  "x":  0.320442,
-                                                  "y":  0.869245,
-                                                  "width":  0.186464,
-                                                  "height":  0.071823
-                                              },
-                              "values":  {
-                                             "dirt":  0.8,
-                                             "crush":  0.7,
-                                             "wobble":  0.4
-                                         }
-                          },
-                          {
-                              "id":  "preset_mf_heaveness",
-                              "label":  "MF Heaveness",
-                              "bounds":  {
-                                             "x":  748,
-                                             "y":  944,
-                                             "width":  270,
-                                             "height":  78
-                                         },
-                              "ratioBounds":  {
-                                                  "x":  0.516575,
-                                                  "y":  0.869245,
-                                                  "width":  0.186464,
-                                                  "height":  0.071823
-                                              },
-                              "values":  {
-                                             "dirt":  0.4,
-                                             "crush":  0.3,
-                                             "wobble":  0.9
-                                         }
-                          },
-                          {
-                              "id":  "preset_bout",
-                              "label":  "Bout",
-                              "bounds":  {
-                                             "x":  1022,
-                                             "y":  944,
-                                             "width":  270,
-                                             "height":  78
-                                         },
-                              "ratioBounds":  {
-                                                  "x":  0.705801,
-                                                  "y":  0.869245,
-                                                  "width":  0.186464,
-                                                  "height":  0.071823
-                                              },
-                              "values":  {
-                                             "dirt":  0.6,
-                                             "crush":  0.5,
-                                             "wobble":  0.2
-                                         }
-                          }
-                      ],
-    "checks":  {
-                   "uiSpec":  {
-                                  "status":  "passed",
-                                  "score":  10
-                              },
-                   "knobAlpha":  {
-                                     "status":  "passed",
-                                     "score":  10
-                                 },
-                   "knobRotation":  {
-                                        "status":  "passed",
-                                        "score":  10
-                                    },
-                   "hitArea":  {
-                                   "status":  "passed",
-                                   "score":  10
-                               },
-                   "screenshotDiff":  {
-                                          "schemaVersion":  1,
-                                          "status":  "passed",
-                                          "score":  10,
-                                          "similarity":  1,
-                                          "rms":  0,
-                                          "note":  "Bootstrap diff compares reference.png and faceplate_vintage_rawness.png until a live host screenshot exists."
-                                      },
-                   "dspPolicy":  {
-                                     "status":  "passed",
-                                     "score":  10
-                                 },
-                   "build":  {
-                                 "status":  "blocked-local-toolchain",
-                                 "score":  0
-                             }
-               },
-    "nextActions":  [
-                        "Install updated VST3 into a scanned FL Studio folder.",
-                        "Verify preset buttons visibly depress on mouse down.",
-                        "Run FL Studio plugin scan.",
-                        "Capture live rendered screenshot.",
-                        "Rerun screenshot diff and harness."
-                    ]
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-05-29T13:29:26.724Z",
+  "project": "projects/VINTAGE_RAWNESS",
+  "purpose": "Minimal handoff payload for image-first VINTAGE RAWNESS plugin work.",
+  "tokenPolicy": {
+    "sendThisFileInsteadOf": [
+      "large images",
+      "full markdown scans",
+      "full build logs"
+    ],
+    "localOnlyArtifacts": [
+      "projects/VINTAGE_RAWNESS/ui/reference/reference.png",
+      "projects/VINTAGE_RAWNESS/ui/rendered/rendered.png"
+    ]
+  },
+  "visualDoctrine": {
+    "mode": "image-first",
+    "ssot": "ui/spec/ui-spec.json",
+    "faceplate": "Resources/faceplate_vintage_rawness.png",
+    "rotatingAssets": [
+      "Resources/knob_dirt.png",
+      "Resources/knob_crush.png",
+      "Resources/knob_wobble.png"
+    ]
+  },
+  "canvas": {
+    "width": 1448,
+    "height": 1086,
+    "aspectRatio": 1.3333333333
+  },
+  "display": {
+    "scale": 0.5,
+    "width": 724,
+    "height": 543
+  },
+  "knobs": [
+    {
+      "id": "DIRT",
+      "parameterId": "dirt",
+      "asset": "Resources/knob_dirt.png",
+      "defaultValue": 0.3,
+      "pointerAngleOffsetDeg": -60,
+      "bounds": {
+        "x": 210,
+        "y": 456,
+        "width": 224,
+        "height": 224
+      },
+      "ratioBounds": {
+        "x": 0.145028,
+        "y": 0.41989,
+        "width": 0.154696,
+        "height": 0.206262
+      },
+      "center": {
+        "x": 322,
+        "y": 568
+      },
+      "ratioCenter": {
+        "x": 0.222376,
+        "y": 0.52302
+      },
+      "radius": 112
+    },
+    {
+      "id": "CRUSH",
+      "parameterId": "crush",
+      "asset": "Resources/knob_crush.png",
+      "defaultValue": 0.2,
+      "pointerAngleOffsetDeg": -90,
+      "bounds": {
+        "x": 612,
+        "y": 456,
+        "width": 224,
+        "height": 224
+      },
+      "ratioBounds": {
+        "x": 0.422652,
+        "y": 0.41989,
+        "width": 0.154696,
+        "height": 0.206262
+      },
+      "center": {
+        "x": 724,
+        "y": 568
+      },
+      "ratioCenter": {
+        "x": 0.5,
+        "y": 0.52302
+      },
+      "radius": 112
+    },
+    {
+      "id": "WOBBLE",
+      "parameterId": "wobble",
+      "asset": "Resources/knob_wobble.png",
+      "defaultValue": 0.1,
+      "pointerAngleOffsetDeg": -120,
+      "bounds": {
+        "x": 1014,
+        "y": 456,
+        "width": 224,
+        "height": 224
+      },
+      "ratioBounds": {
+        "x": 0.700276,
+        "y": 0.41989,
+        "width": 0.154696,
+        "height": 0.206262
+      },
+      "center": {
+        "x": 1126,
+        "y": 568
+      },
+      "ratioCenter": {
+        "x": 0.777624,
+        "y": 0.52302
+      },
+      "radius": 112
+    }
+  ],
+  "presetButtons": [
+    {
+      "id": "preset_vintage_hype",
+      "label": "Vintage Hype",
+      "bounds": {
+        "x": 178,
+        "y": 944,
+        "width": 270,
+        "height": 78
+      },
+      "ratioBounds": {
+        "x": 0.122928,
+        "y": 0.869245,
+        "width": 0.186464,
+        "height": 0.071823
+      },
+      "values": {
+        "dirt": 0.3,
+        "crush": 0.2,
+        "wobble": 0.1
+      }
+    },
+    {
+      "id": "preset_nasty_chain",
+      "label": "Nasty Chain",
+      "bounds": {
+        "x": 464,
+        "y": 944,
+        "width": 270,
+        "height": 78
+      },
+      "ratioBounds": {
+        "x": 0.320442,
+        "y": 0.869245,
+        "width": 0.186464,
+        "height": 0.071823
+      },
+      "values": {
+        "dirt": 0.8,
+        "crush": 0.7,
+        "wobble": 0.4
+      }
+    },
+    {
+      "id": "preset_mf_heaveness",
+      "label": "MF Heaveness",
+      "bounds": {
+        "x": 748,
+        "y": 944,
+        "width": 270,
+        "height": 78
+      },
+      "ratioBounds": {
+        "x": 0.516575,
+        "y": 0.869245,
+        "width": 0.186464,
+        "height": 0.071823
+      },
+      "values": {
+        "dirt": 0.4,
+        "crush": 0.3,
+        "wobble": 0.9
+      }
+    },
+    {
+      "id": "preset_bout",
+      "label": "Bout",
+      "bounds": {
+        "x": 1022,
+        "y": 944,
+        "width": 270,
+        "height": 78
+      },
+      "ratioBounds": {
+        "x": 0.705801,
+        "y": 0.869245,
+        "width": 0.186464,
+        "height": 0.071823
+      },
+      "values": {
+        "dirt": 0.6,
+        "crush": 0.5,
+        "wobble": 0.2
+      }
+    }
+  ],
+  "checks": {
+    "uiSpec": {
+      "status": "passed",
+      "score": 10
+    },
+    "knobAlpha": {
+      "status": "passed",
+      "score": 10
+    },
+    "knobRotation": {
+      "status": "passed",
+      "score": 10
+    },
+    "hitArea": {
+      "status": "passed",
+      "score": 10
+    },
+    "screenshotDiff": {
+      "schemaVersion": 1,
+      "status": "passed",
+      "score": 10,
+      "similarity": 1,
+      "rms": 0,
+      "note": "Bootstrap diff compares reference.png and faceplate_vintage_rawness.png until a live host screenshot exists."
+    },
+    "dspPolicy": {
+      "status": "passed",
+      "score": 10
+    },
+    "build": {
+      "status": "blocked-local-toolchain",
+      "score": 0
+    }
+  }
 }
