@@ -6,7 +6,10 @@
     "noHeapAllocationInProcessBlock": true,
     "denormalProtection": true,
     "dcBlocker": true,
-    "outputCeiling": true
+    "outputCeiling": true,
+    "delayBufferAllocatedInPrepare": true,
+    "dryWetMixPresent": true,
+    "processBlockCount": 2
   },
   "findings": []
 }

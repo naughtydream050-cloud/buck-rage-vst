@@ -37,6 +37,7 @@ juce_add_binary_data(VintageRawnessAssets
 )
 
 target_sources(VintageRawness PRIVATE
+    Source/KrumpWarpEffect.cpp
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
 )

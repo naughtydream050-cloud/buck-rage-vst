@@ -55,15 +55,23 @@ for (const knob of spec.knobs) {
 
 const editorText = fs.readFileSync(path.join(projectRoot, "Source", "PluginEditor.cpp"), "utf8");
 const processorText = fs.readFileSync(path.join(projectRoot, "Source", "PluginProcessor.cpp"), "utf8");
-const processBlock = processorText.match(/void VintageRawnessProcessor::processBlock[\s\S]*?void VintageRawnessProcessor::getStateInformation/);
+const krumpWarpText = fs.readFileSync(path.join(projectRoot, "Source", "KrumpWarpEffect.cpp"), "utf8");
+const dspText = `${processorText}\n${krumpWarpText}`;
+const processorBlock = processorText.match(/void VintageRawnessProcessor::processBlock[\s\S]*?void VintageRawnessProcessor::getStateInformation/);
+const krumpBlock = krumpWarpText.match(/void KrumpWarpEffect::processBlock[\s\S]*$/);
+const processBlocks = [processorBlock, krumpBlock].filter(Boolean);
 const dspFindings = [];
-if (!processBlock) dspFindings.push({ severity: "error", rule: "process_block_found" });
-if (processBlock && /\bnew\b|malloc|calloc|std::vector|push_back|resize\s*\(/.test(processBlock[0])) {
+if (processBlocks.length === 0) dspFindings.push({ severity: "error", rule: "process_block_found" });
+if (processBlocks.some((block) => /\bnew\b|malloc|calloc|std::vector|push_back|resize\s*\(|setSize\s*\(/.test(block[0]))) {
   dspFindings.push({ severity: "error", rule: "no_heap_allocation_in_process_block" });
 }
-if (!/ScopedNoDenormals/.test(processorText)) dspFindings.push({ severity: "error", rule: "denormal_protection" });
-if (!/dcBlock/.test(processorText)) dspFindings.push({ severity: "error", rule: "dc_blocker" });
-if (!/jlimit\(-kOutputCeiling/.test(processorText)) dspFindings.push({ severity: "error", rule: "output_ceiling" });
+if (!/ScopedNoDenormals/.test(dspText)) dspFindings.push({ severity: "error", rule: "denormal_protection" });
+if (!/dcBlock/.test(dspText)) dspFindings.push({ severity: "error", rule: "dc_blocker" });
+if (!/jlimit\(-kOutputCeiling/.test(dspText)) dspFindings.push({ severity: "error", rule: "output_ceiling" });
+if (!/delayBuffer\.setSize/.test(krumpWarpText) || !/void KrumpWarpEffect::prepare/.test(krumpWarpText)) {
+  dspFindings.push({ severity: "error", rule: "delay_buffer_allocated_in_prepare" });
+}
+if (!/kDryWetMix/.test(krumpWarpText)) dspFindings.push({ severity: "error", rule: "dry_wet_mix_present" });
 if (/fillEllipse|drawText\(\"VINTAGE RAWNESS/.test(editorText)) {
   findings.push({ severity: "error", rule: "no_juce_ui_redraw" });
 }
@@ -106,9 +114,12 @@ writeReport("vintage-rawness-dsp-report.json", {
   score: dspPassed ? 10 : 6,
   checks: {
     noHeapAllocationInProcessBlock: !dspFindings.some((finding) => finding.rule === "no_heap_allocation_in_process_block"),
-    denormalProtection: /ScopedNoDenormals/.test(processorText),
-    dcBlocker: /dcBlock/.test(processorText),
-    outputCeiling: /jlimit\(-kOutputCeiling/.test(processorText)
+    denormalProtection: /ScopedNoDenormals/.test(dspText),
+    dcBlocker: /dcBlock/.test(dspText),
+    outputCeiling: /jlimit\(-kOutputCeiling/.test(dspText),
+    delayBufferAllocatedInPrepare: /delayBuffer\.setSize/.test(krumpWarpText),
+    dryWetMixPresent: /kDryWetMix/.test(krumpWarpText),
+    processBlockCount: processBlocks.length
   },
   findings: dspFindings
 });
