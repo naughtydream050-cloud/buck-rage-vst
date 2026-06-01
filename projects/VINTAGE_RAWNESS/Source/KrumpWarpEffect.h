@@ -26,7 +26,7 @@ private:
     static float sanitize(float value) noexcept;
     static float fastClip(float value) noexcept;
     static float saturate(float sample, float dirt, float envelope) noexcept;
-    static float crushSample(float sample, float crush, float envelope, int channel) noexcept;
+    float crushSample(float sample, float crush, float envelope, int channel) noexcept;
     static float dcBlock(float sample, int channel, float* x1, float* y1) noexcept;
     static float onePoleCoefficient(float cutoffHz, float sampleRate) noexcept;
     static float nextRandomBipolar(uint32_t& state) noexcept;
