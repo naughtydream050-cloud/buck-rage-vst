@@ -32,10 +32,12 @@ void KrumpWarpEffect::reset() noexcept
     for (int ch = 0; ch < kMaxChannels; ++ch)
     {
         delayTimeState[ch] = sampleRateHz * kBaseDelayMs * 0.001f;
-        wowNoise[ch] = 0.0f;
+        flangePhase[ch] = ch == 0 ? 0.0f : 0.37f;
+        flangeFeedback[ch] = 0.0f;
         flutterNoise[ch] = 0.0f;
         slopNoise[ch] = 0.0f;
         heldSample[ch] = 0.0f;
+        crushedState[ch] = 0.0f;
         holdCounter[ch] = 0;
         preLowState[ch] = 0.0f;
         preMidState[ch] = 0.0f;
@@ -94,12 +96,17 @@ float KrumpWarpEffect::saturate(float sample, float dirt, float envelope) noexce
 
 float KrumpWarpEffect::crushSample(float sample, float crush, float envelope, int channel) noexcept
 {
-    const auto roughness = juce::jlimit(0.0f, 1.0f, crush + envelope * crush * 0.35f);
-    const auto bits = juce::jmap(roughness, 16.0f, 4.5f);
-    const auto steps = std::pow(2.0f, bits);
-    auto quantized = std::round(sample * steps) / steps;
+    const auto roughness = juce::jlimit(0.0f, 1.0f, crush * (0.88f + envelope * 0.18f));
+    const auto shapedRoughness = std::sqrt(roughness);
+    const auto preTrim = 1.0f / (1.0f + roughness * 0.45f);
+    const auto conditionerDrive = 1.0f + roughness * 0.45f;
+    const auto conditioned = std::tanh(sample * preTrim * conditionerDrive) / std::tanh(conditionerDrive);
 
-    const auto maxHold = 1 + static_cast<int>(roughness * roughness * 34.0f);
+    const auto bits = juce::jmap(shapedRoughness, 16.0f, 6.25f);
+    const auto steps = std::pow(2.0f, bits);
+    auto quantized = std::round(conditioned * steps) / steps;
+
+    const auto maxHold = 1 + static_cast<int>(roughness * roughness * 18.0f);
     if (holdCounter[channel] <= 0)
     {
         heldSample[channel] = quantized;
@@ -108,7 +115,13 @@ float KrumpWarpEffect::crushSample(float sample, float crush, float envelope, in
 
     --holdCounter[channel];
     quantized = juce::jmap(roughness, quantized, heldSample[channel]);
-    return fastClip(quantized);
+
+    const auto slewCoeff = juce::jmap(roughness, 0.62f, 0.18f);
+    crushedState[channel] += slewCoeff * (quantized - crushedState[channel]);
+    const auto fizz = nextRandomBipolar(randomState) * roughness * roughness * 0.006f;
+    const auto degraded = std::tanh((crushedState[channel] + fizz) * (1.0f + roughness * 0.35f));
+    const auto crushMix = juce::jmap(roughness, 0.18f, 0.84f);
+    return sanitize(sample * (1.0f - crushMix) + degraded * crushMix);
 }
 
 float KrumpWarpEffect::dcBlock(float sample, int channel, float* x1, float* y1) noexcept
@@ -128,23 +141,32 @@ float KrumpWarpEffect::onePoleCoefficient(float cutoffHz, float sampleRate) noex
 float KrumpWarpEffect::readModulatedDelay(int channel, float input, float wobble, float envelope) noexcept
 {
     auto* delayData = delayBuffer.getWritePointer(channel);
-    delayData[writeIndex] = input;
 
-    const auto wowCoeff = onePoleCoefficient(juce::jmap(wobble, kWowMinHz, kWowMaxHz), sampleRateHz);
+    const auto phaseRate = juce::jmap(wobble, kFlangeMinHz, kFlangeMaxHz) * (1.0f + envelope * wobble * 0.38f);
+    flangePhase[channel] += phaseRate / sampleRateHz;
+    if (flangePhase[channel] >= 1.0f)
+        flangePhase[channel] -= 1.0f;
+
+    const auto phase = flangePhase[channel] + (channel == 0 ? 0.0f : 0.21f);
+    const auto lfo = 0.5f + 0.5f * std::sin(phase * juce::MathConstants<float>::twoPi);
     const auto flutterCoeff = onePoleCoefficient(juce::jmap(wobble, kFlutterMinHz, kFlutterMaxHz), sampleRateHz);
-    const auto slopCoeff = onePoleCoefficient(juce::jmap(wobble, 1.3f, 6.0f), sampleRateHz);
-    wowNoise[channel] += wowCoeff * (nextRandomBipolar(randomState) - wowNoise[channel]);
+    const auto slopCoeff = onePoleCoefficient(juce::jmap(wobble, 0.8f, 3.5f), sampleRateHz);
     flutterNoise[channel] += flutterCoeff * (nextRandomBipolar(randomState) - flutterNoise[channel]);
     slopNoise[channel] += slopCoeff * (nextRandomBipolar(randomState) - slopNoise[channel]);
 
-    const auto transientBend = envelope * envelope;
+    const auto feedbackAmount = wobble * (0.08f + envelope * 0.12f);
+    delayData[writeIndex] = fastClip(input + flangeFeedback[channel] * feedbackAmount);
+
+    const auto transientBend = envelope * envelope * wobble;
     const auto polarity = channel == 0 ? 1.0f : -1.0f;
-    const auto wowDepthSamples = sampleRateHz * (wobble * wobble * 0.070f);
-    const auto flutterDepthSamples = sampleRateHz * (wobble * 0.018f);
+    const auto flangeDepthMs = wobble * (2.2f + wobble * 4.8f) * (0.65f + envelope * 0.75f);
+    const auto flutterDepthSamples = sampleRateHz * wobble * 0.0018f;
     const auto jitterMs = juce::jmap(wobble, kJitterMinMs, kJitterMaxMs);
-    const auto jitterSamples = sampleRateHz * jitterMs * 0.001f * (0.2f + transientBend);
-    const auto targetDelay = sampleRateHz * kBaseDelayMs * 0.001f
-        + wowNoise[channel] * wowDepthSamples * (0.65f + transientBend * 1.8f)
+    const auto jitterSamples = sampleRateHz * jitterMs * 0.001f * (0.15f + transientBend);
+    const auto targetDelayMs = 1.15f + kBaseDelayMs * (0.28f + wobble * 0.72f)
+        + lfo * flangeDepthMs
+        - transientBend * 1.35f;
+    const auto targetDelay = sampleRateHz * targetDelayMs * 0.001f
         + flutterNoise[channel] * flutterDepthSamples * polarity
         + slopNoise[channel] * jitterSamples;
 
@@ -157,7 +179,12 @@ float KrumpWarpEffect::readModulatedDelay(int channel, float input, float wobble
     const auto index0 = static_cast<int>(readPosition) % delayBufferSamples;
     const auto index1 = (index0 + 1) % delayBufferSamples;
     const auto frac = readPosition - static_cast<float>(index0);
-    return delayData[index0] + (delayData[index1] - delayData[index0]) * frac;
+    const auto delayed = delayData[index0] + (delayData[index1] - delayData[index0]) * frac;
+    flangeFeedback[channel] = sanitize(delayed);
+
+    const auto flangeMix = wobble * (0.34f + envelope * 0.26f);
+    const auto combed = input + delayed * flangeMix;
+    return sanitize(combed / (1.0f + flangeMix * 0.55f));
 }
 
 float KrumpWarpEffect::postBandpass(float sample, float dirt, float crush, int channel) noexcept

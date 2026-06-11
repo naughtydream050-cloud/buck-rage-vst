@@ -44,3 +44,120 @@ jobs:
           name: VINTAGE-RAWNESS-reports-Windows
           path: reports/latest/vintage-rawness-*.json
           if-no-files-found: error
+
+  build-macos-universal:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Toolchain check
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --version
+          xcodebuild -version
+          xcode-select -p
+          if [[ ! -d "JUCE" && ! -d "projects/BUCK_RAGE/JUCE" ]]; then
+            echo "JUCE source is missing" >&2
+            exit 1
+          fi
+
+      - name: Run reports
+        shell: bash
+        run: node projects/VINTAGE_RAWNESS/tools/validate_vintage_rawness.mjs
+
+      - name: Configure CMake
+        shell: bash
+        run: >
+          cmake -S projects/VINTAGE_RAWNESS
+          -B build-vintage-rawness-mac
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+          "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+
+      - name: Build VST3 and AU
+        shell: bash
+        run: cmake --build build-vintage-rawness-mac --config Release --parallel
+
+      - name: Assert macOS plugin bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          vst3_count="$(find build-vintage-rawness-mac -name "VINTAGE RAWNESS.vst3" | wc -l | tr -d ' ')"
+          au_count="$(find build-vintage-rawness-mac -name "VINTAGE RAWNESS.component" | wc -l | tr -d ' ')"
+          test "$vst3_count" -gt 0
+          test "$au_count" -gt 0
+          find build-vintage-rawness-mac -name "VINTAGE RAWNESS.vst3" -print
+          find build-vintage-rawness-mac -name "VINTAGE RAWNESS.component" -print
+
+      - name: Ad-hoc sign test bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r bundle; do
+            codesign --force --deep --sign - "$bundle"
+            codesign --verify --deep --strict "$bundle"
+          done < <(find build-vintage-rawness-mac \( -name "VINTAGE RAWNESS.vst3" -o -name "VINTAGE RAWNESS.component" \) -print)
+
+      - name: Verify universal binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/latest/vintage-rawness
+          report="reports/latest/vintage-rawness/mac-distribution-report.json"
+          vst3_bundle="$(find build-vintage-rawness-mac -name "VINTAGE RAWNESS.vst3" | head -n 1)"
+          au_bundle="$(find build-vintage-rawness-mac -name "VINTAGE RAWNESS.component" | head -n 1)"
+          vst3_binary="$vst3_bundle/Contents/MacOS/VINTAGE RAWNESS"
+          au_binary="$au_bundle/Contents/MacOS/VINTAGE RAWNESS"
+          lipo -verify_arch arm64 x86_64 "$vst3_binary"
+          lipo -verify_arch arm64 x86_64 "$au_binary"
+          vst3_archs="$(lipo -archs "$vst3_binary")"
+          au_archs="$(lipo -archs "$au_binary")"
+          cat > "$report" <<JSON
+          {
+            "schemaVersion": 1,
+            "status": "passed",
+            "project": "projects/VINTAGE_RAWNESS",
+            "runner": "macos-14",
+            "formats": ["VST3", "AU"],
+            "deploymentTarget": "11.0",
+            "universalArchitectures": ["arm64", "x86_64"],
+            "vst3": {
+              "bundle": "$vst3_bundle",
+              "architectures": "$vst3_archs",
+              "adHocCodesign": "verified"
+            },
+            "au": {
+              "bundle": "$au_bundle",
+              "architectures": "$au_archs",
+              "adHocCodesign": "verified"
+            },
+            "notarization": "skipped-test-distribution",
+            "quarantineHandling": "see projects/VINTAGE_RAWNESS/docs/mac-install-test.md"
+          }
+          JSON
+
+      - name: Upload macOS VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: VINTAGE-RAWNESS-VST3-macOS-universal
+          path: build-vintage-rawness-mac/**/*.vst3
+          if-no-files-found: error
+
+      - name: Upload macOS AU
+        uses: actions/upload-artifact@v4
+        with:
+          name: VINTAGE-RAWNESS-AU-macOS-universal
+          path: build-vintage-rawness-mac/**/*.component
+          if-no-files-found: error
+
+      - name: Upload macOS reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: VINTAGE-RAWNESS-reports-macOS
+          path: |
+            reports/latest/vintage-rawness*.json
+            reports/latest/vintage-rawness/**/*.json
+          if-no-files-found: error
