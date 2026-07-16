@@ -6,6 +6,7 @@
   "platform": "Windows",
   "format": "VST3",
   "artifactName": "LAOZI-BUCK-RAW-SHIT-VST3-Windows",
+  "artifactId": "8374852647",
   "binaryBytes": 5897216,
   "testerZip": "LAOZI_BUCK_RAW_SHIT_WINDOWS_FL_STUDIO_TEST.zip",
   "hostValidation": "pending"
