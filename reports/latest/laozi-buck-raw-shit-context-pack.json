@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "project": "LAOZI_BUCK_RAW_SHIT",
+  "phase": "WINDOWS_VST3_UI_IMPLEMENTATION_AND_INTERACTION_VALIDATION",
+  "visualTruth": "ui/reference/reference.png",
+  "uiSpec": "projects/LAOZI_BUCK_RAW_SHIT/ui/spec/ui-spec.json",
+  "status": "passed",
+  "uiReport": "reports/latest/laozi-buck-raw-shit-ui-report.json",
+  "dsp": "temporary output gain + bypass + atomic stereo meter only",
+  "hostValidation": "pending"
+}

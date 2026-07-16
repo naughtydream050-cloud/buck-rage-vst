@@ -1,0 +1,80 @@
+name: Build LAOZI BUCK RAW SHIT Windows VST3
+
+on:
+  push:
+    branches: ["codex/laozi-phase1-windows-ui"]
+    paths:
+      - ".github/workflows/laozi-buck-raw-shit-windows.yml"
+      - "projects/LAOZI_BUCK_RAW_SHIT/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-vst3:
+    runs-on: windows-latest
+    env:
+      PROJECT: projects/LAOZI_BUCK_RAW_SHIT
+      PACKAGE: LAOZI_BUCK_RAW_SHIT_WINDOWS_FL_STUDIO_TEST
+      ARTIFACT: LAOZI-BUCK-RAW-SHIT-VST3-Windows
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Validate image-first UI assets
+        shell: pwsh
+        run: node $env:PROJECT/tools/validate_laozi_ui.mjs
+      - name: Configure Release build
+        shell: pwsh
+        run: cmake -S $env:PROJECT -B build-laozi -A x64 -DCMAKE_BUILD_TYPE=Release
+      - name: Build VST3
+        shell: pwsh
+        run: cmake --build build-laozi --config Release --target LaoziBuckRawShit_VST3 --parallel
+      - name: Validate bundle and create tester ZIP
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $bundle = Get-ChildItem build-laozi -Recurse -Directory -Filter '老子-BUCK RAW SHIT-.vst3' | Select-Object -First 1
+          if ($null -eq $bundle) { throw 'VST3 bundle was not found.' }
+          $binary = Get-ChildItem $bundle.FullName -Recurse -File -Filter '老子-BUCK RAW SHIT-.vst3' | Select-Object -First 1
+          if ($null -eq $binary -or $binary.Length -le 0) { throw 'VST3 binary is missing or empty.' }
+          $staging = Join-Path $PWD $env:PACKAGE
+          New-Item -ItemType Directory -Force -Path $staging | Out-Null
+          Copy-Item $bundle.FullName $staging -Recurse -Force
+          @'
+          老子-BUCK RAW SHIT- Windows FL Studioテストパック
+
+          1. ZIPを解凍します。
+          2. 「老子-BUCK RAW SHIT-.vst3」をFL StudioのVST3スキャン対象へコピーします。
+          3. FL Studio: Options → Manage plugins → Find installed plugins を実行します。
+          4. ミキサーのエフェクトスロットから読み込みます。
+
+          Phase 1はUI操作検証版です。本格マスタリングDSPは未実装です。
+          '@ | Set-Content (Join-Path $staging 'README_FIRST.txt') -Encoding utf8
+          @'
+          Windows FL Studio インストール
+
+          推奨コピー先: C:\Program Files\Common Files\VST3\
+          管理者権限がない場合は、FL StudioのManage pluginsで任意のテストフォルダをスキャン対象に追加してください。
+          '@ | Set-Content (Join-Path $staging 'INSTALL_WINDOWS_FL_STUDIO.txt') -Encoding utf8
+          @{ plugin='老子-BUCK RAW SHIT-'; format='VST3'; platform='Windows'; buildType='Release'; buildRun=$env:GITHUB_RUN_ID; commit=$env:GITHUB_SHA; validation=@{ bundleExists=$true; binaryExists=$true; binaryBytes=$binary.Length; uiValidation='passed'; hostValidation='pending' }; dsp='temporary output gain + bypass + atomic stereo meter only' } | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $staging 'BUILD_INFO.json') -Encoding utf8
+          $zip = "$env:PACKAGE.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path $staging -DestinationPath $zip -Force
+          if ((Get-Item $zip).Length -le 0) { throw 'Tester ZIP is empty.' }
+          Expand-Archive -Path $zip -DestinationPath zip-check -Force
+          if (-not (Test-Path "zip-check/$env:PACKAGE/老子-BUCK RAW SHIT-.vst3")) { throw 'ZIP structure validation failed.' }
+          @{ schemaVersion=1; status='passed'; project='LAOZI_BUCK_RAW_SHIT'; platform='Windows'; format='VST3'; runId=$env:GITHUB_RUN_ID; artifactName=$env:ARTIFACT; binaryBytes=$binary.Length; testerZip="$env:PACKAGE.zip"; hostValidation='pending' } | ConvertTo-Json | Set-Content reports/latest/laozi-buck-raw-shit-build-report.json -Encoding utf8
+      - name: Upload Windows tester ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: LAOZI-BUCK-RAW-SHIT-VST3-Windows
+          path: LAOZI_BUCK_RAW_SHIT_WINDOWS_FL_STUDIO_TEST.zip
+          if-no-files-found: error
+      - name: Upload compact reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: LAOZI-BUCK-RAW-SHIT-reports-Windows
+          path: reports/latest/laozi-buck-raw-shit-*.json
+          if-no-files-found: error

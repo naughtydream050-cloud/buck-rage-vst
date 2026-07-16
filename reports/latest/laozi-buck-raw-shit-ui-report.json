@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "score": 10,
+  "visualMode": "image-first",
+  "checks": {
+    "referencePresent": true,
+    "faceplatePresent": true,
+    "knobCount": 5,
+    "circularKnobBounds": true
+  },
+  "findings": []
+}
