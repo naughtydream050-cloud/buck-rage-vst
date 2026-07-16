@@ -7,5 +7,11 @@
   "status": "passed",
   "uiReport": "reports/latest/laozi-buck-raw-shit-ui-report.json",
   "dsp": "temporary output gain + bypass + atomic stereo meter only",
+  "githubActions": {
+    "runId": "29497008873",
+    "artifactName": "LAOZI-BUCK-RAW-SHIT-VST3-Windows",
+    "artifactId": "8374852647"
+  },
+  "testerZip": "deliverables/LAOZI_BUCK_RAW_SHIT_WINDOWS_FL_STUDIO_TEST.zip",
   "hostValidation": "pending"
 }

@@ -10,6 +10,6 @@ Build a Windows VST3 that presents the supplied image-first UI and validates con
 
 ## Next
 
-1. Run Windows CI and download the VST3 tester artifact.
+1. Windows CI passed on run `29497008873`; artifact `LAOZI-BUCK-RAW-SHIT-VST3-Windows` is downloaded to `deliverables/LAOZI_BUCK_RAW_SHIT_WINDOWS_FL_STUDIO_TEST.zip`.
 2. Install in FL Studio and confirm rendering, control hit areas, presets, bypass, oversample state, and live meter movement.
 3. Freeze the approved UI before opening a separate DSP phase.

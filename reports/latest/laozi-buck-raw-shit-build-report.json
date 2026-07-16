@@ -1,8 +1,12 @@
 {
   "schemaVersion": 1,
-  "status": "pending-ci",
+  "runId": "29497008873",
+  "status": "passed",
   "project": "LAOZI_BUCK_RAW_SHIT",
   "platform": "Windows",
   "format": "VST3",
+  "artifactName": "LAOZI-BUCK-RAW-SHIT-VST3-Windows",
+  "binaryBytes": 5897216,
+  "testerZip": "LAOZI_BUCK_RAW_SHIT_WINDOWS_FL_STUDIO_TEST.zip",
   "hostValidation": "pending"
 }
