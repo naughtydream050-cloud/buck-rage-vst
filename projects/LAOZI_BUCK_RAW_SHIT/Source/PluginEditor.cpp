@@ -84,13 +84,13 @@ void LaoziBuckRawShitEditor::paint(juce::Graphics& g)
     if (faceplate.isValid()) g.drawImage(faceplate, getLocalBounds().toFloat(), juce::RectanglePlacement::stretchToFit, false);
     const auto presetIndex = choiceIndex(LaoziBuckRawShitProcessor::presetIndexParamId, 5);
     g.setColour(juce::Colour(0xffc9c0b7));
-    g.setFont(juce::FontOptions(6.8f));
+    g.setFont(juce::Font(6.8f, juce::Font::plain));
     g.drawFittedText(presets[presetIndex].name, LaoziLayout::presetTextBounds(), juce::Justification::centred, 1);
 
     const auto oversampleIndex = choiceIndex(LaoziBuckRawShitProcessor::oversampleParamId, 3);
     const char* oversampleText[] { "OFF", "2x", "4x" };
     g.setColour(juce::Colour(0xffc3616c));
-    g.setFont(juce::FontOptions(6.2f));
+    g.setFont(juce::Font(6.2f, juce::Font::plain));
     g.drawFittedText(oversampleText[oversampleIndex], LaoziLayout::oversampleStatusBounds(), juce::Justification::centred, 1);
 
     if (processor.apvts.getRawParameterValue(LaoziBuckRawShitProcessor::bypassParamId)->load() > 0.5f)
