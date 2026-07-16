@@ -1,0 +1,363 @@
+name: Package VINTAGE RAWNESS for macOS FL Studio
+
+on:
+  push:
+    branches:
+      - codex/vintage-rawness-windows
+    paths:
+      - ".github/workflows/vintage-rawness-macos.yml"
+      - "projects/VINTAGE_RAWNESS/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-macos-vst3:
+    runs-on: macos-14
+    timeout-minutes: 45
+    env:
+      BUILD_DIR: build-vintage-rawness-macos-package
+      PACKAGE_NAME: VINTAGE_RAWNESS_MAC_FL_STUDIO_TEST
+      ARTIFACT_NAME: VINTAGE-RAWNESS-MAC-FL-STUDIO-TEST
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Verify toolchain and inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --version
+          xcodebuild -version
+          xcode-select -p
+          test -f projects/VINTAGE_RAWNESS/CMakeLists.txt
+          test -f projects/VINTAGE_RAWNESS/packaging/macos/INSTALL.command
+          test -f projects/VINTAGE_RAWNESS/packaging/macos/UNINSTALL.command
+          if [[ ! -f JUCE/CMakeLists.txt && ! -f projects/BUCK_RAGE/JUCE/CMakeLists.txt ]]; then
+            echo "JUCE source is missing." >&2
+            exit 1
+          fi
+
+      - name: Validate frozen project
+        shell: bash
+        run: node projects/VINTAGE_RAWNESS/tools/validate_vintage_rawness.mjs
+
+      - name: Configure Universal Release build
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -G Xcode \
+            -S projects/VINTAGE_RAWNESS \
+            -B "$BUILD_DIR" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+
+      - name: Build VST3 only
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --build "$BUILD_DIR" \
+            --config Release \
+            --target VintageRawness_VST3 \
+            --parallel
+
+      - name: Locate and validate Universal VST3
+        id: locate
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_count="$(find "$BUILD_DIR" -type d -name "VINTAGE RAWNESS.vst3" -path "*/VST3/*" | wc -l | tr -d ' ')"
+          if [[ "$bundle_count" != "1" ]]; then
+            echo "Expected exactly one VST3 bundle, found: $bundle_count" >&2
+            find "$BUILD_DIR" -type d -name "*.vst3" -print
+            exit 1
+          fi
+          vst3_bundle="$(find "$BUILD_DIR" -type d -name "VINTAGE RAWNESS.vst3" -path "*/VST3/*" | head -n 1)"
+          vst3_binary="$vst3_bundle/Contents/MacOS/VINTAGE RAWNESS"
+          test -d "$vst3_bundle"
+          test -f "$vst3_bundle/Contents/Info.plist"
+          test -f "$vst3_binary"
+          test -s "$vst3_binary"
+          chmod +x "$vst3_binary"
+          test -x "$vst3_binary"
+          file "$vst3_binary" | grep -q "Mach-O"
+          if file "$vst3_binary" | grep -Eqi "PE32|MS Windows"; then
+            echo "Windows binary detected in macOS bundle." >&2
+            exit 1
+          fi
+          lipo -verify_arch arm64 x86_64 "$vst3_binary"
+          archs="$(lipo -archs "$vst3_binary")"
+          binary_bytes="$(stat -f%z "$vst3_binary")"
+          echo "Architectures: $archs"
+          echo "Binary bytes: $binary_bytes"
+          echo "bundle=$vst3_bundle" >> "$GITHUB_OUTPUT"
+          echo "binary=$vst3_binary" >> "$GITHUB_OUTPUT"
+          echo "archs=$archs" >> "$GITHUB_OUTPUT"
+          echo "binary_bytes=$binary_bytes" >> "$GITHUB_OUTPUT"
+
+      - name: Check build quarantine attributes
+        shell: bash
+        env:
+          VST3_BUNDLE: ${{ steps.locate.outputs.bundle }}
+        run: |
+          set -euo pipefail
+          xattr_output="$(xattr -lr "$VST3_BUNDLE" 2>/dev/null || true)"
+          if grep -q "com.apple.quarantine" <<< "$xattr_output"; then
+            echo "Unexpected quarantine attribute on build bundle." >&2
+            exit 1
+          fi
+
+      - name: Create and sign tester folder
+        shell: bash
+        env:
+          VST3_BUNDLE: ${{ steps.locate.outputs.bundle }}
+        run: |
+          set -euo pipefail
+          rm -rf "$PACKAGE_NAME"
+          mkdir -p "$PACKAGE_NAME"
+          ditto "$VST3_BUNDLE" "$PACKAGE_NAME/VINTAGE RAWNESS.vst3"
+          cp projects/VINTAGE_RAWNESS/packaging/macos/INSTALL.command "$PACKAGE_NAME/INSTALL.command"
+          cp projects/VINTAGE_RAWNESS/packaging/macos/UNINSTALL.command "$PACKAGE_NAME/UNINSTALL.command"
+          cp projects/VINTAGE_RAWNESS/packaging/macos/README_FIRST.txt "$PACKAGE_NAME/README_FIRST.txt"
+          cp projects/VINTAGE_RAWNESS/packaging/macos/INSTALL_MAC_FL_STUDIO.txt "$PACKAGE_NAME/INSTALL_MAC_FL_STUDIO.txt"
+          chmod +x "$PACKAGE_NAME/INSTALL.command" "$PACKAGE_NAME/UNINSTALL.command"
+          chmod +x "$PACKAGE_NAME/VINTAGE RAWNESS.vst3/Contents/MacOS/VINTAGE RAWNESS"
+          xattr -dr com.apple.quarantine "$PACKAGE_NAME/VINTAGE RAWNESS.vst3" 2>/dev/null || true
+          xattr_output="$(xattr -lr "$PACKAGE_NAME/VINTAGE RAWNESS.vst3" 2>/dev/null || true)"
+          if grep -q "com.apple.quarantine" <<< "$xattr_output"; then
+            echo "Failed to remove quarantine attribute from package bundle." >&2
+            exit 1
+          fi
+          codesign --force --deep --sign - --timestamp=none "$PACKAGE_NAME/VINTAGE RAWNESS.vst3"
+          codesign --verify --deep --strict --verbose=2 "$PACKAGE_NAME/VINTAGE RAWNESS.vst3"
+          codesign -dv --verbose=4 "$PACKAGE_NAME/VINTAGE RAWNESS.vst3" 2>&1 | tee codesign-details.txt
+          grep -q "^Signature=adhoc$" codesign-details.txt
+
+      - name: Test installer and uninstaller
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n "$PACKAGE_NAME/INSTALL.command"
+          bash -n "$PACKAGE_NAME/UNINSTALL.command"
+          test -x "$PACKAGE_NAME/INSTALL.command"
+          test -x "$PACKAGE_NAME/UNINSTALL.command"
+          test_home="$RUNNER_TEMP/vintage-rawness-test-home"
+          rm -rf "$test_home"
+          mkdir -p "$test_home/Library/Audio/Plug-Ins/VST3/SENTINEL.vst3"
+          HOME="$test_home" "$PWD/$PACKAGE_NAME/INSTALL.command"
+          installed="$test_home/Library/Audio/Plug-Ins/VST3/VINTAGE RAWNESS.vst3"
+          installed_binary="$installed/Contents/MacOS/VINTAGE RAWNESS"
+          test -d "$installed"
+          test -s "$installed_binary"
+          test -x "$installed_binary"
+          lipo -verify_arch arm64 x86_64 "$installed_binary"
+          codesign --verify --deep --strict "$installed"
+          printf 'y\n' | HOME="$test_home" "$PWD/$PACKAGE_NAME/UNINSTALL.command"
+          test ! -e "$installed"
+          test -d "$test_home/Library/Audio/Plug-Ins/VST3/SENTINEL.vst3"
+
+      - name: Generate BUILD_INFO and compact reports
+        shell: bash
+        env:
+          ARCHS: ${{ steps.locate.outputs.archs }}
+          BINARY_BYTES: ${{ steps.locate.outputs.binary_bytes }}
+        run: |
+          set -euo pipefail
+          mkdir -p reports/latest
+          python3 - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          archs = os.environ["ARCHS"].split()
+          common = {
+              "plugin": "VINTAGE RAWNESS",
+              "format": "VST3",
+              "platform": "macOS",
+              "architecture": archs,
+              "buildType": "Release",
+              "binaryBytes": int(os.environ["BINARY_BYTES"]),
+              "deploymentTarget": "11.0",
+              "codesign": "ad-hoc",
+              "developerIdSigned": False,
+              "notarized": False,
+              "targetHost": "FL Studio for macOS",
+              "installationTarget": "~/Library/Audio/Plug-Ins/VST3/",
+              "buildRun": os.environ["GITHUB_RUN_ID"],
+              "commit": os.environ["GITHUB_SHA"],
+              "artifactId": None,
+              "artifactName": os.environ["ARTIFACT_NAME"],
+              "validation": {
+                  "bundleExists": True,
+                  "binaryExists": True,
+                  "codesignVerified": True,
+                  "universalBinaryVerified": set(archs) == {"arm64", "x86_64"},
+                  "installerExecutable": True,
+                  "uninstallerExecutable": True,
+                  "zipCreatedWithDitto": False
+              }
+          }
+          with open(os.path.join(os.environ["PACKAGE_NAME"], "BUILD_INFO.json"), "w", encoding="utf-8") as handle:
+              json.dump(common, handle, ensure_ascii=False, indent=2)
+              handle.write("\n")
+
+          generated = datetime.now(timezone.utc).isoformat()
+          build_report = {
+              "schemaVersion": 1,
+              "generatedAt": generated,
+              "status": "passed",
+              "plugin": "VINTAGE RAWNESS",
+              "platform": "macOS",
+              "format": "VST3",
+              "architecture": archs,
+              "buildType": "Release",
+              "binaryBytes": int(os.environ["BINARY_BYTES"]),
+              "deploymentTarget": "11.0",
+              "codesign": "ad-hoc",
+              "codesignVerified": True,
+              "developerIdSigned": False,
+              "notarized": False,
+              "githubActions": {
+                  "runId": os.environ["GITHUB_RUN_ID"],
+                  "commit": os.environ["GITHUB_SHA"],
+                  "artifactName": os.environ["ARTIFACT_NAME"],
+                  "artifactId": None
+              },
+              "hostValidation": "pending"
+          }
+          with open("reports/latest/vintage-rawness-macos-build-report.json", "w", encoding="utf-8") as handle:
+              json.dump(build_report, handle, ensure_ascii=False, indent=2)
+              handle.write("\n")
+          PY
+
+      - name: Create tester ZIP with ditto
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          path = "VINTAGE_RAWNESS_MAC_FL_STUDIO_TEST/BUILD_INFO.json"
+          with open(path, encoding="utf-8") as handle:
+              data = json.load(handle)
+          data["validation"]["zipCreatedWithDitto"] = True
+          with open(path, "w", encoding="utf-8") as handle:
+              json.dump(data, handle, ensure_ascii=False, indent=2)
+              handle.write("\n")
+          PY
+          rm -f "$PACKAGE_NAME.zip"
+          ditto -c -k --keepParent "$PACKAGE_NAME" "$PACKAGE_NAME.zip"
+          test -s "$PACKAGE_NAME.zip"
+
+      - name: Validate extracted ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          extract_dir="$RUNNER_TEMP/vintage-rawness-zip-check"
+          rm -rf "$extract_dir"
+          mkdir -p "$extract_dir"
+          ditto -x -k "$PACKAGE_NAME.zip" "$extract_dir"
+          package="$extract_dir/$PACKAGE_NAME"
+          plugin="$package/VINTAGE RAWNESS.vst3"
+          binary="$plugin/Contents/MacOS/VINTAGE RAWNESS"
+          test -d "$plugin"
+          test -f "$plugin/Contents/Info.plist"
+          test -s "$binary"
+          test -x "$binary"
+          test -x "$package/INSTALL.command"
+          test -x "$package/UNINSTALL.command"
+          test -s "$package/README_FIRST.txt"
+          test -s "$package/INSTALL_MAC_FL_STUDIO.txt"
+          test -s "$package/BUILD_INFO.json"
+          iconv -f UTF-8 -t UTF-8 "$package/README_FIRST.txt" >/dev/null
+          iconv -f UTF-8 -t UTF-8 "$package/INSTALL_MAC_FL_STUDIO.txt" >/dev/null
+          file "$binary" | grep -q "Mach-O"
+          lipo -verify_arch arm64 x86_64 "$binary"
+          codesign --verify --deep --strict "$plugin"
+          xattr_output="$(xattr -lr "$plugin" 2>/dev/null || true)"
+          if grep -q "com.apple.quarantine" <<< "$xattr_output"; then
+            echo "Quarantine attribute found after ZIP extraction." >&2
+            exit 1
+          fi
+          windows_file="$(find "$package" -type f \( -iname "*.exe" -o -iname "*.dll" \) -print -quit)"
+          if [[ -n "$windows_file" ]]; then
+            echo "Windows executable content found in Mac package." >&2
+            exit 1
+          fi
+
+      - name: Upload Mac FL Studio tester ZIP
+        id: upload_package
+        uses: actions/upload-artifact@v4
+        with:
+          name: VINTAGE-RAWNESS-MAC-FL-STUDIO-TEST
+          path: VINTAGE_RAWNESS_MAC_FL_STUDIO_TEST.zip
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Finalize package report
+        shell: bash
+        env:
+          ARCHS: ${{ steps.locate.outputs.archs }}
+          ARTIFACT_ID: ${{ steps.upload_package.outputs.artifact-id }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          archs = os.environ["ARCHS"].split()
+          report = {
+              "schemaVersion": 1,
+              "generatedAt": datetime.now(timezone.utc).isoformat(),
+              "status": "passed",
+              "plugin": "VINTAGE RAWNESS",
+              "platform": "macOS",
+              "format": "VST3",
+              "architecture": archs,
+              "codesign": "ad-hoc",
+              "codesignVerified": True,
+              "notarized": False,
+              "developerIdSigned": False,
+              "installer": "INSTALL.command",
+              "uninstaller": "UNINSTALL.command",
+              "zip": "VINTAGE_RAWNESS_MAC_FL_STUDIO_TEST.zip",
+              "zipCreatedWithDitto": True,
+              "githubActions": {
+                  "runId": os.environ["GITHUB_RUN_ID"],
+                  "commit": os.environ["GITHUB_SHA"],
+                  "artifactId": os.environ["ARTIFACT_ID"],
+                  "artifactName": os.environ["ARTIFACT_NAME"]
+              },
+              "hostValidation": "pending",
+              "warnings": [
+                  "Gatekeeper warning may still appear",
+                  "Right-click Open may be required",
+                  "Apple Developer ID signing and notarization are not included"
+              ]
+          }
+          with open("reports/latest/vintage-rawness-macos-package-report.json", "w", encoding="utf-8") as handle:
+              json.dump(report, handle, ensure_ascii=False, indent=2)
+              handle.write("\n")
+
+          build_path = "reports/latest/vintage-rawness-macos-build-report.json"
+          with open(build_path, encoding="utf-8") as handle:
+              build_report = json.load(handle)
+          build_report["githubActions"]["artifactId"] = os.environ["ARTIFACT_ID"]
+          with open(build_path, "w", encoding="utf-8") as handle:
+              json.dump(build_report, handle, ensure_ascii=False, indent=2)
+              handle.write("\n")
+          PY
+
+      - name: Upload compact reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: VINTAGE-RAWNESS-MAC-REPORTS
+          path: |
+            reports/latest/vintage-rawness-macos-build-report.json
+            reports/latest/vintage-rawness-macos-package-report.json
+          if-no-files-found: error

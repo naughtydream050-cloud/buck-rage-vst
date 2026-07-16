@@ -1,0 +1,45 @@
+VINTAGE RAWNESS Mac版 FL Studio インストール手順
+
+【通常手順】
+1. VINTAGE_RAWNESS_MAC_FL_STUDIO_TEST.zipを解凍します。
+2. 展開したフォルダ内のINSTALL.commandを右クリックします。
+3. メニューから「開く」を選択します。
+4. インストール完了メッセージを確認します。
+5. FL Studioを起動または再起動します。
+
+【FL Studioで再スキャン】
+FL Studio
+→ Options
+→ Manage plugins
+→ Find installed plugins
+
+VINTAGE RAWNESSはミキサーのエフェクトスロットから使用します。
+
+【手動インストール先】
+~/Library/Audio/Plug-Ins/VST3/
+
+通常はINSTALL.commandが自動的に上記フォルダへコピーするため、
+手動コピーや管理者パスワードは不要です。
+
+【起動またはスキャンできない場合】
+1. macOSの「システム設定」を開きます。
+2. 「プライバシーとセキュリティ」を開きます。
+3. VINTAGE RAWNESSに関するブロック通知があれば「このまま開く」を選びます。
+4. FL Studioを終了して再起動します。
+5. Manage pluginsから再スキャンします。
+
+【最終手段】
+INSTALL.commandが正常に完了しなかった場合に限り、ターミナルへ以下を入力します。
+通常はINSTALL.commandが自動実行するため、手入力は不要です。
+
+xattr -dr com.apple.quarantine \
+  "$HOME/Library/Audio/Plug-Ins/VST3/VINTAGE RAWNESS.vst3"
+
+chmod +x \
+  "$HOME/Library/Audio/Plug-Ins/VST3/VINTAGE RAWNESS.vst3/Contents/MacOS/"*
+
+【署名について】
+このテスト版はbundle整合性確認用のad-hoc codesignのみ実施しています。
+Apple Developer ID署名およびnotarizationは実施していません。
+Gatekeeperの警告が表示されないことを保証するものではありません。
+
