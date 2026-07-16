@@ -2,14 +2,14 @@
 
 ## Phase
 
-WINDOWS_VST3_UI_IMPLEMENTATION_AND_INTERACTION_VALIDATION
+PHASE_1_UI_FIX_HOST_SCREENSHOT_REVIEW
 
 ## Goal
 
-Build a Windows VST3 that presents the supplied image-first UI and validates controls in FL Studio. DSP is deliberately limited to output gain, bypass, and stereo-meter analysis.
+Replace visible JUCE standard controls with transparent hit targets and minimal custom state overlays. Darken the baked meter slots so the real atomic L/R meter is the only moving level display. DSP remains deliberately limited to output gain, bypass, and stereo-meter analysis.
 
 ## Next
 
-1. Windows CI passed on run `29497008873`; artifact `LAOZI-BUCK-RAW-SHIT-VST3-Windows` is downloaded to `deliverables/LAOZI_BUCK_RAW_SHIT_WINDOWS_FL_STUDIO_TEST.zip`.
-2. Install in FL Studio and confirm rendering, control hit areas, presets, bypass, oversample state, and live meter movement.
+1. Run Windows CI for the UI overlay/meter-slot revision and refresh `deliverables/LAOZI_BUCK_RAW_SHIT_WINDOWS_FL_STUDIO_TEST.zip` from its artifact.
+2. In FL Studio, confirm natural preset text/arrow hit areas, OFF/2x/4x status, BYPASS LED, and live independent L/R meter movement.
 3. Freeze the approved UI before opening a separate DSP phase.

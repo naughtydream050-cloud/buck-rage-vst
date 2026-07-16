@@ -58,7 +58,19 @@ try {
 
     $source.Save((Join-Path $referenceDir 'reference.png'), [System.Drawing.Imaging.ImageFormat]::Png)
     $faceplatePath = Join-Path $resourcesDir 'faceplate_laozi_buck_raw_shit.png'
-    $source.Save($faceplatePath, [System.Drawing.Imaging.ImageFormat]::Png)
+    $faceplate = New-Object System.Drawing.Bitmap $source
+    $faceplateGraphics = [System.Drawing.Graphics]::FromImage($faceplate)
+    # Preserve the meter frame/scale, but remove only the baked red segment columns.
+    $slotBrush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 12, 11, 12))
+    $faceplateGraphics.FillRectangle($slotBrush, 1127, 429, 19, 197)
+    $faceplateGraphics.FillRectangle($slotBrush, 1164, 429, 19, 197)
+    # Clear only variable state text; the surrounding reference controls remain intact.
+    $faceplateGraphics.FillRectangle($slotBrush, 101, 44, 140, 18)
+    $faceplateGraphics.FillRectangle($slotBrush, 105, 855, 50, 17)
+    $slotBrush.Dispose()
+    $faceplateGraphics.Dispose()
+    $faceplate.Save($faceplatePath, [System.Drawing.Imaging.ImageFormat]::Png)
+    $faceplate.Dispose()
 
     # Full tick-ring crops cover the reference knobs exactly, preventing double-knob rendering.
     Save-CircularCrop $source 210 526 196 (Join-Path $resourcesDir 'knob_pressure.png')

@@ -39,13 +39,15 @@ void StereoMeter::paint(juce::Graphics& g)
             const auto y = area.getBottom() - (static_cast<float>(i + 1) * segmentHeight + static_cast<float>(i) * gap);
             const auto hot = i < active;
             const auto colour = i > 20 ? juce::Colour(0xfff17a8a) : juce::Colour(0xffd55b70);
-            g.setColour(hot ? colour.withAlpha(0.92f) : juce::Colours::black.withAlpha(0.32f));
+            // Fully cover the darkened slot so only real audio peaks light up.
+            g.setColour(hot ? colour.withAlpha(0.92f) : juce::Colour(0xff09090a));
             g.fillRoundedRectangle(area.getX(), y, area.getWidth(), segmentHeight, 0.7f);
         }
     };
 
     const auto bounds = getLocalBounds().toFloat();
-    const auto channelWidth = bounds.getWidth() * 0.31f;
-    drawChannel({ bounds.getX() + bounds.getWidth() * 0.14f, bounds.getY(), channelWidth, bounds.getHeight() }, displayedLeftDb);
-    drawChannel({ bounds.getRight() - bounds.getWidth() * 0.14f - channelWidth, bounds.getY(), channelWidth, bounds.getHeight() }, displayedRightDb);
+    const auto columnWidth = bounds.getWidth() * (19.0f / 56.0f);
+    const auto rightX = bounds.getWidth() * (37.0f / 56.0f);
+    drawChannel({ 0.0f, 0.0f, columnWidth, bounds.getHeight() }, displayedLeftDb);
+    drawChannel({ rightX, 0.0f, columnWidth, bounds.getHeight() }, displayedRightDb);
 }

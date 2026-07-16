@@ -1,17 +1,12 @@
 {
   "schemaVersion": 1,
   "project": "LAOZI_BUCK_RAW_SHIT",
-  "phase": "WINDOWS_VST3_UI_IMPLEMENTATION_AND_INTERACTION_VALIDATION",
+  "phase": "PHASE_1_UI_FIX_HOST_SCREENSHOT_REVIEW",
   "visualTruth": "ui/reference/reference.png",
   "uiSpec": "projects/LAOZI_BUCK_RAW_SHIT/ui/spec/ui-spec.json",
   "status": "passed",
   "uiReport": "reports/latest/laozi-buck-raw-shit-ui-report.json",
+  "uiFix": "transparent hit targets, custom state overlays, darkened meter slots",
   "dsp": "temporary output gain + bypass + atomic stereo meter only",
-  "githubActions": {
-    "runId": "29497008873",
-    "artifactName": "LAOZI-BUCK-RAW-SHIT-VST3-Windows",
-    "artifactId": "8374852647"
-  },
-  "testerZip": "deliverables/LAOZI_BUCK_RAW_SHIT_WINDOWS_FL_STUDIO_TEST.zip",
   "hostValidation": "pending"
 }

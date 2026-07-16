@@ -4,6 +4,13 @@
 #include "PluginProcessor.h"
 #include "StereoMeter.h"
 
+class UiHitTargetButton final : public juce::Button
+{
+public:
+    UiHitTargetButton() : juce::Button("") { setOpaque(false); setWantsKeyboardFocus(false); }
+    void paintButton(juce::Graphics&, bool, bool) override {}
+};
+
 class LaoziBuckRawShitEditor final : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
@@ -23,23 +30,22 @@ private:
 
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
-    using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
 
     static juce::Image loadImage(const char* name);
     void setupKnob(ImageKnob&, juce::Image, float defaultValue);
     void applyPreset(int index);
     void setFloatParameter(const char* id, float value);
     void setChoiceParameter(const char* id, int index, int count);
+    int choiceIndex(const char* id, int count) const noexcept;
     void timerCallback() override;
 
     LaoziBuckRawShitProcessor& processor;
     juce::Image faceplate;
     ImageKnob pressureKnob, kickKnob, auraKnob, glueKnob, outputKnob;
     StereoMeter meter;
-    juce::ComboBox presetSelector;
-    juce::TextButton previousPreset { "<" }, nextPreset { ">" }, oversampleButton, bypassButton { "BYPASS" };
+    UiHitTargetButton presetHit, previousPreset, nextPreset, oversampleButton, bypassButton;
     SliderAttachment pressureAttachment, kickAttachment, auraAttachment, glueAttachment, outputAttachment;
-    ComboBoxAttachment presetAttachment;
     ButtonAttachment bypassAttachment;
     int displayedOversample { -1 };
+    int displayedPreset { -1 };
 };

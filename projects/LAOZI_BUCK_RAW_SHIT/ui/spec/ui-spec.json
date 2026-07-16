@@ -17,7 +17,7 @@
     { "id": "GLUE", "parameterId": "glue", "asset": "Resources/knob_glue.png", "defaultValue": 0.5, "center": { "x": 918, "y": 526 }, "radius": 98, "bounds": { "x": 820, "y": 428, "width": 196, "height": 196 } },
     { "id": "OUTPUT", "parameterId": "output", "asset": "Resources/knob_output.png", "defaultValue": 0.0, "center": { "x": 1155, "y": 687 }, "radius": 50, "bounds": { "x": 1105, "y": 637, "width": 100, "height": 100 } }
   ],
-  "preset": { "bounds": { "x": 94, "y": 39, "width": 154, "height": 28 }, "previousBounds": { "x": 250, "y": 39, "width": 20, "height": 28 }, "nextBounds": { "x": 272, "y": 39, "width": 20, "height": 28 } },
+  "preset": { "bounds": { "x": 94, "y": 39, "width": 154, "height": 28 }, "textBounds": { "x": 101, "y": 44, "width": 140, "height": 18 }, "previousBounds": { "x": 250, "y": 39, "width": 20, "height": 28 }, "nextBounds": { "x": 272, "y": 39, "width": 20, "height": 28 } },
   "meter": { "bounds": { "x": 1127, "y": 429, "width": 56, "height": 197 }, "left": { "x": 1127, "y": 429, "width": 19, "height": 197 }, "right": { "x": 1164, "y": 429, "width": 19, "height": 197 } },
-  "buttons": { "oversampleBounds": { "x": 50, "y": 843, "width": 120, "height": 41 }, "bypassBounds": { "x": 1110, "y": 843, "width": 119, "height": 41 } }
+  "buttons": { "oversampleBounds": { "x": 50, "y": 843, "width": 120, "height": 41 }, "oversampleStatusBounds": { "x": 118, "y": 855, "width": 37, "height": 17 }, "bypassBounds": { "x": 1110, "y": 843, "width": 119, "height": 41 }, "bypassIndicatorBounds": { "x": 1120, "y": 854, "width": 15, "height": 15 } }
 }

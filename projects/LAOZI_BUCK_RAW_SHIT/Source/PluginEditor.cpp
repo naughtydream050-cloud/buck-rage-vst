@@ -1,6 +1,8 @@
 #include "PluginEditor.h"
 #include "GeneratedLayout.h"
 
+#include <cmath>
+
 #if __has_include(<BinaryData.h>)
  #include <BinaryData.h>
 #endif
@@ -22,7 +24,6 @@ LaoziBuckRawShitEditor::LaoziBuckRawShitEditor(LaoziBuckRawShitProcessor& proces
       auraAttachment(processor.apvts, LaoziBuckRawShitProcessor::auraParamId, auraKnob),
       glueAttachment(processor.apvts, LaoziBuckRawShitProcessor::glueParamId, glueKnob),
       outputAttachment(processor.apvts, LaoziBuckRawShitProcessor::outputParamId, outputKnob),
-      presetAttachment(processor.apvts, LaoziBuckRawShitProcessor::presetIndexParamId, presetSelector),
       bypassAttachment(processor.apvts, LaoziBuckRawShitProcessor::bypassParamId, bypassButton)
 {
     faceplate = loadImage("faceplate_laozi_buck_raw_shit_png");
@@ -32,31 +33,39 @@ LaoziBuckRawShitEditor::LaoziBuckRawShitEditor(LaoziBuckRawShitProcessor& proces
     setupKnob(glueKnob, loadImage("knob_glue_png"), 0.50f);
     setupKnob(outputKnob, loadImage("knob_output_png"), 2.0f / 3.0f);
 
-    for (int index = 0; index < 5; ++index)
-        presetSelector.addItem(presets[index].name, index + 1);
-    presetSelector.setColour(juce::ComboBox::backgroundColourId, juce::Colours::black.withAlpha(0.20f));
-    presetSelector.setColour(juce::ComboBox::textColourId, juce::Colour(0xffd0c8bf));
-    presetSelector.setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
-    presetSelector.onChange = [this] { applyPreset(presetSelector.getSelectedItemIndex()); };
-
-    const auto styleButton = [] (juce::TextButton& button)
+    bypassButton.setClickingTogglesState(true);
+    presetHit.onClick = [this]
     {
-        button.setColour(juce::TextButton::buttonColourId, juce::Colours::black.withAlpha(0.08f));
-        button.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff9d3c4f).withAlpha(0.45f));
-        button.setColour(juce::TextButton::textColourOffId, juce::Colour(0xffd0c8bf));
-        button.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
+        juce::PopupMenu menu;
+        for (int index = 0; index < 5; ++index) menu.addItem(index + 1, presets[index].name);
+        auto safeThis = juce::Component::SafePointer<LaoziBuckRawShitEditor>(this);
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&presetHit), [safeThis] (int result)
+        {
+            if (safeThis != nullptr && result > 0)
+            {
+                safeThis->setChoiceParameter(LaoziBuckRawShitProcessor::presetIndexParamId, result - 1, 5);
+                safeThis->applyPreset(result - 1);
+            }
+        });
     };
-    styleButton(previousPreset); styleButton(nextPreset); styleButton(oversampleButton); styleButton(bypassButton);
-    previousPreset.onClick = [this] { setChoiceParameter(LaoziBuckRawShitProcessor::presetIndexParamId, (presetSelector.getSelectedItemIndex() + 4) % 5, 5); };
-    nextPreset.onClick = [this] { setChoiceParameter(LaoziBuckRawShitProcessor::presetIndexParamId, (presetSelector.getSelectedItemIndex() + 1) % 5, 5); };
+    previousPreset.onClick = [this]
+    {
+        const auto next = (choiceIndex(LaoziBuckRawShitProcessor::presetIndexParamId, 5) + 4) % 5;
+        setChoiceParameter(LaoziBuckRawShitProcessor::presetIndexParamId, next, 5); applyPreset(next);
+    };
+    nextPreset.onClick = [this]
+    {
+        const auto next = (choiceIndex(LaoziBuckRawShitProcessor::presetIndexParamId, 5) + 1) % 5;
+        setChoiceParameter(LaoziBuckRawShitProcessor::presetIndexParamId, next, 5); applyPreset(next);
+    };
     oversampleButton.onClick = [this]
     {
-        const auto current = static_cast<int>(processor.apvts.getRawParameterValue(LaoziBuckRawShitProcessor::oversampleParamId)->load());
+        const auto current = choiceIndex(LaoziBuckRawShitProcessor::oversampleParamId, 3);
         setChoiceParameter(LaoziBuckRawShitProcessor::oversampleParamId, (current + 1) % 3, 3);
     };
 
     addAndMakeVisible(pressureKnob); addAndMakeVisible(kickKnob); addAndMakeVisible(auraKnob); addAndMakeVisible(glueKnob); addAndMakeVisible(outputKnob);
-    addAndMakeVisible(meter); addAndMakeVisible(presetSelector); addAndMakeVisible(previousPreset); addAndMakeVisible(nextPreset);
+    addAndMakeVisible(meter); addAndMakeVisible(presetHit); addAndMakeVisible(previousPreset); addAndMakeVisible(nextPreset);
     addAndMakeVisible(oversampleButton); addAndMakeVisible(bypassButton);
     setSize(LaoziLayout::displayWidth, LaoziLayout::displayHeight);
     startTimerHz(15);
@@ -73,14 +82,36 @@ void LaoziBuckRawShitEditor::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colours::black);
     if (faceplate.isValid()) g.drawImage(faceplate, getLocalBounds().toFloat(), juce::RectanglePlacement::stretchToFit, false);
+    const auto presetIndex = choiceIndex(LaoziBuckRawShitProcessor::presetIndexParamId, 5);
+    g.setColour(juce::Colour(0xffc9c0b7));
+    g.setFont(juce::FontOptions(6.8f));
+    g.drawFittedText(presets[presetIndex].name, LaoziLayout::presetTextBounds(), juce::Justification::centred, 1);
+
+    const auto oversampleIndex = choiceIndex(LaoziBuckRawShitProcessor::oversampleParamId, 3);
+    const char* oversampleText[] { "OFF", "2x", "4x" };
+    g.setColour(juce::Colour(0xffc3616c));
+    g.setFont(juce::FontOptions(6.2f));
+    g.drawFittedText(oversampleText[oversampleIndex], LaoziLayout::oversampleStatusBounds(), juce::Justification::centred, 1);
+
+    if (processor.apvts.getRawParameterValue(LaoziBuckRawShitProcessor::bypassParamId)->load() > 0.5f)
+    {
+        g.setColour(juce::Colour(0xffd85b69));
+        g.fillEllipse(LaoziLayout::bypassIndicatorBounds().toFloat().reduced(2.0f));
+    }
 }
 
 void LaoziBuckRawShitEditor::resized()
 {
     pressureKnob.setBounds(LaoziLayout::pressureBounds()); kickKnob.setBounds(LaoziLayout::kickBounds());
     auraKnob.setBounds(LaoziLayout::auraBounds()); glueKnob.setBounds(LaoziLayout::glueBounds()); outputKnob.setBounds(LaoziLayout::outputBounds());
-    presetSelector.setBounds(LaoziLayout::presetBounds()); previousPreset.setBounds(LaoziLayout::previousPresetBounds()); nextPreset.setBounds(LaoziLayout::nextPresetBounds());
+    presetHit.setBounds(LaoziLayout::presetBounds()); previousPreset.setBounds(LaoziLayout::previousPresetBounds()); nextPreset.setBounds(LaoziLayout::nextPresetBounds());
     meter.setBounds(LaoziLayout::meterBounds()); oversampleButton.setBounds(LaoziLayout::oversampleBounds()); bypassButton.setBounds(LaoziLayout::bypassBounds());
+}
+
+int LaoziBuckRawShitEditor::choiceIndex(const char* id, int count) const noexcept
+{
+    const auto normalised = processor.apvts.getRawParameterValue(id)->load();
+    return juce::jlimit(0, count - 1, static_cast<int>(std::lround(normalised * static_cast<float>(count - 1))));
 }
 
 void LaoziBuckRawShitEditor::setFloatParameter(const char* id, float value)
@@ -115,10 +146,14 @@ void LaoziBuckRawShitEditor::applyPreset(int index)
 
 void LaoziBuckRawShitEditor::timerCallback()
 {
-    const auto oversample = static_cast<int>(processor.apvts.getRawParameterValue(LaoziBuckRawShitProcessor::oversampleParamId)->load());
-    if (oversample != displayedOversample)
+    const auto oversample = choiceIndex(LaoziBuckRawShitProcessor::oversampleParamId, 3);
+    const auto preset = choiceIndex(LaoziBuckRawShitProcessor::presetIndexParamId, 5);
+    if (oversample != displayedOversample || preset != displayedPreset)
     {
+        if (preset != displayedPreset)
+            applyPreset(preset);
         displayedOversample = oversample;
-        oversampleButton.setButtonText(oversample == 0 ? "OVERSAMPLE\nOFF" : (oversample == 1 ? "OVERSAMPLE\n2x" : "OVERSAMPLE\n4x"));
+        displayedPreset = preset;
+        repaint();
     }
 }

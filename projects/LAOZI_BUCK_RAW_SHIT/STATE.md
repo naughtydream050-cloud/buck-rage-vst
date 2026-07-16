@@ -2,7 +2,7 @@
 
 ## Phase
 
-WINDOWS_VST3_UI_IMPLEMENTATION_AND_INTERACTION_VALIDATION
+PHASE_1_UI_FIX_HOST_SCREENSHOT_REVIEW
 
 ## Scope Locks
 
@@ -17,8 +17,9 @@ WINDOWS_VST3_UI_IMPLEMENTATION_AND_INTERACTION_VALIDATION
 - APVTS controls, five presets, functional bypass, oversample state selection, output-gain-only temporary audio path, and atomic stereo metering were implemented.
 - Windows VST3 CI passed on run `29497008873`; VST3 binary size is `5897216` bytes.
 - Tester ZIP and expanded folder are available under `deliverables/`.
+- A host-review revision replaces visible JUCE ComboBox/TextButton controls with transparent hit targets and custom, restrained state text. The faceplate meter slots are darkened so real L/R bars are not visually confused with baked red bars.
 
 ## Pending
 
-- FL Studio Windows host validation and user UI approval.
+- Rebuild and FL Studio Windows re-validation of the host-review UI revision.
 - Full mastering DSP, macOS build, signing, and notarization are intentionally out of scope.
