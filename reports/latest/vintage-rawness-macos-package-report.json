@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-16T10:24:51.966318+00:00",
+  "status": "passed",
+  "plugin": "VINTAGE RAWNESS",
+  "platform": "macOS",
+  "format": "VST3",
+  "architecture": [
+    "x86_64",
+    "arm64"
+  ],
+  "codesign": "ad-hoc",
+  "codesignVerified": true,
+  "notarized": false,
+  "developerIdSigned": false,
+  "installer": "INSTALL.command",
+  "uninstaller": "UNINSTALL.command",
+  "zip": "VINTAGE_RAWNESS_MAC_FL_STUDIO_TEST.zip",
+  "zipCreatedWithDitto": true,
+  "githubActions": {
+    "runId": "29490538497",
+    "commit": "2598afd970b7980bc6cb04c32ab0319822023fa0",
+    "artifactId": "8372271891",
+    "artifactName": "VINTAGE-RAWNESS-MAC-FL-STUDIO-TEST"
+  },
+  "hostValidation": "pending",
+  "warnings": [
+    "Gatekeeper warning may still appear",
+    "Right-click Open may be required",
+    "Apple Developer ID signing and notarization are not included"
+  ]
+}

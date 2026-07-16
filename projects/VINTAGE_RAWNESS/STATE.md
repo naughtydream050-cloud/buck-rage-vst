@@ -4,7 +4,7 @@
 
 ### Phase
 
-KRUMP_WARP_EFFECT_CORE
+MAC_FL_STUDIO_TESTER_DISTRIBUTION_PACK
 
 ### Done
 
@@ -67,11 +67,18 @@ KRUMP_WARP_EFFECT_CORE
 - Mac test distribution now addresses four install blockers: Intel/Apple Silicon mismatch, VST3/AU host mismatch, downloaded quarantine, and unsigned test-bundle rejection via ad-hoc codesign.
 - Added `docs/mac-install-test.md` with per-Mac install, quarantine removal, host cache reset, and local verification commands.
 - Added `tools/package_test_deliverables.ps1` to move downloaded/expanded artifacts into `deliverables/VINTAGE_RAWNESS_WINDOWS_FL_STUDIO_TEST` and `deliverables/VINTAGE_RAWNESS_MAC_TEST`.
+- Added a VST3-only macOS tester packaging workflow while leaving the Windows workflow unchanged.
+- GitHub Actions run `29490538497` passed Universal `x86_64` + `arm64` build validation.
+- Applied ad-hoc codesign and passed strict deep verification.
+- Passed isolated install/uninstall tests, `ditto` ZIP creation, ZIP extraction, executable-bit, UTF-8 document, quarantine, bundle, and Windows-binary exclusion checks.
+- Downloaded artifact `VINTAGE-RAWNESS-MAC-FL-STUDIO-TEST` id `8372271891`.
+- Saved `deliverables/VINTAGE_RAWNESS_MAC_FL_STUDIO_TEST.zip` and its expanded tester folder.
 
 ### Known Issues
 
 - Local CMake/MSBuild are not visible in the current Windows shell.
-- macOS public release still needs Developer ID signing, notarization, stapling, and host validation.
+- FL Studio Mac host validation is pending.
+- macOS public release still needs Developer ID signing, notarization, stapling, and a separate release gate.
 - Live host screenshot validation is pending.
 - Common VST3 install is blocked by administrator permission in the current shell.
 - FL Studio scan is pending until the plugin is copied to a scanned folder or the tester folder is added as a custom path.

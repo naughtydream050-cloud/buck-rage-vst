@@ -2,11 +2,11 @@
 
 ## Phase
 
-KRUMP_WARP_EFFECT_CORE
+MAC_FL_STUDIO_TESTER_DISTRIBUTION_PACK
 
 ## Goal
 
-Evolve VINTAGE_RAWNESS into an input-processing dark industrial warp effect. Keep the frozen image-first UI, DIRT/CRUSH/WOBBLE controls, four presets, and Windows VST3 first.
+Deliver a macOS Universal VST3 tester package for FL Studio without changing the frozen UI, DSP, presets, or Windows tester build.
 
 ## Current Status
 
@@ -21,7 +21,7 @@ Evolve VINTAGE_RAWNESS into an input-processing dark industrial warp effect. Kee
 - Reports generated under `reports/latest/`.
 - UI, knob, screenshot bootstrap, and DSP policy reports passed.
 - GitHub Actions workflow added for Windows VST3 first.
-- macOS VST3/AU is intentionally deferred until the Windows VST3, host UI capture, and local quality gates are stable.
+- macOS tester distribution was explicitly promoted while the public release signing/notarization gate remains deferred.
 - Local build is blocked because `cmake` and `msbuild` are not visible in the current shell.
 - GitHub Actions Windows build passed on run `26168487170`.
 - Artifact `VINTAGE-RAWNESS-VST3-Windows` was generated and downloaded.
@@ -68,12 +68,20 @@ Evolve VINTAGE_RAWNESS into an input-processing dark industrial warp effect. Kee
 - Added macOS universal GitHub Actions build coverage for both VST3 and AU.
 - Added Mac test install notes for the four common Mac blockers: universal arch, VST3/AU format coverage, quarantine removal, and ad-hoc codesign verification.
 - Added a packaging script to move expanded artifacts into Windows and Mac test deliverable folders.
+- Added the dedicated `.github/workflows/vintage-rawness-macos.yml` workflow without modifying the Windows workflow.
+- GitHub Actions run `29490538497` passed the macOS Release VST3 build and package validation.
+- Verified Universal architectures `x86_64` and `arm64`.
+- Applied and verified ad-hoc codesign. Developer ID signing and notarization remain intentionally absent.
+- CI executed `INSTALL.command` and `UNINSTALL.command` against an isolated temporary HOME and preserved a sentinel plugin.
+- CI created `VINTAGE_RAWNESS_MAC_FL_STUDIO_TEST.zip` with macOS `ditto` and revalidated the extracted bundle, command permissions, signature, architecture, UTF-8 documentation, and absence of Windows binaries.
+- Artifact `VINTAGE-RAWNESS-MAC-FL-STUDIO-TEST` id `8372271891` was downloaded.
+- Local tester ZIP and expanded folder now exist under `deliverables/`.
+- FL Studio Mac host validation is still pending.
 
 ## Next
 
-1. Push the latest DSP and macOS workflow changes to GitHub.
-2. Let GitHub Actions build Windows VST3, macOS universal VST3, macOS universal AU, and reports.
-3. Download/expand artifacts and run `projects/VINTAGE_RAWNESS/tools/package_test_deliverables.ps1`.
-4. Install the updated Windows tester VST3 in FL Studio.
-5. Send the Mac test zip to the four Macs and follow `docs/mac-install-test.md`.
-6. Check whether CRUSH now reads as dirty lo-fi instead of clipped, and whether WOBBLE gives flanger-like gunya movement.
+1. Send `deliverables/VINTAGE_RAWNESS_MAC_FL_STUDIO_TEST.zip` to a Mac FL Studio tester.
+2. Install by right-clicking `INSTALL.command`, selecting Open, and rescanning FL Studio plugins.
+3. Record Apple Silicon and Intel Mac host results separately.
+4. Keep Developer ID signing/notarization deferred until public distribution is explicitly requested.
+5. Return to the pending Windows DSP rebuild and FL Studio audio review without changing the frozen UI.
