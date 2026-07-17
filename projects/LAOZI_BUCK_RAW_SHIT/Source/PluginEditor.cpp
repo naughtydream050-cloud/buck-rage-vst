@@ -153,8 +153,8 @@ void LaoziBuckRawShitEditor::timerCallback()
     const auto preset = choiceIndex(LaoziBuckRawShitProcessor::presetIndexParamId, static_cast<int>(LaoziPresetLibrary::presets.size()));
     if (oversample != displayedOversample || preset != displayedPreset)
     {
-        if (preset != displayedPreset)
-            applyPreset(preset);
+        // Editor recreation must never overwrite user-adjusted APVTS values.
+        // Preset values are applied only by the explicit menu/previous/next actions.
         displayedOversample = oversample;
         displayedPreset = preset;
         repaint();
