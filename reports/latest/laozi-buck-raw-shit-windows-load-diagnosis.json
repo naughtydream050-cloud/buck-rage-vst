@@ -2,8 +2,17 @@
   "schemaVersion": 1,
   "project": "LAOZI_BUCK_RAW_SHIT",
   "diagnosisMode": "read-only",
-  "status": "ascii-artifact-name-isolation-build-pending",
-  "followUp": "A new build will use LAOZI_BUCK_RAW_SHIT.vst3 for both bundle and internal binary while preserving the Japanese display name. This isolates non-ASCII filesystem naming as a variable; it does not yet disprove the active Code Integrity policy.",
+  "status": "ascii-artifact-name-isolation-ready-for-host-test",
+  "followUp": "Build run 29550243754 produced LAOZI_BUCK_RAW_SHIT.vst3 for both bundle and internal binary while preserving the Japanese display name. This isolates non-ASCII filesystem naming as a variable; it does not yet disprove the active Code Integrity policy.",
+  "asciiArtifactValidation": {
+    "bundleName": "LAOZI_BUCK_RAW_SHIT.vst3",
+    "binaryName": "LAOZI_BUCK_RAW_SHIT.vst3",
+    "binarySha256": "F3695BA0369BA165A3D03318AC83CE57C07B245197CAD86BC7CFD5434A7AD783",
+    "architecture": "x64",
+    "buildRun": 29550243754,
+    "artifactId": 8395493642,
+    "zipValidated": true
+  },
   "trueCause": "Windows Code Integrity rejected the Laozi VST3 executable before FL Studio could load it. The affected executable itself, not a child dependency, is named in the Code Integrity events.",
   "affectedFilePath": "C:\\Program Files\\Common Files\\VST3\\老子-BUCK RAW SHIT-.vst3\\Contents\\x86_64-win\\老子-BUCK RAW SHIT-.vst3",
   "bundle": {
