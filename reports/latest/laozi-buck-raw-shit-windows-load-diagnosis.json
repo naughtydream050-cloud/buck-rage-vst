@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "project": "LAOZI_BUCK_RAW_SHIT",
+  "diagnosisMode": "read-only",
+  "status": "ascii-artifact-name-isolation-build-pending",
+  "followUp": "A new build will use LAOZI_BUCK_RAW_SHIT.vst3 for both bundle and internal binary while preserving the Japanese display name. This isolates non-ASCII filesystem naming as a variable; it does not yet disprove the active Code Integrity policy.",
+  "trueCause": "Windows Code Integrity rejected the Laozi VST3 executable before FL Studio could load it. The affected executable itself, not a child dependency, is named in the Code Integrity events.",
+  "affectedFilePath": "C:\\Program Files\\Common Files\\VST3\\老子-BUCK RAW SHIT-.vst3\\Contents\\x86_64-win\\老子-BUCK RAW SHIT-.vst3",
+  "bundle": {
+    "bundleExists": true,
+    "binaryExists": true,
+    "moduleInfoExists": true,
+    "binaryBytes": 5945344,
+    "pe": {
+      "dosMagic": "MZ",
+      "signature": "PE\\u0000\\u0000",
+      "machine": "0x8664",
+      "architecture": "x64"
+    },
+    "installedSha256": "C7B71BEA264E44B63561AEFED5C46F5208BB36071DD6D20E47B166AB9EC70619",
+    "latestPackageSha256": "C7B71BEA264E44B63561AEFED5C46F5208BB36071DD6D20E47B166AB9EC70619",
+    "hashMatchesLatestPackage": true,
+    "signatureStatus": "NotSigned"
+  },
+  "dependencies": {
+    "imports": ["MSVCP140.dll", "VCRUNTIME140.dll", "VCRUNTIME140_1.dll", "api-ms-win-crt-*"],
+    "vcRuntimeFilesPresentInSystem32": true,
+    "missingDependencyEvidence": false,
+    "note": "The loader was blocked by Code Integrity before dependency loading could be evaluated in FL Studio."
+  },
+  "motw": {
+    "zoneIdentifierPresent": false,
+    "unblockFileCanHelp": false,
+    "reason": "Neither the VST3 bundle root nor executable has a Zone.Identifier stream."
+  },
+  "codeIntegrity": {
+    "events": [3033, 3077],
+    "process": "C:\\Program Files\\Image-Line\\FL Studio 2025\\FL64.exe",
+    "policyId": "{0283AC0F-FFF1-49AE-ADA1-8A933130CAD6}",
+    "messageSummary": "The exact VST3 executable did not meet Enterprise signing level requirements or violated Code Integrity policy.",
+    "activePolicyFilePresent": true,
+    "deviceGuardCodeIntegrityEnforcementStatus": 2,
+    "smartAppControlVerifiedAndReputablePolicyState": 1
+  },
+  "unsignedComparison": {
+    "otherUnsignedVst3Present": ["OTT.vst3", "RUDE HYPE.vst3", "VINTAGE RAWNESS.vst3"],
+    "conclusion": "Their presence alone does not prove they successfully load under the active policy; no successful-load evidence was collected for them."
+  },
+  "conclusions": {
+    "flStudioCacheCause": false,
+    "bundleCorruptionCause": false,
+    "missingVcRuntimeCause": false,
+    "motwCause": false,
+    "codeSigningRequiredForThisPc": "A signer allowed by the active Code Integrity policy is required. An arbitrary self-signed certificate may still be rejected.",
+    "pcAppearsEnterpriseManaged": "Active Code Integrity policy files, Enterprise signing-level rejection events, and enforced Code Integrity status strongly indicate managed or policy-enforced application control."
+  },
+  "nextAction": "Do not rebuild for this symptom. Ask the Windows/IT policy owner to allow the test signer or provide a signing certificate trusted by policy; alternatively validate the VST3 on a Windows machine without this enforcement."
+}

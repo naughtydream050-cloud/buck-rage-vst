@@ -14,7 +14,9 @@ juce_add_plugin(LaoziBuckRawShit
     PLUGIN_MANUFACTURER_CODE Ndre
     PLUGIN_CODE Lbrs
     FORMATS VST3
-    PRODUCT_NAME "老子-BUCK RAW SHIT-"
+    # Keep the user-facing name independent from the Windows filesystem name.
+    PRODUCT_NAME "LAOZI_BUCK_RAW_SHIT"
+    PLUGIN_NAME "老子-BUCK RAW SHIT-"
     BUNDLE_ID "com.naughtydream.laozibuckrawshit"
 )
 

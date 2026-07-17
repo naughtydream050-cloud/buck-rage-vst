@@ -35,9 +35,9 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $bundle = Get-ChildItem build-laozi -Recurse -Directory -Filter '老子-BUCK RAW SHIT-.vst3' | Select-Object -First 1
+          $bundle = Get-ChildItem build-laozi -Recurse -Directory -Filter 'LAOZI_BUCK_RAW_SHIT.vst3' | Select-Object -First 1
           if ($null -eq $bundle) { throw 'VST3 bundle was not found.' }
-          $binary = Get-ChildItem $bundle.FullName -Recurse -File -Filter '老子-BUCK RAW SHIT-.vst3' | Select-Object -First 1
+          $binary = Get-ChildItem $bundle.FullName -Recurse -File -Filter 'LAOZI_BUCK_RAW_SHIT.vst3' | Select-Object -First 1
           if ($null -eq $binary -or $binary.Length -le 0) { throw 'VST3 binary is missing or empty.' }
           $staging = Join-Path $PWD $env:PACKAGE
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
@@ -46,7 +46,7 @@ jobs:
           老子-BUCK RAW SHIT- Windows FL Studioテストパック
 
           1. ZIPを解凍します。
-          2. 「老子-BUCK RAW SHIT-.vst3」をFL StudioのVST3スキャン対象へコピーします。
+          2. 「LAOZI_BUCK_RAW_SHIT.vst3」をFL StudioのVST3スキャン対象へコピーします。
           3. FL Studio: Options → Manage plugins → Find installed plugins を実行します。
           4. ミキサーのエフェクトスロットから読み込みます。
 
@@ -55,8 +55,14 @@ jobs:
           @'
           Windows FL Studio インストール
 
-          推奨コピー先: C:\Program Files\Common Files\VST3\
-          管理者権限がない場合は、FL StudioのManage pluginsで任意のテストフォルダをスキャン対象に追加してください。
+          推奨テストフォルダ: D:\VST3_TEST\LAOZI_BUCK_RAW_SHIT\
+
+          1. ZIPを解凍し、LAOZI_BUCK_RAW_SHIT.vst3 を上記フォルダへコピーします。
+          2. FL Studio → Options → Manage plugins を開きます。
+          3. Plugin search paths に D:\VST3_TEST\LAOZI_BUCK_RAW_SHIT\ を追加します。
+          4. Find installed plugins を実行します。
+
+          表示名は「老子-BUCK RAW SHIT-」ですが、bundleと内部binaryはWindows互換性確認のためASCII名です。
           '@ | Set-Content (Join-Path $staging 'INSTALL_WINDOWS_FL_STUDIO.txt') -Encoding utf8
           @{ plugin='老子-BUCK RAW SHIT-'; format='VST3'; platform='Windows'; buildType='Release'; buildRun=$env:GITHUB_RUN_ID; commit=$env:GITHUB_SHA; validation=@{ bundleExists=$true; binaryExists=$true; binaryBytes=$binary.Length; uiValidation='passed'; hostValidation='pending' }; dsp='temporary output gain + bypass + atomic stereo meter only' } | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $staging 'BUILD_INFO.json') -Encoding utf8
           $zip = "$env:PACKAGE.zip"
@@ -64,8 +70,8 @@ jobs:
           Compress-Archive -Path $staging -DestinationPath $zip -Force
           if ((Get-Item $zip).Length -le 0) { throw 'Tester ZIP is empty.' }
           Expand-Archive -Path $zip -DestinationPath zip-check -Force
-          if (-not (Test-Path "zip-check/$env:PACKAGE/老子-BUCK RAW SHIT-.vst3")) { throw 'ZIP structure validation failed.' }
-          @{ schemaVersion=1; status='passed'; project='LAOZI_BUCK_RAW_SHIT'; platform='Windows'; format='VST3'; runId=$env:GITHUB_RUN_ID; artifactName=$env:ARTIFACT; binaryBytes=$binary.Length; testerZip="$env:PACKAGE.zip"; hostValidation='pending' } | ConvertTo-Json | Set-Content reports/latest/laozi-buck-raw-shit-build-report.json -Encoding utf8
+          if (-not (Test-Path "zip-check/$env:PACKAGE/LAOZI_BUCK_RAW_SHIT.vst3/Contents/x86_64-win/LAOZI_BUCK_RAW_SHIT.vst3")) { throw 'ZIP structure validation failed.' }
+          @{ schemaVersion=1; status='passed'; project='LAOZI_BUCK_RAW_SHIT'; platform='Windows'; format='VST3'; displayName='老子-BUCK RAW SHIT-'; bundleName='LAOZI_BUCK_RAW_SHIT.vst3'; binaryName='LAOZI_BUCK_RAW_SHIT.vst3'; runId=$env:GITHUB_RUN_ID; artifactName=$env:ARTIFACT; binaryBytes=$binary.Length; testerZip="$env:PACKAGE.zip"; hostValidation='pending' } | ConvertTo-Json | Set-Content reports/latest/laozi-buck-raw-shit-build-report.json -Encoding utf8
       - name: Upload Windows tester ZIP
         uses: actions/upload-artifact@v4
         with:
