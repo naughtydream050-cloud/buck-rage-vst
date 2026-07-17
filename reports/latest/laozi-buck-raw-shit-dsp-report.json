@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "project": "LAOZI_BUCK_RAW_SHIT",
+  "phase": "PHASE_2_DSP_IMPLEMENTATION_AND_PRESET_TUNING",
+  "status": "implemented-pending-host-audition",
+  "audioPath": ["input", "KICK low-band impact", "AURA high-band/M-S width", "PRESSURE saturation", "GLUE linked compression", "DC blocker", "OUTPUT gain", "atomic L/R meter", "output"],
+  "parameters": {
+    "pressure": "normalized soft saturation",
+    "kick": "125 Hz one-pole impact reinforcement",
+    "aura": "upper-band excitation plus M/S side expansion",
+    "glue": "stereo-linked peak compression",
+    "output": "post-processing gain",
+    "bypass": "sample-transparent bypass"
+  },
+  "presets": ["IRON PULSE", "GRIME ENGINE", "CRUSHED KICK", "WIDE RITUAL", "BATTLE SMOKE", "CONCRETE FANG", "ASH PARADE", "VILLAIN HALO", "COLD SPIRAL", "FINAL ROUND", "NIGHT PRESS", "RAW CEREMONY"],
+  "referenceGroups": {
+    "RAZOR_FACE": 2,
+    "BRAVODOMO": 2,
+    "MOZARF": 2,
+    "RUGA": 8
+  },
+  "oversample": "state/UI selection only; no processing or latency change in this pass",
+  "realtimeSafety": {
+    "processBlockAllocation": false,
+    "processBlockLocks": false,
+    "meterTransport": "atomic peak exchange"
+  },
+  "hostValidation": "pending"
+}

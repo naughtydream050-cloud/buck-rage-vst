@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include <atomic>
+#include <array>
 
 class LaoziBuckRawShitProcessor final : public juce::AudioProcessor
 {
@@ -39,5 +40,14 @@ public:
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
     static void publishPeak(std::atomic<float>& destination, float value) noexcept;
+    void resetDspState() noexcept;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LaoziBuckRawShitProcessor)
+
+    double currentSampleRate { 44100.0 };
+    std::array<float, 2> kickLow {};
+    std::array<float, 2> auraLow {};
+    std::array<float, 2> dcInput {};
+    std::array<float, 2> dcOutput {};
+    float glueEnvelope { 0.0f };
+    float glueGain { 1.0f };
 };

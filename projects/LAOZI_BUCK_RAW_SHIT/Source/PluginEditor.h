@@ -2,6 +2,7 @@
 #include <JuceHeader.h>
 #include "ImageKnob.h"
 #include "PluginProcessor.h"
+#include "PresetLibrary.h"
 #include "StereoMeter.h"
 
 class UiHitTargetButton final : public juce::Button
@@ -19,15 +20,6 @@ public:
     void resized() override;
 
 private:
-    struct Preset { const char* name; float pressure; float kick; float aura; float glue; };
-    static constexpr Preset presets[5] {
-        { "BUCK MASTER", 0.50f, 0.55f, 0.45f, 0.50f },
-        { "MORF FORCE", 0.70f, 0.85f, 0.65f, 0.55f },
-        { "GRAND KICK", 0.55f, 1.00f, 0.40f, 0.45f },
-        { "DARK CEREMONY", 0.45f, 0.60f, 0.90f, 0.65f },
-        { "RAW SHIT", 0.90f, 0.80f, 0.55f, 0.75f }
-    };
-
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
 

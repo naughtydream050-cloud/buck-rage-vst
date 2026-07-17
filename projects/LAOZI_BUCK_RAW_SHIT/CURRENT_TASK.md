@@ -2,14 +2,14 @@
 
 ## Phase
 
-PHASE_1_UI_FIX_HOST_SCREENSHOT_REVIEW
+PHASE_2_DSP_IMPLEMENTATION_AND_PRESET_TUNING
 
 ## Goal
 
-Replace visible JUCE standard controls with transparent hit targets and minimal custom state overlays. Darken the baked meter slots so the real atomic L/R meter is the only moving level display. DSP remains deliberately limited to output gain, bypass, and stereo-meter analysis.
+Implement real mastering DSP for PRESSURE, KICK, AURA, and GLUE while preserving the frozen image-first UI. Build sound-character presets from RAZOR FACE, MOZARF, BRAVODOMO, and RUGA reference material without exposing artist names in preset labels.
 
 ## Next
 
-1. Run Windows CI for the UI overlay/meter-slot revision and refresh `deliverables/LAOZI_BUCK_RAW_SHIT_WINDOWS_FL_STUDIO_TEST.zip` from its artifact.
-2. In FL Studio, confirm natural preset text/arrow hit areas, OFF/2x/4x status, BYPASS LED, and live independent L/R meter movement.
-3. Freeze the approved UI before opening a separate DSP phase.
+1. Build and validate the DSP implementation on Windows CI.
+2. In FL Studio, audition the sound-character preset bank using reference material and verify bypass, output gain, and meter behavior.
+3. Design a separate true-oversampling/latency pass only after the DSP sound is approved.
