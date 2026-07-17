@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "project": "LAOZI_BUCK_RAW_SHIT",
+  "purpose": "Reference-informed preset retuning; measured descriptors are guides, not a claim of artist identity or a final mastering target.",
+  "analysisMethod": {
+    "window": "up to first 120 seconds per source",
+    "metrics": ["RMS/peak/crest", "stereo correlation", "FFT band-energy ratios"],
+    "limitations": ["No perceptual matching claim", "one RUGA recording is a multi-track screen-recording excerpt", "TOO GRIMY could not be decoded by the local analyzer and was excluded from measured aggregate"]
+  },
+  "sources": [
+    {"group": "RAZOR_FACE", "file": "sports guitar.wav", "rmsDbfs": -8.12, "crestDb": 7.88, "stereoCorrelation": 0.8277, "subBass20to80": 0.5759, "low80to250": 0.2169, "mid250to2000": 0.1258, "presence2to8k": 0.0518, "air8to18k": 0.0283},
+    {"group": "RAZOR_FACE", "file": "TOO GRIMY(BuckTalk Anthem).mp3", "status": "not-measured", "reason": "local decoder failure"},
+    {"group": "BRAVODOMO", "file": "THE GAME", "rmsDbfs": -11.9, "crestDb": 11.9, "stereoCorrelation": 0.8348, "subBass20to80": 0.4958, "low80to250": 0.0695, "mid250to2000": 0.4082, "presence2to8k": 0.0227, "air8to18k": 0.0028},
+    {"group": "BRAVODOMO", "file": "Just Battle", "rmsDbfs": -7.59, "crestDb": 7.59, "stereoCorrelation": 0.9433, "subBass20to80": 0.0002, "low80to250": 0.1283, "mid250to2000": 0.6648, "presence2to8k": 0.1381, "air8to18k": 0.0686},
+    {"group": "MOZARF", "file": "SUPER VILAIN PARTY", "rmsDbfs": -9.18, "crestDb": 9.18, "stereoCorrelation": 0.6545, "subBass20to80": 0.0171, "low80to250": 0.2843, "mid250to2000": 0.5012, "presence2to8k": 0.1788, "air8to18k": 0.0186},
+    {"group": "MOZARF", "file": "Wtf Iz Dat", "rmsDbfs": -9.5, "crestDb": 9.98, "stereoCorrelation": 0.6329, "subBass20to80": 0.4189, "low80to250": 0.2259, "mid250to2000": 0.2225, "presence2to8k": 0.0903, "air8to18k": 0.0214},
+    {"group": "RUGA", "file": "ScreenRecording_07-17-2026 14-42-46_1.wav", "rmsDbfs": -11.63, "crestDb": 11.63, "stereoCorrelation": 0.8422, "subBass20to80": 0.4956, "low80to250": 0.2123, "mid250to2000": 0.1299, "presence2to8k": 0.149, "air8to18k": 0.0129}
+  ],
+  "tuningGroups": [
+    {"group": "RAZOR_FACE", "measuredTendency": "high sub-bass share and high density", "presetNames": ["IRON PULSE", "GRIME ENGINE", "CRUSHED KICK"], "translation": "high KICK/PRESSURE, low AURA, medium-to-high GLUE"},
+    {"group": "BRAVODOMO", "measuredTendency": "mid-forward, narrow/high-correlation image across the supplied pair", "presetNames": ["BATTLE SMOKE", "CONCRETE FANG", "FINAL ROUND"], "translation": "low AURA, moderate KICK/PRESSURE and restrained GLUE"},
+    {"group": "MOZARF", "measuredTendency": "widest stereo image with strong mid/presence variation", "presetNames": ["WIDE RITUAL", "ASH PARADE", "VILLAIN HALO"], "translation": "high AURA, moderate KICK/PRESSURE, restrained GLUE"},
+    {"group": "RUGA", "measuredTendency": "sub-bass plus presence with more retained transient range", "presetNames": ["COLD SPIRAL", "NIGHT PRESS", "RAW CEREMONY"], "translation": "high KICK, medium-to-high AURA, low-to-medium GLUE"}
+  ],
+  "status": "values-applied-pending-user-audition"
+}

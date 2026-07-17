@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "project": "LAOZI_BUCK_RAW_SHIT",
   "phase": "PHASE_2_DSP_IMPLEMENTATION_AND_PRESET_TUNING",
-  "status": "implemented-pending-host-audition",
+  "status": "reference-retuned-pending-host-audition",
   "audioPath": ["input", "KICK low-band impact", "AURA high-band/M-S width", "PRESSURE saturation", "GLUE linked compression", "DC blocker", "OUTPUT gain", "atomic L/R meter", "output"],
   "parameters": {
     "pressure": "normalized soft saturation",
@@ -19,6 +19,8 @@
     "MOZARF": 2,
     "RUGA": 8
   },
+  "referenceAnalysis": "reports/latest/laozi-buck-raw-shit-reference-analysis.json",
+  "presetTuning": "12 presets rebalanced from supplied-source RMS, crest, spectral-band and stereo-correlation descriptors; display names intentionally do not reveal artist groups",
   "oversample": "state/UI selection only; no processing or latency change in this pass",
   "realtimeSafety": {
     "processBlockAllocation": false,
