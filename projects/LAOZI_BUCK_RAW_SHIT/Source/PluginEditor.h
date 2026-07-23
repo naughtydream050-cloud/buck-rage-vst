@@ -26,9 +26,12 @@ private:
     static juce::Image loadImage(const char* name);
     void setupKnob(ImageKnob&, juce::Image, float defaultValue);
     void applyPreset(int index);
+    void markPresetCustom();
     void setFloatParameter(const char* id, float value);
     void setChoiceParameter(const char* id, int index, int count);
     int choiceIndex(const char* id, int count) const noexcept;
+    static constexpr int presetChoiceCount = static_cast<int>(LaoziPresetLibrary::presets.size()) + 1;
+    static constexpr int customPresetIndex = static_cast<int>(LaoziPresetLibrary::presets.size());
     void timerCallback() override;
 
     LaoziBuckRawShitProcessor& processor;

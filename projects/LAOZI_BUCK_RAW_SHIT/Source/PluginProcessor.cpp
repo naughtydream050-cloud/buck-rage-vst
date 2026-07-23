@@ -16,6 +16,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout LaoziBuckRawShitProcessor::c
     parameters.push_back(std::make_unique<juce::AudioParameterChoice>(oversampleParamId, "OVERSAMPLE", juce::StringArray { "Off", "2x", "4x" }, 0));
     juce::StringArray presetNames;
     for (const auto& preset : LaoziPresetLibrary::presets) presetNames.add(preset.name);
+    presetNames.add("CUSTOM");
     parameters.push_back(std::make_unique<juce::AudioParameterChoice>(presetIndexParamId, "PRESET", presetNames, 0));
     return { parameters.begin(), parameters.end() };
 }

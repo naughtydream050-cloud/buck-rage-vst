@@ -27,6 +27,18 @@ void ImageKnob::setDefaultNormalised(float value) noexcept
     setDoubleClickReturnValue(true, proportionOfLengthToValue(defaultNormalised));
 }
 
+void ImageKnob::mouseDown(const juce::MouseEvent& event)
+{
+    if (onUserEdit) onUserEdit();
+    juce::Slider::mouseDown(event);
+}
+
+void ImageKnob::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel)
+{
+    if (onUserEdit) onUserEdit();
+    juce::Slider::mouseWheelMove(event, wheel);
+}
+
 void ImageKnob::paint(juce::Graphics& g)
 {
     if (! knobImage.isValid())

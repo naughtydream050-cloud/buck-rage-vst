@@ -32,6 +32,8 @@ LaoziBuckRawShitEditor::LaoziBuckRawShitEditor(LaoziBuckRawShitProcessor& proces
     setupKnob(auraKnob, loadImage("knob_aura_png"), 0.45f);
     setupKnob(glueKnob, loadImage("knob_glue_png"), 0.50f);
     setupKnob(outputKnob, loadImage("knob_output_png"), 2.0f / 3.0f);
+    for (auto* knob : { &pressureKnob, &kickKnob, &auraKnob, &glueKnob, &outputKnob })
+        knob->onUserEdit = [this] { markPresetCustom(); };
 
     bypassButton.setClickingTogglesState(true);
     presetHit.onClick = [this]
@@ -43,22 +45,24 @@ LaoziBuckRawShitEditor::LaoziBuckRawShitEditor(LaoziBuckRawShitProcessor& proces
         {
             if (safeThis != nullptr && result > 0)
             {
-                safeThis->setChoiceParameter(LaoziBuckRawShitProcessor::presetIndexParamId, result - 1, static_cast<int>(LaoziPresetLibrary::presets.size()));
+                safeThis->setChoiceParameter(LaoziBuckRawShitProcessor::presetIndexParamId, result - 1, presetChoiceCount);
                 safeThis->applyPreset(result - 1);
             }
         });
     };
     previousPreset.onClick = [this]
     {
-        constexpr auto count = static_cast<int>(LaoziPresetLibrary::presets.size());
-        const auto next = (choiceIndex(LaoziBuckRawShitProcessor::presetIndexParamId, count) + count - 1) % count;
-        setChoiceParameter(LaoziBuckRawShitProcessor::presetIndexParamId, next, count); applyPreset(next);
+        constexpr auto presetCount = static_cast<int>(LaoziPresetLibrary::presets.size());
+        const auto current = choiceIndex(LaoziBuckRawShitProcessor::presetIndexParamId, presetChoiceCount);
+        const auto next = current == customPresetIndex ? presetCount - 1 : (current + presetCount - 1) % presetCount;
+        setChoiceParameter(LaoziBuckRawShitProcessor::presetIndexParamId, next, presetChoiceCount); applyPreset(next);
     };
     nextPreset.onClick = [this]
     {
-        constexpr auto count = static_cast<int>(LaoziPresetLibrary::presets.size());
-        const auto next = (choiceIndex(LaoziBuckRawShitProcessor::presetIndexParamId, count) + 1) % count;
-        setChoiceParameter(LaoziBuckRawShitProcessor::presetIndexParamId, next, count); applyPreset(next);
+        constexpr auto presetCount = static_cast<int>(LaoziPresetLibrary::presets.size());
+        const auto current = choiceIndex(LaoziBuckRawShitProcessor::presetIndexParamId, presetChoiceCount);
+        const auto next = current == customPresetIndex ? 0 : (current + 1) % presetCount;
+        setChoiceParameter(LaoziBuckRawShitProcessor::presetIndexParamId, next, presetChoiceCount); applyPreset(next);
     };
     oversampleButton.onClick = [this]
     {
@@ -84,10 +88,11 @@ void LaoziBuckRawShitEditor::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colours::black);
     if (faceplate.isValid()) g.drawImage(faceplate, getLocalBounds().toFloat(), juce::RectanglePlacement::stretchToFit, false);
-    const auto presetIndex = choiceIndex(LaoziBuckRawShitProcessor::presetIndexParamId, static_cast<int>(LaoziPresetLibrary::presets.size()));
+    const auto presetIndex = choiceIndex(LaoziBuckRawShitProcessor::presetIndexParamId, presetChoiceCount);
     g.setColour(juce::Colour(0xffc9c0b7));
     g.setFont(juce::Font(6.8f, juce::Font::plain));
-    g.drawFittedText(LaoziPresetLibrary::presets[static_cast<size_t>(presetIndex)].name, LaoziLayout::presetTextBounds(), juce::Justification::centred, 1);
+    const auto presetName = presetIndex == customPresetIndex ? "CUSTOM" : LaoziPresetLibrary::presets[static_cast<size_t>(presetIndex)].name;
+    g.drawFittedText(presetName, LaoziLayout::presetTextBounds(), juce::Justification::centred, 1);
 
     const auto oversampleIndex = choiceIndex(LaoziBuckRawShitProcessor::oversampleParamId, 3);
     const char* oversampleText[] { "OFF", "2x", "4x" };
@@ -147,10 +152,16 @@ void LaoziBuckRawShitEditor::applyPreset(int index)
     setFloatParameter(LaoziBuckRawShitProcessor::outputParamId, preset.outputDb);
 }
 
+void LaoziBuckRawShitEditor::markPresetCustom()
+{
+    if (choiceIndex(LaoziBuckRawShitProcessor::presetIndexParamId, presetChoiceCount) != customPresetIndex)
+        setChoiceParameter(LaoziBuckRawShitProcessor::presetIndexParamId, customPresetIndex, presetChoiceCount);
+}
+
 void LaoziBuckRawShitEditor::timerCallback()
 {
     const auto oversample = choiceIndex(LaoziBuckRawShitProcessor::oversampleParamId, 3);
-    const auto preset = choiceIndex(LaoziBuckRawShitProcessor::presetIndexParamId, static_cast<int>(LaoziPresetLibrary::presets.size()));
+    const auto preset = choiceIndex(LaoziBuckRawShitProcessor::presetIndexParamId, presetChoiceCount);
     if (oversample != displayedOversample || preset != displayedPreset)
     {
         // Editor recreation must never overwrite user-adjusted APVTS values.

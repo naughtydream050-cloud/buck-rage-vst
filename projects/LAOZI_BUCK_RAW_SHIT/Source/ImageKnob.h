@@ -9,6 +9,12 @@ public:
     void setAngleRange(float startDegrees, float endDegrees);
     void setDefaultNormalised(float value) noexcept;
     void paint(juce::Graphics&) override;
+    void mouseDown(const juce::MouseEvent&) override;
+    void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+
+    // Invoked only for a physical user interaction, never when an APVTS
+    // attachment refreshes the slider from a host parameter change.
+    std::function<void()> onUserEdit;
 
 private:
     juce::Image knobImage;
