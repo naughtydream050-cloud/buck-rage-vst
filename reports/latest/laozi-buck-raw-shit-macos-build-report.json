@@ -1,0 +1,20 @@
+{
+  "status": "passed",
+  "plugin": "LAOZI_BUCK_RAW_SHIT",
+  "displayName": "老子-BUCK RAW SHIT-",
+  "platform": "macOS",
+  "format": "VST3",
+  "architecture": ["x86_64", "arm64"],
+  "binaryBytes": 9008032,
+  "buildType": "Release",
+  "codesign": "ad-hoc",
+  "codesignVerified": true,
+  "developerIdSigned": false,
+  "notarized": false,
+  "githubActions": {
+    "runId": "30001451568",
+    "artifactId": "8561198594",
+    "artifactName": "LAOZI-BUCK-RAW-SHIT-MAC-FL-STUDIO-TEST"
+  },
+  "hostValidation": "pending"
+}
