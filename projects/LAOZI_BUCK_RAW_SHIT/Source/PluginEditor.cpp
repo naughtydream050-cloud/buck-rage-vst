@@ -117,8 +117,10 @@ void LaoziBuckRawShitEditor::resized()
 
 int LaoziBuckRawShitEditor::choiceIndex(const char* id, int count) const noexcept
 {
-    const auto normalised = processor.apvts.getRawParameterValue(id)->load();
-    return juce::jlimit(0, count - 1, static_cast<int>(std::lround(normalised * static_cast<float>(count - 1))));
+    // APVTS raw values are denormalised. For AudioParameterChoice this is the
+    // actual discrete item index, not a 0..1 proportion.
+    const auto rawIndex = processor.apvts.getRawParameterValue(id)->load();
+    return juce::jlimit(0, count - 1, static_cast<int>(std::lround(rawIndex)));
 }
 
 void LaoziBuckRawShitEditor::setFloatParameter(const char* id, float value)
