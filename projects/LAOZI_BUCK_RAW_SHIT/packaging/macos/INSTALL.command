@@ -16,7 +16,7 @@ restore_backup() {
     mv "$BACKUP_PLUGIN" "$TARGET_PLUGIN"
   fi
 }
-on_error() { local code=$?; echo "エラー: インストールに失敗しました（終了コード: $code）。"; cleanup; restore_backup; exit "$code"; }
+on_error() { local code=$?; echo "エラー: インストールに失敗しました（終了コード: ${code}）。"; cleanup; restore_backup; exit "$code"; }
 trap on_error ERR
 trap cleanup EXIT
 
