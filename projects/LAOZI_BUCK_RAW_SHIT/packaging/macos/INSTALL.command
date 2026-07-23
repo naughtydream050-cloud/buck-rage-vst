@@ -10,7 +10,11 @@ TARGET_PLUGIN="$TARGET_DIR/$PLUGIN_NAME"
 TEMP_PLUGIN="$TARGET_DIR/.${PLUGIN_NAME}.installing.$$"
 BACKUP_PLUGIN="$TARGET_DIR/.${PLUGIN_NAME}.backup.$$"
 
-cleanup() { [[ -e "$TEMP_PLUGIN" || -L "$TEMP_PLUGIN" ]] && rm -rf "$TEMP_PLUGIN"; }
+cleanup() {
+  if [[ -e "$TEMP_PLUGIN" || -L "$TEMP_PLUGIN" ]]; then
+    rm -rf "$TEMP_PLUGIN"
+  fi
+}
 restore_backup() {
   if [[ ! -e "$TARGET_PLUGIN" && ! -L "$TARGET_PLUGIN" ]] && [[ -e "$BACKUP_PLUGIN" || -L "$BACKUP_PLUGIN" ]]; then
     mv "$BACKUP_PLUGIN" "$TARGET_PLUGIN"
@@ -44,7 +48,9 @@ if [[ -e "$TARGET_PLUGIN" || -L "$TARGET_PLUGIN" ]]; then
   mv "$TARGET_PLUGIN" "$BACKUP_PLUGIN"
 fi
 mv "$TEMP_PLUGIN" "$TARGET_PLUGIN"
-[[ -e "$BACKUP_PLUGIN" || -L "$BACKUP_PLUGIN" ]] && rm -rf "$BACKUP_PLUGIN"
+if [[ -e "$BACKUP_PLUGIN" || -L "$BACKUP_PLUGIN" ]]; then
+  rm -rf "$BACKUP_PLUGIN"
+fi
 trap - ERR
 
 echo ""
