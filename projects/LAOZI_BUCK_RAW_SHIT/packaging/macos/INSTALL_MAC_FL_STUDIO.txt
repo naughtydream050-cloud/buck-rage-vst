@@ -1,0 +1,24 @@
+老子-BUCK RAW SHIT- Mac版 FL Studioインストール
+
+通常手順
+1. LAOZI_BUCK_RAW_SHIT_MAC_FL_STUDIO_TEST.zipを解凍します。
+2. INSTALL.commandを右クリックして「開く」を選択します。
+3. FL Studioを起動します。
+4. Options → Manage plugins → Find installed plugins を実行します。
+
+手動インストール先
+~/Library/Audio/Plug-Ins/VST3/
+
+起動できない場合
+1. macOSの「システム設定」を開きます。
+2. 「プライバシーとセキュリティ」を開きます。
+3. ブロック通知があれば「このまま開く」を選びます。
+4. FL Studioを再起動し、再スキャンします。
+
+最終手段（通常は不要）
+INSTALL.commandがquarantine除去と実行権限付与を実行します。正常に完了しない場合だけ、ターミナルへ以下を入力してください。
+
+xattr -dr com.apple.quarantine "$HOME/Library/Audio/Plug-Ins/VST3/LAOZI_BUCK_RAW_SHIT.vst3"
+chmod +x "$HOME/Library/Audio/Plug-Ins/VST3/LAOZI_BUCK_RAW_SHIT.vst3/Contents/MacOS/LAOZI_BUCK_RAW_SHIT"
+
+このテスト版はad-hoc署名のみです。Apple Developer ID署名とnotarizationは含まれません。

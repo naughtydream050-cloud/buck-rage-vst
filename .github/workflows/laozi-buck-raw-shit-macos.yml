@@ -1,0 +1,172 @@
+name: Package LAOZI BUCK RAW SHIT for macOS FL Studio
+
+on:
+  push:
+    branches: ["codex/laozi-phase1-windows-ui"]
+    paths:
+      - ".github/workflows/laozi-buck-raw-shit-macos.yml"
+      - "projects/LAOZI_BUCK_RAW_SHIT/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-macos-vst3:
+    runs-on: macos-14
+    timeout-minutes: 45
+    env:
+      PROJECT: projects/LAOZI_BUCK_RAW_SHIT
+      BUILD_DIR: build-laozi-macos-package
+      PACKAGE: LAOZI_BUCK_RAW_SHIT_MAC_FL_STUDIO_TEST
+      ARTIFACT: LAOZI-BUCK-RAW-SHIT-MAC-FL-STUDIO-TEST
+      BUNDLE: LAOZI_BUCK_RAW_SHIT.vst3
+      BINARY: LAOZI_BUCK_RAW_SHIT
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure Universal Release VST3
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -G Xcode -S "$PROJECT" -B "$BUILD_DIR" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+
+      - name: Build VST3
+        shell: bash
+        run: cmake --build "$BUILD_DIR" --config Release --target LaoziBuckRawShit_VST3 --parallel
+
+      - name: Locate and validate universal bundle
+        id: validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="$(find "$BUILD_DIR" -type d -name "$BUNDLE" -path "*/VST3/*" | head -n 1)"
+          test -n "$bundle"
+          test -d "$bundle"
+          binary="$bundle/Contents/MacOS/$BINARY"
+          test -f "$bundle/Contents/Info.plist"
+          test -s "$binary"
+          chmod +x "$binary"
+          test -x "$binary"
+          file "$binary" | grep -q "Mach-O"
+          ! file "$binary" | grep -Eqi "PE32|MS Windows"
+          lipo "$binary" -verify_arch arm64 x86_64
+          ! xattr -lr "$bundle" 2>/dev/null | grep -q "com.apple.quarantine"
+          echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
+          echo "binary=$binary" >> "$GITHUB_OUTPUT"
+          echo "archs=$(lipo "$binary" -archs)" >> "$GITHUB_OUTPUT"
+          echo "bytes=$(stat -f%z "$binary")" >> "$GITHUB_OUTPUT"
+
+      - name: Create, ad-hoc sign and verify tester package
+        shell: bash
+        env:
+          VST3_BUNDLE: ${{ steps.validate.outputs.bundle }}
+        run: |
+          set -euo pipefail
+          rm -rf "$PACKAGE"
+          mkdir -p "$PACKAGE"
+          ditto "$VST3_BUNDLE" "$PACKAGE/$BUNDLE"
+          cp "$PROJECT/packaging/macos/INSTALL.command" "$PACKAGE/INSTALL.command"
+          cp "$PROJECT/packaging/macos/UNINSTALL.command" "$PACKAGE/UNINSTALL.command"
+          cp "$PROJECT/packaging/macos/README_FIRST.txt" "$PACKAGE/README_FIRST.txt"
+          cp "$PROJECT/packaging/macos/INSTALL_MAC_FL_STUDIO.txt" "$PACKAGE/INSTALL_MAC_FL_STUDIO.txt"
+          chmod +x "$PACKAGE/INSTALL.command" "$PACKAGE/UNINSTALL.command" "$PACKAGE/$BUNDLE/Contents/MacOS/$BINARY"
+          xattr -dr com.apple.quarantine "$PACKAGE/$BUNDLE" 2>/dev/null || true
+          ! xattr -lr "$PACKAGE/$BUNDLE" 2>/dev/null | grep -q "com.apple.quarantine"
+          codesign --force --deep --sign - --timestamp=none "$PACKAGE/$BUNDLE"
+          codesign --verify --deep --strict --verbose=2 "$PACKAGE/$BUNDLE"
+          codesign -dv --verbose=4 "$PACKAGE/$BUNDLE" 2>&1 | tee codesign-details.txt
+          grep -q '^Signature=adhoc$' codesign-details.txt
+
+      - name: Test installer and uninstaller in isolated HOME
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n "$PACKAGE/INSTALL.command"
+          bash -n "$PACKAGE/UNINSTALL.command"
+          test_home="$RUNNER_TEMP/laozi-test-home"
+          mkdir -p "$test_home/Library/Audio/Plug-Ins/VST3/SENTINEL.vst3"
+          HOME="$test_home" "$PWD/$PACKAGE/INSTALL.command" </dev/null
+          installed="$test_home/Library/Audio/Plug-Ins/VST3/$BUNDLE"
+          test -s "$installed/Contents/MacOS/$BINARY"
+          test -x "$installed/Contents/MacOS/$BINARY"
+          lipo "$installed/Contents/MacOS/$BINARY" -verify_arch arm64 x86_64
+          codesign --verify --deep --strict "$installed"
+          printf 'y\n' | HOME="$test_home" "$PWD/$PACKAGE/UNINSTALL.command"
+          test ! -e "$installed"
+          test -d "$test_home/Library/Audio/Plug-Ins/VST3/SENTINEL.vst3"
+
+      - name: Write build information and ZIP with ditto
+        shell: bash
+        env:
+          ARCHS: ${{ steps.validate.outputs.archs }}
+          BINARY_BYTES: ${{ steps.validate.outputs.bytes }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          info = {
+            "plugin": "老子-BUCK RAW SHIT-", "format": "VST3", "platform": "macOS",
+            "architecture": os.environ["ARCHS"].split(), "buildType": "Release",
+            "codesign": "ad-hoc", "developerIdSigned": False, "notarized": False,
+            "targetHost": "FL Studio for macOS", "installationTarget": "~/Library/Audio/Plug-Ins/VST3/",
+            "buildRun": os.environ["GITHUB_RUN_ID"], "artifactId": "",
+            "validation": {"bundleExists": True, "binaryExists": True, "codesignVerified": True,
+              "universalBinaryVerified": True, "installerExecutable": True,
+              "uninstallerExecutable": True, "zipCreatedWithDitto": True}
+          }
+          with open(os.path.join(os.environ["PACKAGE"], "BUILD_INFO.json"), "w", encoding="utf-8") as f:
+            json.dump(info, f, ensure_ascii=False, indent=2); f.write("\n")
+          os.makedirs("reports/latest", exist_ok=True)
+          report = {"status": "passed", "plugin": "老子-BUCK RAW SHIT-", "platform": "macOS", "format": "VST3",
+            "architecture": os.environ["ARCHS"].split(), "binaryBytes": int(os.environ["BINARY_BYTES"]),
+            "codesign": "ad-hoc", "codesignVerified": True, "notarized": False, "developerIdSigned": False,
+            "githubActions": {"runId": os.environ["GITHUB_RUN_ID"], "artifactName": os.environ["ARTIFACT"]},
+            "hostValidation": "pending"}
+          for name in ("laozi-buck-raw-shit-macos-build-report.json", "laozi-buck-raw-shit-macos-package-report.json"):
+            with open(os.path.join("reports/latest", name), "w", encoding="utf-8") as f:
+              json.dump(report, f, ensure_ascii=False, indent=2); f.write("\n")
+          PY
+          rm -f "$PACKAGE.zip"
+          ditto -c -k --keepParent "$PACKAGE" "$PACKAGE.zip"
+          test -s "$PACKAGE.zip"
+
+      - name: Validate extracted ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          extract="$RUNNER_TEMP/laozi-zip-check"
+          mkdir -p "$extract"
+          ditto -x -k "$PACKAGE.zip" "$extract"
+          package="$extract/$PACKAGE"
+          test -x "$package/INSTALL.command"
+          test -x "$package/UNINSTALL.command"
+          test -s "$package/README_FIRST.txt"
+          test -s "$package/INSTALL_MAC_FL_STUDIO.txt"
+          test -s "$package/BUILD_INFO.json"
+          iconv -f UTF-8 -t UTF-8 "$package/README_FIRST.txt" >/dev/null
+          binary="$package/$BUNDLE/Contents/MacOS/$BINARY"
+          test -s "$binary" && test -x "$binary"
+          lipo "$binary" -verify_arch arm64 x86_64
+          codesign --verify --deep --strict "$package/$BUNDLE"
+          ! xattr -lr "$package/$BUNDLE" 2>/dev/null | grep -q "com.apple.quarantine"
+          ! find "$package" -type f \( -iname '*.exe' -o -iname '*.dll' \) -print -quit | grep -q .
+
+      - name: Upload tester ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: LAOZI-BUCK-RAW-SHIT-MAC-FL-STUDIO-TEST
+          path: LAOZI_BUCK_RAW_SHIT_MAC_FL_STUDIO_TEST.zip
+          compression-level: 0
+
+      - name: Upload compact reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: LAOZI-BUCK-RAW-SHIT-MAC-REPORTS
+          path: reports/latest/laozi-buck-raw-shit-macos-*.json
