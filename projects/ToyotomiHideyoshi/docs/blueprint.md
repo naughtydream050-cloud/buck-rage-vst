@@ -2,32 +2,25 @@
 
 ## Architecture
 
-`PluginProcessor` owns host-visible globals, lock-free meter transport, minimal playhead snapshot, and later the serialized pattern state. `MainPluginEditor` composes focused UI components and reads geometry from `ui/spec/ui-spec.json`.
-
-The persistent model will use a fixed 64 × 16 array in memory. Serialization will use a versioned ValueTree with validated numeric ranges and bounded motion-point counts. It will not register 1024 slots as APVTS parameters.
+`PluginProcessor` owns host-visible globals, lock-free meter transport, minimal playhead snapshot, and later the serialized pattern state. `MainPluginEditor` composes focused UI components and reads the fixed 1280 x 853 geometry contract from the UI specification.
 
 ## Static versus dynamic
 
-Static reference-derived rendering is limited to the samurai artwork, crest, distressed texture, brush lettering, and decorative marks. The title/status text, tabs, bar cells, count cells, preset cells, parameter controls, XY trajectory, meters, and bottom status are JUCE components.
-
-The Phase 1 skeleton keeps the original JPEG as a visual-truth/source atlas. It draws only approved static source regions; it does not place the complete screenshot behind live controls.
+The reference JPEG remains the source for the samurai artwork, crest, distressed texture, brush lettering, and decoration. Title/status text, tabs, bar cells, count cells, preset cells, parameters, XY trajectory, meters, and bottom status are JUCE components; the complete reference image is never used as a live UI background.
 
 ## Meter contract
 
-The tap point is the output after pass-through. The audio thread publishes independent channel maxima with `std::atomic<float>` compare-exchange. The UI consumes with `exchange(0)` at approximately 30 Hz and applies fast attack/slow release in the declared -60 dB to +6 dB visual range.
+The tap point is output after pass-through. The audio thread publishes independent channel maxima with `std::atomic<float>` compare-exchange. The UI consumes them with `exchange(0)` at approximately 30 Hz and applies fast attack/slow release in the declared -60 dB to +6 dB range.
 
-## Build gate
+## CI build gate
 
-The project uses CMake 3.22+, C++17, JUCE 7.0.12, and the VST3 `Fx` category. `Rzfc` and `TyHd` are four-character JUCE identifiers. CMake validates a complete JUCE source tree (`CMakeLists.txt` plus `modules/CMakeLists.txt`) before adding it; `TOYOTOMI_JUCE_DIR` can supply a canonical checkout.
-
-`tools/build_windows.ps1` does not alter PATH and can use a pre-existing CMake/MSVC shell if one is supplied. Traced Windows VST3 evidence for VINTAGE_RAWNESS, BUCK_RAGE, and LAOZI uses GitHub Actions (`windows-latest`, `cmake`, then `cmake --build`) and downloads the resulting artifact locally; no local CMake cache, generated solution, compiler path, or build log remains. Build status remains NOT RUN until configure, compile, link, and bundle creation are independently observed.
+The dedicated `windows-2022` workflow uses the complete repository `JUCE` 7.0.12 tree, CMake 3.31.6, and MSVC 19.44.35228. Run `30315369457` configured and built `ToyotomiHideyoshi_VST3`, verified the complete VST3 bundle, and uploaded `ToyotomiHideyoshi-Windows-VST3`. The bundle was `4004247` bytes at `ToyotomiHideyoshi_artefacts/Release/VST3/Toyotomi Hideyoshi.vst3`.
 
 ## Phase order
 
 1. Capture reference geometry and style.
 2. Draft component skeleton.
-3. Implement fixed pattern state and serialization.
-4. Connect host display and global state.
-5. Validate output meters and pass-through.
-6. Configure/build Windows VST3.
-7. Record state restore and host-validation truth separately.
+3. Complete the minimum CI build gate.
+4. Implement fixed pattern state and serialization only when authorized.
+5. Validate output meters and pass-through at runtime.
+6. Record state restore and host-validation facts separately.
