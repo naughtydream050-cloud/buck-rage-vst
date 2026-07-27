@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "barTabs": { "action": "selectVisibleBarPage", "pages": [[1,16],[17,32],[33,48],[49,64]] },
+  "barCell": { "action": "selectBar", "playingStateIsIndependent": true },
+  "countCell": { "action": "selectCount", "opens": "ScratchPresetPalette", "editsSelectedBarOnly": true },
+  "presetCell": { "action": "setSelectedCountPreset", "customOnManualMotion": true },
+  "length": { "type": "exclusiveButtons", "values": ["1/16","1/8","1/4","1/2","1 BAR"] },
+  "xyPad": {
+    "mouseDown": "beginRecordingAndReplaceMotion",
+    "mouseDrag": "appendNormalizedPoint",
+    "mouseUp": "finishRecordingAndSetCustom",
+    "clear": "removeSelectedCountMotion",
+    "resetView": "restorePresetMotion"
+  },
+  "bypass": { "scope": "global", "hostAutomatable": true },
+  "hover": { "enabled": true, "mustNotChangeGeometry": true }
+}
+

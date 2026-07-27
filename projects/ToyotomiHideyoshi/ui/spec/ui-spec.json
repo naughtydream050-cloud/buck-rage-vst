@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "name": "Toyotomi Hideyoshi",
+  "visualTruth": "Resources/reference_ui.jpg",
+  "canvas": { "width": 1280, "height": 853, "aspectRatio": 1.5005861665, "resizable": true },
+  "font": {
+    "family": "Bahnschrift Condensed",
+    "fallback": "Arial Narrow",
+    "weights": { "regular": 400, "semibold": 600, "bold": 700 },
+    "sizes": { "micro": 10, "small": 12, "body": 14, "panelTitle": 15, "section": 17, "product": 31 }
+  },
+  "palette": {
+    "background": "#07090A",
+    "panel": "#0A0C0D",
+    "panelRaised": "#0F1112",
+    "ivory": "#D2C6AF",
+    "mutedIvory": "#8F887C",
+    "gold": "#B88731",
+    "goldBright": "#D6A64D",
+    "red": "#A8241E",
+    "redBright": "#DC3228",
+    "green": "#4D9A46",
+    "border": "#292927",
+    "borderSoft": "#1B1D1C",
+    "disabled": "#4F4D48"
+  },
+  "borders": { "panelPx": 1, "selectedPx": 2, "playingPx": 2, "cornerRadius": 2 },
+  "spacing": { "outer": 5, "panel": 10, "cell": 4, "tight": 2 },
+  "regions": {
+    "topBar": { "x": 5, "y": 5, "w": 1270, "h": 79 },
+    "artwork": { "x": 5, "y": 89, "w": 307, "h": 416, "source": { "x": 5, "y": 89, "w": 307, "h": 416 } },
+    "barTabs": { "x": 316, "y": 98, "w": 514, "h": 36 },
+    "barMap": { "x": 316, "y": 143, "w": 618, "h": 268 },
+    "presetPalette": { "x": 942, "y": 88, "w": 333, "h": 350 },
+    "xyPad": { "x": 15, "y": 510, "w": 297, "h": 285 },
+    "countGrid": { "x": 330, "y": 414, "w": 523, "h": 381 },
+    "countParameters": { "x": 866, "y": 465, "w": 251, "h": 327 },
+    "outputMeter": { "x": 1126, "y": 449, "w": 140, "h": 343 },
+    "bottomStatus": { "x": 5, "y": 806, "w": 1270, "h": 42 }
+  },
+  "states": {
+    "normal": { "border": "border", "text": "ivory", "fill": "panel" },
+    "hover": { "border": "mutedIvory", "text": "ivory", "fill": "panelRaised" },
+    "selected": { "border": "goldBright", "text": "goldBright", "fill": "panelRaised" },
+    "playing": { "border": "redBright", "text": "redBright", "fill": "panelRaised" },
+    "disabled": { "border": "borderSoft", "text": "disabled", "fill": "background" }
+  },
+  "meter": { "floorDb": -60.0, "ceilingDb": 6.0, "refreshHz": 30, "attack": 0.62, "release": 0.10, "segments": 28 },
+  "xy": { "xAxis": ["REVERSE", "FORWARD"], "yAxis": ["LOW", "HIGH"], "range": [0.0, 1.0], "maxMotionPoints": 256 }
+}
+

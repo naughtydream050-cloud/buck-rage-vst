@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "root": "MainPluginEditor",
+  "components": [
+    { "name": "TopBarComponent", "region": "topBar", "dynamic": true, "owns": ["productTitle", "hostSync", "bpm", "timeSignature", "preset", "bypass"] },
+    { "name": "ArtworkPanel", "region": "artwork", "dynamic": false, "owns": ["samurai", "crest", "brushLettering", "distress"] },
+    { "name": "BarTabComponent", "region": "barTabs", "dynamic": true, "children": 4 },
+    { "name": "BarMapComponent", "region": "barMap", "dynamic": true, "child": "BarCellComponent", "children": 16 },
+    { "name": "CountGridComponent", "region": "countGrid", "dynamic": true, "child": "CountCellComponent", "children": 16 },
+    { "name": "XYMotionPad", "region": "xyPad", "dynamic": true },
+    { "name": "ScratchPresetPalette", "region": "presetPalette", "dynamic": true, "children": 10 },
+    { "name": "CountParameterPanel", "region": "countParameters", "dynamic": true, "owns": ["length", "speed", "pitch", "depth"] },
+    { "name": "OutputMeterComponent", "region": "outputMeter", "dynamic": true, "channels": 2 },
+    { "name": "BottomStatusBar", "region": "bottomStatus", "dynamic": true }
+  ]
+}
+

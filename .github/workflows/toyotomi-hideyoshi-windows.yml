@@ -1,0 +1,83 @@
+name: Build Toyotomi Hideyoshi Windows VST3
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'projects/ToyotomiHideyoshi/**'
+      - '.github/workflows/toyotomi-hideyoshi-windows.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-vst3:
+    runs-on: windows-2022
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Print CMake and MSVC versions
+        shell: pwsh
+        run: |
+          cmake --version
+          $vsDevCmd = Join-Path ${env:ProgramFiles} 'Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat'
+          if (!(Test-Path -LiteralPath $vsDevCmd)) { throw "VsDevCmd was not found: $vsDevCmd" }
+          cmd /c "`"$vsDevCmd`" -arch=x64 -host_arch=x64 && cl"
+
+      - name: Verify complete JUCE 7.0.12 source tree
+        shell: pwsh
+        run: |
+          $jucePath = (Resolve-Path -LiteralPath 'JUCE').Path
+          $required = @(
+            'JUCE/CMakeLists.txt',
+            'JUCE/modules/juce_core',
+            'JUCE/modules/juce_audio_processors',
+            'JUCE/modules/juce_gui_basics'
+          )
+          $missing = $required | Where-Object { !(Test-Path -LiteralPath $_) }
+          if ($missing) { throw "Incomplete JUCE source tree: $($missing -join ', ')" }
+          Write-Host "JUCE_PATH=$jucePath"
+          Select-String -LiteralPath 'JUCE/CMakeLists.txt' -Pattern 'project\(JUCE VERSION' | ForEach-Object { Write-Host $_.Line }
+
+      - name: Configure Release VST3
+        shell: pwsh
+        run: |
+          cmake -S projects/ToyotomiHideyoshi `
+            -B build-toyotomi-hideyoshi `
+            -G 'Visual Studio 17 2022' `
+            -A x64 `
+            -DCMAKE_BUILD_TYPE=Release `
+            "-DTOYOTOMI_JUCE_DIR=$((Resolve-Path -LiteralPath 'JUCE').Path)"
+
+      - name: Compile and link Release VST3
+        shell: pwsh
+        run: |
+          cmake --build build-toyotomi-hideyoshi `
+            --config Release `
+            --target ToyotomiHideyoshi_VST3 `
+            --parallel
+
+      - name: Verify VST3 bundle
+        shell: pwsh
+        run: |
+          $bundles = @(Get-ChildItem -LiteralPath 'build-toyotomi-hideyoshi' -Recurse -Directory -Filter 'Toyotomi Hideyoshi.vst3')
+          if ($bundles.Count -ne 1) { throw "Expected one Toyotomi Hideyoshi.vst3 bundle, found $($bundles.Count)." }
+          $bundle = $bundles[0]
+          $binary = Join-Path $bundle.FullName 'Contents/x86_64-win/Toyotomi Hideyoshi.vst3'
+          if (!(Test-Path -LiteralPath $binary)) { throw "VST3 binary is missing: $binary" }
+          $size = (Get-ChildItem -LiteralPath $bundle.FullName -Recurse -File | Measure-Object -Property Length -Sum).Sum
+          Write-Host "VST3_BUNDLE=$($bundle.FullName)"
+          Write-Host "VST3_BINARY=$binary"
+          Write-Host "VST3_SIZE_BYTES=$size"
+          Write-Host "VST3_LAST_WRITE_UTC=$($bundle.LastWriteTimeUtc.ToString('o'))"
+          Get-ChildItem -LiteralPath $bundle.FullName -Recurse -Force | Select-Object FullName,Length,LastWriteTimeUtc | Format-Table -AutoSize
+
+      - name: Upload VST3 bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ToyotomiHideyoshi-Windows-VST3
+          path: build-toyotomi-hideyoshi/**/*.vst3
+          if-no-files-found: error

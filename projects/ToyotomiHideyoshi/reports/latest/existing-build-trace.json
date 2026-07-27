@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "scope": "Existing VST project build-method trace",
+  "projects": {
+    "VINTAGE_RAWNESS": {
+      "buildRoute": "GitHub Actions",
+      "runner": "windows-latest",
+      "commands": [
+        "cmake -S projects/VINTAGE_RAWNESS -B build-vintage-rawness -DCMAKE_BUILD_TYPE=Release",
+        "cmake --build build-vintage-rawness --config Release --parallel"
+      ],
+      "evidence": "reports/latest/vintage-rawness-build-report.json run 26891457799",
+      "localArtifact": "deliverables/VINTAGE_RAWNESS_WINDOWS_FL_STUDIO_TEST/VINTAGE RAWNESS.vst3"
+    },
+    "BUCK_RAGE": {
+      "buildRoute": "GitHub Actions",
+      "runner": "windows-latest",
+      "commands": [
+        "cmake -B build -DCMAKE_BUILD_TYPE=Release",
+        "cmake --build build --config Release --parallel"
+      ],
+      "evidence": "projects/BUCK_RAGE/.github/workflows/build.yml",
+      "localArtifact": "D:/Downloads/BUCK_RAGE_v2.2/BuckRage_artefacts/Release/VST3/BUCK RAGE.vst3"
+    },
+    "LAOZI_BUCK_RAW_SHIT": {
+      "buildRoute": "GitHub Actions",
+      "runner": "Windows",
+      "evidence": "reports/latest/laozi-buck-raw-shit-build-report.json run 29497008873",
+      "localArtifact": "deliverables/LAOZI_BUCK_RAW_SHIT_WINDOWS_FL_STUDIO_TEST/LAOZI_BUCK_RAW_SHIT.vst3"
+    }
+  },
+  "localTrace": {
+    "cmakeCache": "not found",
+    "generatedSolution": "not found",
+    "generatedVcxproj": "not found",
+    "compilerOrBuildToolAbsolutePath": "not found",
+    "portableCmake": "not found",
+    "result": "No existing local compile route can be reused from current filesystem evidence."
+  },
+  "toyotomiBuild": {
+    "configure": "not run",
+    "compile": "not run",
+    "link": "not run",
+    "reason": "No reusable local toolchain and no Toyotomi-specific CI workflow."
+  }
+}

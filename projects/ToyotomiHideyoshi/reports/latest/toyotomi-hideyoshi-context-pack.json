@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "project": "ToyotomiHideyoshi",
+  "phase": "1 UI",
+  "checkpoint": "Build environment and static review complete; state model not started",
+  "reference": "Resources/reference_ui.jpg",
+  "canvas": [1280, 853],
+  "uiSpec": "ui/spec/ui-spec.json",
+  "identity": {
+    "manufacturerCode": "Rzfc",
+    "pluginCode": "TyHd",
+    "bundleId": "com.razorfacecompany.toyotomihideyoshi"
+  },
+  "validation": {
+    "jsonSpecs": "passed",
+    "sourceImplementation": "static-review-passed-with-project-local-fixes",
+    "cmakeConfiguration": "not-run-cmake-unavailable",
+    "vst3Compile": "not-run",
+    "vst3Link": "not-run",
+    "vst3Bundle": "not-generated",
+    "localBuild": "not-run-preflight-toolchain-unavailable",
+    "ciBuild": "not-tested",
+    "stateRestore": "not-started",
+    "audioPassThrough": "implemented-not-run",
+    "flStudio": "not-tested"
+  },
+  "blockers": [
+    "No local CMake/MSVC toolchain or historical local build trace was detected; established project Windows builds are GitHub Actions artifacts.",
+    "The shared root JUCE checkout lacks modules/CMakeLists.txt; only the .codex_tmp fallback is complete.",
+    "A Toyotomi-specific GitHub Actions workflow would require approval to edit the shared root .github/workflows directory."
+  ],
+  "nextAction": "Use a supplied existing local CMake/MSVC path, or obtain approval for a minimal Toyotomi GitHub Actions workflow; then run the minimum build gate before state-model implementation."
+}
