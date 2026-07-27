@@ -43,9 +43,9 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         publishPeak (outputPeakRight, buffer.getMagnitude (1, 0, buffer.getNumSamples()));
 
     auto syncWasRead = false;
-    if (auto* playHead = getPlayHead())
+    if (auto* audioPlayHead = getPlayHead())
     {
-        if (const auto position = playHead->getPosition())
+        if (const auto position = audioPlayHead->getPosition())
         {
             syncWasRead = true;
             hostPlaying.store (position->getIsPlaying(), std::memory_order_relaxed);
@@ -89,4 +89,3 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new ToyotomiHideyoshiAudioProcessor();
 }
-
