@@ -9,6 +9,7 @@
 
 namespace
 {
+    juce::Logger::writeToLog ("Toyotomi Editor constructor reached");
 juce::Image loadReferenceImage()
 {
 #if TOYOTOMI_HAS_BINARY_DATA
@@ -42,16 +43,24 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
              &xyPad, &presetPalette, &countParameters, &outputMeter, &bottomStatus })
         addAndMakeVisible (*component);
 
+    artwork.sendToBack();
+    topBar.toFront (false); barTabs.toFront (false); barMap.toFront (false);
+    countGrid.toFront (false); xyPad.toFront (false); presetPalette.toFront (false);
+    countParameters.toFront (false); outputMeter.toFront (false); bottomStatus.toFront (false);
+
     setOpaque (true);
     setResizable (true, true);
     getConstrainer()->setFixedAspectRatio (1280.0 / 853.0);
     setResizeLimits (960, 640, 1920, 1280);
     setSize (uiSpec.getCanvasWidth(), uiSpec.getCanvasHeight());
+    juce::Logger::writeToLog ("Toyotomi Editor setSize 1280x853");
 }
 
 void ToyotomiHideyoshiAudioProcessorEditor::paint (juce::Graphics& g)
 {
     g.fillAll (ToyotomiUi::background());
+
+    g.setColour (juce::Colours::red); g.drawRect (getLocalBounds(), 2);
 
     // Subtle static faceplate treatment; the complete reference screenshot is never used as a backdrop.
     const auto fitted = juce::RectanglePlacement (juce::RectanglePlacement::centred)
@@ -76,4 +85,12 @@ void ToyotomiHideyoshiAudioProcessorEditor::resized()
     countParameters.setBounds (uiSpec.scaleRegion ("countParameters", viewport));
     outputMeter.setBounds     (uiSpec.scaleRegion ("outputMeter", viewport));
     bottomStatus.setBounds    (uiSpec.scaleRegion ("bottomStatus", viewport));
+
+    const std::array<std::pair<const char*, juce::Component*>, 6> debugComponents {{
+        { "TopBar", &topBar }, { "BarMap", &barMap }, { "CountGrid", &countGrid },
+        { "XYPad", &xyPad }, { "PresetPanel", &presetPalette }, { "Meter", &outputMeter } }};
+    for (const auto& [name, component] : debugComponents)
+        juce::Logger::writeToLog (juce::String ("Toyotomi ") + name + " visible=" + juce::String (component->isVisible())
+                                  + " bounds=" + component->getBounds().toString()
+                                  + " parent=" + juce::String (component->getParentComponent() != nullptr));
 }

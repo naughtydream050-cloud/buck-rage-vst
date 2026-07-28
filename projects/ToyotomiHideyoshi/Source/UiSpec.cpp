@@ -20,6 +20,19 @@ juce::Rectangle<int> UiSpec::getRegion (const juce::String& name) const
                          static_cast<int> (region->getProperty ("w")),
                          static_cast<int> (region->getProperty ("h")) };
 
+    // Runtime fallback mirrors ui/spec/ui-spec.json. The editor must remain
+    // visible even when the design-time JSON is not embedded as BinaryData.
+    struct Region { const char* id; int x, y, w, h; };
+    static constexpr Region regions[] {
+        { "topBar", 5, 5, 1270, 79 }, { "artwork", 5, 89, 307, 416 },
+        { "barTabs", 316, 98, 514, 36 }, { "barMap", 316, 143, 618, 268 },
+        { "presetPalette", 942, 88, 333, 350 }, { "xyPad", 15, 510, 297, 285 },
+        { "countGrid", 330, 414, 523, 381 }, { "countParameters", 866, 465, 251, 327 },
+        { "outputMeter", 1126, 449, 140, 343 }, { "bottomStatus", 5, 806, 1270, 42 }
+    };
+    for (const auto& region : regions)
+        if (name == region.id) return { region.x, region.y, region.w, region.h };
+
     return {};
 }
 
