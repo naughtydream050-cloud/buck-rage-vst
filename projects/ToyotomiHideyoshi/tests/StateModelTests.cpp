@@ -1,0 +1,3 @@
+#include "PluginStateModel.h"
+#include <iostream>
+int main(){ PluginStateModel a; a.selectBar(10); a.setCountPreset(10,2,PluginStateModel::ScratchPreset::backspin); a.setCountPreset(10,4,PluginStateModel::ScratchPreset::chirp); a.setCountPreset(10,12,PluginStateModel::ScratchPreset::zigzag); a.setCountMotion(10,4,{{.1f,.2f},{.4f,.5f},{.8f,.9f}}); auto tree=a.toValueTree(); PluginStateModel b; if(!b.fromValueTree(tree)) return 1; if(b.getCount(10,2).preset!=PluginStateModel::ScratchPreset::backspin||b.getCount(10,4).motion.size()!=3||b.getCount(10,12).preset!=PluginStateModel::ScratchPreset::zigzag) return 2; juce::ValueTree future("ToyotomiHideyoshiState");future.setProperty("stateVersion",99,nullptr);return b.fromValueTree(future)?3:0; }

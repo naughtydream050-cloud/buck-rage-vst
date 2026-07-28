@@ -49,6 +49,7 @@ private:
 class BarTabComponent final : public juce::Component
 {
 public:
+    std::function<void (int)> onSelectedPage;
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     int getSelectedPage() const noexcept { return selectedPage; }
@@ -74,6 +75,7 @@ private:
 class BarMapComponent final : public juce::Component
 {
 public:
+    std::function<void (int)> onSelectedBar;
     BarMapComponent();
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -102,6 +104,7 @@ private:
 class CountGridComponent final : public juce::Component
 {
 public:
+    std::function<void (int)> onSelectedCount;
     CountGridComponent();
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -115,6 +118,7 @@ private:
 class XYMotionPad final : public juce::Component
 {
 public:
+    std::function<void (const std::vector<PluginStateModel::MotionPoint>&)> onMotionChanged;
     XYMotionPad();
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
@@ -131,6 +135,7 @@ private:
 class ScratchPresetPalette final : public juce::Component
 {
 public:
+    std::function<void (int)> onPresetSelected;
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
 
@@ -141,6 +146,7 @@ private:
 class CountParameterPanel final : public juce::Component
 {
 public:
+    std::function<void (int)> onLengthSelected;
     explicit CountParameterPanel (juce::Image sourceImage) : source (std::move (sourceImage)) {}
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;

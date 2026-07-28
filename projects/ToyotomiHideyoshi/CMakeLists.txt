@@ -39,7 +39,16 @@ target_sources(ToyotomiHideyoshi PRIVATE
     Source/PluginEditor.cpp
     Source/UIComponents.cpp
     Source/UiSpec.cpp
+    Source/PluginStateModel.cpp
 )
+
+option(TOYOTOMI_BUILD_STATE_TESTS "Build local state-model tests" ON)
+if (TOYOTOMI_BUILD_STATE_TESTS)
+    juce_add_console_app(ToyotomiHideyoshiStateTests PRODUCT_NAME "Toyotomi Hideyoshi State Tests")
+    target_sources(ToyotomiHideyoshiStateTests PRIVATE Source/PluginStateModel.cpp tests/StateModelTests.cpp)
+    target_include_directories(ToyotomiHideyoshiStateTests PRIVATE Source)
+    target_link_libraries(ToyotomiHideyoshiStateTests PRIVATE juce::juce_audio_utils)
+endif()
 
 target_compile_definitions(ToyotomiHideyoshi PUBLIC
     JUCE_WEB_BROWSER=0

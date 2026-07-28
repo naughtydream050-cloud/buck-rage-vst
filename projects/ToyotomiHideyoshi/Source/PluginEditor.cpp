@@ -30,6 +30,13 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
       countParameters (referenceImage),
       outputMeter (p)
 {
+    auto& state = processor.getStateModel();
+    barTabs.onSelectedPage = [&state] (int page) { state.selectTab (page); };
+    barMap.onSelectedBar = [&state] (int bar) { state.selectBar (bar); };
+    countGrid.onSelectedCount = [&state] (int count) { state.selectCount (count); };
+    presetPalette.onPresetSelected = [&state] (int preset) { state.setSelectedPreset ((PluginStateModel::ScratchPreset) preset); };
+    countParameters.onLengthSelected = [&state] (int length) { state.setSelectedLength ((PluginStateModel::NoteLength) length); };
+    xyPad.onMotionChanged = [&state] (const std::vector<PluginStateModel::MotionPoint>& motion) { state.setSelectedMotion (motion); };
     for (auto* component : std::array<juce::Component*, 10> {
              &topBar, &artwork, &barTabs, &barMap, &countGrid,
              &xyPad, &presetPalette, &countParameters, &outputMeter, &bottomStatus })

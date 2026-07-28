@@ -11,6 +11,18 @@ ToyotomiHideyoshiAudioProcessor::ToyotomiHideyoshiAudioProcessor()
 void ToyotomiHideyoshiAudioProcessor::prepareToPlay (double, int) {}
 void ToyotomiHideyoshiAudioProcessor::releaseResources() {}
 
+void ToyotomiHideyoshiAudioProcessor::getStateInformation (juce::MemoryBlock& destination)
+{
+    if (auto xml = stateModel.toValueTree().createXml())
+        copyXmlToBinary (*xml, destination);
+}
+
+void ToyotomiHideyoshiAudioProcessor::setStateInformation (const void* data, int size)
+{
+    if (auto xml = getXmlFromBinary (data, size))
+        stateModel.fromValueTree (juce::ValueTree::fromXml (*xml));
+}
+
 bool ToyotomiHideyoshiAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
     const auto output = layouts.getMainOutputChannelSet();

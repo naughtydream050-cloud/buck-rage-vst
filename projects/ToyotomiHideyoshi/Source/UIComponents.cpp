@@ -170,6 +170,7 @@ void BarTabComponent::paint (juce::Graphics& g)
 void BarTabComponent::mouseDown (const juce::MouseEvent& event)
 {
     selectedPage = juce::jlimit (0, 3, event.x * 4 / juce::jmax (1, getWidth()));
+    if (onSelectedPage) onSelectedPage (selectedPage);
     repaint();
 }
 
@@ -206,6 +207,7 @@ BarMapComponent::BarMapComponent()
 void BarMapComponent::selectBar (int number)
 {
     selectedBar = number;
+    if (onSelectedBar) onSelectedBar (number - 1);
     for (int i = 0; i < 16; ++i) cells[static_cast<size_t> (i)].configure (i + 1, i + 1 == selectedBar, i + 1 == playingBar);
     repaint();
 }
@@ -260,6 +262,7 @@ CountGridComponent::CountGridComponent()
 void CountGridComponent::selectCount (int number)
 {
     selectedCount = number;
+    if (onSelectedCount) onSelectedCount (number - 1);
     const std::array<int, 16> presets { 0,1,2,3,2,7,6,8,1,3,0,7,7,6,3,0 };
     for (int i = 0; i < 16; ++i) cells[static_cast<size_t> (i)].configure (i + 1, presets[static_cast<size_t> (i)], i + 1 == selectedCount);
     repaint();
@@ -330,7 +333,17 @@ void XYMotionPad::appendPoint (juce::Point<float> position)
 
 void XYMotionPad::mouseDown (const juce::MouseEvent& event) { recording = padBounds().contains (event.position); if (recording) { normalizedMotion.clearQuick(); appendPoint (event.position); } }
 void XYMotionPad::mouseDrag (const juce::MouseEvent& event) { if (recording) appendPoint (event.position); }
-void XYMotionPad::mouseUp (const juce::MouseEvent&) { recording = false; }
+void XYMotionPad::mouseUp (const juce::MouseEvent&)
+{
+    recording = false;
+    if (onMotionChanged)
+    {
+        std::vector<PluginStateModel::MotionPoint> points;
+        points.reserve ((size_t) normalizedMotion.size());
+        for (const auto& point : normalizedMotion) points.push_back ({ point.x, point.y });
+        onMotionChanged (points);
+    }
+}
 
 void ScratchPresetPalette::paint (juce::Graphics& g)
 {
@@ -355,6 +368,7 @@ void ScratchPresetPalette::mouseDown (const juce::MouseEvent& event)
 {
     auto area = getLocalBounds().withTrimmedTop (36).reduced (8, 0);
     for (int i = 0; i < 10; ++i) if (gridCell (area, i % 3, i / 3, 3, 4, 3).contains (event.getPosition())) { selectedPreset = i; repaint(); break; }
+    if (onPresetSelected) onPresetSelected (selectedPreset);
 }
 
 void CountParameterPanel::paint (juce::Graphics& g)
@@ -400,7 +414,7 @@ void CountParameterPanel::paint (juce::Graphics& g)
 
 void CountParameterPanel::mouseDown (const juce::MouseEvent& event)
 {
-    if (event.y < 105 && event.y > 55) { selectedLength = juce::jlimit (0, 4, (event.x - 10) * 5 / juce::jmax (1, getWidth() - 20)); repaint(); }
+    if (event.y < 105 && event.y > 55) { selectedLength = juce::jlimit (0, 4, (event.x - 10) * 5 / juce::jmax (1, getWidth() - 20)); if (onLengthSelected) onLengthSelected (selectedLength); repaint(); }
 }
 
 OutputMeterComponent::OutputMeterComponent (ToyotomiHideyoshiAudioProcessor& p) : processor (p) { startTimerHz (30); }
