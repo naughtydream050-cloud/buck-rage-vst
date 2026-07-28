@@ -1,6 +1,6 @@
 #include "PluginStateModel.h"
 #include <iostream>
-namespace { bool ok=true; void check(bool v,const char* n){std::cout<<(v?"PASS ":"FAIL ")<<n<<'\n';ok&=v;} juce::MemoryBlock bytes(const PluginStateModel& s){juce::MemoryBlock b;if(auto x=s.toValueTree().createXml())copyXmlToBinary(*x,b);return b;} double now(){return juce::Time::getMillisecondCounterHiRes();} }
+namespace { bool ok=true; void check(bool v,const char* n){std::cout<<(v?"PASS ":"FAIL ")<<n<<'\n';ok&=v;} juce::MemoryBlock bytes(const PluginStateModel& s){auto x=s.toValueTree().createXml();auto text=x->toString();return {text.toRawUTF8(),(size_t)text.getNumBytesAsUTF8()};} double now(){return juce::Time::getMillisecondCounterHiRes();} }
 int main(){
  PluginStateModel a; a.selectBar(10);a.selectCount(4);a.selectTab(0);a.setBypass(true);
  a.setCountPreset(10,2,PluginStateModel::ScratchPreset::backspin);a.setCountPreset(10,4,PluginStateModel::ScratchPreset::chirp);a.setCountPreset(10,12,PluginStateModel::ScratchPreset::zigzag);
