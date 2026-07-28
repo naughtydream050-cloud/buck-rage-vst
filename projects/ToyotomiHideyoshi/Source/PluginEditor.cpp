@@ -92,5 +92,5 @@ void ToyotomiHideyoshiAudioProcessorEditor::resized()
     for (const auto& [name, component] : debugComponents)
         juce::Logger::writeToLog (juce::String ("Toyotomi ") + name + " visible=" + (component->isVisible() ? "true" : "false")
                                   + " bounds=" + component->getBounds().toString()
-                                  + " parent=" + juce::String (component->getParentComponent() != nullptr));
+                                  + " parent=" + (component->getParentComponent() != nullptr ? "true" : "false"));
 }
