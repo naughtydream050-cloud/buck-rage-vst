@@ -32,6 +32,7 @@ juce_generate_juce_header(ToyotomiHideyoshi)
 juce_add_binary_data(ToyotomiHideyoshiAssets
     SOURCES
         Resources/reference_ui.jpg
+        ui/spec/ui-spec.json
 )
 
 target_sources(ToyotomiHideyoshi PRIVATE

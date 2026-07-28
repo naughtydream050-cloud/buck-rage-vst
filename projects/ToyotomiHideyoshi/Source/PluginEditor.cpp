@@ -30,7 +30,6 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
       countParameters (referenceImage),
       outputMeter (p)
 {
-    juce::Logger::writeToLog ("Toyotomi Editor constructor reached");
     auto& state = processor.getStateModel();
     barTabs.onSelectedPage = [&state] (int page) { state.selectTab (page); };
     barMap.onSelectedBar = [&state] (int bar) { state.selectBar (bar); };
@@ -41,7 +40,14 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
     for (auto* component : std::array<juce::Component*, 10> {
              &topBar, &artwork, &barTabs, &barMap, &countGrid,
              &xyPad, &presetPalette, &countParameters, &outputMeter, &bottomStatus })
+    {
         addAndMakeVisible (*component);
+
+        // Image-first Phase 1: retain each component as a hit region while
+        // keeping the supplied visual truth free of a second approximation.
+        if (referenceImage.isValid())
+            component->setAlpha (0.0f);
+    }
 
     artwork.toBack();
     topBar.toFront (false); barTabs.toFront (false); barMap.toFront (false);
@@ -53,23 +59,16 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
     getConstrainer()->setFixedAspectRatio (1280.0 / 853.0);
     setResizeLimits (960, 640, 1920, 1280);
     setSize (uiSpec.getCanvasWidth(), uiSpec.getCanvasHeight());
-    juce::Logger::writeToLog ("Toyotomi Editor setSize 1280x853");
 }
 
 void ToyotomiHideyoshiAudioProcessorEditor::paint (juce::Graphics& g)
 {
     g.fillAll (ToyotomiUi::background());
 
-    g.setColour (juce::Colours::red); g.drawRect (getLocalBounds(), 2);
-
-    // Subtle static faceplate treatment; the complete reference screenshot is never used as a backdrop.
-    const auto fitted = juce::RectanglePlacement (juce::RectanglePlacement::centred)
-                            .appliedTo ({ 0.0f, 0.0f, 1280.0f, 853.0f }, getLocalBounds().toFloat());
-    g.setColour (juce::Colour (0xff131514));
-    g.drawRect (fitted, 1.0f);
-    g.setColour (juce::Colours::black.withAlpha (0.22f));
-    for (int y = juce::roundToInt (fitted.getY()); y < fitted.getBottom(); y += 4)
-        g.drawHorizontalLine (y, fitted.getX(), fitted.getRight());
+    if (referenceImage.isValid())
+        g.drawImageWithin (referenceImage, getLocalBounds().getX(), getLocalBounds().getY(),
+                           getLocalBounds().getWidth(), getLocalBounds().getHeight(),
+                           juce::RectanglePlacement::centred);
 }
 
 void ToyotomiHideyoshiAudioProcessorEditor::resized()
@@ -86,11 +85,4 @@ void ToyotomiHideyoshiAudioProcessorEditor::resized()
     outputMeter.setBounds     (uiSpec.scaleRegion ("outputMeter", viewport));
     bottomStatus.setBounds    (uiSpec.scaleRegion ("bottomStatus", viewport));
 
-    const std::array<std::pair<const char*, juce::Component*>, 6> debugComponents {{
-        { "TopBar", &topBar }, { "BarMap", &barMap }, { "CountGrid", &countGrid },
-        { "XYPad", &xyPad }, { "PresetPanel", &presetPalette }, { "Meter", &outputMeter } }};
-    for (const auto& [name, component] : debugComponents)
-        juce::Logger::writeToLog (juce::String ("Toyotomi ") + name + " visible=" + (component->isVisible() ? "true" : "false")
-                                  + " bounds=" + component->getBounds().toString()
-                                  + " parent=" + (component->getParentComponent() != nullptr ? "true" : "false"));
 }

@@ -1,13 +1,50 @@
 #include "UiSpec.h"
 
+#if __has_include(<BinaryData.h>)
+ #include <BinaryData.h>
+ #define TOYOTOMI_HAS_BINARY_DATA 1
+#else
+ #define TOYOTOMI_HAS_BINARY_DATA 0
+#endif
+
+namespace
+{
+juce::var loadEmbeddedUiSpec()
+{
+#if TOYOTOMI_HAS_BINARY_DATA
+    const auto json = juce::String::fromUTF8 (
+        reinterpret_cast<const char*> (BinaryData::ui_spec_json),
+        BinaryData::ui_spec_jsonSize);
+    const auto parsed = juce::JSON::parse (json);
+    return parsed.isObject() ? parsed : juce::var {};
+#else
+    return {};
+#endif
+}
+}
+
 UiSpec::UiSpec()
 {
-    // ui/spec/ui-spec.json is the design-time SSOT. The initial Phase 1
-    // skeleton only needs its fixed canvas contract at runtime; this avoids
-    // coupling component construction to generated BinaryData symbol names.
-    canvasWidth = 1280;
-    canvasHeight = 853;
-    valid = true;
+    // ui/spec/ui-spec.json is the single source of truth. It is compiled into
+    // the VST3, so FL Studio never depends on a sidecar file being present.
+    root = loadEmbeddedUiSpec();
+
+    if (auto* rootObject = root.getDynamicObject())
+        if (auto* canvas = rootObject->getProperty ("canvas").getDynamicObject())
+        {
+            canvasWidth = static_cast<int> (canvas->getProperty ("width"));
+            canvasHeight = static_cast<int> (canvas->getProperty ("height"));
+            valid = canvasWidth > 0 && canvasHeight > 0
+                 && rootObject->getProperty ("regions").getDynamicObject() != nullptr;
+        }
+
+    // Keep the canonical Phase 1 canvas available if an invalid future asset
+    // is packaged. getRegion() supplies safe non-zero fallback regions.
+    if (! valid)
+    {
+        canvasWidth = 1280;
+        canvasHeight = 853;
+    }
 }
 
 juce::Rectangle<int> UiSpec::getRegion (const juce::String& name) const
