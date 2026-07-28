@@ -9,7 +9,6 @@
 
 namespace
 {
-    juce::Logger::writeToLog ("Toyotomi Editor constructor reached");
 juce::Image loadReferenceImage()
 {
 #if TOYOTOMI_HAS_BINARY_DATA
@@ -31,6 +30,7 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
       countParameters (referenceImage),
       outputMeter (p)
 {
+    juce::Logger::writeToLog ("Toyotomi Editor constructor reached");
     auto& state = processor.getStateModel();
     barTabs.onSelectedPage = [&state] (int page) { state.selectTab (page); };
     barMap.onSelectedBar = [&state] (int bar) { state.selectBar (bar); };
@@ -43,7 +43,7 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
              &xyPad, &presetPalette, &countParameters, &outputMeter, &bottomStatus })
         addAndMakeVisible (*component);
 
-    artwork.sendToBack();
+    artwork.toBack();
     topBar.toFront (false); barTabs.toFront (false); barMap.toFront (false);
     countGrid.toFront (false); xyPad.toFront (false); presetPalette.toFront (false);
     countParameters.toFront (false); outputMeter.toFront (false); bottomStatus.toFront (false);
