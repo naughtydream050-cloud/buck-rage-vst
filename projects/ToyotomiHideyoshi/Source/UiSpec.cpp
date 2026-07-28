@@ -13,8 +13,8 @@ juce::var loadEmbeddedUiSpec()
 {
 #if TOYOTOMI_HAS_BINARY_DATA
     const auto json = juce::String::fromUTF8 (
-        reinterpret_cast<const char*> (BinaryData::ui_spec_json),
-        BinaryData::ui_spec_jsonSize);
+        reinterpret_cast<const char*> (BinaryData::uispec_json),
+        BinaryData::uispec_jsonSize);
     const auto parsed = juce::JSON::parse (json);
     return parsed.isObject() ? parsed : juce::var {};
 #else
