@@ -27,16 +27,16 @@
   "borders": { "panelPx": 1, "selectedPx": 2, "playingPx": 2, "cornerRadius": 2 },
   "spacing": { "outer": 5, "panel": 10, "cell": 4, "tight": 2 },
   "regions": {
-    "topBar": { "x": 5, "y": 5, "w": 1270, "h": 79 },
-    "artwork": { "x": 5, "y": 89, "w": 307, "h": 416, "source": { "x": 5, "y": 89, "w": 307, "h": 416 } },
-    "barTabs": { "x": 316, "y": 98, "w": 514, "h": 36 },
-    "barMap": { "x": 316, "y": 143, "w": 618, "h": 268 },
-    "presetPalette": { "x": 942, "y": 88, "w": 333, "h": 350 },
-    "xyPad": { "x": 15, "y": 510, "w": 297, "h": 285 },
-    "countGrid": { "x": 330, "y": 414, "w": 523, "h": 381 },
-    "countParameters": { "x": 866, "y": 465, "w": 251, "h": 327 },
-    "outputMeter": { "x": 1126, "y": 449, "w": 140, "h": 343 },
-    "bottomStatus": { "x": 5, "y": 806, "w": 1270, "h": 42 }
+    "topBar": { "x": 5, "y": 5, "w": 1270, "h": 78 },
+    "artwork": { "x": 5, "y": 86, "w": 307, "h": 426, "source": { "x": 5, "y": 86, "w": 307, "h": 426 } },
+    "barTabs": { "x": 320, "y": 89, "w": 545, "h": 38 },
+    "barMap": { "x": 317, "y": 129, "w": 578, "h": 276 },
+    "presetPalette": { "x": 905, "y": 89, "w": 360, "h": 314 },
+    "xyPad": { "x": 18, "y": 518, "w": 289, "h": 251 },
+    "countGrid": { "x": 319, "y": 408, "w": 510, "h": 358 },
+    "countParameters": { "x": 836, "y": 431, "w": 271, "h": 339 },
+    "outputMeter": { "x": 1114, "y": 407, "w": 151, "h": 363 },
+    "bottomStatus": { "x": 5, "y": 772, "w": 1270, "h": 76 }
   },
   "states": {
     "normal": { "border": "border", "text": "ivory", "fill": "panel" },
