@@ -393,7 +393,7 @@ void CountParameterPanel::paint (juce::Graphics& g)
         g.setColour (juce::Colours::black.withAlpha (0.48f));
         g.fillRect (cell);
         g.setColour (selected ? ToyotomiUi::gold() : ToyotomiUi::border());
-        g.drawRect (cell, selected ? 2.0f : 1.0f);
+        g.drawRect (cell, selected ? 2 : 1);
     }
 
     const std::array<float, 3> normalized {
@@ -426,12 +426,12 @@ void CountParameterPanel::paint (juce::Graphics& g)
             const auto outer = center + juce::Point<float> (std::cos (angle), std::sin (angle)) * (radius + 7.0f);
             const auto inner = center + juce::Point<float> (std::cos (angle), std::sin (angle)) * (radius + (tick % 5 == 0 ? 2.0f : 4.0f));
             g.setColour (ToyotomiUi::muted().withAlpha (0.80f));
-            g.drawLine ({ inner, outer }, tick % 5 == 0 ? 1.5f : 0.8f);
+            g.drawLine (juce::Line<float> (inner, outer), tick % 5 == 0 ? 1.5f : 0.8f);
         }
         const auto pointerAngle = start + sweep * juce::jlimit (0.0f, 1.0f, normalized[static_cast<size_t> (i)]);
         const auto pointerEnd = center + juce::Point<float> (std::cos (pointerAngle), std::sin (pointerAngle)) * (radius * 0.72f);
         g.setColour (ToyotomiUi::red());
-        g.drawLine ({ center, pointerEnd }, 2.2f);
+        g.drawLine (juce::Line<float> (center, pointerEnd), 2.2f);
         g.setColour (ToyotomiUi::gold().withAlpha (0.28f));
         g.fillEllipse (center.x - 5.0f, center.y - 5.0f, 10.0f, 10.0f);
         g.setColour (ToyotomiUi::ivory());
