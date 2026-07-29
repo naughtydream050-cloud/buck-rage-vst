@@ -318,7 +318,7 @@ void XYMotionPad::appendPoint (juce::Point<float> position)
 
 void XYMotionPad::mouseDown (const juce::MouseEvent& event)
 {
-    const auto bottom = getLocalBounds().removeFromBottom (30).reduced (7, 2);
+    auto bottom = getLocalBounds().removeFromBottom (30).reduced (7, 2);
     if (bottom.removeFromLeft (bottom.getWidth() / 2).contains (event.getPosition()))
     {
         normalizedMotion.clearQuick();
