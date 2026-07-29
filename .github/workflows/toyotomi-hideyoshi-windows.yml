@@ -58,7 +58,16 @@ jobs:
           cmake --build build-toyotomi-hideyoshi `
             --config Release `
             --target ToyotomiHideyoshi_VST3 `
-            --parallel
+            --parallel 2>&1 | Tee-Object -FilePath toyotomi-build.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload compact build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ToyotomiHideyoshi-build-diagnostics
+          path: toyotomi-build.log
+          if-no-files-found: warn
 
       - name: Run state-model round-trip tests
         shell: pwsh
