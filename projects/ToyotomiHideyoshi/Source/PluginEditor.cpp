@@ -27,7 +27,7 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
       referenceImage (loadReferenceImage()),
       topBar (p),
       artwork (referenceImage),
-      countParameters (referenceImage),
+      countParameters (p),
       outputMeter (p)
 {
     auto& state = processor.getStateModel();
@@ -37,16 +37,17 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
     presetPalette.onPresetSelected = [&state] (int preset) { state.setSelectedPreset ((PluginStateModel::ScratchPreset) preset); };
     countParameters.onLengthSelected = [&state] (int length) { state.setSelectedLength ((PluginStateModel::NoteLength) length); };
     xyPad.onMotionChanged = [&state] (const std::vector<PluginStateModel::MotionPoint>& motion) { state.setSelectedMotion (motion); };
+    xyPad.onClearMotion = [&state] { state.clearSelectedMotion(); };
+    xyPad.onResetCount = [&state] { const auto ui = state.getUiState(); state.resetCountSlot (ui.selectedBar, ui.selectedCount); };
     for (auto* component : std::array<juce::Component*, 10> {
              &topBar, &artwork, &barTabs, &barMap, &countGrid,
              &xyPad, &presetPalette, &countParameters, &outputMeter, &bottomStatus })
     {
         addAndMakeVisible (*component);
 
-        // Image-first Phase 1: retain each component as a hit region while
-        // keeping the supplied visual truth free of a second approximation.
-        if (referenceImage.isValid() && component != &outputMeter)
-            component->setAlpha (0.0f);
+        // Static texture remains image-first, while each control paints its
+        // live state as a restrained overlay on top of the faceplate.
+        component->setAlpha (1.0f);
     }
 
     artwork.toBack();

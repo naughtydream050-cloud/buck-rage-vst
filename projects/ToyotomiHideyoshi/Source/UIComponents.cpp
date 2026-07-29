@@ -112,43 +112,30 @@ void TopBarComponent::timerCallback()
 
 void TopBarComponent::paint (juce::Graphics& g)
 {
-    ToyotomiUi::drawPanel (g, getLocalBounds().toFloat());
-    auto area = getLocalBounds().reduced (18, 8);
-    auto brand = area.removeFromLeft (430);
-    g.setColour (ToyotomiUi::gold());
-    g.setFont (ToyotomiUi::font (31.0f, true));
-    g.drawText ("Toyotomi Hideyoshi", brand.removeFromTop (40), juce::Justification::centredLeft);
-    g.setColour (ToyotomiUi::red().darker (0.1f));
-    g.setFont (ToyotomiUi::font (13.0f, true));
-    g.drawText ("TOYOTOMI HIDEYOSHI   BUCK / KRUMP SCRATCH SEQUENCER", brand,
-                juce::Justification::centredLeft);
+    const auto bypass = getLocalBounds().removeFromRight (116).reduced (12, 17);
+    const auto active = processor.getStateModel().getUiState().bypass;
+    g.setColour ((active ? ToyotomiUi::red() : ToyotomiUi::border()).withAlpha (0.78f));
+    g.fillRoundedRectangle (bypass.toFloat(), 8.0f);
+    g.setColour (active ? ToyotomiUi::red() : ToyotomiUi::gold().withAlpha (0.55f));
+    g.drawRoundedRectangle (bypass.toFloat(), 8.0f, 1.2f);
+    g.setColour (active ? ToyotomiUi::ivory() : ToyotomiUi::muted());
+    g.setFont (ToyotomiUi::font (11.0f, true));
+    g.drawText (active ? "BYPASS ON" : "BYPASS OFF", bypass, juce::Justification::centred);
+}
 
-    const auto statusWidth = juce::jmax (90, area.getWidth() / 7);
-    auto drawStatus = [&] (const juce::String& label, const juce::String& value)
+void TopBarComponent::mouseDown (const juce::MouseEvent& event)
+{
+    if (event.x >= getWidth() - 128)
     {
-        auto box = area.removeFromLeft (statusWidth).reduced (8, 0);
-        g.setColour (ToyotomiUi::muted());
-        g.setFont (ToyotomiUi::font (11.0f));
-        g.drawText (label, box.removeFromTop (20), juce::Justification::centredLeft);
-        g.setColour (ToyotomiUi::ivory());
-        g.setFont (ToyotomiUi::font (18.0f));
-        g.drawText (value, box, juce::Justification::centredLeft);
-    };
-
-    drawStatus ("HOST SYNC", hostSync ? "ON" : "--");
-    drawStatus ("BPM", juce::String (bpm, 2));
-    drawStatus ("TIME SIG", juce::String (numerator) + "/" + juce::String (denominator));
-    drawStatus ("PRESET", "Init");
-    drawStatus ("BYPASS", "OFF");
+        const auto current = processor.getStateModel().getUiState().bypass;
+        processor.getStateModel().setBypass (! current);
+        repaint();
+    }
 }
 
 void ArtworkPanel::paint (juce::Graphics& g)
 {
-    g.fillAll (ToyotomiUi::background());
-    if (source.isValid())
-        g.drawImage (source, 0, 0, getWidth(), getHeight(), 5, 89, 307, 416, false);
-    g.setColour (ToyotomiUi::border());
-    g.drawRect (getLocalBounds());
+    juce::ignoreUnused (g, source);
 }
 
 void BarTabComponent::paint (juce::Graphics& g)
@@ -157,13 +144,11 @@ void BarTabComponent::paint (juce::Graphics& g)
     for (int i = 0; i < 4; ++i)
     {
         auto cell = gridCell (getLocalBounds(), i, 0, 4, 1, 4);
-        g.setColour (i == selectedPage ? ToyotomiUi::gold().withAlpha (0.22f) : ToyotomiUi::panel());
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
         g.fillRect (cell);
         g.setColour (i == selectedPage ? ToyotomiUi::gold() : ToyotomiUi::border());
         g.drawRect (cell, i == selectedPage ? 2 : 1);
-        g.setColour (i == selectedPage ? ToyotomiUi::gold() : ToyotomiUi::ivory());
-        g.setFont (ToyotomiUi::font (15.0f));
-        g.drawText (labels[static_cast<size_t> (i)], cell, juce::Justification::centred);
+        juce::ignoreUnused (labels);
     }
 }
 
@@ -181,15 +166,11 @@ void BarCellComponent::configure (int number, bool isSelected, bool isPlaying)
 
 void BarCellComponent::paint (juce::Graphics& g)
 {
-    g.fillAll (ToyotomiUi::panel());
+    g.fillAll (juce::Colours::black.withAlpha (0.60f));
     g.setColour (playing ? ToyotomiUi::red() : selected ? ToyotomiUi::gold() : ToyotomiUi::border());
     g.drawRect (getLocalBounds(), playing || selected ? 2 : 1);
-    g.setFont (ToyotomiUi::font (12.0f));
-    g.drawText ("BAR " + juce::String (barNumber), getLocalBounds().removeFromTop (22), juce::Justification::centred);
-    ToyotomiUi::drawMotionGlyph (g, getLocalBounds().toFloat().reduced (7.0f, 18.0f), barNumber % 9);
-    g.setFont (ToyotomiUi::font (11.0f, true));
-    if (playing) g.drawText ("PLAYING", getLocalBounds().removeFromBottom (22), juce::Justification::centred);
-    else if (selected) g.drawText ("SELECTED", getLocalBounds().removeFromBottom (22), juce::Justification::centred);
+    g.setColour (playing ? ToyotomiUi::red() : selected ? ToyotomiUi::gold() : ToyotomiUi::muted());
+    g.fillEllipse ((float) getWidth() * 0.5f - 3.0f, (float) getHeight() - 15.0f, 6.0f, 6.0f);
 }
 
 void BarCellComponent::mouseDown (const juce::MouseEvent&) { if (onSelected) onSelected (barNumber); }
@@ -214,13 +195,7 @@ void BarMapComponent::selectBar (int number)
 
 void BarMapComponent::paint (juce::Graphics& g)
 {
-    ToyotomiUi::drawPanel (g, getLocalBounds().toFloat(), "BAR MAP");
-    auto footer = getLocalBounds().removeFromBottom (35).reduced (10, 0);
-    g.setFont (ToyotomiUi::font (13.0f));
-    g.setColour (ToyotomiUi::red());
-    g.drawText ("> PLAYING BAR:  " + juce::String (playingBar), footer.removeFromLeft (footer.getWidth() / 2), juce::Justification::centredLeft);
-    g.setColour (ToyotomiUi::gold());
-    g.drawText ("SELECTED BAR:  " + juce::String (selectedBar), footer, juce::Justification::centred);
+    juce::ignoreUnused (g);
 }
 
 void BarMapComponent::resized()
@@ -236,14 +211,15 @@ void CountCellComponent::configure (int number, int preset, bool isSelected)
 
 void CountCellComponent::paint (juce::Graphics& g)
 {
-    g.fillAll (ToyotomiUi::panel());
+    g.fillAll (juce::Colours::black.withAlpha (0.54f));
     g.setColour (selected ? ToyotomiUi::gold() : ToyotomiUi::border());
     g.drawRect (getLocalBounds(), selected ? 2 : 1);
-    g.setFont (ToyotomiUi::font (15.0f));
-    g.drawText (juce::String (countNumber), getLocalBounds().removeFromTop (24), juce::Justification::centred);
-    ToyotomiUi::drawMotionGlyph (g, getLocalBounds().toFloat().reduced (12.0f, 19.0f), presetIndex);
-    g.setFont (ToyotomiUi::font (11.0f));
-    g.drawText (presetNames[static_cast<size_t> (presetIndex)], getLocalBounds().removeFromBottom (21), juce::Justification::centred);
+    if (selected)
+    {
+        g.setColour (ToyotomiUi::gold().withAlpha (0.18f));
+        g.fillRect (getLocalBounds().reduced (2));
+    }
+    juce::ignoreUnused (countNumber, presetIndex);
 }
 
 void CountCellComponent::mouseDown (const juce::MouseEvent&) { if (onSelected) onSelected (countNumber); }
@@ -270,10 +246,7 @@ void CountGridComponent::selectCount (int number)
 
 void CountGridComponent::paint (juce::Graphics& g)
 {
-    ToyotomiUi::drawPanel (g, getLocalBounds().toFloat(), "COUNT GRID - BAR 11");
-    g.setColour (ToyotomiUi::gold());
-    g.setFont (ToyotomiUi::font (14.0f));
-    g.drawText ("SELECTED COUNT:  " + juce::String (selectedCount), getLocalBounds().removeFromBottom (22), juce::Justification::centred);
+    juce::ignoreUnused (g, selectedCount);
 }
 
 void CountGridComponent::resized()
@@ -290,21 +263,29 @@ XYMotionPad::XYMotionPad()
     normalizedMotion.add ({ 0.78f, 0.20f });
 }
 
-juce::Rectangle<float> XYMotionPad::padBounds() const { return getLocalBounds().toFloat().reduced (35.0f, 38.0f).withTrimmedBottom (18.0f); }
+juce::Rectangle<float> XYMotionPad::padBounds() const
+{
+    return getLocalBounds().toFloat().reduced (30.0f, 31.0f).withTrimmedBottom (35.0f);
+}
 
 void XYMotionPad::paint (juce::Graphics& g)
 {
-    ToyotomiUi::drawPanel (g, getLocalBounds().toFloat(), "XY PAD (COUNT 5)");
     const auto pad = padBounds();
-    g.setColour (ToyotomiUi::border());
-    g.drawRect (pad);
-    g.drawLine (pad.getCentreX(), pad.getY(), pad.getCentreX(), pad.getBottom());
-    g.drawLine (pad.getX(), pad.getCentreY(), pad.getRight(), pad.getCentreY());
-    for (int i = 1; i <= 3; ++i) g.drawEllipse (pad.withSizeKeepingCentre (pad.getWidth() * i / 3.0f, pad.getHeight() * i / 3.0f), 0.7f);
-    g.setColour (ToyotomiUi::ivory());
-    g.setFont (ToyotomiUi::font (11.0f));
-    g.drawText ("HIGH", pad.withHeight (16).translated (0, -18), juce::Justification::centred);
-    g.drawText ("LOW", pad.withHeight (16).withY (pad.getBottom() + 2), juce::Justification::centred);
+    g.setColour (juce::Colours::black.withAlpha (0.42f));
+    g.fillRoundedRectangle (pad, 3.0f);
+    g.setColour (ToyotomiUi::gold().withAlpha (0.60f));
+    g.drawRoundedRectangle (pad, 3.0f, 1.2f);
+    g.setColour (ToyotomiUi::ivory().withAlpha (0.32f));
+    for (int i = 1; i < 4; ++i)
+    {
+        const auto x = pad.getX() + pad.getWidth() * i / 4.0f;
+        const auto y = pad.getY() + pad.getHeight() * i / 4.0f;
+        g.drawVerticalLine (juce::roundToInt (x), pad.getY(), pad.getBottom());
+        g.drawHorizontalLine (juce::roundToInt (y), pad.getX(), pad.getRight());
+    }
+    g.setColour (ToyotomiUi::gold().withAlpha (0.35f));
+    g.drawLine (pad.getCentreX(), pad.getY(), pad.getCentreX(), pad.getBottom(), 1.0f);
+    g.drawLine (pad.getX(), pad.getCentreY(), pad.getRight(), pad.getCentreY(), 1.0f);
 
     juce::Path motion;
     for (int i = 0; i < normalizedMotion.size(); ++i)
@@ -313,12 +294,16 @@ void XYMotionPad::paint (juce::Graphics& g)
         const auto screen = juce::Point<float> (pad.getX() + p.x * pad.getWidth(), pad.getY() + p.y * pad.getHeight());
         if (i == 0) motion.startNewSubPath (screen); else motion.lineTo (screen);
     }
-    g.setColour (ToyotomiUi::gold());
-    g.strokePath (motion, juce::PathStrokeType (1.5f));
+    g.setColour (ToyotomiUi::gold().withAlpha (0.90f));
+    g.strokePath (motion, juce::PathStrokeType (2.0f));
     if (! normalizedMotion.isEmpty())
     {
         const auto p = normalizedMotion.getLast();
-        g.drawEllipse ({ pad.getX() + p.x * pad.getWidth() - 5.0f, pad.getY() + p.y * pad.getHeight() - 5.0f, 10.0f, 10.0f }, 2.0f);
+        const auto point = juce::Point<float> (pad.getX() + p.x * pad.getWidth(), pad.getY() + p.y * pad.getHeight());
+        g.setColour (ToyotomiUi::gold().withAlpha (0.18f));
+        g.fillEllipse (point.x - 10.0f, point.y - 10.0f, 20.0f, 20.0f);
+        g.setColour (ToyotomiUi::gold());
+        g.drawEllipse (point.x - 5.0f, point.y - 5.0f, 10.0f, 10.0f, 2.0f);
     }
 }
 
@@ -331,7 +316,26 @@ void XYMotionPad::appendPoint (juce::Point<float> position)
     repaint();
 }
 
-void XYMotionPad::mouseDown (const juce::MouseEvent& event) { recording = padBounds().contains (event.position); if (recording) { normalizedMotion.clearQuick(); appendPoint (event.position); } }
+void XYMotionPad::mouseDown (const juce::MouseEvent& event)
+{
+    const auto bottom = getLocalBounds().removeFromBottom (30).reduced (7, 2);
+    if (bottom.removeFromLeft (bottom.getWidth() / 2).contains (event.getPosition()))
+    {
+        normalizedMotion.clearQuick();
+        if (onClearMotion) onClearMotion();
+        repaint();
+        return;
+    }
+    if (bottom.contains (event.getPosition()))
+    {
+        normalizedMotion.clearQuick();
+        if (onResetCount) onResetCount();
+        repaint();
+        return;
+    }
+    recording = padBounds().contains (event.position);
+    if (recording) { normalizedMotion.clearQuick(); appendPoint (event.position); }
+}
 void XYMotionPad::mouseDrag (const juce::MouseEvent& event) { if (recording) appendPoint (event.position); }
 void XYMotionPad::mouseUp (const juce::MouseEvent&)
 {
@@ -347,20 +351,16 @@ void XYMotionPad::mouseUp (const juce::MouseEvent&)
 
 void ScratchPresetPalette::paint (juce::Graphics& g)
 {
-    ToyotomiUi::drawPanel (g, getLocalBounds().toFloat(), "COUNT 5 PRESET");
     auto area = getLocalBounds().withTrimmedTop (36).reduced (8, 0);
     const auto rows = 4;
     for (int i = 0; i < 10; ++i)
     {
         auto cell = gridCell (area, i % 3, i / 3, 3, rows, 3);
-        g.setColour (i == selectedPreset ? ToyotomiUi::gold().withAlpha (0.15f) : ToyotomiUi::panel());
+        g.setColour (juce::Colours::black.withAlpha (0.48f));
         g.fillRect (cell);
         g.setColour (i == selectedPreset ? ToyotomiUi::gold() : ToyotomiUi::border());
         g.drawRect (cell, i == selectedPreset ? 2 : 1);
-        ToyotomiUi::drawMotionGlyph (g, cell.toFloat().withTrimmedBottom (22.0f), i);
-        g.setColour (i == selectedPreset ? ToyotomiUi::gold() : ToyotomiUi::ivory());
-        g.setFont (ToyotomiUi::font (11.0f));
-        g.drawText (presetNames[static_cast<size_t> (i)], cell.removeFromBottom (23), juce::Justification::centred);
+        juce::ignoreUnused (presetNames);
     }
 }
 
@@ -371,50 +371,111 @@ void ScratchPresetPalette::mouseDown (const juce::MouseEvent& event)
     if (onPresetSelected) onPresetSelected (selectedPreset);
 }
 
+CountParameterPanel::CountParameterPanel (ToyotomiHideyoshiAudioProcessor& p) : processor (p) {}
+
+juce::Rectangle<float> CountParameterPanel::knobBounds (int index) const
+{
+    const auto width = getWidth() / 3.0f;
+    const auto diameter = juce::jmin (width * 0.76f, getHeight() * 0.30f);
+    return { width * index + (width - diameter) * 0.5f, getHeight() * 0.43f, diameter, diameter };
+}
+
 void CountParameterPanel::paint (juce::Graphics& g)
 {
-    ToyotomiUi::drawPanel (g, getLocalBounds().toFloat(), "COUNT PARAMETERS (COUNT 5)");
-    auto area = getLocalBounds().withTrimmedTop (38).reduced (10, 0);
-    g.setColour (ToyotomiUi::gold());
-    g.setFont (ToyotomiUi::font (12.0f));
-    g.drawText ("LENGTH", area.removeFromTop (18), juce::Justification::centredLeft);
-    auto lengths = area.removeFromTop (36);
-    const std::array<const char*, 5> labels { "1/16", "1/8", "1/4", "1/2", "1 BAR" };
+    const auto& state = processor.getStateModel();
+    const auto ui = state.getUiState();
+    const auto& count = state.getCount (ui.selectedBar, ui.selectedCount);
+    auto lengths = getLocalBounds().withTrimmedTop (67).withHeight (35).reduced (12, 0);
     for (int i = 0; i < 5; ++i)
     {
-        auto cell = gridCell (lengths, i, 0, 5, 1, 2);
-        g.setColour (i == selectedLength ? ToyotomiUi::gold() : ToyotomiUi::border());
-        g.drawRect (cell, i == selectedLength ? 2 : 1);
-        g.setColour (i == selectedLength ? ToyotomiUi::gold() : ToyotomiUi::ivory());
-        g.drawText (labels[static_cast<size_t> (i)], cell, juce::Justification::centred);
+        const auto cell = gridCell (lengths, i, 0, 5, 1, 3);
+        const auto selected = i == static_cast<int> (count.length);
+        g.setColour (juce::Colours::black.withAlpha (0.48f));
+        g.fillRect (cell);
+        g.setColour (selected ? ToyotomiUi::gold() : ToyotomiUi::border());
+        g.drawRect (cell, selected ? 2.0f : 1.0f);
     }
 
-    auto knobs = area.withTrimmedTop (42).withTrimmedBottom (20);
-    const std::array<const char*, 3> names { "SPEED", "PITCH", "DEPTH" };
-    const std::array<const char*, 3> values { "0.00", "-12.00 st", "50 %" };
-    const std::array<juce::Rectangle<int>, 3> sources { juce::Rectangle<int> (878, 635, 67, 72), { 958, 635, 67, 72 }, { 1038, 635, 67, 72 } };
+    const std::array<float, 3> normalized {
+        count.speed / PluginStateModel::kMaxSpeed,
+        (count.pitch - PluginStateModel::kMinPitch) / (PluginStateModel::kMaxPitch - PluginStateModel::kMinPitch),
+        count.depth
+    };
+    const std::array<juce::String, 3> values {
+        juce::String (count.speed, 2) + "x",
+        juce::String (count.pitch, 1) + " st",
+        juce::String (juce::roundToInt (count.depth * 100.0f)) + " %"
+    };
+
     for (int i = 0; i < 3; ++i)
     {
-        auto column = gridCell (knobs, i, 0, 3, 1, 6);
-        g.setColour (ToyotomiUi::gold());
-        g.setFont (ToyotomiUi::font (12.0f));
-        g.drawText (names[static_cast<size_t> (i)], column.removeFromTop (22), juce::Justification::centred);
-        auto knob = column.removeFromTop (78).reduced (2);
-        if (source.isValid())
-        {
-            const auto src = sources[static_cast<size_t> (i)];
-            g.drawImage (source, knob.getX(), knob.getY(), knob.getWidth(), knob.getHeight(), src.getX(), src.getY(), src.getWidth(), src.getHeight(), false);
-        }
+        const auto knob = knobBounds (i);
+        const auto center = knob.getCentre();
+        const auto radius = knob.getWidth() * 0.5f;
+        const auto start = juce::MathConstants<float>::pi * 1.25f;
+        const auto sweep = juce::MathConstants<float>::pi * 1.5f;
+        g.setColour (juce::Colours::black.withAlpha (0.72f));
+        g.fillEllipse (knob.expanded (4.0f));
+        g.setColour (ToyotomiUi::gold().withAlpha (0.62f));
+        g.drawEllipse (knob.expanded (4.0f), 1.2f);
         g.setColour (ToyotomiUi::border());
-        g.drawRect (column.removeFromTop (28));
+        g.fillEllipse (knob.reduced (2.0f));
+        for (int tick = 0; tick <= 10; ++tick)
+        {
+            const auto angle = start + sweep * tick / 10.0f;
+            const auto outer = center + juce::Point<float> (std::cos (angle), std::sin (angle)) * (radius + 7.0f);
+            const auto inner = center + juce::Point<float> (std::cos (angle), std::sin (angle)) * (radius + (tick % 5 == 0 ? 2.0f : 4.0f));
+            g.setColour (ToyotomiUi::muted().withAlpha (0.80f));
+            g.drawLine ({ inner, outer }, tick % 5 == 0 ? 1.5f : 0.8f);
+        }
+        const auto pointerAngle = start + sweep * juce::jlimit (0.0f, 1.0f, normalized[static_cast<size_t> (i)]);
+        const auto pointerEnd = center + juce::Point<float> (std::cos (pointerAngle), std::sin (pointerAngle)) * (radius * 0.72f);
+        g.setColour (ToyotomiUi::red());
+        g.drawLine ({ center, pointerEnd }, 2.2f);
+        g.setColour (ToyotomiUi::gold().withAlpha (0.28f));
+        g.fillEllipse (center.x - 5.0f, center.y - 5.0f, 10.0f, 10.0f);
         g.setColour (ToyotomiUi::ivory());
-        g.drawText (values[static_cast<size_t> (i)], column.withTrimmedBottom (column.getHeight() - 28), juce::Justification::centred);
+        g.setFont (ToyotomiUi::font (11.0f, true));
+        g.drawText (values[static_cast<size_t> (i)], knob.withY (knob.getBottom() + 9.0f).withHeight (22.0f).toNearestInt(), juce::Justification::centred);
     }
+}
+
+void CountParameterPanel::updateKnob (int index, float delta)
+{
+    auto& state = processor.getStateModel();
+    const auto ui = state.getUiState();
+    const auto& count = state.getCount (ui.selectedBar, ui.selectedCount);
+    if (index == 0) state.setCountSpeed (ui.selectedBar, ui.selectedCount, count.speed + delta * 0.012f);
+    if (index == 1) state.setCountPitch (ui.selectedBar, ui.selectedCount, count.pitch + delta * 0.20f);
+    if (index == 2) state.setCountDepth (ui.selectedBar, ui.selectedCount, count.depth + delta * 0.010f);
+    repaint();
 }
 
 void CountParameterPanel::mouseDown (const juce::MouseEvent& event)
 {
-    if (event.y < 105 && event.y > 55) { selectedLength = juce::jlimit (0, 4, (event.x - 10) * 5 / juce::jmax (1, getWidth() - 20)); if (onLengthSelected) onLengthSelected (selectedLength); repaint(); }
+    auto lengths = getLocalBounds().withTrimmedTop (67).withHeight (35).reduced (12, 0);
+    if (lengths.contains (event.getPosition()))
+    {
+        const auto length = juce::jlimit (0, 4, event.x * 5 / juce::jmax (1, getWidth()));
+        if (onLengthSelected) onLengthSelected (length);
+        repaint();
+        return;
+    }
+    for (int i = 0; i < 3; ++i)
+        if (knobBounds (i).expanded (8.0f).contains (event.position)) { activeKnob = i; dragStartY = event.position.y; return; }
+}
+
+void CountParameterPanel::mouseDrag (const juce::MouseEvent& event)
+{
+    if (activeKnob >= 0) { updateKnob (activeKnob, dragStartY - event.position.y); dragStartY = event.position.y; }
+}
+
+void CountParameterPanel::mouseUp (const juce::MouseEvent&) { activeKnob = -1; }
+
+void CountParameterPanel::mouseWheelMove (const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel)
+{
+    for (int i = 0; i < 3; ++i)
+        if (knobBounds (i).expanded (8.0f).contains (event.position)) { updateKnob (i, wheel.deltaY * 12.0f); return; }
 }
 
 OutputMeterComponent::OutputMeterComponent (ToyotomiHideyoshiAudioProcessor& p) : processor (p) { startTimerHz (30); }

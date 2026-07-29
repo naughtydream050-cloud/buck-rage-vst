@@ -26,6 +26,7 @@ class TopBarComponent final : public juce::Component,
 public:
     explicit TopBarComponent (ToyotomiHideyoshiAudioProcessor&);
     void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent&) override;
 
 private:
     void timerCallback() override;
@@ -124,6 +125,8 @@ public:
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
+    std::function<void()> onClearMotion;
+    std::function<void()> onResetCount;
 
 private:
     void appendPoint (juce::Point<float>);
@@ -147,13 +150,19 @@ class CountParameterPanel final : public juce::Component
 {
 public:
     std::function<void (int)> onLengthSelected;
-    explicit CountParameterPanel (juce::Image sourceImage) : source (std::move (sourceImage)) {}
+    explicit CountParameterPanel (ToyotomiHideyoshiAudioProcessor&);
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
+    void mouseDrag (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
 
 private:
-    juce::Image source;
-    int selectedLength = 2;
+    juce::Rectangle<float> knobBounds (int index) const;
+    void updateKnob (int index, float delta);
+    ToyotomiHideyoshiAudioProcessor& processor;
+    int activeKnob = -1;
+    float dragStartY = 0.0f;
 };
 
 class OutputMeterComponent final : public juce::Component,
