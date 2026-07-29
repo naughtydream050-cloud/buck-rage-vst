@@ -45,7 +45,7 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
 
         // Image-first Phase 1: retain each component as a hit region while
         // keeping the supplied visual truth free of a second approximation.
-        if (referenceImage.isValid())
+        if (referenceImage.isValid() && component != &outputMeter)
             component->setAlpha (0.0f);
     }
 

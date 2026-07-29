@@ -435,25 +435,38 @@ void OutputMeterComponent::timerCallback()
 
 void OutputMeterComponent::paint (juce::Graphics& g)
 {
-    ToyotomiUi::drawPanel (g, getLocalBounds().toFloat(), "OUTPUT");
-    auto area = getLocalBounds().withTrimmedTop (48).withTrimmedBottom (32).reduced (24, 0);
-    const auto drawChannel = [&] (juce::Rectangle<int> column, float level, const char* label)
+    // The faceplate provides the meter frame, legends, scale and glass. This
+    // component replaces only the two LED wells with live audio-thread peaks.
+    const auto trackTop = juce::roundToInt (getHeight() * 0.18f);
+    const auto trackHeight = juce::roundToInt (getHeight() * 0.70f);
+    const auto trackWidth = juce::jmax (10, juce::roundToInt (getWidth() * 0.115f));
+    const auto leftTrack = juce::Rectangle<int> (juce::roundToInt (getWidth() * 0.36f), trackTop, trackWidth, trackHeight);
+    const auto rightTrack = juce::Rectangle<int> (juce::roundToInt (getWidth() * 0.66f), trackTop, trackWidth, trackHeight);
+
+    const auto drawChannel = [&] (juce::Rectangle<int> track, float level)
     {
-        g.setColour (ToyotomiUi::ivory()); g.setFont (ToyotomiUi::font (12.0f));
-        g.drawText (label, column.removeFromTop (18), juce::Justification::centred);
+        g.setColour (juce::Colours::black.withAlpha (0.88f));
+        g.fillRoundedRectangle (track.expanded (2, 2).toFloat(), 1.5f);
+        g.setColour (ToyotomiUi::gold().withAlpha (0.38f));
+        g.drawRoundedRectangle (track.expanded (2, 2).toFloat(), 1.5f, 1.0f);
+
         const auto segments = 28;
         const auto active = juce::roundToInt (juce::jmap (level, -60.0f, 6.0f, 0.0f, static_cast<float> (segments)));
         for (int i = 0; i < segments; ++i)
         {
-            auto segment = column.removeFromBottom (juce::jmax (2, column.getHeight() / (segments - i))).withTrimmedTop (2).reduced (2, 0);
+            const auto segmentHeight = track.getHeight() / segments;
+            auto segment = juce::Rectangle<int> (track.getX() + 2,
+                                                  track.getBottom() - (i + 1) * segmentHeight + 1,
+                                                  juce::jmax (2, track.getWidth() - 4),
+                                                  juce::jmax (1, segmentHeight - 2));
             const auto lit = i < active;
             const auto colour = i > 23 ? ToyotomiUi::red() : i > 17 ? ToyotomiUi::gold() : juce::Colour (0xff4d9a46);
-            g.setColour (lit ? colour : ToyotomiUi::border().darker (0.35f));
+            g.setColour (lit ? colour.brighter (0.10f) : juce::Colour (0xff171917));
             g.fillRect (segment);
         }
     };
-    drawChannel (area.removeFromLeft (area.getWidth() / 2), leftDb, "L");
-    drawChannel (area, rightDb, "R");
+    drawChannel (leftTrack, leftDb);
+    drawChannel (rightTrack, rightDb);
 }
 
 void BottomStatusBar::paint (juce::Graphics& g)
