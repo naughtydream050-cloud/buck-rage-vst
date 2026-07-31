@@ -37,6 +37,20 @@ juce_add_binary_data(ToyotomiHideyoshiAssets
         Resources/ui/knob_pointer.png
         Resources/ui/bar_cell_surface.png
         Resources/ui/meter_well.png
+        Resources/ui-cuts/bar_normal_frame.png
+        Resources/ui-cuts/bar_selected_frame.png
+        Resources/ui-cuts/bar_playing_frame.png
+        Resources/ui-cuts/count_normal_frame.png
+        Resources/ui-cuts/count_selected_frame.png
+        Resources/ui-cuts/preset_normal_frame.png
+        Resources/ui-cuts/preset_selected_frame.png
+        Resources/ui-cuts/length_normal_frame.png
+        Resources/ui-cuts/length_selected_frame.png
+        Resources/ui-cuts/tab_normal_frame.png
+        Resources/ui-cuts/tab_selected_frame.png
+        Resources/ui-cuts/output_meter_reference.png
+        Resources/ui-cuts/meter_led_strip.png
+        Resources/ui-cuts/bypass_off.png
         ui/spec/ui-spec.json
         ui/spec/assets-manifest.json
 )
@@ -73,4 +87,5 @@ target_link_libraries(ToyotomiHideyoshi PRIVATE
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags
 )
+
 

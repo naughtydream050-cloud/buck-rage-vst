@@ -9,11 +9,11 @@
 
 namespace
 {
-juce::Image loadFaceplateImage()
+juce::Image loadReferenceImage()
 {
 #if TOYOTOMI_HAS_BINARY_DATA
-    return juce::ImageFileFormat::loadFrom (BinaryData::faceplate_static_png,
-                                            BinaryData::faceplate_static_pngSize);
+    return juce::ImageFileFormat::loadFrom (BinaryData::reference_ui_jpg,
+                                            BinaryData::reference_ui_jpgSize);
 #else
     return {};
 #endif
@@ -24,7 +24,7 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
     ToyotomiHideyoshiAudioProcessor& p)
     : AudioProcessorEditor (&p),
       processor (p),
-      referenceImage (loadFaceplateImage()),
+      referenceImage (loadReferenceImage()),
       topBar (p),
       artwork (referenceImage),
       countParameters (p),
@@ -45,8 +45,6 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
     {
         addAndMakeVisible (*component);
 
-        // Static texture remains image-first, while each control paints its
-        // live state as a restrained overlay on top of the faceplate.
         component->setAlpha (1.0f);
     }
 
@@ -64,8 +62,6 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
 
 void ToyotomiHideyoshiAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (ToyotomiUi::background());
-
     if (referenceImage.isValid())
     {
         const auto canvas = uiSpec.getScaledCanvasBounds (getLocalBounds());
@@ -90,4 +86,5 @@ void ToyotomiHideyoshiAudioProcessorEditor::resized()
     bottomStatus.setBounds    (uiSpec.scaleRegion ("bottomStatus", viewport));
 
 }
+
 

@@ -178,6 +178,8 @@ private:
     ToyotomiHideyoshiAudioProcessor& processor;
     float leftDb = -60.0f;
     float rightDb = -60.0f;
+    float leftPeakDb = -60.0f;
+    float rightPeakDb = -60.0f;
 };
 
 class BottomStatusBar final : public juce::Component
@@ -185,3 +187,5 @@ class BottomStatusBar final : public juce::Component
 public:
     void paint (juce::Graphics&) override;
 };
+
+
