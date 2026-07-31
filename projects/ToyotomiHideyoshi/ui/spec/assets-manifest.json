@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "reference": "Resources/reference_ui.jpg",
+  "canvas": [1280, 853],
+  "faceplate": {
+    "path": "Resources/faceplate_static.png",
+    "contains": ["samurai-artwork", "texture", "panel-frames", "fixed-labels", "crest", "brush-lettering", "meter-scale"],
+    "excludes": ["stateful-cells", "knob-pointers", "parameter-values", "meter-bars", "top-values", "bottom-values"]
+  },
+  "assets": [
+    { "id": "knobRing", "path": "Resources/ui/knob_ring_67.png", "bounds": [847, 596, 67, 67], "role": "shared-speed-pitch-depth-base" },
+    { "id": "knobPointer", "path": "Resources/ui/knob_pointer.png", "bounds": [847, 596, 67, 67], "role": "rotated-shared-pointer" },
+    { "id": "barCellSurface", "path": "Resources/ui/bar_cell_surface.png", "bounds": [328, 160, 67, 96], "role": "engraved-cell-surface" },
+    { "id": "meterWell", "path": "Resources/ui/meter_well.png", "bounds": [1156, 469, 15, 255], "role": "live-lr-meter-background" }
+  ],
+  "dynamicRegions": [
+    "top-values", "bypass", "bar-tabs", "bar-cells", "count-cells", "count-preset-cells",
+    "length-buttons", "speed-pitch-depth", "xy-motion", "meter-bars", "bottom-status"
+  ]
+}
+

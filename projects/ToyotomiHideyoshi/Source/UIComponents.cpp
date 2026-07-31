@@ -1,6 +1,13 @@
 #include "UIComponents.h"
 #include <cmath>
 
+#if __has_include(<BinaryData.h>)
+ #include <BinaryData.h>
+ #define TOYOTOMI_HAS_BINARY_DATA 1
+#else
+ #define TOYOTOMI_HAS_BINARY_DATA 0
+#endif
+
 namespace
 {
 constexpr std::array<const char*, 9> presetNames {
@@ -15,7 +22,43 @@ juce::Rectangle<int> gridCell (juce::Rectangle<int> area, int column, int row,
     const auto height = (area.getHeight() - gap * (rows - 1)) / rows;
     return { area.getX() + column * (width + gap), area.getY() + row * (height + gap), width, height };
 }
+
+juce::Image loadAsset (const void* data, int size)
+{
+    return juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (size));
 }
+
+const juce::Image& knobRingAsset()
+{
+#if TOYOTOMI_HAS_BINARY_DATA
+    static const auto image = loadAsset (BinaryData::knob_ring_67_png, BinaryData::knob_ring_67_pngSize);
+#else
+    static const juce::Image image;
+#endif
+    return image;
+}
+
+const juce::Image& knobPointerAsset()
+{
+#if TOYOTOMI_HAS_BINARY_DATA
+    static const auto image = loadAsset (BinaryData::knob_pointer_png, BinaryData::knob_pointer_pngSize);
+#else
+    static const juce::Image image;
+#endif
+    return image;
+}
+
+const juce::Image& meterWellAsset()
+{
+#if TOYOTOMI_HAS_BINARY_DATA
+    static const auto image = loadAsset (BinaryData::meter_well_png, BinaryData::meter_well_pngSize);
+#else
+    static const juce::Image image;
+#endif
+    return image;
+}
+}
+
 namespace ToyotomiUi
 {
 juce::Colour background() { return juce::Colour (0xff07090a); }
@@ -474,12 +517,15 @@ void CountParameterPanel::paint (juce::Graphics& g)
         const auto radius = knob.getWidth() * 0.5f;
         const auto start = juce::MathConstants<float>::pi * 1.25f;
         const auto sweep = juce::MathConstants<float>::pi * 1.5f;
-        g.setColour (ToyotomiUi::background().withAlpha (0.97f));
-        g.fillEllipse (knob.expanded (4.0f));
-        g.setColour (ToyotomiUi::gold().withAlpha (0.62f));
-        g.drawEllipse (knob.expanded (4.0f), 1.2f);
-        g.setColour (ToyotomiUi::border());
-        g.fillEllipse (knob.reduced (2.0f));
+        if (knobRingAsset().isValid())
+            g.drawImageWithin (knobRingAsset(), knob.getX(), knob.getY(), knob.getWidth(), knob.getHeight(), juce::RectanglePlacement::centred);
+        else
+        {
+            g.setColour (ToyotomiUi::background().withAlpha (0.97f));
+            g.fillEllipse (knob.expanded (4.0f));
+            g.setColour (ToyotomiUi::border());
+            g.fillEllipse (knob.reduced (2.0f));
+        }
         for (int tick = 0; tick <= 10; ++tick)
         {
             const auto angle = start + sweep * tick / 10.0f;
@@ -489,9 +535,19 @@ void CountParameterPanel::paint (juce::Graphics& g)
             g.drawLine (juce::Line<float> (inner, outer), tick % 5 == 0 ? 1.5f : 0.8f);
         }
         const auto pointerAngle = start + sweep * juce::jlimit (0.0f, 1.0f, normalized[static_cast<size_t> (i)]);
-        const auto pointerEnd = center + juce::Point<float> (std::cos (pointerAngle), std::sin (pointerAngle)) * (radius * 0.72f);
-        g.setColour (ToyotomiUi::red());
-        g.drawLine (juce::Line<float> (center, pointerEnd), 2.2f);
+        if (knobPointerAsset().isValid())
+        {
+            g.saveState();
+            g.addTransform (juce::AffineTransform::rotation (pointerAngle + juce::MathConstants<float>::halfPi, center.x, center.y));
+            g.drawImageWithin (knobPointerAsset(), knob.getX(), knob.getY(), knob.getWidth(), knob.getHeight(), juce::RectanglePlacement::centred);
+            g.restoreState();
+        }
+        else
+        {
+            const auto pointerEnd = center + juce::Point<float> (std::cos (pointerAngle), std::sin (pointerAngle)) * (radius * 0.72f);
+            g.setColour (ToyotomiUi::red());
+            g.drawLine (juce::Line<float> (center, pointerEnd), 2.2f);
+        }
         g.setColour (ToyotomiUi::gold().withAlpha (0.28f));
         g.fillEllipse (center.x - 5.0f, center.y - 5.0f, 10.0f, 10.0f);
         g.setColour (ToyotomiUi::ivory());
@@ -570,10 +626,15 @@ void OutputMeterComponent::paint (juce::Graphics& g)
 
     const auto drawChannel = [&] (juce::Rectangle<int> track, float level)
     {
-        g.setColour (juce::Colours::black.withAlpha (0.88f));
-        g.fillRoundedRectangle (track.expanded (2, 2).toFloat(), 1.5f);
-        g.setColour (ToyotomiUi::gold().withAlpha (0.38f));
-        g.drawRoundedRectangle (track.expanded (2, 2).toFloat(), 1.5f, 1.0f);
+        if (meterWellAsset().isValid())
+            g.drawImageWithin (meterWellAsset(), track.getX(), track.getY(), track.getWidth(), track.getHeight(), juce::RectanglePlacement::centred);
+        else
+        {
+            g.setColour (juce::Colours::black.withAlpha (0.88f));
+            g.fillRoundedRectangle (track.expanded (2, 2).toFloat(), 1.5f);
+            g.setColour (ToyotomiUi::gold().withAlpha (0.38f));
+            g.drawRoundedRectangle (track.expanded (2, 2).toFloat(), 1.5f, 1.0f);
+        }
 
         const auto segments = 28;
         const auto active = juce::roundToInt (juce::jmap (level, -60.0f, 6.0f, 0.0f, static_cast<float> (segments)));
@@ -622,3 +683,4 @@ void BottomStatusBar::paint (juce::Graphics& g)
     drawStatus ({ 723.0f * scaleX, 20.0f * scaleY, 180.0f * scaleX, 31.0f * scaleY }, "MODE  SEQUENCER", ToyotomiUi::ivory());
     drawStatus ({ 920.0f * scaleX, 20.0f * scaleY, 185.0f * scaleX, 31.0f * scaleY }, "STATUS  PASS THROUGH", ToyotomiUi::gold());
 }
+

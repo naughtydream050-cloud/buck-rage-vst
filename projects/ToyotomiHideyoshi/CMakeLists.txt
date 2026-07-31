@@ -32,7 +32,13 @@ juce_generate_juce_header(ToyotomiHideyoshi)
 juce_add_binary_data(ToyotomiHideyoshiAssets
     SOURCES
         Resources/reference_ui.jpg
+        Resources/faceplate_static.png
+        Resources/ui/knob_ring_67.png
+        Resources/ui/knob_pointer.png
+        Resources/ui/bar_cell_surface.png
+        Resources/ui/meter_well.png
         ui/spec/ui-spec.json
+        ui/spec/assets-manifest.json
 )
 
 target_sources(ToyotomiHideyoshi PRIVATE
@@ -67,3 +73,4 @@ target_link_libraries(ToyotomiHideyoshi PRIVATE
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags
 )
+

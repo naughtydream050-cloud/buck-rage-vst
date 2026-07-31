@@ -9,11 +9,11 @@
 
 namespace
 {
-juce::Image loadReferenceImage()
+juce::Image loadFaceplateImage()
 {
 #if TOYOTOMI_HAS_BINARY_DATA
-    return juce::ImageFileFormat::loadFrom (BinaryData::reference_ui_jpg,
-                                            BinaryData::reference_ui_jpgSize);
+    return juce::ImageFileFormat::loadFrom (BinaryData::faceplate_static_png,
+                                            BinaryData::faceplate_static_pngSize);
 #else
     return {};
 #endif
@@ -24,7 +24,7 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
     ToyotomiHideyoshiAudioProcessor& p)
     : AudioProcessorEditor (&p),
       processor (p),
-      referenceImage (loadReferenceImage()),
+      referenceImage (loadFaceplateImage()),
       topBar (p),
       artwork (referenceImage),
       countParameters (p),
@@ -90,3 +90,4 @@ void ToyotomiHideyoshiAudioProcessorEditor::resized()
     bottomStatus.setBounds    (uiSpec.scaleRegion ("bottomStatus", viewport));
 
 }
+
