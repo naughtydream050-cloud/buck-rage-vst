@@ -67,9 +67,12 @@ void ToyotomiHideyoshiAudioProcessorEditor::paint (juce::Graphics& g)
     g.fillAll (ToyotomiUi::background());
 
     if (referenceImage.isValid())
-        g.drawImageWithin (referenceImage, getLocalBounds().getX(), getLocalBounds().getY(),
-                           getLocalBounds().getWidth(), getLocalBounds().getHeight(),
+    {
+        const auto canvas = uiSpec.getScaledCanvasBounds (getLocalBounds());
+        g.drawImageWithin (referenceImage, canvas.getX(), canvas.getY(),
+                           canvas.getWidth(), canvas.getHeight(),
                            juce::RectanglePlacement::centred);
+    }
 }
 
 void ToyotomiHideyoshiAudioProcessorEditor::resized()

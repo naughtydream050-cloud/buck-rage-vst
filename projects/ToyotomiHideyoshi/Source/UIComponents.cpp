@@ -3,9 +3,9 @@
 
 namespace
 {
-constexpr std::array<const char*, 10> presetNames {
+constexpr std::array<const char*, 9> presetNames {
     "OFF", "FORWARD CUT", "BACKSPIN", "CHIRP", "BABY",
-    "TRANSFORM", "DRAG", "ZIGZAG", "TAPE BRAKE", "CUSTOM"
+    "TRANSFORM", "DRAG", "ZIGZAG", "TAPE BRAKE"
 };
 
 juce::Rectangle<int> gridCell (juce::Rectangle<int> area, int column, int row,
@@ -16,7 +16,6 @@ juce::Rectangle<int> gridCell (juce::Rectangle<int> area, int column, int row,
     return { area.getX() + column * (width + gap), area.getY() + row * (height + gap), width, height };
 }
 }
-
 namespace ToyotomiUi
 {
 juce::Colour background() { return juce::Colour (0xff07090a); }
@@ -112,20 +111,39 @@ void TopBarComponent::timerCallback()
 
 void TopBarComponent::paint (juce::Graphics& g)
 {
-    const auto bypass = getLocalBounds().removeFromRight (116).reduced (12, 17);
+    // These value wells cover the values baked into the image-only reference;
+    // labels and the surrounding engraved chrome intentionally remain visible.
+    const auto coverValue = [&] (juce::Rectangle<int> bounds, const juce::String& value,
+                                 juce::Colour colour)
+    {
+        g.setColour (ToyotomiUi::background().withAlpha (0.92f));
+        g.fillRect (bounds);
+        g.setColour (colour);
+        g.setFont (ToyotomiUi::font (16.0f, true));
+        g.drawText (value, bounds, juce::Justification::centred);
+    };
+
+    coverValue ({ 435, 37, 74, 24 }, hostSync ? "ON" : "OFF", hostSync ? ToyotomiUi::red() : ToyotomiUi::muted());
+    coverValue ({ 579, 37, 88, 24 }, juce::String (bpm, 2), ToyotomiUi::ivory());
+    coverValue ({ 702, 37, 90, 24 }, juce::String (numerator) + "/" + juce::String (denominator), ToyotomiUi::ivory());
+    coverValue ({ 830, 37, 215, 24 }, "CUSTOM PROJECT", ToyotomiUi::ivory());
+
+    const auto bypass = juce::Rectangle<int> (1172, 28, 68, 33);
     const auto active = processor.getStateModel().getUiState().bypass;
-    g.setColour ((active ? ToyotomiUi::red() : ToyotomiUi::border()).withAlpha (0.78f));
+    g.setColour (ToyotomiUi::background().withAlpha (0.94f));
+    g.fillRoundedRectangle (bypass.toFloat(), 8.0f);
+    g.setColour ((active ? ToyotomiUi::red() : ToyotomiUi::border()).withAlpha (0.86f));
     g.fillRoundedRectangle (bypass.toFloat(), 8.0f);
     g.setColour (active ? ToyotomiUi::red() : ToyotomiUi::gold().withAlpha (0.55f));
     g.drawRoundedRectangle (bypass.toFloat(), 8.0f, 1.2f);
     g.setColour (active ? ToyotomiUi::ivory() : ToyotomiUi::muted());
-    g.setFont (ToyotomiUi::font (11.0f, true));
-    g.drawText (active ? "BYPASS ON" : "BYPASS OFF", bypass, juce::Justification::centred);
+    g.setFont (ToyotomiUi::font (10.0f, true));
+    g.drawText (active ? "ON" : "OFF", bypass, juce::Justification::centred);
 }
 
 void TopBarComponent::mouseDown (const juce::MouseEvent& event)
 {
-    if (event.x >= getWidth() - 128)
+    if (juce::Rectangle<int> (1172, 28, 68, 33).contains (event.getPosition()))
     {
         const auto current = processor.getStateModel().getUiState().bypass;
         processor.getStateModel().setBypass (! current);
@@ -144,11 +162,13 @@ void BarTabComponent::paint (juce::Graphics& g)
     for (int i = 0; i < 4; ++i)
     {
         auto cell = gridCell (getLocalBounds(), i, 0, 4, 1, 4);
-        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.setColour (ToyotomiUi::background().withAlpha (0.97f));
         g.fillRect (cell);
         g.setColour (i == selectedPage ? ToyotomiUi::gold() : ToyotomiUi::border());
         g.drawRect (cell, i == selectedPage ? 2 : 1);
-        juce::ignoreUnused (labels);
+        g.setColour (i == selectedPage ? ToyotomiUi::gold() : ToyotomiUi::ivory());
+        g.setFont (ToyotomiUi::font (15.0f, true));
+        g.drawText (labels[static_cast<size_t> (i)], cell, juce::Justification::centred);
     }
 }
 
@@ -166,9 +186,27 @@ void BarCellComponent::configure (int number, bool isSelected, bool isPlaying)
 
 void BarCellComponent::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colours::black.withAlpha (0.60f));
+    auto body = getLocalBounds().reduced (1);
+    g.setColour (ToyotomiUi::background().withAlpha (0.97f));
+    g.fillRect (body);
     g.setColour (playing ? ToyotomiUi::red() : selected ? ToyotomiUi::gold() : ToyotomiUi::border());
     g.drawRect (getLocalBounds(), playing || selected ? 2 : 1);
+    g.setColour (playing ? ToyotomiUi::red() : selected ? ToyotomiUi::gold() : ToyotomiUi::ivory());
+    g.setFont (ToyotomiUi::font (13.0f, true));
+    g.drawText ("BAR " + juce::String (barNumber), body.removeFromTop (26), juce::Justification::centred);
+    ToyotomiUi::drawMotionGlyph (g, body.withTrimmedTop (24).withTrimmedBottom (19).toFloat(), barNumber % 9);
+    if (playing)
+    {
+        g.setColour (ToyotomiUi::red());
+        g.setFont (ToyotomiUi::font (11.0f, true));
+        g.drawText ("PLAYING", body.withTrimmedBottom (2).removeFromBottom (19), juce::Justification::centred);
+    }
+    else if (selected)
+    {
+        g.setColour (ToyotomiUi::gold());
+        g.setFont (ToyotomiUi::font (11.0f, true));
+        g.drawText ("SELECTED", body.withTrimmedBottom (2).removeFromBottom (19), juce::Justification::centred);
+    }
     g.setColour (playing ? ToyotomiUi::red() : selected ? ToyotomiUi::gold() : ToyotomiUi::muted());
     g.fillEllipse ((float) getWidth() * 0.5f - 3.0f, (float) getHeight() - 15.0f, 6.0f, 6.0f);
 }
@@ -200,7 +238,7 @@ void BarMapComponent::paint (juce::Graphics& g)
 
 void BarMapComponent::resized()
 {
-    auto area = getLocalBounds().withTrimmedTop (32).withTrimmedBottom (42).reduced (7, 0);
+    auto area = getLocalBounds().withTrimmedTop (32).withTrimmedBottom (48).reduced (9, 0);
     for (int i = 0; i < 16; ++i) cells[static_cast<size_t> (i)].setBounds (gridCell (area, i % 8, i / 8, 8, 2, 4));
 }
 
@@ -211,15 +249,24 @@ void CountCellComponent::configure (int number, int preset, bool isSelected)
 
 void CountCellComponent::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colours::black.withAlpha (0.54f));
+    auto body = getLocalBounds().reduced (1);
+    g.setColour (ToyotomiUi::background().withAlpha (0.97f));
+    g.fillRect (body);
     g.setColour (selected ? ToyotomiUi::gold() : ToyotomiUi::border());
     g.drawRect (getLocalBounds(), selected ? 2 : 1);
+    g.setColour (selected ? ToyotomiUi::gold() : ToyotomiUi::ivory());
+    g.setFont (ToyotomiUi::font (15.0f, true));
+    g.drawText (juce::String (countNumber), body.removeFromTop (25), juce::Justification::centred);
+    ToyotomiUi::drawMotionGlyph (g, body.withTrimmedTop (24).withTrimmedBottom (24).toFloat(), presetIndex);
+    g.setColour (selected ? ToyotomiUi::gold() : ToyotomiUi::ivory());
+    g.setFont (ToyotomiUi::font (11.0f, true));
+    g.drawText (presetNames[static_cast<size_t> (juce::jlimit (0, 8, presetIndex))],
+                body.withTrimmedBottom (2).removeFromBottom (21), juce::Justification::centred);
     if (selected)
     {
         g.setColour (ToyotomiUi::gold().withAlpha (0.18f));
         g.fillRect (getLocalBounds().reduced (2));
     }
-    juce::ignoreUnused (countNumber, presetIndex);
 }
 
 void CountCellComponent::mouseDown (const juce::MouseEvent&) { if (onSelected) onSelected (countNumber); }
@@ -251,7 +298,7 @@ void CountGridComponent::paint (juce::Graphics& g)
 
 void CountGridComponent::resized()
 {
-    auto area = getLocalBounds().withTrimmedTop (32).withTrimmedBottom (25).reduced (10, 0);
+    auto area = getLocalBounds().withTrimmedTop (28).withTrimmedBottom (35).reduced (15, 0);
     for (int i = 0; i < 16; ++i) cells[static_cast<size_t> (i)].setBounds (gridCell (area, i % 4, i / 4, 4, 4, 3));
 }
 
@@ -265,27 +312,20 @@ XYMotionPad::XYMotionPad()
 
 juce::Rectangle<float> XYMotionPad::padBounds() const
 {
-    return getLocalBounds().toFloat().reduced (30.0f, 31.0f).withTrimmedBottom (35.0f);
+    // Measured from the 1280 x 853 faceplate: this excludes the title,
+    // direction labels, and the two physical action buttons below the pad.
+    const auto scaleX = getWidth() / 289.0f;
+    const auto scaleY = getHeight() / 249.0f;
+    return { 30.0f * scaleX, 27.0f * scaleY, 243.0f * scaleX, 176.0f * scaleY };
 }
 
 void XYMotionPad::paint (juce::Graphics& g)
 {
     const auto pad = padBounds();
-    g.setColour (juce::Colours::black.withAlpha (0.42f));
-    g.fillRoundedRectangle (pad, 3.0f);
-    g.setColour (ToyotomiUi::gold().withAlpha (0.60f));
-    g.drawRoundedRectangle (pad, 3.0f, 1.2f);
-    g.setColour (ToyotomiUi::ivory().withAlpha (0.32f));
-    for (int i = 1; i < 4; ++i)
-    {
-        const auto x = pad.getX() + pad.getWidth() * i / 4.0f;
-        const auto y = pad.getY() + pad.getHeight() * i / 4.0f;
-        g.drawVerticalLine (juce::roundToInt (x), pad.getY(), pad.getBottom());
-        g.drawHorizontalLine (juce::roundToInt (y), pad.getX(), pad.getRight());
-    }
-    g.setColour (ToyotomiUi::gold().withAlpha (0.35f));
-    g.drawLine (pad.getCentreX(), pad.getY(), pad.getCentreX(), pad.getBottom(), 1.0f);
-    g.drawLine (pad.getX(), pad.getCentreY(), pad.getRight(), pad.getCentreY(), 1.0f);
+    // The glass, frame and grid are image-first. Only recorded motion is
+    // dynamic, so the pad never acquires a second, offset frame.
+    g.saveState();
+    g.reduceClipRegion (pad.toNearestInt());
 
     juce::Path motion;
     for (int i = 0; i < normalizedMotion.size(); ++i)
@@ -305,6 +345,7 @@ void XYMotionPad::paint (juce::Graphics& g)
         g.setColour (ToyotomiUi::gold());
         g.drawEllipse (point.x - 5.0f, point.y - 5.0f, 10.0f, 10.0f, 2.0f);
     }
+    g.restoreState();
 }
 
 void XYMotionPad::appendPoint (juce::Point<float> position)
@@ -318,15 +359,20 @@ void XYMotionPad::appendPoint (juce::Point<float> position)
 
 void XYMotionPad::mouseDown (const juce::MouseEvent& event)
 {
-    auto bottom = getLocalBounds().removeFromBottom (30).reduced (7, 2);
-    if (bottom.removeFromLeft (bottom.getWidth() / 2).contains (event.getPosition()))
+    const auto scaleX = getWidth() / 289.0f;
+    const auto scaleY = getHeight() / 249.0f;
+    const auto clear = juce::Rectangle<int> (juce::roundToInt (18.0f * scaleX), juce::roundToInt (211.0f * scaleY),
+                                             juce::roundToInt (124.0f * scaleX), juce::roundToInt (33.0f * scaleY));
+    const auto reset = juce::Rectangle<int> (juce::roundToInt (156.0f * scaleX), juce::roundToInt (211.0f * scaleY),
+                                             juce::roundToInt (114.0f * scaleX), juce::roundToInt (33.0f * scaleY));
+    if (clear.contains (event.getPosition()))
     {
         normalizedMotion.clearQuick();
         if (onClearMotion) onClearMotion();
         repaint();
         return;
     }
-    if (bottom.contains (event.getPosition()))
+    if (reset.contains (event.getPosition()))
     {
         normalizedMotion.clearQuick();
         if (onResetCount) onResetCount();
@@ -351,23 +397,31 @@ void XYMotionPad::mouseUp (const juce::MouseEvent&)
 
 void ScratchPresetPalette::paint (juce::Graphics& g)
 {
-    auto area = getLocalBounds().withTrimmedTop (36).reduced (8, 0);
-    const auto rows = 4;
-    for (int i = 0; i < 10; ++i)
+    const auto scaleX = getWidth() / 360.0f;
+    const auto scaleY = getHeight() / 313.0f;
+    const auto area = juce::Rectangle<int> (juce::roundToInt (14.0f * scaleX), juce::roundToInt (32.0f * scaleY),
+                                            juce::roundToInt (333.0f * scaleX), juce::roundToInt (257.0f * scaleY));
+    for (int i = 0; i < 9; ++i)
     {
-        auto cell = gridCell (area, i % 3, i / 3, 3, rows, 3);
-        g.setColour (juce::Colours::black.withAlpha (0.48f));
+        auto cell = gridCell (area, i % 3, i / 3, 3, 3, 3);
+        g.setColour (ToyotomiUi::background().withAlpha (0.97f));
         g.fillRect (cell);
         g.setColour (i == selectedPreset ? ToyotomiUi::gold() : ToyotomiUi::border());
         g.drawRect (cell, i == selectedPreset ? 2 : 1);
-        juce::ignoreUnused (presetNames);
+        ToyotomiUi::drawMotionGlyph (g, cell.reduced (12, 16).toFloat(), i);
+        g.setColour (i == selectedPreset ? ToyotomiUi::gold() : ToyotomiUi::ivory());
+        g.setFont (ToyotomiUi::font (12.0f * scaleY, true));
+        g.drawText (presetNames[static_cast<size_t> (i)], cell.removeFromBottom (23), juce::Justification::centred);
     }
 }
 
 void ScratchPresetPalette::mouseDown (const juce::MouseEvent& event)
 {
-    auto area = getLocalBounds().withTrimmedTop (36).reduced (8, 0);
-    for (int i = 0; i < 10; ++i) if (gridCell (area, i % 3, i / 3, 3, 4, 3).contains (event.getPosition())) { selectedPreset = i; repaint(); break; }
+    const auto scaleX = getWidth() / 360.0f;
+    const auto scaleY = getHeight() / 313.0f;
+    const auto area = juce::Rectangle<int> (juce::roundToInt (14.0f * scaleX), juce::roundToInt (32.0f * scaleY),
+                                            juce::roundToInt (333.0f * scaleX), juce::roundToInt (257.0f * scaleY));
+    for (int i = 0; i < 9; ++i) if (gridCell (area, i % 3, i / 3, 3, 3, 3).contains (event.getPosition())) { selectedPreset = i; repaint(); break; }
     if (onPresetSelected) onPresetSelected (selectedPreset);
 }
 
@@ -375,9 +429,12 @@ CountParameterPanel::CountParameterPanel (ToyotomiHideyoshiAudioProcessor& p) : 
 
 juce::Rectangle<float> CountParameterPanel::knobBounds (int index) const
 {
-    const auto width = getWidth() / 3.0f;
-    const auto diameter = juce::jmin (width * 0.76f, getHeight() * 0.30f);
-    return { width * index + (width - diameter) * 0.5f, getHeight() * 0.43f, diameter, diameter };
+    // speed/pitch/depth are equal 67 px circles at x=10/97/184 and y=165
+    // within the measured 270 x 339 parameter panel.
+    const auto scaleX = getWidth() / 270.0f;
+    const auto scaleY = getHeight() / 339.0f;
+    return { (10.0f + 87.0f * index) * scaleX, 165.0f * scaleY,
+             67.0f * scaleX, 67.0f * scaleY };
 }
 
 void CountParameterPanel::paint (juce::Graphics& g)
@@ -385,12 +442,15 @@ void CountParameterPanel::paint (juce::Graphics& g)
     const auto& state = processor.getStateModel();
     const auto ui = state.getUiState();
     const auto& count = state.getCount (ui.selectedBar, ui.selectedCount);
-    auto lengths = getLocalBounds().withTrimmedTop (67).withHeight (35).reduced (12, 0);
+    const auto scaleX = getWidth() / 270.0f;
+    const auto scaleY = getHeight() / 339.0f;
+    auto lengths = juce::Rectangle<int> (juce::roundToInt (12.0f * scaleX), juce::roundToInt (72.0f * scaleY),
+                                         juce::roundToInt (248.0f * scaleX), juce::roundToInt (32.0f * scaleY));
     for (int i = 0; i < 5; ++i)
     {
         const auto cell = gridCell (lengths, i, 0, 5, 1, 3);
         const auto selected = i == static_cast<int> (count.length);
-        g.setColour (juce::Colours::black.withAlpha (0.48f));
+        g.setColour (ToyotomiUi::background().withAlpha (0.96f));
         g.fillRect (cell);
         g.setColour (selected ? ToyotomiUi::gold() : ToyotomiUi::border());
         g.drawRect (cell, selected ? 2 : 1);
@@ -414,7 +474,7 @@ void CountParameterPanel::paint (juce::Graphics& g)
         const auto radius = knob.getWidth() * 0.5f;
         const auto start = juce::MathConstants<float>::pi * 1.25f;
         const auto sweep = juce::MathConstants<float>::pi * 1.5f;
-        g.setColour (juce::Colours::black.withAlpha (0.72f));
+        g.setColour (ToyotomiUi::background().withAlpha (0.97f));
         g.fillEllipse (knob.expanded (4.0f));
         g.setColour (ToyotomiUi::gold().withAlpha (0.62f));
         g.drawEllipse (knob.expanded (4.0f), 1.2f);
@@ -436,7 +496,7 @@ void CountParameterPanel::paint (juce::Graphics& g)
         g.fillEllipse (center.x - 5.0f, center.y - 5.0f, 10.0f, 10.0f);
         g.setColour (ToyotomiUi::ivory());
         g.setFont (ToyotomiUi::font (11.0f, true));
-        g.drawText (values[static_cast<size_t> (i)], knob.withY (knob.getBottom() + 9.0f).withHeight (22.0f).toNearestInt(), juce::Justification::centred);
+        g.drawText (values[static_cast<size_t> (i)], knob.withY (knob.getBottom() + 11.0f * scaleY).withHeight (21.0f * scaleY).toNearestInt(), juce::Justification::centred);
     }
 }
 
@@ -453,10 +513,13 @@ void CountParameterPanel::updateKnob (int index, float delta)
 
 void CountParameterPanel::mouseDown (const juce::MouseEvent& event)
 {
-    auto lengths = getLocalBounds().withTrimmedTop (67).withHeight (35).reduced (12, 0);
+    const auto scaleX = getWidth() / 270.0f;
+    const auto scaleY = getHeight() / 339.0f;
+    auto lengths = juce::Rectangle<int> (juce::roundToInt (12.0f * scaleX), juce::roundToInt (72.0f * scaleY),
+                                         juce::roundToInt (248.0f * scaleX), juce::roundToInt (32.0f * scaleY));
     if (lengths.contains (event.getPosition()))
     {
-        const auto length = juce::jlimit (0, 4, event.x * 5 / juce::jmax (1, getWidth()));
+        const auto length = juce::jlimit (0, 4, (event.x - lengths.getX()) * 5 / juce::jmax (1, lengths.getWidth()));
         if (onLengthSelected) onLengthSelected (length);
         repaint();
         return;
@@ -496,13 +559,14 @@ void OutputMeterComponent::timerCallback()
 
 void OutputMeterComponent::paint (juce::Graphics& g)
 {
-    // The faceplate provides the meter frame, legends, scale and glass. This
-    // component replaces only the two LED wells with live audio-thread peaks.
-    const auto trackTop = juce::roundToInt (getHeight() * 0.18f);
-    const auto trackHeight = juce::roundToInt (getHeight() * 0.70f);
-    const auto trackWidth = juce::jmax (10, juce::roundToInt (getWidth() * 0.115f));
-    const auto leftTrack = juce::Rectangle<int> (juce::roundToInt (getWidth() * 0.36f), trackTop, trackWidth, trackHeight);
-    const auto rightTrack = juce::Rectangle<int> (juce::roundToInt (getWidth() * 0.66f), trackTop, trackWidth, trackHeight);
+    // Fixed frame, dB legend and L/R headings remain in the faceplate. The
+    // two wells and numeric readouts are fully covered and replaced here.
+    const auto scaleX = getWidth() / 149.0f;
+    const auto scaleY = getHeight() / 360.0f;
+    const auto leftTrack = juce::Rectangle<int> (juce::roundToInt (40.0f * scaleX), juce::roundToInt (61.0f * scaleY),
+                                                 juce::roundToInt (15.0f * scaleX), juce::roundToInt (255.0f * scaleY));
+    const auto rightTrack = juce::Rectangle<int> (juce::roundToInt (84.0f * scaleX), juce::roundToInt (61.0f * scaleY),
+                                                  juce::roundToInt (15.0f * scaleX), juce::roundToInt (255.0f * scaleY));
 
     const auto drawChannel = [&] (juce::Rectangle<int> track, float level)
     {
@@ -528,19 +592,33 @@ void OutputMeterComponent::paint (juce::Graphics& g)
     };
     drawChannel (leftTrack, leftDb);
     drawChannel (rightTrack, rightDb);
+
+    const auto drawValue = [&] (juce::Rectangle<float> area, float level)
+    {
+        g.setColour (ToyotomiUi::background().withAlpha (0.97f));
+        g.fillRect (area);
+        g.setColour (ToyotomiUi::ivory());
+        g.setFont (ToyotomiUi::font (10.0f * scaleY, true));
+        g.drawText (juce::String (level, 1), area.toNearestInt(), juce::Justification::centred);
+    };
+    drawValue ({ 25.0f * scaleX, 328.0f * scaleY, 42.0f * scaleX, 23.0f * scaleY }, leftDb);
+    drawValue ({ 72.0f * scaleX, 328.0f * scaleY, 42.0f * scaleX, 23.0f * scaleY }, rightDb);
 }
 
 void BottomStatusBar::paint (juce::Graphics& g)
 {
-    ToyotomiUi::drawPanel (g, getLocalBounds().toFloat());
-    auto area = getLocalBounds().reduced (18, 0);
-    g.setFont (ToyotomiUi::font (12.0f));
-    const std::array<juce::String, 4> values { "RAZOR FACE COMPANY", "PROJECT  Toyotomi Hideyoshi", "VERSION  0.1.0", "STATUS  PASS THROUGH" };
-    const auto columnWidth = area.getWidth() / static_cast<int> (values.size());
-    for (size_t i = 0; i < values.size(); ++i)
+    const auto scaleX = getWidth() / 1270.0f;
+    const auto scaleY = getHeight() / 76.0f;
+    const auto drawStatus = [&] (juce::Rectangle<float> area, const juce::String& value, juce::Colour colour)
     {
-        auto cell = i + 1 == values.size() ? area : area.removeFromLeft (columnWidth);
-        g.setColour (values[i].contains ("PASS") ? ToyotomiUi::ivory() : ToyotomiUi::muted());
-        g.drawText (values[i], cell, juce::Justification::centredLeft);
-    }
+        g.setColour (ToyotomiUi::background().withAlpha (0.94f));
+        g.fillRect (area);
+        g.setColour (colour);
+        g.setFont (ToyotomiUi::font (12.0f * scaleY));
+        g.drawText (value, area.toNearestInt(), juce::Justification::centredLeft);
+    };
+    drawStatus ({ 256.0f * scaleX, 20.0f * scaleY, 255.0f * scaleX, 31.0f * scaleY }, "PROJECT  Toyotomi Hideyoshi", ToyotomiUi::ivory());
+    drawStatus ({ 538.0f * scaleX, 20.0f * scaleY, 150.0f * scaleX, 31.0f * scaleY }, "VERSION  0.1.0", ToyotomiUi::ivory());
+    drawStatus ({ 723.0f * scaleX, 20.0f * scaleY, 180.0f * scaleX, 31.0f * scaleY }, "MODE  SEQUENCER", ToyotomiUi::ivory());
+    drawStatus ({ 920.0f * scaleX, 20.0f * scaleY, 185.0f * scaleX, 31.0f * scaleY }, "STATUS  PASS THROUGH", ToyotomiUi::gold());
 }
