@@ -54,10 +54,9 @@ void drawImage (juce::Graphics& g, const juce::Image& image, juce::Rectangle<int
         g.drawImageWithin (image, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), juce::RectanglePlacement::stretchToFit);
 }
 
-template <typename ImageId>
-void drawFrame (juce::Graphics& g, ImageId&& id, juce::Rectangle<int> bounds)
+void drawFrame (juce::Graphics& g, const char* id, juce::Rectangle<int> bounds)
 {
-    drawImage (g, imageFor (std::forward<ImageId> (id)), bounds);
+    drawImage (g, imageFor (id), bounds);
 }
 }
 
@@ -70,7 +69,7 @@ juce::Colour muted()      { return juce::Colour (0xff8f887c); }
 juce::Colour gold()       { return juce::Colour (0xffd6a64d); }
 juce::Colour red()        { return juce::Colour (0xffdc3228); }
 juce::Colour border()     { return juce::Colour (0xff292927); }
-juce::Font font (float height, bool bold) { return juce::Font (juce::FontOptions (height).withStyle (bold ? "Bold" : "Regular")); }
+juce::Font font (float height, bool bold) { return juce::Font (height, bold ? juce::Font::bold : juce::Font::plain); }
 void drawPanel (juce::Graphics&, juce::Rectangle<float>, const juce::String&) {}
 void drawMotionGlyph (juce::Graphics&, juce::Rectangle<float>, int) {}
 }
@@ -337,5 +336,4 @@ void OutputMeterComponent::paint (juce::Graphics& g)
 }
 
 void BottomStatusBar::paint (juce::Graphics&) {}
-
 
