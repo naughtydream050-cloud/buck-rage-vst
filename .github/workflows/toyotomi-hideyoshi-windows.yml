@@ -55,11 +55,13 @@ jobs:
       - name: Compile and link Release VST3
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Continue'
           cmake --build build-toyotomi-hideyoshi `
             --config Release `
             --target ToyotomiHideyoshi_VST3 `
-            --parallel 2>&1 | Tee-Object -FilePath toyotomi-build.log
+            --parallel --verbose 2>&1 | Tee-Object -FilePath toyotomi-build.log
           $buildExit = $LASTEXITCODE
+          $ErrorActionPreference = 'Stop'
           $binary = 'build-toyotomi-hideyoshi/ToyotomiHideyoshi_artefacts/Release/VST3/Toyotomi Hideyoshi.vst3/Contents/x86_64-win/Toyotomi Hideyoshi.vst3'
           if ($buildExit -ne 0 -and !(Test-Path -LiteralPath $binary)) { exit $buildExit }
           if ($buildExit -ne 0) { Write-Warning 'JUCE moduleinfo cleanup returned nonzero after the VST3 binary was linked; continuing to smoke validation.' }
