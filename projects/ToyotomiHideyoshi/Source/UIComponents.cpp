@@ -71,6 +71,22 @@ juce::Colour border()     { return juce::Colour (0xff292927); }
 juce::Font font (float height, bool bold) { return juce::Font (height, bold ? juce::Font::bold : juce::Font::plain); }
 void drawPanel (juce::Graphics&, juce::Rectangle<float>, const juce::String&) {}
 void drawMotionGlyph (juce::Graphics&, juce::Rectangle<float>, int) {}
+bool validateEmbeddedImageAssets()
+{
+    static constexpr std::array<const char*, 13> ids {
+        "tabNormal", "tabSelected", "barNormal", "barSelected", "barPlaying",
+        "countNormal", "countSelected", "presetNormal", "presetSelected",
+        "lengthNormal", "lengthSelected", "knobBase", "knobPointer"
+    };
+    for (const auto* id : ids)
+    {
+        const auto& image = imageFor (id);
+        if (! image.isValid() || image.getWidth() <= 0 || image.getHeight() <= 0)
+            return false;
+    }
+    const auto& meter = imageFor ("meterLed");
+    return meter.isValid() && meter.getWidth() == 15 && meter.getHeight() == 255;
+}
 }
 
 TopBarComponent::TopBarComponent (ToyotomiHideyoshiAudioProcessor& p) : processor (p) { startTimerHz (15); }

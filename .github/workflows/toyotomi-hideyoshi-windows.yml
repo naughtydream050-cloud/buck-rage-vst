@@ -75,6 +75,12 @@ jobs:
           cmake --build build-toyotomi-hideyoshi --config Release --target ToyotomiHideyoshiStateTests --parallel
           & 'build-toyotomi-hideyoshi/ToyotomiHideyoshiStateTests_artefacts/Release/ToyotomiHideyoshiStateTests.exe'
 
+      - name: Run Editor runtime smoke test
+        shell: pwsh
+        run: |
+          cmake --build build-toyotomi-hideyoshi --config Release --target ToyotomiHideyoshiRuntimeSmoke --parallel
+          & 'build-toyotomi-hideyoshi/ToyotomiHideyoshiRuntimeSmoke_artefacts/Release/ToyotomiHideyoshiRuntimeSmoke.exe'
+
       - name: Verify VST3 bundle
         shell: pwsh
         run: |

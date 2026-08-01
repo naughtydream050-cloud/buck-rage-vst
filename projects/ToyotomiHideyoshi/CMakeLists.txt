@@ -67,6 +67,21 @@ if (TOYOTOMI_BUILD_STATE_TESTS)
     target_sources(ToyotomiHideyoshiStateTests PRIVATE Source/PluginStateModel.cpp tests/StateModelTests.cpp)
     target_include_directories(ToyotomiHideyoshiStateTests PRIVATE Source)
     target_link_libraries(ToyotomiHideyoshiStateTests PRIVATE juce::juce_audio_utils)
+
+    juce_add_console_app(ToyotomiHideyoshiRuntimeSmoke PRODUCT_NAME "Toyotomi Hideyoshi Runtime Smoke")
+    juce_generate_juce_header(ToyotomiHideyoshiRuntimeSmoke)
+    target_sources(ToyotomiHideyoshiRuntimeSmoke PRIVATE
+        Source/PluginProcessor.cpp
+        Source/PluginEditor.cpp
+        Source/UIComponents.cpp
+        Source/UiSpec.cpp
+        Source/PluginStateModel.cpp
+        tests/RuntimeSmokeTests.cpp)
+    target_include_directories(ToyotomiHideyoshiRuntimeSmoke PRIVATE Source)
+    target_link_libraries(ToyotomiHideyoshiRuntimeSmoke PRIVATE
+        ToyotomiHideyoshiAssets
+        juce::juce_audio_utils
+        juce::juce_graphics)
 endif()
 
 target_compile_definitions(ToyotomiHideyoshi PUBLIC
@@ -84,4 +99,3 @@ target_link_libraries(ToyotomiHideyoshi PRIVATE
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags
 )
-
