@@ -57,8 +57,8 @@ int main()
         {
             juce::FileOutputStream stream (output);
             rendered = stream.openedOk()
-                       && juce::PNGImageFormat().writeImageToStream (barMapImage, stream)
-                       && stream.flush();
+                       && juce::PNGImageFormat().writeImageToStream (barMapImage, stream);
+            stream.flush();
         }
 
         passed &= require (rendered && output.existsAsFile() && output.getSize() > 0, filename);
