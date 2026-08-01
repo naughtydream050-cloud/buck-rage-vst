@@ -53,12 +53,15 @@ int main()
         juce::Graphics barMapGraphics (barMapImage);
         barMap.paint (barMapGraphics);
         auto output = juce::File::getCurrentWorkingDirectory().getChildFile (filename);
-        juce::FileOutputStream stream (output);
-        passed &= require (stream.openedOk()
-                           && juce::PNGImageFormat().writeImageToStream (barMapImage, stream)
-                           && output.existsAsFile()
-                           && output.getSize() > 0,
-                           filename);
+        bool rendered = false;
+        {
+            juce::FileOutputStream stream (output);
+            rendered = stream.openedOk()
+                       && juce::PNGImageFormat().writeImageToStream (barMapImage, stream)
+                       && stream.flush();
+        }
+
+        passed &= require (rendered && output.existsAsFile() && output.getSize() > 0, filename);
     }
 
     editor.reset();
