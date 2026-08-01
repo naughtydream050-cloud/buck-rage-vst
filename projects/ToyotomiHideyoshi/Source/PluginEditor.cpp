@@ -31,9 +31,21 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
       outputMeter (p)
 {
     auto& state = processor.getStateModel();
-    barTabs.setSelectedPage (state.getUiState().selectedTab);
-    barTabs.onSelectedPage = [&state] (int page) { state.selectTab (page); };
-    barMap.onSelectedBar = [&state] (int bar) { state.selectBar (bar); };
+    const auto uiState = state.getUiState();
+    barTabs.setSelectedPage (uiState.selectedTab);
+    barMap.setDisplayState (uiState.selectedTab, uiState.selectedBar, 5);
+    barTabs.onSelectedPage = [this, &state] (int page)
+    {
+        state.selectTab (page);
+        const auto ui = state.getUiState();
+        barMap.setDisplayState (ui.selectedTab, ui.selectedBar, 5);
+    };
+    barMap.onSelectedBar = [this, &state] (int bar)
+    {
+        state.selectBar (bar);
+        const auto ui = state.getUiState();
+        barMap.setDisplayState (ui.selectedTab, ui.selectedBar, 5);
+    };
     countGrid.onSelectedCount = [&state] (int count) { state.selectCount (count); };
     presetPalette.onPresetSelected = [&state] (int preset) { state.setSelectedPreset ((PluginStateModel::ScratchPreset) preset); };
     countParameters.onLengthSelected = [&state] (int length) { state.setSelectedLength ((PluginStateModel::NoteLength) length); };
@@ -87,4 +99,3 @@ void ToyotomiHideyoshiAudioProcessorEditor::resized()
     bottomStatus.setBounds    (uiSpec.scaleRegion ("bottomStatus", viewport));
 
 }
-

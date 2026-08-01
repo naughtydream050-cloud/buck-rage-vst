@@ -63,14 +63,14 @@ private:
 
 class BarCellComponent final : public juce::Component
 {
-public:
-    std::function<void (int)> onSelected;
-    void configure (int number, bool isSelected, bool isPlaying);
+  public:
+      std::function<void (int)> onSelected;
+      void configure (int globalBar, bool isSelected, bool isPlaying);
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
 
 private:
-    int barNumber = 1;
+      int globalBarIndex = 0;
     bool selected = false;
     bool playing = false;
 };
@@ -78,16 +78,20 @@ private:
 class BarMapComponent final : public juce::Component
 {
 public:
-    std::function<void (int)> onSelectedBar;
-    BarMapComponent();
-    void paint (juce::Graphics&) override;
-    void resized() override;
+      std::function<void (int)> onSelectedBar;
+      BarMapComponent();
+      void setDisplayState (int selectedTab, int selectedBar, int playingBar);
+      bool hasReferenceCellBounds() const;
+      void paint (juce::Graphics&) override;
+      void resized() override;
 
-private:
-    void selectBar (int number);
-    std::array<BarCellComponent, 16> cells;
-    int selectedBar = 11;
-    int playingBar = 6;
+  private:
+      void selectBar (int globalBar);
+      void refreshCells();
+      std::array<BarCellComponent, 16> cells;
+      int displayTab = 0;
+      int selectedBar = 0;
+      int playingBar = 5;
 };
 
 class CountCellComponent final : public juce::Component

@@ -63,8 +63,8 @@ jobs:
           $buildExit = $LASTEXITCODE
           $ErrorActionPreference = 'Stop'
           $binary = 'build-toyotomi-hideyoshi/ToyotomiHideyoshi_artefacts/Release/VST3/Toyotomi Hideyoshi.vst3/Contents/x86_64-win/Toyotomi Hideyoshi.vst3'
-          if ($buildExit -ne 0 -and !(Test-Path -LiteralPath $binary)) { exit $buildExit }
-          if ($buildExit -ne 0) { Write-Warning 'JUCE moduleinfo cleanup returned nonzero after the VST3 binary was linked; continuing to smoke validation.' }
+          if ($buildExit -ne 0) { exit $buildExit }
+          if (!(Test-Path -LiteralPath $binary)) { throw "VST3 binary is missing after a successful build: $binary" }
 
       - name: Upload compact build diagnostics
         if: always()
@@ -78,6 +78,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Run state-model round-trip tests
+        id: state_tests
         if: always()
         shell: pwsh
         run: |
@@ -86,9 +87,11 @@ jobs:
           $buildExit=$LASTEXITCODE
           if ($buildExit -eq 0) { & 'build-toyotomi-hideyoshi/ToyotomiHideyoshiStateTests_artefacts/Release/ToyotomiHideyoshiStateTests.exe' 2>&1 | Tee-Object -Append toyotomi-state-tests.log; $testExit=$LASTEXITCODE } else { $testExit=$buildExit }
           "STATE_BUILD_EXIT=$buildExit STATE_TEST_EXIT=$testExit" | Tee-Object -Append toyotomi-state-tests.log
+          "exit_code=$testExit" >> $env:GITHUB_OUTPUT
           exit 0
 
       - name: Run Editor runtime smoke test
+        id: runtime_smoke
         if: always()
         shell: pwsh
         run: |
@@ -97,7 +100,19 @@ jobs:
           $buildExit=$LASTEXITCODE
           if ($buildExit -eq 0) { & 'build-toyotomi-hideyoshi/ToyotomiHideyoshiRuntimeSmoke_artefacts/Release/ToyotomiHideyoshiRuntimeSmoke.exe' 2>&1 | Tee-Object -Append toyotomi-runtime-smoke.log; $testExit=$LASTEXITCODE } else { $testExit=$buildExit }
           "SMOKE_BUILD_EXIT=$buildExit SMOKE_TEST_EXIT=$testExit" | Tee-Object -Append toyotomi-runtime-smoke.log
+          "exit_code=$testExit" >> $env:GITHUB_OUTPUT
           exit 0
+
+      - name: Upload test diagnostics and BAR MAP render previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ToyotomiHideyoshi-test-diagnostics
+          path: |
+            toyotomi-state-tests.log
+            toyotomi-runtime-smoke.log
+            bar-map-render-*.png
+          if-no-files-found: error
 
       - name: Verify VST3 bundle
         shell: pwsh
@@ -120,3 +135,13 @@ jobs:
           name: ToyotomiHideyoshi-Windows-VST3
           path: build-toyotomi-hideyoshi/**/*.vst3
           if-no-files-found: error
+
+      - name: Aggregate BAR MAP validation
+        if: always()
+        shell: pwsh
+        run: |
+          $stateExit = '${{ steps.state_tests.outputs.exit_code }}'
+          $smokeExit = '${{ steps.runtime_smoke.outputs.exit_code }}'
+          if ($stateExit -ne '0' -or $smokeExit -ne '0') {
+            throw "BAR MAP validation failed: StateModelTests=$stateExit RuntimeSmoke=$smokeExit"
+          }

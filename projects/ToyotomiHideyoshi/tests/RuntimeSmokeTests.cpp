@@ -2,6 +2,7 @@
 #include "PluginEditor.h"
 #include "UIComponents.h"
 #include <iostream>
+#include <tuple>
 
 namespace
 {
@@ -34,6 +35,31 @@ int main()
     juce::Graphics graphics (image);
     editor->paint (graphics);
     passed &= require (image.isValid(), "editor-painted");
+
+    const std::array<std::tuple<int, int, int, const char*>, 5> barMapStates {{
+        { 0, 10,  5, "bar-map-render-01-selected-11-playing-06.png" },
+        { 0,  5,  5, "bar-map-render-02-selected-playing-06.png" },
+        { 1, 20, 29, "bar-map-render-03-selected-21-playing-30.png" },
+        { 2, 39, -1, "bar-map-render-04-selected-40-playing-outside.png" },
+        { 3, 63, 48, "bar-map-render-05-selected-64-playing-49.png" }
+    }};
+    ToyotomiUi::BarMapComponent barMap;
+    barMap.setSize (577, 277);
+    passed &= require (barMap.hasReferenceCellBounds(), "bar-map-16-reference-cell-bounds");
+    for (const auto& [tab, selectedBar, playingBar, filename] : barMapStates)
+    {
+        barMap.setDisplayState (tab, selectedBar, playingBar);
+        auto barMapImage = juce::Image (juce::Image::ARGB, 577, 277, true);
+        juce::Graphics barMapGraphics (barMapImage);
+        barMap.paint (barMapGraphics);
+        auto output = juce::File::getCurrentWorkingDirectory().getChildFile (filename);
+        juce::FileOutputStream stream (output);
+        passed &= require (stream.openedOk()
+                           && juce::PNGImageFormat().writeImageToStream (barMapImage, stream)
+                           && output.existsAsFile()
+                           && output.getSize() > 0,
+                           filename);
+    }
 
     editor.reset();
     processor.releaseResources();

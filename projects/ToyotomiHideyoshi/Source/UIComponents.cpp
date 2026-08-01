@@ -35,6 +35,11 @@ const juce::Image& imageFor (const juce::String& id)
     if (id == "barNormal")       { static const auto image = loadAsset (BinaryData::bar_normal_frame_png, BinaryData::bar_normal_frame_pngSize); return image; }
     if (id == "barSelected")     { static const auto image = loadAsset (BinaryData::bar_selected_frame_png, BinaryData::bar_selected_frame_pngSize); return image; }
     if (id == "barPlaying")      { static const auto image = loadAsset (BinaryData::bar_playing_frame_png, BinaryData::bar_playing_frame_pngSize); return image; }
+    if (id == "barBaseNormal")   { static const auto image = loadAsset (BinaryData::bar_cell_base_normal_png, BinaryData::bar_cell_base_normal_pngSize); return image; }
+    if (id == "barBaseSelected") { static const auto image = loadAsset (BinaryData::bar_cell_base_selected_png, BinaryData::bar_cell_base_selected_pngSize); return image; }
+    if (id == "barBasePlaying")  { static const auto image = loadAsset (BinaryData::bar_cell_base_playing_png, BinaryData::bar_cell_base_playing_pngSize); return image; }
+    if (id == "barBaseSelectedPlaying") { static const auto image = loadAsset (BinaryData::bar_cell_base_selected_and_playing_png, BinaryData::bar_cell_base_selected_and_playing_pngSize); return image; }
+    if (id == "barPlayingBadge") { static const auto image = loadAsset (BinaryData::bar_playing_badge_png, BinaryData::bar_playing_badge_pngSize); return image; }
     if (id == "countNormal")     { static const auto image = loadAsset (BinaryData::count_normal_frame_png, BinaryData::count_normal_frame_pngSize); return image; }
     if (id == "countSelected")   { static const auto image = loadAsset (BinaryData::count_selected_frame_png, BinaryData::count_selected_frame_pngSize); return image; }
     if (id == "presetNormal")    { static const auto image = loadAsset (BinaryData::preset_normal_frame_png, BinaryData::preset_normal_frame_pngSize); return image; }
@@ -49,6 +54,83 @@ const juce::Image& imageFor (const juce::String& id)
 #endif
     static const juce::Image empty;
     return empty;
+}
+
+const juce::Image& barLabelImage (int globalBarIndex)
+{
+#if TOYOTOMI_HAS_BINARY_DATA
+    static const std::array<juce::Image, 64> labels {{
+        loadAsset (BinaryData::bar_label_01_png, BinaryData::bar_label_01_pngSize),
+        loadAsset (BinaryData::bar_label_02_png, BinaryData::bar_label_02_pngSize),
+        loadAsset (BinaryData::bar_label_03_png, BinaryData::bar_label_03_pngSize),
+        loadAsset (BinaryData::bar_label_04_png, BinaryData::bar_label_04_pngSize),
+        loadAsset (BinaryData::bar_label_05_png, BinaryData::bar_label_05_pngSize),
+        loadAsset (BinaryData::bar_label_06_png, BinaryData::bar_label_06_pngSize),
+        loadAsset (BinaryData::bar_label_07_png, BinaryData::bar_label_07_pngSize),
+        loadAsset (BinaryData::bar_label_08_png, BinaryData::bar_label_08_pngSize),
+        loadAsset (BinaryData::bar_label_09_png, BinaryData::bar_label_09_pngSize),
+        loadAsset (BinaryData::bar_label_10_png, BinaryData::bar_label_10_pngSize),
+        loadAsset (BinaryData::bar_label_11_png, BinaryData::bar_label_11_pngSize),
+        loadAsset (BinaryData::bar_label_12_png, BinaryData::bar_label_12_pngSize),
+        loadAsset (BinaryData::bar_label_13_png, BinaryData::bar_label_13_pngSize),
+        loadAsset (BinaryData::bar_label_14_png, BinaryData::bar_label_14_pngSize),
+        loadAsset (BinaryData::bar_label_15_png, BinaryData::bar_label_15_pngSize),
+        loadAsset (BinaryData::bar_label_16_png, BinaryData::bar_label_16_pngSize),
+        loadAsset (BinaryData::bar_label_17_png, BinaryData::bar_label_17_pngSize),
+        loadAsset (BinaryData::bar_label_18_png, BinaryData::bar_label_18_pngSize),
+        loadAsset (BinaryData::bar_label_19_png, BinaryData::bar_label_19_pngSize),
+        loadAsset (BinaryData::bar_label_20_png, BinaryData::bar_label_20_pngSize),
+        loadAsset (BinaryData::bar_label_21_png, BinaryData::bar_label_21_pngSize),
+        loadAsset (BinaryData::bar_label_22_png, BinaryData::bar_label_22_pngSize),
+        loadAsset (BinaryData::bar_label_23_png, BinaryData::bar_label_23_pngSize),
+        loadAsset (BinaryData::bar_label_24_png, BinaryData::bar_label_24_pngSize),
+        loadAsset (BinaryData::bar_label_25_png, BinaryData::bar_label_25_pngSize),
+        loadAsset (BinaryData::bar_label_26_png, BinaryData::bar_label_26_pngSize),
+        loadAsset (BinaryData::bar_label_27_png, BinaryData::bar_label_27_pngSize),
+        loadAsset (BinaryData::bar_label_28_png, BinaryData::bar_label_28_pngSize),
+        loadAsset (BinaryData::bar_label_29_png, BinaryData::bar_label_29_pngSize),
+        loadAsset (BinaryData::bar_label_30_png, BinaryData::bar_label_30_pngSize),
+        loadAsset (BinaryData::bar_label_31_png, BinaryData::bar_label_31_pngSize),
+        loadAsset (BinaryData::bar_label_32_png, BinaryData::bar_label_32_pngSize),
+        loadAsset (BinaryData::bar_label_33_png, BinaryData::bar_label_33_pngSize),
+        loadAsset (BinaryData::bar_label_34_png, BinaryData::bar_label_34_pngSize),
+        loadAsset (BinaryData::bar_label_35_png, BinaryData::bar_label_35_pngSize),
+        loadAsset (BinaryData::bar_label_36_png, BinaryData::bar_label_36_pngSize),
+        loadAsset (BinaryData::bar_label_37_png, BinaryData::bar_label_37_pngSize),
+        loadAsset (BinaryData::bar_label_38_png, BinaryData::bar_label_38_pngSize),
+        loadAsset (BinaryData::bar_label_39_png, BinaryData::bar_label_39_pngSize),
+        loadAsset (BinaryData::bar_label_40_png, BinaryData::bar_label_40_pngSize),
+        loadAsset (BinaryData::bar_label_41_png, BinaryData::bar_label_41_pngSize),
+        loadAsset (BinaryData::bar_label_42_png, BinaryData::bar_label_42_pngSize),
+        loadAsset (BinaryData::bar_label_43_png, BinaryData::bar_label_43_pngSize),
+        loadAsset (BinaryData::bar_label_44_png, BinaryData::bar_label_44_pngSize),
+        loadAsset (BinaryData::bar_label_45_png, BinaryData::bar_label_45_pngSize),
+        loadAsset (BinaryData::bar_label_46_png, BinaryData::bar_label_46_pngSize),
+        loadAsset (BinaryData::bar_label_47_png, BinaryData::bar_label_47_pngSize),
+        loadAsset (BinaryData::bar_label_48_png, BinaryData::bar_label_48_pngSize),
+        loadAsset (BinaryData::bar_label_49_png, BinaryData::bar_label_49_pngSize),
+        loadAsset (BinaryData::bar_label_50_png, BinaryData::bar_label_50_pngSize),
+        loadAsset (BinaryData::bar_label_51_png, BinaryData::bar_label_51_pngSize),
+        loadAsset (BinaryData::bar_label_52_png, BinaryData::bar_label_52_pngSize),
+        loadAsset (BinaryData::bar_label_53_png, BinaryData::bar_label_53_pngSize),
+        loadAsset (BinaryData::bar_label_54_png, BinaryData::bar_label_54_pngSize),
+        loadAsset (BinaryData::bar_label_55_png, BinaryData::bar_label_55_pngSize),
+        loadAsset (BinaryData::bar_label_56_png, BinaryData::bar_label_56_pngSize),
+        loadAsset (BinaryData::bar_label_57_png, BinaryData::bar_label_57_pngSize),
+        loadAsset (BinaryData::bar_label_58_png, BinaryData::bar_label_58_pngSize),
+        loadAsset (BinaryData::bar_label_59_png, BinaryData::bar_label_59_pngSize),
+        loadAsset (BinaryData::bar_label_60_png, BinaryData::bar_label_60_pngSize),
+        loadAsset (BinaryData::bar_label_61_png, BinaryData::bar_label_61_pngSize),
+        loadAsset (BinaryData::bar_label_62_png, BinaryData::bar_label_62_pngSize),
+        loadAsset (BinaryData::bar_label_63_png, BinaryData::bar_label_63_pngSize),
+        loadAsset (BinaryData::bar_label_64_png, BinaryData::bar_label_64_pngSize)
+    }};
+    return labels[static_cast<size_t> (juce::jlimit (0, 63, globalBarIndex))];
+#else
+    juce::ignoreUnused (globalBarIndex);
+    static const juce::Image empty;
+    return empty;
+#endif
 }
 
 void drawImage (juce::Graphics& g, const juce::Image& image, juce::Rectangle<int> bounds)
@@ -77,8 +159,9 @@ void drawPanel (juce::Graphics&, juce::Rectangle<float>, const juce::String&) {}
 void drawMotionGlyph (juce::Graphics&, juce::Rectangle<float>, int) {}
 bool validateEmbeddedImageAssets()
 {
-    static constexpr std::array<const char*, 17> ids {
+    static constexpr std::array<const char*, 22> ids {
         "tabNormal", "tabSelected", "tabStrip1", "tabStrip2", "tabStrip3", "tabStrip4", "barNormal", "barSelected", "barPlaying",
+        "barBaseNormal", "barBaseSelected", "barBasePlaying", "barBaseSelectedPlaying", "barPlayingBadge",
         "countNormal", "countSelected", "presetNormal", "presetSelected",
         "lengthNormal", "lengthSelected", "knobBase", "knobPointer"
     };
@@ -89,7 +172,15 @@ bool validateEmbeddedImageAssets()
             return false;
     }
     const auto& meter = imageFor ("meterLed");
-    return meter.isValid() && meter.getWidth() == 15 && meter.getHeight() == 255;
+    if (! meter.isValid() || meter.getWidth() != 15 || meter.getHeight() != 255)
+        return false;
+    for (int bar = 0; bar < 64; ++bar)
+    {
+        const auto& label = barLabelImage (bar);
+        if (! label.isValid() || label.getWidth() != 66 || label.getHeight() != 24)
+            return false;
+    }
+    return true;
 }
 }
 
@@ -148,40 +239,88 @@ void BarTabComponent::mouseDown (const juce::MouseEvent& event)
     }
 }
 
-void BarCellComponent::configure (int number, bool isSelected, bool isPlaying)
+void BarCellComponent::configure (int globalBar, bool isSelected, bool isPlaying)
 {
-    barNumber = number; selected = isSelected; playing = isPlaying; repaint();
+    globalBarIndex = juce::jlimit (0, 63, globalBar);
+    selected = isSelected;
+    playing = isPlaying;
+    repaint();
 }
 void BarCellComponent::paint (juce::Graphics& g)
 {
-    drawFrame (g, "barNormal", getLocalBounds());
-    if (playing) drawFrame (g, "barPlaying", getLocalBounds());
-    else if (selected) drawFrame (g, "barSelected", getLocalBounds());
+    const auto stateId = playing ? (selected ? "barBaseSelectedPlaying" : "barBasePlaying")
+                                 : (selected ? "barBaseSelected" : "barBaseNormal");
+    drawFrame (g, stateId, getLocalBounds());
+
+    const auto labelBounds = juce::Rectangle<int> (0,
+                                                     juce::roundToInt (7.0f * getHeight() / 96.0f),
+                                                     getWidth(),
+                                                     juce::roundToInt (24.0f * getHeight() / 96.0f));
+    drawImage (g, barLabelImage (globalBarIndex), labelBounds);
+
+    if (playing)
+    {
+        const auto badgeBounds = juce::Rectangle<int> (
+            juce::roundToInt (5.0f * getWidth() / 66.0f),
+            juce::roundToInt (61.0f * getHeight() / 96.0f),
+            juce::roundToInt (56.0f * getWidth() / 66.0f),
+            juce::roundToInt (31.0f * getHeight() / 96.0f));
+        drawFrame (g, "barPlayingBadge", badgeBounds);
+    }
 }
-void BarCellComponent::mouseDown (const juce::MouseEvent&) { if (onSelected) onSelected (barNumber); }
+void BarCellComponent::mouseDown (const juce::MouseEvent&) { if (onSelected) onSelected (globalBarIndex); }
 
 BarMapComponent::BarMapComponent()
 {
     for (int i = 0; i < 16; ++i)
-    {
-        cells[static_cast<size_t> (i)].onSelected = [this] (int number) { selectBar (number); };
-        addAndMakeVisible (cells[static_cast<size_t> (i)]);
-    }
-    selectBar (selectedBar);
+      {
+          cells[static_cast<size_t> (i)].onSelected = [this] (int number) { selectBar (number); };
+          addAndMakeVisible (cells[static_cast<size_t> (i)]);
+      }
+      refreshCells();
 }
-void BarMapComponent::selectBar (int number)
+void BarMapComponent::setDisplayState (int selectedTab, int selectedGlobalBar, int playingGlobalBar)
 {
-    selectedBar = number;
-    if (onSelectedBar) onSelectedBar (number - 1);
+    displayTab = juce::jlimit (0, 3, selectedTab);
+    selectedBar = juce::jlimit (0, 63, selectedGlobalBar);
+    playingBar = juce::jlimit (-1, 63, playingGlobalBar);
+    refreshCells();
+}
+bool BarMapComponent::hasReferenceCellBounds() const
+{
+    if (getWidth() != 577 || getHeight() != 277)
+        return false;
     for (int i = 0; i < 16; ++i)
-        cells[static_cast<size_t> (i)].configure (i + 1, i + 1 == selectedBar, i + 1 == playingBar);
+    {
+        const auto expected = juce::Rectangle<int> (9 + (i % 8) * 70,
+                                                     32 + (i / 8) * 100,
+                                                     66, 96);
+        if (cells[static_cast<size_t> (i)].getBounds() != expected)
+            return false;
+    }
+    return true;
+}
+void BarMapComponent::selectBar (int globalBar)
+{
+    selectedBar = juce::jlimit (0, 63, globalBar);
+    refreshCells();
+    if (onSelectedBar) onSelectedBar (selectedBar);
+}
+void BarMapComponent::refreshCells()
+{
+    for (int i = 0; i < 16; ++i)
+    {
+        const auto globalBar = displayTab * 16 + i;
+        cells[static_cast<size_t> (i)].configure (globalBar, globalBar == selectedBar, globalBar == playingBar);
+    }
 }
 void BarMapComponent::paint (juce::Graphics&) {}
 void BarMapComponent::resized()
 {
     const auto area = getLocalBounds().withTrimmedTop (32).withTrimmedBottom (48).reduced (9, 0);
     for (int i = 0; i < 16; ++i)
-        cells[static_cast<size_t> (i)].setBounds (gridCell (area, i % 8, i / 8, 8, 2, 4));
+          cells[static_cast<size_t> (i)].setBounds (gridCell (area, i % 8, i / 8, 8, 2, 4));
+    refreshCells();
 }
 
 void CountCellComponent::configure (int number, int preset, bool isSelected)
