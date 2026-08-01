@@ -53,7 +53,7 @@ int main()
 
     auto image = juce::Image (juce::Image::ARGB, 1280, 853, true);
     juce::Graphics graphics (image);
-    editor->paint (graphics);
+    editor->paintEntireComponent (graphics, true);
     passed &= require (image.isValid(), "editor-painted");
 
     const std::array<std::tuple<int, int, int, const char*>, 5> barMapStates {{
