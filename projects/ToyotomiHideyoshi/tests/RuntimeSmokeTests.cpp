@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "UIComponents.h"
+#include "UiSpec.h"
 #include <iostream>
 #include <tuple>
 
@@ -31,6 +32,22 @@ int main()
     const auto bounds = editor->getLocalBounds();
     passed &= require (bounds.getWidth() == 1280 && bounds.getHeight() == 853, "editor-size");
 
+    UiSpec uiSpec;
+    passed &= require (uiSpec.getRegion ("barTabs") == juce::Rectangle<int> (324, 91, 540, 36)
+                       && uiSpec.getRegion ("barMap") == juce::Rectangle<int> (319, 128, 577, 277),
+                       "bar-ui-reference-regions");
+
+    BarTabComponent tabs;
+    tabs.setSize (540, 36);
+    for (int tab = 0; tab < 4; ++tab)
+    {
+        tabs.setSelectedPage (tab);
+        auto tabImage = juce::Image (juce::Image::ARGB, 540, 36, true);
+        juce::Graphics tabGraphics (tabImage);
+        tabs.paintEntireComponent (tabGraphics, true);
+        passed &= require (tabImage.isValid(), ("tab-strip-native-" + juce::String (tab)).toRawUTF8());
+    }
+
     auto image = juce::Image (juce::Image::ARGB, 1280, 853, true);
     juce::Graphics graphics (image);
     editor->paint (graphics);
@@ -51,7 +68,17 @@ int main()
         barMap.setDisplayState (tab, selectedBar, playingBar);
         auto barMapImage = juce::Image (juce::Image::ARGB, 577, 277, true);
         juce::Graphics barMapGraphics (barMapImage);
-        barMap.paint (barMapGraphics);
+        barMap.paintEntireComponent (barMapGraphics, true);
+        bool cellsAreClipped = true;
+        for (int y = 0; y < barMapImage.getHeight(); ++y)
+            for (int x = 0; x < barMapImage.getWidth(); ++x)
+            {
+                bool inCell = false;
+                for (int i = 0; i < 16; ++i)
+                    inCell = inCell || juce::Rectangle<int> (9 + (i % 8) * 70, 32 + (i / 8) * 100, 66, 96).contains (x, y);
+                if (! inCell && barMapImage.getPixelAt (x, y).getAlpha() != 0)
+                    cellsAreClipped = false;
+            }
         auto output = juce::File::getCurrentWorkingDirectory().getChildFile (filename);
         bool rendered = false;
         {
@@ -61,7 +88,7 @@ int main()
             stream.flush();
         }
 
-        passed &= require (rendered && output.existsAsFile() && output.getSize() > 0, filename);
+        passed &= require (rendered && output.existsAsFile() && output.getSize() > 0 && cellsAreClipped, filename);
     }
 
     editor.reset();

@@ -180,6 +180,29 @@ bool validateEmbeddedImageAssets()
         if (! label.isValid() || label.getWidth() != 66 || label.getHeight() != 24)
             return false;
     }
+
+    // These are compositing assets, not sprites. Any transparent pixel would
+    // reveal the old reference-image tab/cell content underneath it.
+    for (const auto* id : { "tabStrip1", "tabStrip2", "tabStrip3", "tabStrip4" })
+    {
+        const auto& strip = imageFor (id);
+        if (strip.getWidth() != 540 || strip.getHeight() != 36)
+            return false;
+        for (int y = 0; y < strip.getHeight(); ++y)
+            for (int x = 0; x < strip.getWidth(); ++x)
+                if (strip.getPixelAt (x, y).getAlpha() != 255)
+                    return false;
+    }
+    for (const auto* id : { "barBaseNormal", "barBaseSelected", "barBasePlaying", "barBaseSelectedPlaying" })
+    {
+        const auto& cell = imageFor (id);
+        if (cell.getWidth() != 66 || cell.getHeight() != 96)
+            return false;
+        for (int y = 0; y < cell.getHeight(); ++y)
+            for (int x = 0; x < cell.getWidth(); ++x)
+                if (cell.getPixelAt (x, y).getAlpha() != 255)
+                    return false;
+    }
     return true;
 }
 }
@@ -208,7 +231,9 @@ void ArtworkPanel::paint (juce::Graphics& g) { juce::ignoreUnused (g, source); }
 void BarTabComponent::paint (juce::Graphics& g)
 {
     static constexpr std::array<const char*, 4> stripIds { "tabStrip1", "tabStrip2", "tabStrip3", "tabStrip4" };
-    drawFrame (g, stripIds[static_cast<size_t> (selectedPage)], getLocalBounds());
+    const auto& strip = imageFor (stripIds[static_cast<size_t> (selectedPage)]);
+    if (strip.isValid() && getLocalBounds().getWidth() == 540 && getLocalBounds().getHeight() == 36)
+        g.drawImageAt (strip, 0, 0);
 }
 void BarTabComponent::mouseDown (const juce::MouseEvent& event)
 {
@@ -222,13 +247,17 @@ void BarTabComponent::mouseDown (const juce::MouseEvent& event)
         { 410.0f, 0.0f, 130.0f, 36.0f }
     }};
 
-    const auto scaleX = static_cast<float> (getWidth()) / 540.0f;
-    const auto scaleY = static_cast<float> (getHeight()) / 36.0f;
+    // The source strip and its hit regions are native 540 x 36 pixels.  Do
+    // not transform the zones: a transformed hit test can disagree with the
+    // one-to-one overlay and leak a page change from an adjacent tab.
+    if (getWidth() != 540 || getHeight() != 36)
+        return;
+
     const auto point = event.getPosition().toFloat();
 
     for (size_t i = 0; i < referenceHitZones.size(); ++i)
     {
-        const auto zone = referenceHitZones[i].transformedBy (juce::AffineTransform::scale (scaleX, scaleY));
+        const auto zone = referenceHitZones[i];
         if (! zone.contains (point))
             continue;
 
@@ -248,24 +277,23 @@ void BarCellComponent::configure (int globalBar, bool isSelected, bool isPlaying
 }
 void BarCellComponent::paint (juce::Graphics& g)
 {
+    const juce::Graphics::ScopedSaveState clipped (g);
+    g.reduceClipRegion (getLocalBounds());
     const auto stateId = playing ? (selected ? "barBaseSelectedPlaying" : "barBasePlaying")
                                  : (selected ? "barBaseSelected" : "barBaseNormal");
-    drawFrame (g, stateId, getLocalBounds());
+    const auto& background = imageFor (stateId);
+    if (background.isValid() && getWidth() == 66 && getHeight() == 96)
+        g.drawImageAt (background, 0, 0);
 
-    const auto labelBounds = juce::Rectangle<int> (0,
-                                                     juce::roundToInt (7.0f * getHeight() / 96.0f),
-                                                     getWidth(),
-                                                     juce::roundToInt (24.0f * getHeight() / 96.0f));
-    drawImage (g, barLabelImage (globalBarIndex), labelBounds);
+    const auto& label = barLabelImage (globalBarIndex);
+    if (label.isValid() && label.getWidth() == 66 && label.getHeight() == 24)
+        g.drawImageAt (label, 0, 7);
 
     if (playing)
     {
-        const auto badgeBounds = juce::Rectangle<int> (
-            juce::roundToInt (5.0f * getWidth() / 66.0f),
-            juce::roundToInt (61.0f * getHeight() / 96.0f),
-            juce::roundToInt (56.0f * getWidth() / 66.0f),
-            juce::roundToInt (31.0f * getHeight() / 96.0f));
-        drawFrame (g, "barPlayingBadge", badgeBounds);
+        const auto& badge = imageFor ("barPlayingBadge");
+        if (badge.isValid() && badge.getWidth() == 56 && badge.getHeight() == 31)
+            g.drawImageAt (badge, 5, 61);
     }
 }
 void BarCellComponent::mouseDown (const juce::MouseEvent&) { if (onSelected) onSelected (globalBarIndex); }
@@ -317,9 +345,8 @@ void BarMapComponent::refreshCells()
 void BarMapComponent::paint (juce::Graphics&) {}
 void BarMapComponent::resized()
 {
-    const auto area = getLocalBounds().withTrimmedTop (32).withTrimmedBottom (48).reduced (9, 0);
     for (int i = 0; i < 16; ++i)
-          cells[static_cast<size_t> (i)].setBounds (gridCell (area, i % 8, i / 8, 8, 2, 4));
+        cells[static_cast<size_t> (i)].setBounds (9 + (i % 8) * 70, 32 + (i / 8) * 100, 66, 96);
     refreshCells();
 }
 
