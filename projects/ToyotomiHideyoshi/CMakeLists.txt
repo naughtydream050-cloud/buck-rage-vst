@@ -45,6 +45,7 @@ juce_add_binary_data(ToyotomiHideyoshiAssets
         Resources/ui-cuts/length_selected_frame.png
         Resources/ui-cuts/tab_normal_frame.png
         Resources/ui-cuts/tab_selected_frame.png
+        Resources/ui-cuts/tab_selected_fill.png
         Resources/ui-cuts/output_meter_reference.png
         Resources/ui-cuts/meter_led_strip.png
         Resources/ui-cuts/bypass_off.png

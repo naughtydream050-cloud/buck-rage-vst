@@ -31,6 +31,7 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
       outputMeter (p)
 {
     auto& state = processor.getStateModel();
+    barTabs.setSelectedPage (state.getUiState().selectedTab);
     barTabs.onSelectedPage = [&state] (int page) { state.selectTab (page); };
     barMap.onSelectedBar = [&state] (int bar) { state.selectBar (bar); };
     countGrid.onSelectedCount = [&state] (int count) { state.selectCount (count); };
@@ -86,5 +87,4 @@ void ToyotomiHideyoshiAudioProcessorEditor::resized()
     bottomStatus.setBounds    (uiSpec.scaleRegion ("bottomStatus", viewport));
 
 }
-
 

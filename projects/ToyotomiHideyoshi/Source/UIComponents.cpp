@@ -27,7 +27,7 @@ const juce::Image& imageFor (const juce::String& id)
 {
 #if TOYOTOMI_HAS_BINARY_DATA
     if (id == "tabNormal")       { static const auto image = loadAsset (BinaryData::tab_normal_frame_png, BinaryData::tab_normal_frame_pngSize); return image; }
-    if (id == "tabSelected")     { static const auto image = loadAsset (BinaryData::tab_selected_frame_png, BinaryData::tab_selected_frame_pngSize); return image; }
+    if (id == "tabSelected")     { static const auto image = loadAsset (BinaryData::tab_selected_fill_png, BinaryData::tab_selected_fill_pngSize); return image; }
     if (id == "barNormal")       { static const auto image = loadAsset (BinaryData::bar_normal_frame_png, BinaryData::bar_normal_frame_pngSize); return image; }
     if (id == "barSelected")     { static const auto image = loadAsset (BinaryData::bar_selected_frame_png, BinaryData::bar_selected_frame_pngSize); return image; }
     if (id == "barPlaying")      { static const auto image = loadAsset (BinaryData::bar_playing_frame_png, BinaryData::bar_playing_frame_pngSize); return image; }

@@ -55,6 +55,7 @@ public:
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     int getSelectedPage() const noexcept { return selectedPage; }
+    void setSelectedPage (int page) { selectedPage = juce::jlimit (0, 3, page); repaint(); }
 
 private:
     int selectedPage = 0;
