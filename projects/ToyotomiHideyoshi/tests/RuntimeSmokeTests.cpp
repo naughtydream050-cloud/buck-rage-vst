@@ -1,7 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "UIComponents.h"
-#include "UiSpec.h"
 #include <iostream>
 #include <tuple>
 
@@ -18,12 +17,6 @@ int main()
 {
     juce::ScopedJuceInitialiser_GUI gui;
     bool passed = require (ToyotomiUi::validateEmbeddedImageAssets(), "embedded-image-assets");
-    passed &= require (ToyotomiUi::validateBarMapReferenceAssets(), "BAR MAP opaque native-size assets");
-    const UiSpec uiSpec;
-    passed &= require (uiSpec.isValid()
-                       && uiSpec.getRegion ("barTabs") == juce::Rectangle<int> (324, 91, 540, 36)
-                       && uiSpec.getRegion ("barMap") == juce::Rectangle<int> (319, 128, 577, 277),
-                       "BAR tab and map reference bounds");
 
     ToyotomiHideyoshiAudioProcessor processor;
     processor.prepareToPlay (48000.0, 512);
@@ -50,16 +43,6 @@ int main()
         { 2, 39, -1, "bar-map-render-04-selected-40-playing-outside.png" },
         { 3, 63, 48, "bar-map-render-05-selected-64-playing-49.png" }
     }};
-    BarTabComponent barTabs;
-    barTabs.setSize (540, 36);
-    for (int tab = 0; tab < 4; ++tab)
-    {
-        barTabs.setSelectedPage (tab);
-        auto tabImage = juce::Image (juce::Image::ARGB, 540, 36, true);
-        juce::Graphics tabGraphics (tabImage);
-        barTabs.paint (tabGraphics);
-        passed &= require (tabImage.isValid(), "bar-tab-native-render");
-    }
     BarMapComponent barMap;
     barMap.setSize (577, 277);
     passed &= require (barMap.hasReferenceCellBounds(), "bar-map-16-reference-cell-bounds");

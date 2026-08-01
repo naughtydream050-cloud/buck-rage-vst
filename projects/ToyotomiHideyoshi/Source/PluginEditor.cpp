@@ -67,10 +67,9 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
     countParameters.toFront (false); outputMeter.toFront (false); bottomStatus.toFront (false);
 
     setOpaque (true);
-    // BAR overlays are literal 1280 x 853 reference-image pixels. Keeping the
-    // editor at that native canvas prevents host resize interpolation from
-    // deforming the tab strip or the 66 x 96 BAR cells.
-    setResizable (false, false);
+    setResizable (true, true);
+    getConstrainer()->setFixedAspectRatio (1280.0 / 853.0);
+    setResizeLimits (960, 640, 1920, 1280);
     setSize (uiSpec.getCanvasWidth(), uiSpec.getCanvasHeight());
 }
 
@@ -78,7 +77,10 @@ void ToyotomiHideyoshiAudioProcessorEditor::paint (juce::Graphics& g)
 {
     if (referenceImage.isValid())
     {
-        g.drawImageAt (referenceImage, 0, 0);
+        const auto canvas = uiSpec.getScaledCanvasBounds (getLocalBounds());
+        g.drawImageWithin (referenceImage, canvas.getX(), canvas.getY(),
+                           canvas.getWidth(), canvas.getHeight(),
+                           juce::RectanglePlacement::centred);
     }
 }
 
