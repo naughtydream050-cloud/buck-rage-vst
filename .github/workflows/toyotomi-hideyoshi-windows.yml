@@ -71,20 +71,33 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ToyotomiHideyoshi-build-diagnostics
-          path: toyotomi-build.log
+          path: |
+            toyotomi-build.log
+            toyotomi-state-tests.log
+            toyotomi-runtime-smoke.log
           if-no-files-found: warn
 
       - name: Run state-model round-trip tests
+        if: always()
         shell: pwsh
         run: |
-          cmake --build build-toyotomi-hideyoshi --config Release --target ToyotomiHideyoshiStateTests --parallel
-          & 'build-toyotomi-hideyoshi/ToyotomiHideyoshiStateTests_artefacts/Release/ToyotomiHideyoshiStateTests.exe'
+          $ErrorActionPreference = 'Continue'
+          cmake --build build-toyotomi-hideyoshi --config Release --target ToyotomiHideyoshiStateTests --parallel 2>&1 | Tee-Object toyotomi-state-tests.log
+          $buildExit=$LASTEXITCODE
+          if ($buildExit -eq 0) { & 'build-toyotomi-hideyoshi/ToyotomiHideyoshiStateTests_artefacts/Release/ToyotomiHideyoshiStateTests.exe' 2>&1 | Tee-Object -Append toyotomi-state-tests.log; $testExit=$LASTEXITCODE } else { $testExit=$buildExit }
+          "STATE_BUILD_EXIT=$buildExit STATE_TEST_EXIT=$testExit" | Tee-Object -Append toyotomi-state-tests.log
+          exit 0
 
       - name: Run Editor runtime smoke test
+        if: always()
         shell: pwsh
         run: |
-          cmake --build build-toyotomi-hideyoshi --config Release --target ToyotomiHideyoshiRuntimeSmoke --parallel
-          & 'build-toyotomi-hideyoshi/ToyotomiHideyoshiRuntimeSmoke_artefacts/Release/ToyotomiHideyoshiRuntimeSmoke.exe'
+          $ErrorActionPreference = 'Continue'
+          cmake --build build-toyotomi-hideyoshi --config Release --target ToyotomiHideyoshiRuntimeSmoke --parallel 2>&1 | Tee-Object toyotomi-runtime-smoke.log
+          $buildExit=$LASTEXITCODE
+          if ($buildExit -eq 0) { & 'build-toyotomi-hideyoshi/ToyotomiHideyoshiRuntimeSmoke_artefacts/Release/ToyotomiHideyoshiRuntimeSmoke.exe' 2>&1 | Tee-Object -Append toyotomi-runtime-smoke.log; $testExit=$LASTEXITCODE } else { $testExit=$buildExit }
+          "SMOKE_BUILD_EXIT=$buildExit SMOKE_TEST_EXIT=$testExit" | Tee-Object -Append toyotomi-runtime-smoke.log
+          exit 0
 
       - name: Verify VST3 bundle
         shell: pwsh
