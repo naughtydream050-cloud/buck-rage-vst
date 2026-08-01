@@ -152,6 +152,8 @@ if (TOYOTOMI_BUILD_STATE_TESTS)
         Source/PluginStateModel.cpp
         tests/RuntimeSmokeTests.cpp)
     target_include_directories(ToyotomiHideyoshiRuntimeSmoke PRIVATE Source)
+    target_compile_definitions(ToyotomiHideyoshiRuntimeSmoke PRIVATE
+        "JucePlugin_Name=\"Toyotomi Hideyoshi\"")
     target_link_libraries(ToyotomiHideyoshiRuntimeSmoke PRIVATE
         ToyotomiHideyoshiAssets
         juce::juce_audio_utils
