@@ -39,7 +39,6 @@ const juce::Image& imageFor (const juce::String& id)
     if (id == "lengthSelected")  { static const auto image = loadAsset (BinaryData::length_selected_frame_png, BinaryData::length_selected_frame_pngSize); return image; }
     if (id == "knobBase")        { static const auto image = loadAsset (BinaryData::knob_ring_67_png, BinaryData::knob_ring_67_pngSize); return image; }
     if (id == "knobPointer")     { static const auto image = loadAsset (BinaryData::knob_pointer_png, BinaryData::knob_pointer_pngSize); return image; }
-    if (id == "meterWell")       { static const auto image = loadAsset (BinaryData::meter_well_png, BinaryData::meter_well_pngSize); return image; }
     if (id == "meterLed")        { static const auto image = loadAsset (BinaryData::meter_led_strip_png, BinaryData::meter_led_strip_pngSize); return image; }
 #else
     juce::ignoreUnused (id);
@@ -275,7 +274,7 @@ void CountParameterPanel::paint (juce::Graphics& g)
         drawFrame (g, "lengthNormal", cell);
         if (i == static_cast<int> (count.length)) drawFrame (g, "lengthSelected", cell);
     }
-    const std::array<float, 3> normalized { count.speed / PluginStateModel::kMaxSpeed, (count.pitch - PluginStateModel::kMinPitch) / (PluginStateModel::kMaxPitch - PluginStateModel::kMinPitch), count.depth };
+    const std::array<float, 3> normalized { (count.speed - PluginStateModel::kMinSpeed) / (PluginStateModel::kMaxSpeed - PluginStateModel::kMinSpeed), (count.pitch - PluginStateModel::kMinPitch) / (PluginStateModel::kMaxPitch - PluginStateModel::kMinPitch), count.depth };
     const std::array<juce::String, 3> values { juce::String (count.speed, 2) + "x", juce::String (count.pitch, 1) + " st", juce::String (juce::roundToInt (count.depth * 100.0f)) + " %" };
     for (int i = 0; i < 3; ++i)
     {
@@ -304,6 +303,19 @@ void CountParameterPanel::mouseDown (const juce::MouseEvent& event)
     if (lengths.contains (event.getPosition())) { if (onLengthSelected) onLengthSelected (juce::jlimit (0, 4, (event.x - lengths.getX()) * 5 / juce::jmax (1, lengths.getWidth()))); repaint(); return; }
     for (int i = 0; i < 3; ++i) if (knobBounds (i).contains (event.position)) { activeKnob = i; dragStartY = event.position.y; return; }
 }
+void CountParameterPanel::mouseDoubleClick (const juce::MouseEvent& event)
+{
+    const auto ui = processor.getStateModel().getUiState();
+    for (int i = 0; i < 3; ++i)
+        if (knobBounds (i).contains (event.position))
+        {
+            if (i == 0) processor.getStateModel().setCountSpeed (ui.selectedBar, ui.selectedCount, 1.0f);
+            if (i == 1) processor.getStateModel().setCountPitch (ui.selectedBar, ui.selectedCount, 0.0f);
+            if (i == 2) processor.getStateModel().setCountDepth (ui.selectedBar, ui.selectedCount, 0.5f);
+            repaint();
+            return;
+        }
+}
 void CountParameterPanel::mouseDrag (const juce::MouseEvent& event) { if (activeKnob >= 0) { updateKnob (activeKnob, dragStartY - event.position.y); dragStartY = event.position.y; } }
 void CountParameterPanel::mouseUp (const juce::MouseEvent&) { activeKnob = -1; }
 void CountParameterPanel::mouseWheelMove (const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel)
@@ -326,7 +338,6 @@ void OutputMeterComponent::paint (juce::Graphics& g)
     const auto right = juce::Rectangle<int> (juce::roundToInt (84.0f * scaleX), juce::roundToInt (61.0f * scaleY), juce::roundToInt (15.0f * scaleX), juce::roundToInt (255.0f * scaleY));
     const auto drawChannel = [&] (juce::Rectangle<int> track, float level, float peak)
     {
-        drawImage (g, imageFor ("meterWell"), track);
         const auto pixels = juce::roundToInt (juce::jmap (level, -60.0f, 6.0f, 0.0f, static_cast<float> (track.getHeight())));
         if (pixels > 0) { g.saveState(); g.reduceClipRegion (track.withTop (track.getBottom() - pixels)); drawImage (g, imageFor ("meterLed"), track); g.restoreState(); }
         const auto peakY = track.getBottom() - juce::roundToInt (juce::jmap (peak, -60.0f, 6.0f, 0.0f, static_cast<float> (track.getHeight())));
@@ -336,4 +347,3 @@ void OutputMeterComponent::paint (juce::Graphics& g)
 }
 
 void BottomStatusBar::paint (juce::Graphics&) {}
-

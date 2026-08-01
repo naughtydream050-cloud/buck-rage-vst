@@ -10,7 +10,7 @@ public:
     enum class ScratchPreset { off, forwardCut, backspin, chirp, baby, transform, drag, zigzag, tapeBrake, custom };
     enum class NoteLength { sixteenth, eighth, quarter, half, oneBar };
     struct MotionPoint { float x = 0.0f, y = 0.0f; };
-    struct CountSlot { ScratchPreset preset = ScratchPreset::off; NoteLength length = NoteLength::sixteenth; float speed = 1.0f, pitch = 0.0f, depth = 1.0f; bool customMotion = false; std::vector<MotionPoint> motion; };
+    struct CountSlot { ScratchPreset preset = ScratchPreset::off; NoteLength length = NoteLength::sixteenth; float speed = 1.0f, pitch = 0.0f, depth = 0.5f; bool customMotion = false; std::vector<MotionPoint> motion; };
     struct BarPattern { std::array<CountSlot, kCountsPerBar> counts; };
     struct UiState { int selectedTab = 0, selectedBar = 0, selectedCount = 0; bool bypass = false; };
 
@@ -24,7 +24,7 @@ public:
     void setSelectedPreset (ScratchPreset); void setSelectedLength (NoteLength); void setSelectedSpeed (float); void setSelectedPitch (float); void setSelectedDepth (float); void setSelectedMotion (const std::vector<MotionPoint>&); void clearSelectedMotion();
     juce::ValueTree toValueTree() const; bool fromValueTree (const juce::ValueTree&);
     void reset();
-    static constexpr float kMinSpeed = 0.0f, kMaxSpeed = 2.0f, kMinPitch = -24.0f, kMaxPitch = 24.0f;
+    static constexpr float kMinSpeed = 0.25f, kMaxSpeed = 4.0f, kMinPitch = -12.0f, kMaxPitch = 12.0f;
 private:
     static int barIndex (int) noexcept; static int countIndex (int) noexcept;
     static float finiteClamp (float, float, float, float) noexcept;
