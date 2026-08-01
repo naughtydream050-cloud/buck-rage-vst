@@ -113,6 +113,7 @@ class CountGridComponent final : public juce::Component
 public:
     std::function<void (int)> onSelectedCount;
     CountGridComponent();
+    void setSelectedCount (int zeroBasedCount);
     void paint (juce::Graphics&) override;
     void resized() override;
 
@@ -145,6 +146,7 @@ class ScratchPresetPalette final : public juce::Component
 {
 public:
     std::function<void (int)> onPresetSelected;
+    void setSelectedPreset (int preset) { selectedPreset = juce::jlimit (0, 8, preset); repaint(); }
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
 

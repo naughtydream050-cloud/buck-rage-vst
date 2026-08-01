@@ -33,18 +33,22 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
     auto& state = processor.getStateModel();
     const auto uiState = state.getUiState();
     barTabs.setSelectedPage (uiState.selectedTab);
-    barMap.setDisplayState (uiState.selectedTab, uiState.selectedBar, 5);
+    // Page selection is a view-only choice.  It must never mutate the active
+    // BAR/COUNT slot or any parameter state.
+    barMap.setDisplayState (uiState.selectedTab, uiState.selectedBar, -1);
+    countGrid.setSelectedCount (uiState.selectedCount);
+    presetPalette.setSelectedPreset (static_cast<int> (state.getCount (uiState.selectedBar, uiState.selectedCount).preset));
     barTabs.onSelectedPage = [this, &state] (int page)
     {
         state.selectTab (page);
         const auto ui = state.getUiState();
-        barMap.setDisplayState (ui.selectedTab, ui.selectedBar, 5);
+        barMap.setDisplayState (ui.selectedTab, ui.selectedBar, -1);
     };
     barMap.onSelectedBar = [this, &state] (int bar)
     {
         state.selectBar (bar);
         const auto ui = state.getUiState();
-        barMap.setDisplayState (ui.selectedTab, ui.selectedBar, 5);
+        barMap.setDisplayState (ui.selectedTab, ui.selectedBar, -1);
     };
     countGrid.onSelectedCount = [&state] (int count) { state.selectCount (count); };
     presetPalette.onPresetSelected = [&state] (int preset) { state.setSelectedPreset ((PluginStateModel::ScratchPreset) preset); };
@@ -67,9 +71,9 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
     countParameters.toFront (false); outputMeter.toFront (false); bottomStatus.toFront (false);
 
     setOpaque (true);
-    setResizable (true, true);
-    getConstrainer()->setFixedAspectRatio (1280.0 / 853.0);
-    setResizeLimits (960, 640, 1920, 1280);
+    // Image cutouts are authored at native pixels.  A fitted/scaled editor
+    // makes visual and hit-test geometry diverge in FL Studio.
+    setResizable (false, false);
     setSize (uiSpec.getCanvasWidth(), uiSpec.getCanvasHeight());
 }
 
@@ -77,10 +81,7 @@ void ToyotomiHideyoshiAudioProcessorEditor::paint (juce::Graphics& g)
 {
     if (referenceImage.isValid())
     {
-        const auto canvas = uiSpec.getScaledCanvasBounds (getLocalBounds());
-        g.drawImageWithin (referenceImage, canvas.getX(), canvas.getY(),
-                           canvas.getWidth(), canvas.getHeight(),
-                           juce::RectanglePlacement::centred);
+        g.drawImageAt (referenceImage, 0, 0);
     }
 }
 

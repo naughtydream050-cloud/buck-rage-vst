@@ -36,6 +36,9 @@ int main()
     passed &= require (uiSpec.getRegion ("barTabs") == juce::Rectangle<int> (324, 91, 540, 36)
                        && uiSpec.getRegion ("barMap") == juce::Rectangle<int> (319, 128, 577, 277),
                        "bar-ui-reference-regions");
+    passed &= require (uiSpec.scaledBounds (uiSpec.getRegion ("barTabs"), { 0, 0, 960, 640 })
+                           == uiSpec.getRegion ("barTabs"),
+                       "fixed-canvas-never-scales-hit-regions");
 
     BarTabComponent tabs;
     tabs.setSize (540, 36);

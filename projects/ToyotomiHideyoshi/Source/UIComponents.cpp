@@ -135,8 +135,10 @@ const juce::Image& barLabelImage (int globalBarIndex)
 
 void drawImage (juce::Graphics& g, const juce::Image& image, juce::Rectangle<int> bounds)
 {
-    if (image.isValid())
-        g.drawImageWithin (image, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), juce::RectanglePlacement::stretchToFit);
+    // Every state asset is authored at its final pixel dimensions.  Refuse a
+    // mismatch instead of silently resampling a label or moving a hit target.
+    if (image.isValid() && image.getWidth() == bounds.getWidth() && image.getHeight() == bounds.getHeight())
+        g.drawImageAt (image, bounds.getX(), bounds.getY());
 }
 
 void drawFrame (juce::Graphics& g, const char* id, juce::Rectangle<int> bounds)
@@ -371,13 +373,17 @@ CountGridComponent::CountGridComponent()
         addAndMakeVisible (cells[static_cast<size_t> (i)]);
     }
 }
-void CountGridComponent::selectCount (int number)
+void CountGridComponent::setSelectedCount (int zeroBasedCount)
 {
-    selectedCount = number;
-    if (onSelectedCount) onSelectedCount (number - 1);
+    selectedCount = juce::jlimit (0, 15, zeroBasedCount) + 1;
     const std::array<int, 16> presets { 0, 1, 2, 3, 2, 7, 6, 8, 1, 3, 0, 7, 7, 6, 3, 0 };
     for (int i = 0; i < 16; ++i)
         cells[static_cast<size_t> (i)].configure (i + 1, presets[static_cast<size_t> (i)], i + 1 == selectedCount);
+}
+void CountGridComponent::selectCount (int number)
+{
+    setSelectedCount (number - 1);
+    if (onSelectedCount) onSelectedCount (number - 1);
 }
 void CountGridComponent::paint (juce::Graphics&) {}
 void CountGridComponent::resized()
@@ -394,8 +400,7 @@ XYMotionPad::XYMotionPad()
 }
 juce::Rectangle<float> XYMotionPad::padBounds() const
 {
-    return { 30.0f * getWidth() / 289.0f, 27.0f * getHeight() / 249.0f,
-             243.0f * getWidth() / 289.0f, 176.0f * getHeight() / 249.0f };
+    return { 30.0f, 27.0f, 243.0f, 176.0f };
 }
 void XYMotionPad::paint (juce::Graphics& g)
 {
@@ -427,9 +432,8 @@ void XYMotionPad::appendPoint (juce::Point<float> position)
 }
 void XYMotionPad::mouseDown (const juce::MouseEvent& event)
 {
-    const auto scaleX = getWidth() / 289.0f, scaleY = getHeight() / 249.0f;
-    const auto clear = juce::Rectangle<int> (juce::roundToInt (18.0f * scaleX), juce::roundToInt (211.0f * scaleY), juce::roundToInt (124.0f * scaleX), juce::roundToInt (33.0f * scaleY));
-    const auto reset = juce::Rectangle<int> (juce::roundToInt (156.0f * scaleX), juce::roundToInt (211.0f * scaleY), juce::roundToInt (114.0f * scaleX), juce::roundToInt (33.0f * scaleY));
+    const auto clear = juce::Rectangle<int> (18, 211, 124, 33);
+    const auto reset = juce::Rectangle<int> (156, 211, 114, 33);
     if (clear.contains (event.getPosition())) { normalizedMotion.clear(); if (onClearMotion) onClearMotion(); repaint(); return; }
     if (reset.contains (event.getPosition())) { normalizedMotion.clear(); if (onResetCount) onResetCount(); repaint(); return; }
     if (padBounds().contains (event.position)) { recording = true; normalizedMotion.clear(); appendPoint (event.position); }
@@ -447,7 +451,7 @@ void XYMotionPad::mouseUp (const juce::MouseEvent&)
 
 void ScratchPresetPalette::paint (juce::Graphics& g)
 {
-    const auto area = juce::Rectangle<int> (juce::roundToInt (14.0f * getWidth() / 360.0f), juce::roundToInt (32.0f * getHeight() / 313.0f), juce::roundToInt (333.0f * getWidth() / 360.0f), juce::roundToInt (257.0f * getHeight() / 313.0f));
+    const auto area = juce::Rectangle<int> (14, 32, 333, 257);
     for (int i = 0; i < 9; ++i)
     {
         const auto cell = gridCell (area, i % 3, i / 3, 3, 3, 3);
@@ -457,21 +461,20 @@ void ScratchPresetPalette::paint (juce::Graphics& g)
 }
 void ScratchPresetPalette::mouseDown (const juce::MouseEvent& event)
 {
-    const auto area = juce::Rectangle<int> (juce::roundToInt (14.0f * getWidth() / 360.0f), juce::roundToInt (32.0f * getHeight() / 313.0f), juce::roundToInt (333.0f * getWidth() / 360.0f), juce::roundToInt (257.0f * getHeight() / 313.0f));
+    const auto area = juce::Rectangle<int> (14, 32, 333, 257);
     for (int i = 0; i < 9; ++i) if (gridCell (area, i % 3, i / 3, 3, 3, 3).contains (event.getPosition())) { selectedPreset = i; repaint(); if (onPresetSelected) onPresetSelected (i); return; }
 }
 
 CountParameterPanel::CountParameterPanel (ToyotomiHideyoshiAudioProcessor& p) : processor (p) {}
 juce::Rectangle<float> CountParameterPanel::knobBounds (int index) const
 {
-    return { (10.0f + 87.0f * index) * getWidth() / 270.0f, 165.0f * getHeight() / 339.0f,
-             67.0f * getWidth() / 270.0f, 67.0f * getHeight() / 339.0f };
+    return { 10.0f + 87.0f * index, 165.0f, 67.0f, 67.0f };
 }
 void CountParameterPanel::paint (juce::Graphics& g)
 {
     const auto ui = processor.getStateModel().getUiState();
     const auto& count = processor.getStateModel().getCount (ui.selectedBar, ui.selectedCount);
-    const auto lengths = juce::Rectangle<int> (juce::roundToInt (12.0f * getWidth() / 270.0f), juce::roundToInt (72.0f * getHeight() / 339.0f), juce::roundToInt (248.0f * getWidth() / 270.0f), juce::roundToInt (32.0f * getHeight() / 339.0f));
+    const auto lengths = juce::Rectangle<int> (12, 72, 248, 32);
     for (int i = 0; i < 5; ++i)
     {
         const auto cell = gridCell (lengths, i, 0, 5, 1, 3);
@@ -489,8 +492,8 @@ void CountParameterPanel::paint (juce::Graphics& g)
         g.addTransform (juce::AffineTransform::rotation (angle + juce::MathConstants<float>::halfPi, centre.x, centre.y));
         drawImage (g, imageFor ("knobPointer"), knob.toNearestInt());
         g.restoreState();
-        g.setColour (ToyotomiUi::ivory()); g.setFont (juce::Font (11.0f * getHeight() / 339.0f));
-        g.drawText (values[static_cast<size_t> (i)], knob.withY (knob.getBottom() + 11.0f * getHeight() / 339.0f).withHeight (21.0f * getHeight() / 339.0f).toNearestInt(), juce::Justification::centred);
+        g.setColour (ToyotomiUi::ivory()); g.setFont (juce::Font (11.0f));
+        g.drawText (values[static_cast<size_t> (i)], knob.withY (knob.getBottom() + 11.0f).withHeight (21.0f).toNearestInt(), juce::Justification::centred);
     }
 }
 void CountParameterPanel::updateKnob (int index, float delta)
@@ -503,7 +506,7 @@ void CountParameterPanel::updateKnob (int index, float delta)
 }
 void CountParameterPanel::mouseDown (const juce::MouseEvent& event)
 {
-    const auto lengths = juce::Rectangle<int> (juce::roundToInt (12.0f * getWidth() / 270.0f), juce::roundToInt (72.0f * getHeight() / 339.0f), juce::roundToInt (248.0f * getWidth() / 270.0f), juce::roundToInt (32.0f * getHeight() / 339.0f));
+    const auto lengths = juce::Rectangle<int> (12, 72, 248, 32);
     if (lengths.contains (event.getPosition())) { if (onLengthSelected) onLengthSelected (juce::jlimit (0, 4, (event.x - lengths.getX()) * 5 / juce::jmax (1, lengths.getWidth()))); repaint(); return; }
     for (int i = 0; i < 3; ++i) if (knobBounds (i).contains (event.position)) { activeKnob = i; dragStartY = event.position.y; return; }
 }
@@ -537,9 +540,8 @@ void OutputMeterComponent::timerCallback()
 }
 void OutputMeterComponent::paint (juce::Graphics& g)
 {
-    const auto scaleX = getWidth() / 149.0f, scaleY = getHeight() / 360.0f;
-    const auto left = juce::Rectangle<int> (juce::roundToInt (40.0f * scaleX), juce::roundToInt (61.0f * scaleY), juce::roundToInt (15.0f * scaleX), juce::roundToInt (255.0f * scaleY));
-    const auto right = juce::Rectangle<int> (juce::roundToInt (84.0f * scaleX), juce::roundToInt (61.0f * scaleY), juce::roundToInt (15.0f * scaleX), juce::roundToInt (255.0f * scaleY));
+    const auto left = juce::Rectangle<int> (40, 61, 15, 255);
+    const auto right = juce::Rectangle<int> (84, 61, 15, 255);
     const auto drawChannel = [&] (juce::Rectangle<int> track, float level, float peak)
     {
         const auto pixels = juce::roundToInt (juce::jmap (level, -60.0f, 6.0f, 0.0f, static_cast<float> (track.getHeight())));

@@ -86,26 +86,15 @@ juce::Rectangle<int> UiSpec::getControl (const juce::String& name) const
 
 juce::Rectangle<int> UiSpec::getScaledCanvasBounds (juce::Rectangle<int> editorBounds) const
 {
-    // The editor is aspect-constrained, but retaining one fitted canvas here
-    // keeps the faceplate and every component on precisely the same transform.
-    const auto scaleX = editorBounds.getWidth() / static_cast<float> (canvasWidth);
-    const auto scaleY = editorBounds.getHeight() / static_cast<float> (canvasHeight);
-    const auto scale = juce::jmin (scaleX, scaleY);
-    const auto width = juce::roundToInt (canvasWidth * scale);
-    const auto height = juce::roundToInt (canvasHeight * scale);
-    return { editorBounds.getCentreX() - width / 2, editorBounds.getCentreY() - height / 2, width, height };
+    juce::ignoreUnused (editorBounds);
+    return { 0, 0, canvasWidth, canvasHeight };
 }
 
 juce::Rectangle<int> UiSpec::scaledBounds (juce::Rectangle<int> referenceBounds,
                                            juce::Rectangle<int> editorBounds) const
 {
-    const auto canvas = getScaledCanvasBounds (editorBounds);
-    const auto scaleX = canvas.getWidth() / static_cast<float> (canvasWidth);
-    const auto scaleY = canvas.getHeight() / static_cast<float> (canvasHeight);
-    return { canvas.getX() + juce::roundToInt (referenceBounds.getX() * scaleX),
-             canvas.getY() + juce::roundToInt (referenceBounds.getY() * scaleY),
-             juce::roundToInt (referenceBounds.getWidth() * scaleX),
-             juce::roundToInt (referenceBounds.getHeight() * scaleY) };
+    juce::ignoreUnused (editorBounds);
+    return referenceBounds;
 }
 
 juce::Rectangle<int> UiSpec::scaleRegion (const juce::String& name,

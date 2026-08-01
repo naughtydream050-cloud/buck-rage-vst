@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "name": "Toyotomi Hideyoshi",
   "visualTruth": "Resources/reference_ui.jpg",
-  "canvas": { "width": 1280, "height": 853, "aspectRatio": 1.5005861665, "resizable": true },
+  "canvas": { "width": 1280, "height": 853, "aspectRatio": 1.5005861665, "resizable": false },
   "font": {
     "family": "Bahnschrift Condensed",
     "fallback": "Arial Narrow",
