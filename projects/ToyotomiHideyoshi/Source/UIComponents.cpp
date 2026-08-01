@@ -28,6 +28,10 @@ const juce::Image& imageFor (const juce::String& id)
 #if TOYOTOMI_HAS_BINARY_DATA
     if (id == "tabNormal")       { static const auto image = loadAsset (BinaryData::tab_normal_frame_png, BinaryData::tab_normal_frame_pngSize); return image; }
     if (id == "tabSelected")     { static const auto image = loadAsset (BinaryData::tab_selected_fill_png, BinaryData::tab_selected_fill_pngSize); return image; }
+    if (id == "tabStrip1")       { static const auto image = loadAsset (BinaryData::tab_strip_selected_1_16_png, BinaryData::tab_strip_selected_1_16_pngSize); return image; }
+    if (id == "tabStrip2")       { static const auto image = loadAsset (BinaryData::tab_strip_selected_17_32_png, BinaryData::tab_strip_selected_17_32_pngSize); return image; }
+    if (id == "tabStrip3")       { static const auto image = loadAsset (BinaryData::tab_strip_selected_33_48_png, BinaryData::tab_strip_selected_33_48_pngSize); return image; }
+    if (id == "tabStrip4")       { static const auto image = loadAsset (BinaryData::tab_strip_selected_49_64_png, BinaryData::tab_strip_selected_49_64_pngSize); return image; }
     if (id == "barNormal")       { static const auto image = loadAsset (BinaryData::bar_normal_frame_png, BinaryData::bar_normal_frame_pngSize); return image; }
     if (id == "barSelected")     { static const auto image = loadAsset (BinaryData::bar_selected_frame_png, BinaryData::bar_selected_frame_pngSize); return image; }
     if (id == "barPlaying")      { static const auto image = loadAsset (BinaryData::bar_playing_frame_png, BinaryData::bar_playing_frame_pngSize); return image; }
@@ -73,8 +77,8 @@ void drawPanel (juce::Graphics&, juce::Rectangle<float>, const juce::String&) {}
 void drawMotionGlyph (juce::Graphics&, juce::Rectangle<float>, int) {}
 bool validateEmbeddedImageAssets()
 {
-    static constexpr std::array<const char*, 13> ids {
-        "tabNormal", "tabSelected", "barNormal", "barSelected", "barPlaying",
+    static constexpr std::array<const char*, 17> ids {
+        "tabNormal", "tabSelected", "tabStrip1", "tabStrip2", "tabStrip3", "tabStrip4", "barNormal", "barSelected", "barPlaying",
         "countNormal", "countSelected", "presetNormal", "presetSelected",
         "lengthNormal", "lengthSelected", "knobBase", "knobPointer"
     };
@@ -112,18 +116,36 @@ void ArtworkPanel::paint (juce::Graphics& g) { juce::ignoreUnused (g, source); }
 
 void BarTabComponent::paint (juce::Graphics& g)
 {
-    for (int i = 0; i < 4; ++i)
-    {
-        const auto cell = gridCell (getLocalBounds(), i, 0, 4, 1, 4);
-        drawFrame (g, "tabNormal", cell);
-        if (i == selectedPage) drawFrame (g, "tabSelected", cell);
-    }
+    static constexpr std::array<const char*, 4> stripIds { "tabStrip1", "tabStrip2", "tabStrip3", "tabStrip4" };
+    drawFrame (g, stripIds[static_cast<size_t> (selectedPage)], getLocalBounds());
 }
 void BarTabComponent::mouseDown (const juce::MouseEvent& event)
 {
-    selectedPage = juce::jlimit (0, 3, event.x * 4 / juce::jmax (1, getWidth()));
-    if (onSelectedPage) onSelectedPage (selectedPage);
-    repaint();
+    // These hit zones are the 1280 x 853 reference-image tab bounds, expressed
+    // relative to this 540 x 36 component. Rendering and input therefore use
+    // the exact same geometry as the one-strip image overlays.
+    static constexpr std::array<juce::Rectangle<float>, 4> referenceHitZones {{
+        {   0.0f, 0.0f, 132.0f, 36.0f },
+        { 137.0f, 0.0f, 133.0f, 36.0f },
+        { 275.0f, 0.0f, 132.0f, 36.0f },
+        { 410.0f, 0.0f, 130.0f, 36.0f }
+    }};
+
+    const auto scaleX = static_cast<float> (getWidth()) / 540.0f;
+    const auto scaleY = static_cast<float> (getHeight()) / 36.0f;
+    const auto point = event.getPosition().toFloat();
+
+    for (size_t i = 0; i < referenceHitZones.size(); ++i)
+    {
+        const auto zone = referenceHitZones[i].transformedBy (juce::AffineTransform::scale (scaleX, scaleY));
+        if (! zone.contains (point))
+            continue;
+
+        selectedPage = static_cast<int> (i);
+        if (onSelectedPage) onSelectedPage (selectedPage);
+        repaint();
+        break;
+    }
 }
 
 void BarCellComponent::configure (int number, bool isSelected, bool isPlaying)
