@@ -124,7 +124,7 @@ void BarTabComponent::mouseDown (const juce::MouseEvent& event)
     // These hit zones are the 1280 x 853 reference-image tab bounds, expressed
     // relative to this 540 x 36 component. Rendering and input therefore use
     // the exact same geometry as the one-strip image overlays.
-    static constexpr std::array<juce::Rectangle<float>, 4> referenceHitZones {{
+    static const std::array<juce::Rectangle<float>, 4> referenceHitZones {{
         {   0.0f, 0.0f, 132.0f, 36.0f },
         { 137.0f, 0.0f, 133.0f, 36.0f },
         { 275.0f, 0.0f, 132.0f, 36.0f },
