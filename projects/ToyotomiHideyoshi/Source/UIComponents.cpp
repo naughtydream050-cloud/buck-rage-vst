@@ -143,6 +143,30 @@ void drawFrame (juce::Graphics& g, const char* id, juce::Rectangle<int> bounds)
 {
     drawImage (g, imageFor (id), bounds);
 }
+
+bool isFullyOpaque (const juce::Image& image)
+{
+    if (! image.isValid())
+        return false;
+
+    for (int y = 0; y < image.getHeight(); ++y)
+        for (int x = 0; x < image.getWidth(); ++x)
+            if (image.getPixelAt (x, y).getAlpha() != 255)
+                return false;
+
+    return true;
+}
+
+void drawNativeImage (juce::Graphics& g, const juce::Image& image, juce::Rectangle<int> bounds)
+{
+    if (! image.isValid() || image.getWidth() != bounds.getWidth() || image.getHeight() != bounds.getHeight())
+    {
+        jassertfalse;
+        return;
+    }
+
+    g.drawImageAt (image, bounds.getX(), bounds.getY());
+}
 }
 
 namespace ToyotomiUi
@@ -180,6 +204,25 @@ bool validateEmbeddedImageAssets()
         if (! label.isValid() || label.getWidth() != 66 || label.getHeight() != 24)
             return false;
     }
+    return validateBarMapReferenceAssets();
+}
+
+bool validateBarMapReferenceAssets()
+{
+    static constexpr std::array<const char*, 4> tabIds { "tabStrip1", "tabStrip2", "tabStrip3", "tabStrip4" };
+    static constexpr std::array<const char*, 4> cellIds { "barBaseNormal", "barBaseSelected", "barBasePlaying", "barBaseSelectedPlaying" };
+    for (const auto* id : tabIds)
+    {
+        const auto& image = imageFor (id);
+        if (image.getWidth() != 540 || image.getHeight() != 36 || ! isFullyOpaque (image))
+            return false;
+    }
+    for (const auto* id : cellIds)
+    {
+        const auto& image = imageFor (id);
+        if (image.getWidth() != 66 || image.getHeight() != 96 || ! isFullyOpaque (image))
+            return false;
+    }
     return true;
 }
 }
@@ -208,7 +251,7 @@ void ArtworkPanel::paint (juce::Graphics& g) { juce::ignoreUnused (g, source); }
 void BarTabComponent::paint (juce::Graphics& g)
 {
     static constexpr std::array<const char*, 4> stripIds { "tabStrip1", "tabStrip2", "tabStrip3", "tabStrip4" };
-    drawFrame (g, stripIds[static_cast<size_t> (selectedPage)], getLocalBounds());
+    drawNativeImage (g, imageFor (stripIds[static_cast<size_t> (selectedPage)]), getLocalBounds());
 }
 void BarTabComponent::mouseDown (const juce::MouseEvent& event)
 {
@@ -222,14 +265,14 @@ void BarTabComponent::mouseDown (const juce::MouseEvent& event)
         { 410.0f, 0.0f, 130.0f, 36.0f }
     }};
 
-    const auto scaleX = static_cast<float> (getWidth()) / 540.0f;
-    const auto scaleY = static_cast<float> (getHeight()) / 36.0f;
+    if (getWidth() != 540 || getHeight() != 36)
+        return;
+
     const auto point = event.getPosition().toFloat();
 
     for (size_t i = 0; i < referenceHitZones.size(); ++i)
     {
-        const auto zone = referenceHitZones[i].transformedBy (juce::AffineTransform::scale (scaleX, scaleY));
-        if (! zone.contains (point))
+        if (! referenceHitZones[i].contains (point))
             continue;
 
         selectedPage = static_cast<int> (i);
@@ -250,22 +293,12 @@ void BarCellComponent::paint (juce::Graphics& g)
 {
     const auto stateId = playing ? (selected ? "barBaseSelectedPlaying" : "barBasePlaying")
                                  : (selected ? "barBaseSelected" : "barBaseNormal");
-    drawFrame (g, stateId, getLocalBounds());
-
-    const auto labelBounds = juce::Rectangle<int> (0,
-                                                     juce::roundToInt (7.0f * getHeight() / 96.0f),
-                                                     getWidth(),
-                                                     juce::roundToInt (24.0f * getHeight() / 96.0f));
-    drawImage (g, barLabelImage (globalBarIndex), labelBounds);
+    drawNativeImage (g, imageFor (stateId), getLocalBounds());
+    drawNativeImage (g, barLabelImage (globalBarIndex), { 0, 7, 66, 24 });
 
     if (playing)
     {
-        const auto badgeBounds = juce::Rectangle<int> (
-            juce::roundToInt (5.0f * getWidth() / 66.0f),
-            juce::roundToInt (61.0f * getHeight() / 96.0f),
-            juce::roundToInt (56.0f * getWidth() / 66.0f),
-            juce::roundToInt (31.0f * getHeight() / 96.0f));
-        drawFrame (g, "barPlayingBadge", badgeBounds);
+        drawNativeImage (g, imageFor ("barPlayingBadge"), { 5, 61, 56, 31 });
     }
 }
 void BarCellComponent::mouseDown (const juce::MouseEvent&) { if (onSelected) onSelected (globalBarIndex); }
@@ -317,9 +350,8 @@ void BarMapComponent::refreshCells()
 void BarMapComponent::paint (juce::Graphics&) {}
 void BarMapComponent::resized()
 {
-    const auto area = getLocalBounds().withTrimmedTop (32).withTrimmedBottom (48).reduced (9, 0);
     for (int i = 0; i < 16; ++i)
-          cells[static_cast<size_t> (i)].setBounds (gridCell (area, i % 8, i / 8, 8, 2, 4));
+        cells[static_cast<size_t> (i)].setBounds (9 + (i % 8) * 70, 32 + (i / 8) * 100, 66, 96);
     refreshCells();
 }
 
