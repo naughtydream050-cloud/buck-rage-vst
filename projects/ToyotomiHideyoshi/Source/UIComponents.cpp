@@ -179,7 +179,7 @@ bool validateEmbeddedImageAssets()
     for (int bar = 0; bar < 64; ++bar)
     {
         const auto& label = barLabelImage (bar);
-        if (! label.isValid() || label.getWidth() != 66 || label.getHeight() != 24)
+        if (! label.isValid() || label.getWidth() != 71 || label.getHeight() != 24)
             return false;
     }
 
@@ -188,7 +188,7 @@ bool validateEmbeddedImageAssets()
     for (const auto* id : { "tabStrip1", "tabStrip2", "tabStrip3", "tabStrip4" })
     {
         const auto& strip = imageFor (id);
-        if (strip.getWidth() != 540 || strip.getHeight() != 36)
+        if (strip.getWidth() != 542 || strip.getHeight() != 35)
             return false;
         for (int y = 0; y < strip.getHeight(); ++y)
             for (int x = 0; x < strip.getWidth(); ++x)
@@ -198,7 +198,7 @@ bool validateEmbeddedImageAssets()
     for (const auto* id : { "barBaseNormal", "barBaseSelected", "barBasePlaying", "barBaseSelectedPlaying" })
     {
         const auto& cell = imageFor (id);
-        if (cell.getWidth() != 66 || cell.getHeight() != 96)
+        if (cell.getWidth() != 71 || cell.getHeight() != 92)
             return false;
         for (int y = 0; y < cell.getHeight(); ++y)
             for (int x = 0; x < cell.getWidth(); ++x)
@@ -234,25 +234,25 @@ void BarTabComponent::paint (juce::Graphics& g)
 {
     static constexpr std::array<const char*, 4> stripIds { "tabStrip1", "tabStrip2", "tabStrip3", "tabStrip4" };
     const auto& strip = imageFor (stripIds[static_cast<size_t> (selectedPage)]);
-    if (strip.isValid() && getLocalBounds().getWidth() == 540 && getLocalBounds().getHeight() == 36)
+    if (strip.isValid() && getLocalBounds().getWidth() == 542 && getLocalBounds().getHeight() == 35)
         g.drawImageAt (strip, 0, 0);
 }
 void BarTabComponent::mouseDown (const juce::MouseEvent& event)
 {
     // These hit zones are the 1280 x 853 reference-image tab bounds, expressed
-    // relative to this 540 x 36 component. Rendering and input therefore use
+    // relative to this 542 x 35 component. Rendering and input therefore use
     // the exact same geometry as the one-strip image overlays.
     static const std::array<juce::Rectangle<float>, 4> referenceHitZones {{
-        {   0.0f, 0.0f, 132.0f, 36.0f },
-        { 137.0f, 0.0f, 133.0f, 36.0f },
-        { 275.0f, 0.0f, 132.0f, 36.0f },
-        { 410.0f, 0.0f, 130.0f, 36.0f }
+        {   0.0f, 0.0f, 130.0f, 35.0f },
+        { 135.0f, 0.0f, 135.0f, 35.0f },
+        { 275.0f, 0.0f, 132.0f, 35.0f },
+        { 412.0f, 0.0f, 130.0f, 35.0f }
     }};
 
-    // The source strip and its hit regions are native 540 x 36 pixels.  Do
+    // The source strip and its hit regions are native 542 x 35 pixels.  Do
     // not transform the zones: a transformed hit test can disagree with the
     // one-to-one overlay and leak a page change from an adjacent tab.
-    if (getWidth() != 540 || getHeight() != 36)
+    if (getWidth() != 542 || getHeight() != 35)
         return;
 
     const auto point = event.getPosition().toFloat();
@@ -284,18 +284,18 @@ void BarCellComponent::paint (juce::Graphics& g)
     const auto stateId = playing ? (selected ? "barBaseSelectedPlaying" : "barBasePlaying")
                                  : (selected ? "barBaseSelected" : "barBaseNormal");
     const auto& background = imageFor (stateId);
-    if (background.isValid() && getWidth() == 66 && getHeight() == 96)
+    if (background.isValid() && getWidth() == 71 && getHeight() == 92)
         g.drawImageAt (background, 0, 0);
 
     const auto& label = barLabelImage (globalBarIndex);
-    if (label.isValid() && label.getWidth() == 66 && label.getHeight() == 24)
+    if (label.isValid() && label.getWidth() == 71 && label.getHeight() == 24)
         g.drawImageAt (label, 0, 7);
 
     if (playing)
     {
         const auto& badge = imageFor ("barPlayingBadge");
-        if (badge.isValid() && badge.getWidth() == 56 && badge.getHeight() == 31)
-            g.drawImageAt (badge, 5, 61);
+        if (badge.isValid() && badge.getWidth() == 60 && badge.getHeight() == 29)
+            g.drawImageAt (badge, 6, 58);
     }
 }
 void BarCellComponent::mouseDown (const juce::MouseEvent&) { if (onSelected) onSelected (globalBarIndex); }
@@ -318,13 +318,13 @@ void BarMapComponent::setDisplayState (int selectedTab, int selectedGlobalBar, i
 }
 bool BarMapComponent::hasReferenceCellBounds() const
 {
-    if (getWidth() != 577 || getHeight() != 277)
+    if (getWidth() != 608 || getHeight() != 266)
         return false;
     for (int i = 0; i < 16; ++i)
     {
-        const auto expected = juce::Rectangle<int> (9 + (i % 8) * 70,
-                                                     32 + (i / 8) * 100,
-                                                     66, 96);
+        const auto expected = juce::Rectangle<int> (6 + (i % 8) * 75,
+                                                     32 + (i / 8) * 97,
+                                                     71, 92);
         if (cells[static_cast<size_t> (i)].getBounds() != expected)
             return false;
     }
@@ -338,9 +338,11 @@ void BarMapComponent::selectBar (int globalBar)
 }
 void BarMapComponent::refreshCells()
 {
+    const auto showOverlay = displayTab != 0 || selectedBar != 0 || playingBar >= 0;
     for (int i = 0; i < 16; ++i)
     {
         const auto globalBar = displayTab * 16 + i;
+        cells[static_cast<size_t> (i)].setVisible (showOverlay);
         cells[static_cast<size_t> (i)].configure (globalBar, globalBar == selectedBar, globalBar == playingBar);
     }
 }
@@ -348,7 +350,7 @@ void BarMapComponent::paint (juce::Graphics&) {}
 void BarMapComponent::resized()
 {
     for (int i = 0; i < 16; ++i)
-        cells[static_cast<size_t> (i)].setBounds (9 + (i % 8) * 70, 32 + (i / 8) * 100, 66, 96);
+        cells[static_cast<size_t> (i)].setBounds (6 + (i % 8) * 75, 32 + (i / 8) * 97, 71, 92);
     refreshCells();
 }
 
@@ -378,10 +380,14 @@ void CountGridComponent::setSelectedCount (int zeroBasedCount)
     selectedCount = juce::jlimit (0, 15, zeroBasedCount) + 1;
     const std::array<int, 16> presets { 0, 1, 2, 3, 2, 7, 6, 8, 1, 3, 0, 7, 7, 6, 3, 0 };
     for (int i = 0; i < 16; ++i)
+    {
+        cells[static_cast<size_t> (i)].setVisible (showOverlay);
         cells[static_cast<size_t> (i)].configure (i + 1, presets[static_cast<size_t> (i)], i + 1 == selectedCount);
+    }
 }
 void CountGridComponent::selectCount (int number)
 {
+    showOverlay = true;
     setSelectedCount (number - 1);
     if (onSelectedCount) onSelectedCount (number - 1);
 }
@@ -395,8 +401,6 @@ void CountGridComponent::resized()
 
 XYMotionPad::XYMotionPad()
 {
-    normalizedMotion.add ({ 0.30f, 0.72f }); normalizedMotion.add ({ 0.46f, 0.62f });
-    normalizedMotion.add ({ 0.58f, 0.45f }); normalizedMotion.add ({ 0.78f, 0.20f });
 }
 juce::Rectangle<float> XYMotionPad::padBounds() const
 {
@@ -451,6 +455,8 @@ void XYMotionPad::mouseUp (const juce::MouseEvent&)
 
 void ScratchPresetPalette::paint (juce::Graphics& g)
 {
+    if (! showOverlay)
+        return;
     const auto area = juce::Rectangle<int> (14, 32, 333, 257);
     for (int i = 0; i < 9; ++i)
     {
@@ -462,7 +468,7 @@ void ScratchPresetPalette::paint (juce::Graphics& g)
 void ScratchPresetPalette::mouseDown (const juce::MouseEvent& event)
 {
     const auto area = juce::Rectangle<int> (14, 32, 333, 257);
-    for (int i = 0; i < 9; ++i) if (gridCell (area, i % 3, i / 3, 3, 3, 3).contains (event.getPosition())) { selectedPreset = i; repaint(); if (onPresetSelected) onPresetSelected (i); return; }
+    for (int i = 0; i < 9; ++i) if (gridCell (area, i % 3, i / 3, 3, 3, 3).contains (event.getPosition())) { selectedPreset = i; showOverlay = true; repaint(); if (onPresetSelected) onPresetSelected (i); return; }
 }
 
 CountParameterPanel::CountParameterPanel (ToyotomiHideyoshiAudioProcessor& p) : processor (p) {}
@@ -472,6 +478,8 @@ juce::Rectangle<float> CountParameterPanel::knobBounds (int index) const
 }
 void CountParameterPanel::paint (juce::Graphics& g)
 {
+    if (! showLiveValues)
+        return;
     const auto ui = processor.getStateModel().getUiState();
     const auto& count = processor.getStateModel().getCount (ui.selectedBar, ui.selectedCount);
     const auto lengths = juce::Rectangle<int> (12, 72, 248, 32);
@@ -507,8 +515,8 @@ void CountParameterPanel::updateKnob (int index, float delta)
 void CountParameterPanel::mouseDown (const juce::MouseEvent& event)
 {
     const auto lengths = juce::Rectangle<int> (12, 72, 248, 32);
-    if (lengths.contains (event.getPosition())) { if (onLengthSelected) onLengthSelected (juce::jlimit (0, 4, (event.x - lengths.getX()) * 5 / juce::jmax (1, lengths.getWidth()))); repaint(); return; }
-    for (int i = 0; i < 3; ++i) if (knobBounds (i).contains (event.position)) { activeKnob = i; dragStartY = event.position.y; return; }
+    if (lengths.contains (event.getPosition())) { showLiveValues = true; if (onLengthSelected) onLengthSelected (juce::jlimit (0, 4, (event.x - lengths.getX()) * 5 / juce::jmax (1, lengths.getWidth()))); repaint(); return; }
+    for (int i = 0; i < 3; ++i) if (knobBounds (i).contains (event.position)) { showLiveValues = true; activeKnob = i; dragStartY = event.position.y; repaint(); return; }
 }
 void CountParameterPanel::mouseDoubleClick (const juce::MouseEvent& event)
 {

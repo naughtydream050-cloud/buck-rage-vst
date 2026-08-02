@@ -33,19 +33,19 @@ int main()
     passed &= require (bounds.getWidth() == 1280 && bounds.getHeight() == 853, "editor-size");
 
     UiSpec uiSpec;
-    passed &= require (uiSpec.getRegion ("barTabs") == juce::Rectangle<int> (324, 91, 540, 36)
-                       && uiSpec.getRegion ("barMap") == juce::Rectangle<int> (319, 128, 577, 277),
+    passed &= require (uiSpec.getRegion ("barTabs") == juce::Rectangle<int> (317, 99, 542, 35)
+                       && uiSpec.getRegion ("barMap") == juce::Rectangle<int> (316, 143, 608, 266),
                        "bar-ui-reference-regions");
     passed &= require (uiSpec.scaledBounds (uiSpec.getRegion ("barTabs"), { 0, 0, 960, 640 })
                            == uiSpec.getRegion ("barTabs"),
                        "fixed-canvas-never-scales-hit-regions");
 
     BarTabComponent tabs;
-    tabs.setSize (540, 36);
+    tabs.setSize (542, 35);
     for (int tab = 0; tab < 4; ++tab)
     {
         tabs.setSelectedPage (tab);
-        auto tabImage = juce::Image (juce::Image::ARGB, 540, 36, true);
+        auto tabImage = juce::Image (juce::Image::ARGB, 542, 35, true);
         juce::Graphics tabGraphics (tabImage);
         tabs.paintEntireComponent (tabGraphics, true);
         passed &= require (tabImage.isValid(), ("tab-strip-native-" + juce::String (tab)).toRawUTF8());
@@ -64,12 +64,12 @@ int main()
         { 3, 63, 48, "bar-map-render-05-selected-64-playing-49.png" }
     }};
     BarMapComponent barMap;
-    barMap.setSize (577, 277);
+    barMap.setSize (608, 266);
     passed &= require (barMap.hasReferenceCellBounds(), "bar-map-16-reference-cell-bounds");
     for (const auto& [tab, selectedBar, playingBar, filename] : barMapStates)
     {
         barMap.setDisplayState (tab, selectedBar, playingBar);
-        auto barMapImage = juce::Image (juce::Image::ARGB, 577, 277, true);
+        auto barMapImage = juce::Image (juce::Image::ARGB, 608, 266, true);
         juce::Graphics barMapGraphics (barMapImage);
         barMap.paintEntireComponent (barMapGraphics, true);
         bool cellsAreClipped = true;
@@ -78,7 +78,7 @@ int main()
             {
                 bool inCell = false;
                 for (int i = 0; i < 16; ++i)
-                    inCell = inCell || juce::Rectangle<int> (9 + (i % 8) * 70, 32 + (i / 8) * 100, 66, 96).contains (x, y);
+                    inCell = inCell || juce::Rectangle<int> (6 + (i % 8) * 75, 32 + (i / 8) * 97, 71, 92).contains (x, y);
                 if (! inCell && barMapImage.getPixelAt (x, y).getAlpha() != 0)
                     cellsAreClipped = false;
             }

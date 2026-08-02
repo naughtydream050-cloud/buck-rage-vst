@@ -121,6 +121,7 @@ private:
     void selectCount (int number);
     std::array<CountCellComponent, 16> cells;
     int selectedCount = 5;
+    bool showOverlay = false;
 };
 
 class XYMotionPad final : public juce::Component
@@ -152,6 +153,7 @@ public:
 
 private:
     int selectedPreset = 2;
+    bool showOverlay = false;
 };
 
 class CountParameterPanel final : public juce::Component
@@ -172,6 +174,7 @@ private:
     ToyotomiHideyoshiAudioProcessor& processor;
     int activeKnob = -1;
     float dragStartY = 0.0f;
+    bool showLiveValues = false;
 };
 
 class OutputMeterComponent final : public juce::Component,
