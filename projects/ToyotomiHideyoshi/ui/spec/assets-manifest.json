@@ -1,12 +1,12 @@
 {
   "schemaVersion": 2,
-  "reference": "Resources/reference_ui.jpg",
+  "reference": "Resources/ui-decomposition-board.jpg",
   "decompositionBoard": "Resources/ui-decomposition-board.jpg",
   "canvas": [1280, 853],
   "implementation": "reference-image cutouts with transparent hit regions",
   "faceplate": {
-    "path": "Resources/reference_ui.jpg",
-    "role": "1280x853 visual baseline; dynamic state assets are placed at native pixel bounds"
+    "path": "Resources/static_faceplate_ssot.png",
+    "role": "static-only 1280x853 faceplate; all interactive panel content is supplied by native-size component assets"
   },
   "cutouts": [
     { "id": "tabNormalFrame", "path": "Resources/ui-cuts/tab_normal_frame.png", "source": [461, 91, 133, 36], "role": "normal tab frame" },
@@ -28,4 +28,3 @@
   ],
   "dynamicOnly": ["state frame selection", "knob pointer rotation", "parameter values", "XY path", "meter strip clip", "host values"]
 }
-

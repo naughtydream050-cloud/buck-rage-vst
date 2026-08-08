@@ -19,6 +19,21 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Record authoritative source snapshot
+        shell: pwsh
+        run: |
+          $repoPath = (Get-Location).Path
+          $projectPath = (Resolve-Path -LiteralPath 'projects/ToyotomiHideyoshi').Path
+          $head = git rev-parse HEAD
+          $status = (git status --short | Out-String).Trim()
+          @(
+            "REPOSITORY_PATH=$repoPath"
+            "PROJECT_PATH=$projectPath"
+            "SOURCE_HEAD=$head"
+            "GIT_STATUS=$status"
+          ) | Set-Content -LiteralPath SOURCE_HEAD.txt -Encoding utf8
+          Get-Content SOURCE_HEAD.txt
+
       - name: Print CMake and MSVC versions
         shell: pwsh
         run: |
@@ -112,6 +127,8 @@ jobs:
             toyotomi-state-tests.log
             toyotomi-runtime-smoke.log
             bar-map-render-*.png
+            toyotomi-editor-*.png
+            SOURCE_HEAD.txt
           if-no-files-found: error
 
       - name: Verify VST3 bundle
@@ -133,7 +150,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ToyotomiHideyoshi-Windows-VST3
-          path: build-toyotomi-hideyoshi/**/*.vst3
+          path: |
+            build-toyotomi-hideyoshi/**/*.vst3
+            SOURCE_HEAD.txt
           if-no-files-found: error
 
       - name: Aggregate BAR MAP validation

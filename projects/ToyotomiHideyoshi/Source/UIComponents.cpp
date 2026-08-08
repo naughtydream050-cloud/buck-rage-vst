@@ -26,6 +26,14 @@ juce::Image loadAsset (const void* data, int size)
 const juce::Image& imageFor (const juce::String& id)
 {
 #if TOYOTOMI_HAS_BINARY_DATA
+    if (id == "topBarDefault")    { static const auto image = loadAsset (BinaryData::top_bar_default_png, BinaryData::top_bar_default_pngSize); return image; }
+    if (id == "bottomDefault")    { static const auto image = loadAsset (BinaryData::bottom_status_default_png, BinaryData::bottom_status_default_pngSize); return image; }
+    if (id == "barMapDefault")    { static const auto image = loadAsset (BinaryData::bar_map_default_png, BinaryData::bar_map_default_pngSize); return image; }
+    if (id == "countGridDefault") { static const auto image = loadAsset (BinaryData::count_grid_default_png, BinaryData::count_grid_default_pngSize); return image; }
+    if (id == "presetDefault")    { static const auto image = loadAsset (BinaryData::preset_palette_default_png, BinaryData::preset_palette_default_pngSize); return image; }
+    if (id == "parametersDefault"){ static const auto image = loadAsset (BinaryData::parameter_panel_default_png, BinaryData::parameter_panel_default_pngSize); return image; }
+    if (id == "meterDefault")     { static const auto image = loadAsset (BinaryData::output_meter_default_png, BinaryData::output_meter_default_pngSize); return image; }
+    if (id == "xyDefault")        { static const auto image = loadAsset (BinaryData::xy_pad_default_png, BinaryData::xy_pad_default_pngSize); return image; }
     if (id == "tabNormal")       { static const auto image = loadAsset (BinaryData::tab_normal_frame_png, BinaryData::tab_normal_frame_pngSize); return image; }
     if (id == "tabSelected")     { static const auto image = loadAsset (BinaryData::tab_selected_fill_png, BinaryData::tab_selected_fill_pngSize); return image; }
     if (id == "tabStrip1")       { static const auto image = loadAsset (BinaryData::tab_strip_selected_1_16_png, BinaryData::tab_strip_selected_1_16_pngSize); return image; }
@@ -217,7 +225,7 @@ void TopBarComponent::timerCallback()
     denominator = processor.getTimeSignatureDenominator();
     hostSync = processor.getHostSyncAvailable();
 }
-void TopBarComponent::paint (juce::Graphics&) {}
+void TopBarComponent::paint (juce::Graphics& g) { drawFrame (g, "topBarDefault", getLocalBounds()); }
 void TopBarComponent::mouseDown (const juce::MouseEvent& event)
 {
     const auto bypass = juce::Rectangle<int> (getWidth() - juce::roundToInt (98.0f * getWidth() / 1270.0f),
@@ -346,7 +354,7 @@ void BarMapComponent::refreshCells()
         cells[static_cast<size_t> (i)].configure (globalBar, globalBar == selectedBar, globalBar == playingBar);
     }
 }
-void BarMapComponent::paint (juce::Graphics&) {}
+void BarMapComponent::paint (juce::Graphics& g) { drawFrame (g, "barMapDefault", getLocalBounds()); }
 void BarMapComponent::resized()
 {
     for (int i = 0; i < 16; ++i)
@@ -391,12 +399,16 @@ void CountGridComponent::selectCount (int number)
     setSelectedCount (number - 1);
     if (onSelectedCount) onSelectedCount (number - 1);
 }
-void CountGridComponent::paint (juce::Graphics&) {}
+void CountGridComponent::paint (juce::Graphics& g) { drawFrame (g, "countGridDefault", getLocalBounds()); }
 void CountGridComponent::resized()
 {
-    const auto area = getLocalBounds().withTrimmedTop (28).withTrimmedBottom (35).reduced (15, 0);
+    // Authored cell assets are final 117 x 72 pixels. Keep input and image
+    // bounds identical on the fixed 1280 x 853 canvas.
+    const auto area = juce::Rectangle<int> (12, 12, 480, 300);
     for (int i = 0; i < 16; ++i)
-        cells[static_cast<size_t> (i)].setBounds (gridCell (area, i % 4, i / 4, 4, 4, 3));
+        cells[static_cast<size_t> (i)].setBounds (area.getX() + (i % 4) * 121,
+                                                   area.getY() + (i / 4) * 76,
+                                                   117, 72);
 }
 
 XYMotionPad::XYMotionPad()
@@ -408,6 +420,7 @@ juce::Rectangle<float> XYMotionPad::padBounds() const
 }
 void XYMotionPad::paint (juce::Graphics& g)
 {
+    drawFrame (g, "xyDefault", getLocalBounds());
     const auto pad = padBounds();
     g.saveState(); g.reduceClipRegion (pad.toNearestInt());
     juce::Path motion;
@@ -455,6 +468,7 @@ void XYMotionPad::mouseUp (const juce::MouseEvent&)
 
 void ScratchPresetPalette::paint (juce::Graphics& g)
 {
+    drawFrame (g, "presetDefault", getLocalBounds());
     if (! showOverlay)
         return;
     const auto area = juce::Rectangle<int> (14, 32, 333, 257);
@@ -478,6 +492,7 @@ juce::Rectangle<float> CountParameterPanel::knobBounds (int index) const
 }
 void CountParameterPanel::paint (juce::Graphics& g)
 {
+    drawFrame (g, "parametersDefault", getLocalBounds());
     if (! showLiveValues)
         return;
     const auto ui = processor.getStateModel().getUiState();
@@ -548,6 +563,7 @@ void OutputMeterComponent::timerCallback()
 }
 void OutputMeterComponent::paint (juce::Graphics& g)
 {
+    drawFrame (g, "meterDefault", getLocalBounds());
     const auto left = juce::Rectangle<int> (40, 61, 15, 255);
     const auto right = juce::Rectangle<int> (84, 61, 15, 255);
     const auto drawChannel = [&] (juce::Rectangle<int> track, float level, float peak)
@@ -560,4 +576,4 @@ void OutputMeterComponent::paint (juce::Graphics& g)
     drawChannel (left, leftDb, leftPeakDb); drawChannel (right, rightDb, rightPeakDb);
 }
 
-void BottomStatusBar::paint (juce::Graphics&) {}
+void BottomStatusBar::paint (juce::Graphics& g) { drawFrame (g, "bottomDefault", getLocalBounds()); }

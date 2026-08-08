@@ -1,0 +1,246 @@
+{
+  "reference": "Resources/reference_ui.jpg",
+  "canvas": [
+    1280,
+    853
+  ],
+  "states": [
+    "bar_cell_normal.png",
+    "bar_cell_selected.png",
+    "bar_cell_playing.png",
+    "bar_cell_selected_and_playing.png"
+  ],
+  "labelDirectory": "Resources/ui-bar-map-preview/bar-labels",
+  "cells": [
+    {
+      "cell": 1,
+      "x": 328,
+      "y": 160,
+      "width": 66,
+      "height": 96,
+      "clickBounds": [
+        328,
+        160,
+        66,
+        96
+      ]
+    },
+    {
+      "cell": 2,
+      "x": 398,
+      "y": 160,
+      "width": 66,
+      "height": 96,
+      "clickBounds": [
+        398,
+        160,
+        66,
+        96
+      ]
+    },
+    {
+      "cell": 3,
+      "x": 468,
+      "y": 160,
+      "width": 66,
+      "height": 96,
+      "clickBounds": [
+        468,
+        160,
+        66,
+        96
+      ]
+    },
+    {
+      "cell": 4,
+      "x": 538,
+      "y": 160,
+      "width": 66,
+      "height": 96,
+      "clickBounds": [
+        538,
+        160,
+        66,
+        96
+      ]
+    },
+    {
+      "cell": 5,
+      "x": 608,
+      "y": 160,
+      "width": 66,
+      "height": 96,
+      "clickBounds": [
+        608,
+        160,
+        66,
+        96
+      ]
+    },
+    {
+      "cell": 6,
+      "x": 678,
+      "y": 160,
+      "width": 66,
+      "height": 96,
+      "clickBounds": [
+        678,
+        160,
+        66,
+        96
+      ]
+    },
+    {
+      "cell": 7,
+      "x": 748,
+      "y": 160,
+      "width": 66,
+      "height": 96,
+      "clickBounds": [
+        748,
+        160,
+        66,
+        96
+      ]
+    },
+    {
+      "cell": 8,
+      "x": 818,
+      "y": 160,
+      "width": 66,
+      "height": 96,
+      "clickBounds": [
+        818,
+        160,
+        66,
+        96
+      ]
+    },
+    {
+      "cell": 9,
+      "x": 328,
+      "y": 260,
+      "width": 66,
+      "height": 96,
+      "clickBounds": [
+        328,
+        260,
+        66,
+        96
+      ]
+    },
+    {
+      "cell": 10,
+      "x": 398,
+      "y": 260,
+      "width": 66,
+      "height": 96,
+      "clickBounds": [
+        398,
+        260,
+        66,
+        96
+      ]
+    },
+    {
+      "cell": 11,
+      "x": 468,
+      "y": 260,
+      "width": 66,
+      "height": 96,
+      "clickBounds": [
+        468,
+        260,
+        66,
+        96
+      ]
+    },
+    {
+      "cell": 12,
+      "x": 538,
+      "y": 260,
+      "width": 66,
+      "height": 96,
+      "clickBounds": [
+        538,
+        260,
+        66,
+        96
+      ]
+    },
+    {
+      "cell": 13,
+      "x": 608,
+      "y": 260,
+      "width": 66,
+      "height": 96,
+      "clickBounds": [
+        608,
+        260,
+        66,
+        96
+      ]
+    },
+    {
+      "cell": 14,
+      "x": 678,
+      "y": 260,
+      "width": 66,
+      "height": 96,
+      "clickBounds": [
+        678,
+        260,
+        66,
+        96
+      ]
+    },
+    {
+      "cell": 15,
+      "x": 748,
+      "y": 260,
+      "width": 66,
+      "height": 96,
+      "clickBounds": [
+        748,
+        260,
+        66,
+        96
+      ]
+    },
+    {
+      "cell": 16,
+      "x": 818,
+      "y": 260,
+      "width": 66,
+      "height": 96,
+      "clickBounds": [
+        818,
+        260,
+        66,
+        96
+      ]
+    }
+  ],
+  "previewOutsideCellDiff": {
+    "preview_01_selected_11_playing_06.png": {
+      "outsideCellDifferencePixels": 0,
+      "outsideCellMaxRgbDelta": 0
+    },
+    "preview_02_selected_playing_06.png": {
+      "outsideCellDifferencePixels": 0,
+      "outsideCellMaxRgbDelta": 0
+    },
+    "preview_03_tab_17_32_selected_21_playing_30.png": {
+      "outsideCellDifferencePixels": 0,
+      "outsideCellMaxRgbDelta": 0
+    },
+    "preview_04_tab_33_48_selected_40_playing_outside.png": {
+      "outsideCellDifferencePixels": 0,
+      "outsideCellMaxRgbDelta": 0
+    },
+    "preview_05_tab_49_64_selected_64_playing_49.png": {
+      "outsideCellDifferencePixels": 0,
+      "outsideCellMaxRgbDelta": 0
+    }
+  }
+}

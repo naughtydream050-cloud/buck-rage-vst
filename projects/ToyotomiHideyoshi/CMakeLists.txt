@@ -31,7 +31,16 @@ juce_generate_juce_header(ToyotomiHideyoshi)
 
 juce_add_binary_data(ToyotomiHideyoshiAssets
     SOURCES
-        Resources/reference_ui.jpg
+        Resources/static_faceplate_ssot.png
+        Resources/ui-final/top_bar_default.png
+        Resources/ui-final/bottom_status_default.png
+        Resources/ui-final/bar_tabs_default.png
+        Resources/ui-final/bar_map_default.png
+        Resources/ui-final/count_grid_default.png
+        Resources/ui-final/preset_palette_default.png
+        Resources/ui-final/parameter_panel_default.png
+        Resources/ui-final/output_meter_default.png
+        Resources/ui-final/xy_pad_default.png
         Resources/ui/knob_ring_67.png
         Resources/ui/knob_pointer.png
         Resources/ui-cuts/bar_normal_frame.png

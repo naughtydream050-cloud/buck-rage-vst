@@ -56,6 +56,26 @@ int main()
     editor->paintEntireComponent (graphics, true);
     passed &= require (image.isValid(), "editor-painted");
 
+    const auto writePng = [] (const juce::Image& source, const juce::String& name)
+    {
+        const auto output = juce::File::getCurrentWorkingDirectory().getChildFile (name);
+        juce::FileOutputStream stream (output);
+        return stream.openedOk() && juce::PNGImageFormat().writeImageToStream (source, stream);
+    };
+    passed &= require (writePng (image, "toyotomi-editor-full.png"), "editor-full-preview");
+
+    const std::array<std::pair<juce::Rectangle<int>, const char*>, 4> editorCrops {{
+        { { 317,  99, 542,  35 }, "toyotomi-editor-bar-tabs.png" },
+        { { 316, 143, 608, 266 }, "toyotomi-editor-bar-map.png" },
+        { { 332, 432, 512, 360 }, "toyotomi-editor-count-grid.png" },
+        { { 866, 465, 251, 327 }, "toyotomi-editor-knob-panel.png" }
+    }};
+    for (const auto& [crop, name] : editorCrops)
+    {
+        auto cropImage = image.getClippedImage (crop);
+        passed &= require (writePng (cropImage, name), name);
+    }
+
     const std::array<std::tuple<int, int, int, const char*>, 5> barMapStates {{
         { 0, 10,  5, "bar-map-render-01-selected-11-playing-06.png" },
         { 0,  5,  5, "bar-map-render-02-selected-playing-06.png" },
