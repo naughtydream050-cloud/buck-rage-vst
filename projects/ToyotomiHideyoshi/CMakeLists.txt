@@ -24,6 +24,10 @@ juce_add_plugin(ToyotomiHideyoshi
     VST3_CATEGORIES Fx
     PRODUCT_NAME "Toyotomi Hideyoshi"
     BUNDLE_ID "com.razorfacecompany.toyotomihideyoshi"
+    # The JUCE 7 manifest helper must load the freshly-linked VST3.  Keep that
+    # scan out of this build step; bundle validation and the runtime smoke test
+    # are the authoritative checks in this CI workflow.
+    VST3_AUTO_MANIFEST FALSE
     COPY_PLUGIN_AFTER_BUILD FALSE
 )
 
