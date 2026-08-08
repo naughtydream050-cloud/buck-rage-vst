@@ -33,7 +33,7 @@ int main()
     passed &= require (bounds.getWidth() == 1280 && bounds.getHeight() == 853, "editor-size");
 
     UiSpec uiSpec;
-    passed &= require (uiSpec.getRegion ("barTabs") == juce::Rectangle<int> (317, 99, 542, 35)
+    passed &= require (uiSpec.getRegion ("barTabs") == juce::Rectangle<int> (317, 99, 542, 34)
                        && uiSpec.getRegion ("barMap") == juce::Rectangle<int> (316, 143, 608, 266),
                        "bar-ui-reference-regions");
     passed &= require (uiSpec.scaledBounds (uiSpec.getRegion ("barTabs"), { 0, 0, 960, 640 })
@@ -41,11 +41,11 @@ int main()
                        "fixed-canvas-never-scales-hit-regions");
 
     BarTabComponent tabs;
-    tabs.setSize (542, 35);
+    tabs.setSize (542, 34);
     for (int tab = 0; tab < 4; ++tab)
     {
         tabs.setSelectedPage (tab);
-        auto tabImage = juce::Image (juce::Image::ARGB, 542, 35, true);
+        auto tabImage = juce::Image (juce::Image::ARGB, 542, 34, true);
         juce::Graphics tabGraphics (tabImage);
         tabs.paintEntireComponent (tabGraphics, true);
         passed &= require (tabImage.isValid(), ("tab-strip-native-" + juce::String (tab)).toRawUTF8());
@@ -65,7 +65,7 @@ int main()
     passed &= require (writePng (image, "toyotomi-editor-full.png"), "editor-full-preview");
 
     const std::array<std::pair<juce::Rectangle<int>, const char*>, 4> editorCrops {{
-        { { 317,  99, 542,  35 }, "toyotomi-editor-bar-tabs.png" },
+        { { 317,  99, 542,  34 }, "toyotomi-editor-bar-tabs.png" },
         { { 316, 143, 608, 266 }, "toyotomi-editor-bar-map.png" },
         { { 332, 432, 512, 360 }, "toyotomi-editor-count-grid.png" },
         { { 866, 465, 251, 327 }, "toyotomi-editor-knob-panel.png" }

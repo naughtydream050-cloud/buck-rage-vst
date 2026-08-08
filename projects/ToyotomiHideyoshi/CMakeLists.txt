@@ -29,110 +29,26 @@ juce_add_plugin(ToyotomiHideyoshi
 
 juce_generate_juce_header(ToyotomiHideyoshi)
 
+file (GLOB_RECURSE TOYOTOMI_MASTER_UI_ASSETS CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/bar-labels/*.png"
+    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/bar-cells/*.png"
+    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/count/*.png"
+    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/preset/*.png"
+    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/length/*.png"
+    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/tabs/*.png"
+    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/xy-buttons/*.png"
+    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/knobs/*.png"
+    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/output/*.png")
+
 juce_add_binary_data(ToyotomiHideyoshiAssets
     SOURCES
-        Resources/static_faceplate_ssot.png
-        Resources/ui-final/top_bar_default.png
-        Resources/ui-final/bottom_status_default.png
-        Resources/ui-final/bar_tabs_default.png
-        Resources/ui-final/bar_map_default.png
-        Resources/ui-final/count_grid_default.png
-        Resources/ui-final/preset_palette_default.png
-        Resources/ui-final/parameter_panel_default.png
-        Resources/ui-final/output_meter_default.png
-        Resources/ui-final/xy_pad_default.png
+        Resources/ui-master-default-preview-20260808/previews/A_default_1280x853.png
+        ${TOYOTOMI_MASTER_UI_ASSETS}
         Resources/ui/knob_ring_67.png
         Resources/ui/knob_pointer.png
-        Resources/ui-cuts/bar_normal_frame.png
-        Resources/ui-cuts/bar_selected_frame.png
-        Resources/ui-cuts/bar_playing_frame.png
-        Resources/ui-bar-map/bar_cell_base_normal.png
-        Resources/ui-bar-map/bar_cell_base_selected.png
-        Resources/ui-bar-map/bar_cell_base_playing.png
-        Resources/ui-bar-map/bar_cell_base_selected_and_playing.png
-        Resources/ui-bar-map/bar_playing_badge.png
-        Resources/ui-bar-map/bar-labels/bar_label_01.png
-        Resources/ui-bar-map/bar-labels/bar_label_02.png
-        Resources/ui-bar-map/bar-labels/bar_label_03.png
-        Resources/ui-bar-map/bar-labels/bar_label_04.png
-        Resources/ui-bar-map/bar-labels/bar_label_05.png
-        Resources/ui-bar-map/bar-labels/bar_label_06.png
-        Resources/ui-bar-map/bar-labels/bar_label_07.png
-        Resources/ui-bar-map/bar-labels/bar_label_08.png
-        Resources/ui-bar-map/bar-labels/bar_label_09.png
-        Resources/ui-bar-map/bar-labels/bar_label_10.png
-        Resources/ui-bar-map/bar-labels/bar_label_11.png
-        Resources/ui-bar-map/bar-labels/bar_label_12.png
-        Resources/ui-bar-map/bar-labels/bar_label_13.png
-        Resources/ui-bar-map/bar-labels/bar_label_14.png
-        Resources/ui-bar-map/bar-labels/bar_label_15.png
-        Resources/ui-bar-map/bar-labels/bar_label_16.png
-        Resources/ui-bar-map/bar-labels/bar_label_17.png
-        Resources/ui-bar-map/bar-labels/bar_label_18.png
-        Resources/ui-bar-map/bar-labels/bar_label_19.png
-        Resources/ui-bar-map/bar-labels/bar_label_20.png
-        Resources/ui-bar-map/bar-labels/bar_label_21.png
-        Resources/ui-bar-map/bar-labels/bar_label_22.png
-        Resources/ui-bar-map/bar-labels/bar_label_23.png
-        Resources/ui-bar-map/bar-labels/bar_label_24.png
-        Resources/ui-bar-map/bar-labels/bar_label_25.png
-        Resources/ui-bar-map/bar-labels/bar_label_26.png
-        Resources/ui-bar-map/bar-labels/bar_label_27.png
-        Resources/ui-bar-map/bar-labels/bar_label_28.png
-        Resources/ui-bar-map/bar-labels/bar_label_29.png
-        Resources/ui-bar-map/bar-labels/bar_label_30.png
-        Resources/ui-bar-map/bar-labels/bar_label_31.png
-        Resources/ui-bar-map/bar-labels/bar_label_32.png
-        Resources/ui-bar-map/bar-labels/bar_label_33.png
-        Resources/ui-bar-map/bar-labels/bar_label_34.png
-        Resources/ui-bar-map/bar-labels/bar_label_35.png
-        Resources/ui-bar-map/bar-labels/bar_label_36.png
-        Resources/ui-bar-map/bar-labels/bar_label_37.png
-        Resources/ui-bar-map/bar-labels/bar_label_38.png
-        Resources/ui-bar-map/bar-labels/bar_label_39.png
-        Resources/ui-bar-map/bar-labels/bar_label_40.png
-        Resources/ui-bar-map/bar-labels/bar_label_41.png
-        Resources/ui-bar-map/bar-labels/bar_label_42.png
-        Resources/ui-bar-map/bar-labels/bar_label_43.png
-        Resources/ui-bar-map/bar-labels/bar_label_44.png
-        Resources/ui-bar-map/bar-labels/bar_label_45.png
-        Resources/ui-bar-map/bar-labels/bar_label_46.png
-        Resources/ui-bar-map/bar-labels/bar_label_47.png
-        Resources/ui-bar-map/bar-labels/bar_label_48.png
-        Resources/ui-bar-map/bar-labels/bar_label_49.png
-        Resources/ui-bar-map/bar-labels/bar_label_50.png
-        Resources/ui-bar-map/bar-labels/bar_label_51.png
-        Resources/ui-bar-map/bar-labels/bar_label_52.png
-        Resources/ui-bar-map/bar-labels/bar_label_53.png
-        Resources/ui-bar-map/bar-labels/bar_label_54.png
-        Resources/ui-bar-map/bar-labels/bar_label_55.png
-        Resources/ui-bar-map/bar-labels/bar_label_56.png
-        Resources/ui-bar-map/bar-labels/bar_label_57.png
-        Resources/ui-bar-map/bar-labels/bar_label_58.png
-        Resources/ui-bar-map/bar-labels/bar_label_59.png
-        Resources/ui-bar-map/bar-labels/bar_label_60.png
-        Resources/ui-bar-map/bar-labels/bar_label_61.png
-        Resources/ui-bar-map/bar-labels/bar_label_62.png
-        Resources/ui-bar-map/bar-labels/bar_label_63.png
-        Resources/ui-bar-map/bar-labels/bar_label_64.png
-        Resources/ui-cuts/count_normal_frame.png
-        Resources/ui-cuts/count_selected_frame.png
-        Resources/ui-cuts/preset_normal_frame.png
-        Resources/ui-cuts/preset_selected_frame.png
-        Resources/ui-cuts/length_normal_frame.png
-        Resources/ui-cuts/length_selected_frame.png
-        Resources/ui-cuts/tab_normal_frame.png
-        Resources/ui-cuts/tab_selected_frame.png
-        Resources/ui-cuts/tab_selected_fill.png
-        Resources/ui-tabs-final/tab_strip_selected_1_16.png
-        Resources/ui-tabs-final/tab_strip_selected_17_32.png
-        Resources/ui-tabs-final/tab_strip_selected_33_48.png
-        Resources/ui-tabs-final/tab_strip_selected_49_64.png
-        Resources/ui-cuts/output_meter_reference.png
         Resources/ui-cuts/meter_led_strip.png
-        Resources/ui-cuts/bypass_off.png
         ui/spec/ui-spec.json
-        ui/spec/assets-manifest.json
+        ui/spec/master-default-preview-manifest.json
 )
 
 target_sources(ToyotomiHideyoshi PRIVATE

@@ -1,0 +1,35 @@
+{
+  "status": "preview-only",
+  "masterDefault": "C:/Users/razor/.codex/codex-remote-attachments/019f6a14-1937-79f3-b16e-6f1866c4a3b1/33C9B8B4-1C75-4D95-8691-2C2FD08F1184/1-写真1.jpg",
+  "canvas": [1280, 853],
+  "drawPolicy": "native-size, integer-coordinate, no runtime scale",
+  "output": "Resources/ui-master-default-preview-20260808",
+  "opaqueReplacementAssets": {
+    "tabStrip": { "nativeSize": [542, 34], "drawBounds": [317, 99, 542, 34], "clickBounds": [[317,99,132,34],[452,99,132,34],[589,99,132,34],[727,99,132,34]], "minAlpha": 255 },
+    "barCellShell": { "nativeSize": [72, 94], "drawBounds": "per cell", "minAlpha": 255 },
+    "countCell": { "nativeSize": [117, 72], "drawBounds": [117,72], "clickBounds": [117,72], "minAlpha": 255 },
+    "presetCell": { "nativeSize": [102,79], "drawBounds": [102,79], "clickBounds": [102,79], "minAlpha": 255 },
+    "lengthCell": { "nativeSize": [40,33], "drawBounds": [40,33], "clickBounds": [40,33], "minAlpha": 255 },
+    "xyNeutral": { "nativeSize": [288,256], "drawBounds": [20,534,288,256], "minAlpha": 255 },
+    "clear": { "nativeSize": [73,30], "drawBounds": [35,752,73,30], "minAlpha": 255 },
+    "reset": { "nativeSize": [102,30], "drawBounds": [196,752,102,30], "minAlpha": 255 },
+    "outputNeutral": { "nativeSize": [140,343], "drawBounds": [1127,449,140,343], "minAlpha": 255 }
+  },
+  "stateAssets": {
+    "barLabels": "bar-labels/bar_label_01.png through bar_label_64.png; deterministic composition from MASTER DEFAULT BAR/0-9 real-pixel glyphs",
+    "barCells": "bar-cells/bar_cell_shell_{normal,selected,playing,selected_playing}_72x94.png",
+    "counts": "count/count_01..16_{normal,selected}_117x72.png",
+    "presets": "preset/preset_{off,forward_cut,backspin,chirp,baby,transform,drag,zigzag,tape_brake,custom}_{normal,selected}_*.png",
+    "lengths": "length/length_{1_16,1_8,1_4,1_2,1_bar}_{normal,selected}_40x33.png"
+  },
+  "previews": [
+    "previews/A_default_1280x853.png",
+    "previews/B_bar11_selected_bar6_playing_count5_backspin_length14_1280x853.png",
+    "previews/C_tab17_32_bar21_selected_1280x853.png",
+    "previews/D_tab33_48_bar40_selected_1280x853.png",
+    "previews/E_tab49_64_bar64_selected_1280x853.png"
+  ],
+  "candidateUpdated": false,
+  "binaryDataUpdated": false,
+  "ciRun": null
+}

@@ -60,7 +60,7 @@ juce::Rectangle<int> UiSpec::getRegion (const juce::String& name) const
     struct Region { const char* id; int x, y, w, h; };
     static constexpr Region regions[] {
         { "topBar", 5, 5, 1270, 79 }, { "artwork", 5, 89, 307, 416 },
-        { "barTabs", 317, 99, 542, 35 }, { "barMap", 316, 143, 608, 266 },
+        { "barTabs", 317, 99, 542, 34 }, { "barMap", 316, 143, 608, 266 },
         { "presetPalette", 942, 87, 333, 350 }, { "xyPad", 18, 520, 289, 249 },
         { "countGrid", 332, 432, 512, 360 }, { "countParameters", 866, 465, 251, 327 },
         { "outputMeter", 1126, 449, 140, 343 }, { "bottomStatus", 5, 806, 1270, 42 }

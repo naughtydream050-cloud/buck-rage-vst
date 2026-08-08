@@ -120,8 +120,8 @@ public:
 private:
     void selectCount (int number);
     std::array<CountCellComponent, 16> cells;
-    int selectedCount = 5;
-    bool showOverlay = false;
+    int selectedCount = 1;
+    bool showOverlay = true;
 };
 
 class XYMotionPad final : public juce::Component
@@ -147,13 +147,13 @@ class ScratchPresetPalette final : public juce::Component
 {
 public:
     std::function<void (int)> onPresetSelected;
-    void setSelectedPreset (int preset) { selectedPreset = juce::jlimit (0, 8, preset); repaint(); }
+    void setSelectedPreset (int preset) { selectedPreset = juce::jlimit (0, 9, preset); repaint(); }
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
 
 private:
-    int selectedPreset = 2;
-    bool showOverlay = false;
+    int selectedPreset = 0;
+    bool showOverlay = true;
 };
 
 class CountParameterPanel final : public juce::Component
