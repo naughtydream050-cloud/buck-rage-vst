@@ -396,7 +396,7 @@ void XYMotionPad::mouseUp (const juce::MouseEvent&)
 
 void ScratchPresetPalette::paint (juce::Graphics& g)
 {
-    static constexpr std::array<juce::Rectangle<int>, 10> cells {{
+    static const std::array<juce::Rectangle<int>, 10> cells {{
         { 7, 37, 102, 79 }, { 112, 37, 102, 79 }, { 217, 37, 102, 79 },
         { 7, 120, 102, 79 }, { 112, 120, 102, 79 }, { 217, 120, 102, 79 },
         { 7, 205, 102, 79 }, { 112, 205, 102, 79 }, { 217, 205, 102, 79 },
@@ -407,7 +407,7 @@ void ScratchPresetPalette::paint (juce::Graphics& g)
 }
 void ScratchPresetPalette::mouseDown (const juce::MouseEvent& event)
 {
-    static constexpr std::array<juce::Rectangle<int>, 10> cells {{ { 7,37,102,79 }, {112,37,102,79}, {217,37,102,79}, {7,120,102,79}, {112,120,102,79}, {217,120,102,79}, {7,205,102,79}, {112,205,102,79}, {217,205,102,79}, {7,289,102,55} }};
+    static const std::array<juce::Rectangle<int>, 10> cells {{ { 7,37,102,79 }, {112,37,102,79}, {217,37,102,79}, {7,120,102,79}, {112,120,102,79}, {217,120,102,79}, {7,205,102,79}, {112,205,102,79}, {217,205,102,79}, {7,289,102,55} }};
     for (int i = 0; i < 10; ++i) if (cells[static_cast<size_t> (i)].contains (event.getPosition())) { selectedPreset = i; repaint(); if (onPresetSelected) onPresetSelected (i); return; }
 }
 
@@ -420,7 +420,7 @@ void CountParameterPanel::paint (juce::Graphics& g)
 {
     const auto ui = processor.getStateModel().getUiState();
     const auto& count = processor.getStateModel().getCount (ui.selectedBar, ui.selectedCount);
-    static constexpr std::array<juce::Rectangle<int>, 5> lengths {{ {10,72,40,33}, {55,72,40,33}, {99,72,40,33}, {144,72,40,33}, {192,72,40,33} }};
+    static const std::array<juce::Rectangle<int>, 5> lengths {{ {10,72,40,33}, {55,72,40,33}, {99,72,40,33}, {144,72,40,33}, {192,72,40,33} }};
     for (int i = 0; i < 5; ++i)
         drawImage (g, lengthImage (i, i == static_cast<int> (count.length)), lengths[static_cast<size_t> (i)]);
     const std::array<float, 3> normalized { (count.speed - PluginStateModel::kMinSpeed) / (PluginStateModel::kMaxSpeed - PluginStateModel::kMinSpeed), (count.pitch - PluginStateModel::kMinPitch) / (PluginStateModel::kMaxPitch - PluginStateModel::kMinPitch), count.depth };
@@ -448,7 +448,7 @@ void CountParameterPanel::updateKnob (int index, float delta)
 }
 void CountParameterPanel::mouseDown (const juce::MouseEvent& event)
 {
-    static constexpr std::array<juce::Rectangle<int>, 5> lengths {{ {10,72,40,33}, {55,72,40,33}, {99,72,40,33}, {144,72,40,33}, {192,72,40,33} }};
+    static const std::array<juce::Rectangle<int>, 5> lengths {{ {10,72,40,33}, {55,72,40,33}, {99,72,40,33}, {144,72,40,33}, {192,72,40,33} }};
     for (int i = 0; i < 5; ++i) if (lengths[static_cast<size_t> (i)].contains (event.getPosition())) { if (onLengthSelected) onLengthSelected (i); repaint(); return; }
     for (int i = 0; i < 3; ++i) if (knobBounds (i).contains (event.position)) { showLiveValues = true; activeKnob = i; dragStartY = event.position.y; repaint(); return; }
 }
