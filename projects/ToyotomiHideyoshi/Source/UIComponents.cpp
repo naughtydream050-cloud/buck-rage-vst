@@ -1,5 +1,6 @@
 #include "UIComponents.h"
 #include <cmath>
+#include <iostream>
 
 #if __has_include(<BinaryData.h>)
  #include <BinaryData.h>
@@ -120,13 +121,19 @@ bool validateEmbeddedImageAssets()
     {
         const auto& image = imageFor (id);
         if (! image.isValid() || image.getWidth() <= 0 || image.getHeight() <= 0)
+        {
+            std::cerr << "ASSET_FAIL id=" << id << '\n';
             return false;
+        }
     }
     for (int bar = 0; bar < 64; ++bar)
     {
         const auto& label = barLabelImage (bar);
         if (! label.isValid() || label.getWidth() != 72 || label.getHeight() != 22)
+        {
+            std::cerr << "ASSET_FAIL barLabel=" << (bar + 1) << '\n';
             return false;
+        }
     }
 
     // The approved master-default exports retain their source alpha at a few
@@ -136,13 +143,21 @@ bool validateEmbeddedImageAssets()
     {
         const auto& strip = imageFor (id);
         if (strip.getWidth() != 542 || strip.getHeight() != 34)
+        {
+            std::cerr << "ASSET_DIM_FAIL tab=" << id << ' '
+                      << strip.getWidth() << 'x' << strip.getHeight() << '\n';
             return false;
+        }
     }
     for (const auto* id : { "barBaseNormal", "barBaseSelected", "barBasePlaying", "barBaseSelectedPlaying" })
     {
         const auto& cell = imageFor (id);
         if (cell.getWidth() != 72 || cell.getHeight() != 94)
+        {
+            std::cerr << "ASSET_DIM_FAIL cell=" << id << ' '
+                      << cell.getWidth() << 'x' << cell.getHeight() << '\n';
             return false;
+        }
     }
     return true;
 }
