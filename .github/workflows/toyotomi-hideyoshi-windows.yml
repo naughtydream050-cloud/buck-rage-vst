@@ -170,5 +170,15 @@ jobs:
           $stateExit = '${{ steps.state_tests.outputs.exit_code }}'
           $smokeExit = '${{ steps.runtime_smoke.outputs.exit_code }}'
           if ($stateExit -ne '0' -or $smokeExit -ne '0') {
+            foreach ($entry in @(@{ name = 'StateModelTests'; exit = $stateExit; log = 'toyotomi-state-tests.log' }, @{ name = 'RuntimeSmoke'; exit = $smokeExit; log = 'toyotomi-runtime-smoke.log' })) {
+              if ($entry.exit -ne '0' -and (Test-Path -LiteralPath $entry.log)) {
+                $diagnostic = Get-Content -LiteralPath $entry.log |
+                  Where-Object { $_ -match '(FAIL |error|exception|assert|access violation)' } |
+                  Select-Object -Last 12
+                $summary = (($diagnostic -join ' | ') -replace '::', ':')
+                if ([string]::IsNullOrWhiteSpace($summary)) { $summary = "See $($entry.log) in ToyotomiHideyoshi-test-diagnostics." }
+                Write-Output "::error title=$($entry.name) diagnostic::$summary"
+              }
+            }
             throw "BAR MAP validation failed: StateModelTests=$stateExit RuntimeSmoke=$smokeExit"
           }
