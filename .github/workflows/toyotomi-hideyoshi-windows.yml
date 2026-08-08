@@ -74,7 +74,7 @@ jobs:
           cmake --build build-toyotomi-hideyoshi `
             --config Release `
             --target ToyotomiHideyoshi_VST3 `
-            --parallel --verbose 2>&1 | Tee-Object -FilePath toyotomi-build.log
+            --parallel 1 --verbose 2>&1 | Tee-Object -FilePath toyotomi-build.log
           $buildExit = $LASTEXITCODE
           $ErrorActionPreference = 'Stop'
           $binary = 'build-toyotomi-hideyoshi/ToyotomiHideyoshi_artefacts/Release/VST3/Toyotomi Hideyoshi.vst3/Contents/x86_64-win/Toyotomi Hideyoshi.vst3'
