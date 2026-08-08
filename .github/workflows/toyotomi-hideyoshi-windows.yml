@@ -78,7 +78,15 @@ jobs:
           $buildExit = $LASTEXITCODE
           $ErrorActionPreference = 'Stop'
           $binary = 'build-toyotomi-hideyoshi/ToyotomiHideyoshi_artefacts/Release/VST3/Toyotomi Hideyoshi.vst3/Contents/x86_64-win/Toyotomi Hideyoshi.vst3'
-          if ($buildExit -ne 0) { exit $buildExit }
+          if ($buildExit -ne 0) {
+            $diagnostic = Get-Content -LiteralPath toyotomi-build.log |
+              Where-Object { $_ -match '(: error |fatal error|LNK[0-9]+|FAILED:|error:)' } |
+              Select-Object -Last 8
+            $summary = (($diagnostic -join ' | ') -replace '::', ':')
+            if ([string]::IsNullOrWhiteSpace($summary)) { $summary = 'No compiler diagnostic matched; inspect ToyotomiHideyoshi-build-diagnostics.' }
+            Write-Output "::error title=VST3 build diagnostic::$summary"
+            exit $buildExit
+          }
           if (!(Test-Path -LiteralPath $binary)) { throw "VST3 binary is missing after a successful build: $binary" }
 
       - name: Upload compact build diagnostics
