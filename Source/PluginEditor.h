@@ -1,29 +1,35 @@
 #pragma once
+
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
-#include "KnobLookAndFeel.h"
+#include "UiSpec.h"
+#include "UIComponents.h"
 
-class BuckRageEditor : public juce::AudioProcessorEditor,
-                       private juce::Timer
+class ToyotomiHideyoshiAudioProcessorEditor final : public juce::AudioProcessorEditor
 {
 public:
-    explicit BuckRageEditor(BuckRageProcessor&);
-    ~BuckRageEditor() override;
+    explicit ToyotomiHideyoshiAudioProcessorEditor (ToyotomiHideyoshiAudioProcessor&);
+    ~ToyotomiHideyoshiAudioProcessorEditor() override = default;
 
-    void paint(juce::Graphics&) override;
+    void paint (juce::Graphics&) override;
     void resized() override;
 
 private:
-    void timerCallback() override {}
+    ToyotomiHideyoshiAudioProcessor& processor;
+    UiSpec uiSpec;
+    juce::Image referenceImage;
 
-    BuckRageProcessor& proc;
-    SilverKnobLAF knobLAF;
+    TopBarComponent topBar;
+    ArtworkPanel artwork;
+    BarTabComponent barTabs;
+    BarMapComponent barMap;
+    CountGridComponent countGrid;
+    XYMotionPad xyPad;
+    ScratchPresetPalette presetPalette;
+    CountParameterPanel countParameters;
+    OutputMeterComponent outputMeter;
+    BottomStatusBar bottomStatus;
 
-    juce::Slider buckKnob, rageKnob;
-    using Attach = juce::AudioProcessorValueTreeState::SliderAttachment;
-    Attach buckAttach, rageAttach;
-
-    juce::Image bgImage;
-
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BuckRageEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ToyotomiHideyoshiAudioProcessorEditor)
 };
+

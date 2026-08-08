@@ -1,54 +1,103 @@
 #include "PluginEditor.h"
-#include <BinaryData.h>
 
-BuckRageEditor::BuckRageEditor(BuckRageProcessor& p)
-    : AudioProcessorEditor(&p), proc(p),
-      buckAttach(p.apvts, "buck", buckKnob),
-      rageAttach(p.apvts, "rage", rageKnob)
+#if __has_include(<BinaryData.h>)
+ #include <BinaryData.h>
+ #define TOYOTOMI_HAS_BINARY_DATA 1
+#else
+ #define TOYOTOMI_HAS_BINARY_DATA 0
+#endif
+
+namespace
 {
-    setSize(992, 496);
-
-    {
-        int sz = 0;
-        auto* data = BinaryData::getNamedResource("background_buck_rage_png", sz);
-        if (data)
-            bgImage = juce::ImageCache::getFromMemory(data, sz);
-    }
-
-    for (auto* k : { &buckKnob, &rageKnob })
-    {
-        k->setSliderStyle(juce::Slider::RotaryVerticalDrag);
-        k->setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-        k->setLookAndFeel(&knobLAF);
-        addAndMakeVisible(k);
-    }
-
-    startTimerHz(30);
+juce::Image loadMasterDefault()
+{
+#if TOYOTOMI_HAS_BINARY_DATA
+    int size = 0;
+    const auto* data = BinaryData::getNamedResource ("A_default_1280x853.png", size);
+    return data != nullptr ? juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (size)) : juce::Image {};
+#else
+    return {};
+#endif
+}
 }
 
-BuckRageEditor::~BuckRageEditor()
+ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
+    ToyotomiHideyoshiAudioProcessor& p)
+    : AudioProcessorEditor (&p),
+      processor (p),
+      referenceImage (loadMasterDefault()),
+      topBar (p),
+      artwork (referenceImage),
+      countParameters (p),
+      outputMeter (p)
 {
-    buckKnob.setLookAndFeel(nullptr);
-    rageKnob.setLookAndFeel(nullptr);
+    auto& state = processor.getStateModel();
+    const auto uiState = state.getUiState();
+    barTabs.setSelectedPage (uiState.selectedTab);
+    // Page selection is a view-only choice.  It must never mutate the active
+    // BAR/COUNT slot or any parameter state.
+    barMap.setDisplayState (uiState.selectedTab, uiState.selectedBar, -1);
+    countGrid.setSelectedCount (uiState.selectedCount);
+    presetPalette.setSelectedPreset (static_cast<int> (state.getCount (uiState.selectedBar, uiState.selectedCount).preset));
+    barTabs.onSelectedPage = [this, &state] (int page)
+    {
+        state.selectTab (page);
+        const auto ui = state.getUiState();
+        barMap.setDisplayState (ui.selectedTab, ui.selectedBar, -1);
+    };
+    barMap.onSelectedBar = [this, &state] (int bar)
+    {
+        state.selectBar (bar);
+        const auto ui = state.getUiState();
+        barMap.setDisplayState (ui.selectedTab, ui.selectedBar, -1);
+    };
+    countGrid.onSelectedCount = [&state] (int count) { state.selectCount (count); };
+    presetPalette.onPresetSelected = [&state] (int preset) { state.setSelectedPreset ((PluginStateModel::ScratchPreset) preset); };
+    countParameters.onLengthSelected = [&state] (int length) { state.setSelectedLength ((PluginStateModel::NoteLength) length); };
+    xyPad.onMotionChanged = [&state] (const std::vector<PluginStateModel::MotionPoint>& motion) { state.setSelectedMotion (motion); };
+    xyPad.onClearMotion = [&state] { state.clearSelectedMotion(); };
+    xyPad.onResetCount = [&state] { const auto ui = state.getUiState(); state.resetCountSlot (ui.selectedBar, ui.selectedCount); };
+    for (auto* component : std::array<juce::Component*, 10> {
+             &topBar, &artwork, &barTabs, &barMap, &countGrid,
+             &xyPad, &presetPalette, &countParameters, &outputMeter, &bottomStatus })
+    {
+        addAndMakeVisible (*component);
+
+        component->setAlpha (1.0f);
+    }
+
+    artwork.toBack();
+    topBar.toFront (false); barTabs.toFront (false); barMap.toFront (false);
+    countGrid.toFront (false); xyPad.toFront (false); presetPalette.toFront (false);
+    countParameters.toFront (false); outputMeter.toFront (false); bottomStatus.toFront (false);
+
+    setOpaque (true);
+    // Image cutouts are authored at native pixels.  A fitted/scaled editor
+    // makes visual and hit-test geometry diverge in FL Studio.
+    setResizable (false, false);
+    setSize (uiSpec.getCanvasWidth(), uiSpec.getCanvasHeight());
 }
 
-void BuckRageEditor::resized()
+void ToyotomiHideyoshiAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    buckKnob.setBounds(98,  163, 155, 155);
-    rageKnob.setBounds(738, 163, 155, 155);
+    if (referenceImage.isValid())
+    {
+        g.drawImageAt (referenceImage, 0, 0);
+    }
 }
 
-void BuckRageEditor::paint(juce::Graphics& g)
+void ToyotomiHideyoshiAudioProcessorEditor::resized()
 {
-    if (bgImage.isValid())
-    {
-        g.drawImageAt(bgImage, 0, 0);
-    }
-    else
-    {
-        g.fillAll(juce::Colour(0xff0a0a0a));
-        g.setColour(juce::Colours::red);
-        g.setFont(14.f);
-        g.drawText("BinaryData load failed", getLocalBounds(), juce::Justification::centred);
-    }
+    const auto viewport = getLocalBounds();
+    topBar.setBounds          (uiSpec.scaleRegion ("topBar", viewport));
+    artwork.setBounds         (uiSpec.scaleRegion ("artwork", viewport));
+    barTabs.setBounds         (uiSpec.scaleRegion ("barTabs", viewport));
+    barMap.setBounds          (uiSpec.scaleRegion ("barMap", viewport));
+    countGrid.setBounds       (uiSpec.scaleRegion ("countGrid", viewport));
+    xyPad.setBounds           (uiSpec.scaleRegion ("xyPad", viewport));
+    presetPalette.setBounds   (uiSpec.scaleRegion ("presetPalette", viewport));
+    countParameters.setBounds (uiSpec.scaleRegion ("countParameters", viewport));
+    outputMeter.setBounds     (uiSpec.scaleRegion ("outputMeter", viewport));
+    bottomStatus.setBounds    (uiSpec.scaleRegion ("bottomStatus", viewport));
+
 }

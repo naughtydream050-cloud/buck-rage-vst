@@ -1,63 +1,10 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-
-juce::AudioProcessorValueTreeState::ParameterLayout BuckRageProcessor::createLayout()
-{
-    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "buck", "Distortion/Drive", 0.f, 1.f, 0.3f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "rage", "Pitch Mod/Expression", 0.f, 1.f, 0.0f));
-    return { params.begin(), params.end() };
-}
-
-BuckRageProcessor::BuckRageProcessor()
-    : AudioProcessor(BusesProperties()
-        .withInput("Input", juce::AudioChannelSet::stereo(), true)
-        .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts(*this, nullptr, "STATE", createLayout())
-{}
-
-void BuckRageProcessor::prepareToPlay(double sr, int)
-{
-    sampleRate_ = sr;
-    lfoPhase = 0.f;
-    lpfZ[0] = lpfZ[1] = 0.f;
-}
-
-void BuckRageProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
-{
-    const float buck = *apvts.getRawParameterValue("buck");
-    const float rage = *apvts.getRawParameterValue("rage");
-    const float drive = 0.5f + buck * 2.5f;
-    const float lfoFreq = 0.5f + rage * 8.f;
-    const float lfoDepth = rage * 0.004f;
-    const float alpha = 0.05f;
-    const float lfoInc = juce::MathConstants<float>::twoPi * lfoFreq / (float)sampleRate_;
-
-    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
-    {
-        auto* data = buffer.getWritePointer(ch);
-        float phase = lfoPhase;
-        for (int i = 0; i < buffer.getNumSamples(); ++i)
-        {
-            float x = data[i];
-            x *= (1.f + lfoDepth * std::sin(phase));
-            if (ch == 0) phase += lfoInc;
-            x = asymSat(x, drive);
-            lpfZ[ch] += alpha * (x - lpfZ[ch]);
-            data[i] = lpfZ[ch];
-        }
-    }
-    lfoPhase = std::fmod(lfoPhase + lfoInc * buffer.getNumSamples(), juce::MathConstants<float>::twoPi);
-}
-
-void BuckRageProcessor::getStateInformation(juce::MemoryBlock& d)
-{ if (auto xml = apvts.copyState().createXml()) copyXmlToBinary(*xml, d); }
-
-void BuckRageProcessor::setStateInformation(const void* d, int s)
-{ if (auto xml = getXmlFromBinary(d, s)) apvts.replaceState(juce::ValueTree::fromXml(*xml)); }
-
-juce::AudioProcessorEditor* BuckRageProcessor::createEditor() { return new BuckRageEditor(*this); }
-
-juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new BuckRageProcessor(); }
+ToyotomiHideyoshiAudioProcessor::ToyotomiHideyoshiAudioProcessor():AudioProcessor(BusesProperties().withInput("Input",juce::AudioChannelSet::stereo(),true).withOutput("Output",juce::AudioChannelSet::stereo(),true)){}
+void ToyotomiHideyoshiAudioProcessor::prepareToPlay(double,int){} void ToyotomiHideyoshiAudioProcessor::releaseResources(){}
+void ToyotomiHideyoshiAudioProcessor::getStateInformation(juce::MemoryBlock& d){if(auto x=stateModel.toValueTree().createXml())copyXmlToBinary(*x,d);} void ToyotomiHideyoshiAudioProcessor::setStateInformation(const void*d,int s){if(auto x=getXmlFromBinary(d,s))stateModel.fromValueTree(juce::ValueTree::fromXml(*x));}
+bool ToyotomiHideyoshiAudioProcessor::isBusesLayoutSupported(const BusesLayout& l)const{auto o=l.getMainOutputChannelSet();return(o==juce::AudioChannelSet::mono()||o==juce::AudioChannelSet::stereo())&&o==l.getMainInputChannelSet();}
+void ToyotomiHideyoshiAudioProcessor::publishPeak(std::atomic<float>&d,float v)noexcept{auto c=d.load();while(v>c&&!d.compare_exchange_weak(c,v)){}}
+void ToyotomiHideyoshiAudioProcessor::processBlock(juce::AudioBuffer<float>& b,juce::MidiBuffer&){juce::ScopedNoDenormals n;for(int c=getTotalNumInputChannels();c<getTotalNumOutputChannels();++c)b.clear(c,0,b.getNumSamples());if(b.getNumChannels()>0)publishPeak(outputPeakLeft,b.getMagnitude(0,0,b.getNumSamples()));if(b.getNumChannels()>1)publishPeak(outputPeakRight,b.getMagnitude(1,0,b.getNumSamples()));bool read=false;if(auto*p=getPlayHead())if(auto pos=p->getPosition()){read=true;hostPlaying.store(pos->getIsPlaying());if(auto bpm=pos->getBpm())hostBpm.store(*bpm);if(auto t=pos->getTimeSignature()){timeSignatureNumerator.store(t->numerator);timeSignatureDenominator.store(t->denominator);}}hostSyncAvailable.store(read);}
+float ToyotomiHideyoshiAudioProcessor::consumeOutputPeak(int c)noexcept{return(c==0?outputPeakLeft:outputPeakRight).exchange(0.0f);}
+juce::AudioProcessorEditor* ToyotomiHideyoshiAudioProcessor::createEditor(){return new ToyotomiHideyoshiAudioProcessorEditor(*this);} juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter(){return new ToyotomiHideyoshiAudioProcessor();}

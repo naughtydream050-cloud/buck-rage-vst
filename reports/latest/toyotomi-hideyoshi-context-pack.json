@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 3,
+  "project": "ToyotomiHideyoshi",
+  "phase": "Phase 1 Windows VST3 candidate review",
+  "ssot": "D:/Development/RAZOR_FACE_COMPANY/01_PLUGINS/projects/ToyotomiHideyoshi",
+  "candidate": "output/fl-candidate/Toyotomi Hideyoshi.vst3",
+  "sourceHead": "a49df568f72da9f63af9f08df666f0b24690703c",
+  "candidateInternalSha256": "F591F0207B58D2B0080CDC9421F530225C41AD950FBEDF11350952C9683F2B2F",
+  "ciRun": 31250870603,
+  "ci": { "configure": "passed", "compileLink": "passed", "stateModelTests": "passed", "runtimeSmoke": "passed" },
+  "hostValidation": "pending user FL Studio test",
+  "nextAction": "User rescans and loads the candidate; final output remains untouched until approval."
+}

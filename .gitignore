@@ -1,0 +1,7 @@
+/.artifact-stage-*/
+/.pre-ssot-backup-*/
+/build*/
+/output/
+/reports/latest/*.log
+/reports/latest/*.zip
+
