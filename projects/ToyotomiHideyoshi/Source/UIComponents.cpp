@@ -22,8 +22,11 @@ juce::Rectangle<int> gridCell (juce::Rectangle<int> area, int column, int row,
 juce::Image loadAsset (const juce::String& filename)
 {
 #if TOYOTOMI_HAS_BINARY_DATA
+    // juce_add_binary_data exposes resource names as C++ identifiers, not
+    // filesystem names (e.g. "tab_strip_selected_1_16_png").
+    const auto resourceName = filename.replaceCharacters (".- ", "___");
     int size = 0;
-    const auto* data = BinaryData::getNamedResource (filename.toRawUTF8(), size);
+    const auto* data = BinaryData::getNamedResource (resourceName.toRawUTF8(), size);
     return data != nullptr ? juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (size)) : juce::Image {};
 #else
     juce::ignoreUnused (filename);
