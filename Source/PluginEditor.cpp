@@ -17,13 +17,12 @@ juce::Image loadMasterDefault()
     // juce_add_binary_data converts the filename into an identifier.  The
     // previous literal filename lookup always returned nullptr in the VST3,
     // leaving the editor with its opaque black clear colour.
-    const auto* data = BinaryData::getNamedResource ("mastertimeline1280x853_png", size);
+    const auto* data = BinaryData::getNamedResource ("Adefault1280x853_png", size);
     const auto image = data != nullptr ? juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (size)) : juce::Image {};
     if (! image.isValid() || image.getWidth() != 1280 || image.getHeight() != 853)
-        std::cerr << "BACKGROUND_ASSET_FAIL resource=mastertimeline1280x853_png bytes=" << size << '\n';
+        std::cerr << "BACKGROUND_ASSET_FAIL resource=Adefault1280x853_png bytes=" << size << '\n';
     return image;
 #else
-    return {};
     return {};
 #endif
 }
@@ -32,7 +31,7 @@ juce::Image loadQuoteImage()
 {
 #if TOYOTOMI_HAS_BINARY_DATA
     int size = 0;
-    const auto* data = BinaryData::getNamedResource ("toyotomihideyoshiquote_jpg", size);
+    const auto* data = BinaryData::getNamedResource ("quotepanel512x360_png", size);
     return data != nullptr ? juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (size)) : juce::Image {};
 #else
     return {};
@@ -150,15 +149,6 @@ void ToyotomiHideyoshiAudioProcessorEditor::refreshSelectedSlotViews()
 void ToyotomiHideyoshiAudioProcessorEditor::timerCallback()
 {
     const auto playhead = processor.getCurrentTimelineSlot();
-    if (playhead >= 0)
-    {
-        const auto followedTab = playhead / 16;
-        if (followedTab != displayTab)
-        {
-            displayTab = followedTab;
-            barTabs.setSelectedPage (displayTab);
-        }
-    }
     const auto ui = processor.getStateModel().getUiState();
     barMap.setDisplayState (displayTab, ui.selectedBar, playhead);
     refreshSelectedSlotViews();

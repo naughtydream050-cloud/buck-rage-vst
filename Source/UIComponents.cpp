@@ -411,14 +411,11 @@ void BarMapComponent::resized()
 void QuotePanel::paint (juce::Graphics& g)
 {
     if (! sourceImage.isValid()) return;
-    const auto bounds = getLocalBounds().toFloat();
-    const auto scale = juce::jmin (bounds.getWidth() / static_cast<float> (sourceImage.getWidth()),
-                                   bounds.getHeight() / static_cast<float> (sourceImage.getHeight()));
-    const auto width = juce::roundToInt (sourceImage.getWidth() * scale);
-    const auto height = juce::roundToInt (sourceImage.getHeight() * scale);
-    // The supplied quote is static art: maintain its authored aspect ratio,
-    // centre it in the old COUNT GRID region, and do not make it interactive.
-    g.drawImageAt (sourceImage, (getWidth() - width) / 2, (getHeight() - height) / 2);
+    // This image was prepared once at the former COUNT GRID dimensions.  Keep
+    // it native-size so it cannot cross into the adjacent parameter panel.
+    if (sourceImage.getWidth() != getWidth() || sourceImage.getHeight() != getHeight())
+        return;
+    g.drawImageAt (sourceImage, 0, 0);
 }
 
 XYMotionPad::XYMotionPad()
@@ -438,11 +435,6 @@ juce::Rectangle<float> XYMotionPad::padBounds() const
 void XYMotionPad::paint (juce::Graphics& g)
 {
     drawFrame (g, "xyNeutral", getLocalBounds());
-    g.setColour (ToyotomiUi::background());
-    g.fillRect (50, 0, 190, 22);
-    g.setColour (ToyotomiUi::gold());
-    g.setFont (ToyotomiUi::font (13.0f, false));
-    g.drawText ("XY PAD (BAR " + juce::String (selectedBar + 1) + ")", juce::Rectangle<int> (50, 1, 190, 20), juce::Justification::centred);
     const auto pad = padBounds();
     g.saveState(); g.reduceClipRegion (pad.toNearestInt());
     juce::Path motion;
@@ -496,11 +488,6 @@ void ScratchPresetPalette::paint (juce::Graphics& g)
         { 7, 205, 102, 79 }, { 112, 205, 102, 79 }, { 217, 205, 102, 79 },
         { 7, 289, 102, 79 }
     }};
-    g.setColour (ToyotomiUi::background());
-    g.fillRect (7, 4, 224, 27);
-    g.setColour (ToyotomiUi::gold());
-    g.setFont (ToyotomiUi::font (14.0f, false));
-    g.drawText ("BAR " + juce::String (selectedBar + 1) + " PRESET", juce::Rectangle<int> (8, 6, 220, 23), juce::Justification::centredLeft);
     for (int i = 0; i < 10; ++i)
         drawImage (g, presetCellImage (i, i == selectedPreset), cells[static_cast<size_t> (i)]);
 }
@@ -519,11 +506,6 @@ void CountParameterPanel::paint (juce::Graphics& g)
 {
     const auto ui = processor.getStateModel().getUiState();
     const auto& count = processor.getStateModel().getSlot (ui.selectedBar);
-    g.setColour (ToyotomiUi::background());
-    g.fillRect (6, 4, 238, 36);
-    g.setColour (ToyotomiUi::gold());
-    g.setFont (ToyotomiUi::font (13.0f, false));
-    g.drawText ("BAR PARAMETERS (BAR " + juce::String (selectedBar + 1) + ")", juce::Rectangle<int> (8, 7, 235, 27), juce::Justification::centredLeft);
     static const std::array<juce::Rectangle<int>, 5> lengths {{ {10,72,40,33}, {55,72,40,33}, {99,72,40,33}, {144,72,40,33}, {192,72,40,33} }};
     for (int i = 0; i < 5; ++i)
         drawImage (g, lengthImage (i, i == static_cast<int> (count.length)), lengths[static_cast<size_t> (i)]);

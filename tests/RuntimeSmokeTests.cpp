@@ -42,12 +42,12 @@ int main()
 
 #if TOYOTOMI_HAS_BINARY_DATA
     int backgroundBytes = 0, quoteBytes = 0;
-    const auto* backgroundData = BinaryData::getNamedResource ("mastertimeline1280x853_png", backgroundBytes);
-    const auto* quoteData = BinaryData::getNamedResource ("toyotomihideyoshiquote_jpg", quoteBytes);
+    const auto* backgroundData = BinaryData::getNamedResource ("Adefault1280x853_png", backgroundBytes);
+    const auto* quoteData = BinaryData::getNamedResource ("quotepanel512x360_png", quoteBytes);
     const auto background = backgroundData != nullptr ? juce::ImageFileFormat::loadFrom (backgroundData, static_cast<size_t> (backgroundBytes)) : juce::Image {};
     const auto quote = quoteData != nullptr ? juce::ImageFileFormat::loadFrom (quoteData, static_cast<size_t> (quoteBytes)) : juce::Image {};
     passed &= require (background.isValid() && background.getWidth() == 1280 && background.getHeight() == 853, "master-background-loaded");
-    passed &= require (quote.isValid() && quote.getWidth() == 1280 && quote.getHeight() == 960, "quote-decoration-loaded");
+    passed &= require (quote.isValid() && quote.getWidth() == 512 && quote.getHeight() == 360, "quote-decoration-loaded-native-count-grid-size");
 #else
     passed &= require (false, "binarydata-unavailable");
 #endif

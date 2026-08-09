@@ -52,8 +52,8 @@ file (GLOB TOYOTOMI_EXACT_PRESET_BYPASS_ASSETS CONFIGURE_DEPENDS
 
 juce_add_binary_data(ToyotomiHideyoshiAssets
     SOURCES
-        Resources/ui-user-timeline-20260809/master-timeline-1280x853.png
-        Resources/ui-user-quote-20260809/toyotomi-hideyoshi-quote.jpg
+        Resources/ui-master-default-preview-20260808/previews/A_default_1280x853.png
+        Resources/ui-quote-panel-20260810/quote_panel_512x360.png
         ${TOYOTOMI_MASTER_UI_ASSETS}
         ${TOYOTOMI_EXACT_PRESET_BYPASS_ASSETS}
         ui/spec/ui-spec.json
