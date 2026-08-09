@@ -67,18 +67,6 @@ const juce::Image& barLabelImage (int globalBarIndex)
     return labels[static_cast<size_t> (juce::jlimit (0, 63, globalBarIndex))];
 }
 
-const juce::Image& barWaveImage (int globalBarIndex)
-{
-    static const auto waves = []
-    {
-        std::array<juce::Image, 64> result;
-        for (int i = 0; i < 64; ++i)
-            result[static_cast<size_t> (i)] = loadAsset (juce::String::formatted ("bar_wave_%02d.png", i + 1));
-        return result;
-    }();
-    return waves[static_cast<size_t> (juce::jlimit (0, 63, globalBarIndex))];
-}
-
 const juce::Image& countCellImage (int oneBasedCount, bool selected)
 {
     static const auto normal = [] { std::array<juce::Image, 16> r; for (int i = 0; i < 16; ++i) r[static_cast<size_t> (i)] = loadAsset (juce::String::formatted ("count_%02d_normal_117x72.png", i + 1)); return r; }();
@@ -119,6 +107,62 @@ void drawFrame (juce::Graphics& g, const char* id, juce::Rectangle<int> bounds)
 {
     drawImage (g, imageFor (id), bounds);
 }
+
+void drawPresetPreview (juce::Graphics& g, juce::Rectangle<float> bounds,
+                        const PluginStateModel::CountSlot& slot, juce::Colour colour)
+{
+    const auto preset = slot.preset;
+    if (preset == PluginStateModel::ScratchPreset::off)
+        return;
+
+    const auto point = [&bounds] (float x, float y)
+    {
+        return juce::Point<float> (bounds.getX() + bounds.getWidth() * x,
+                                   bounds.getY() + bounds.getHeight() * y);
+    };
+    juce::Path path;
+
+    if (preset == PluginStateModel::ScratchPreset::custom)
+    {
+        if (slot.motion.empty())
+        {
+            const auto c = bounds.getCentre();
+            g.setColour (colour);
+            g.drawLine (c.x - 4.0f, c.y, c.x + 4.0f, c.y, 1.25f);
+            g.drawLine (c.x, c.y - 4.0f, c.x, c.y + 4.0f, 1.25f);
+            return;
+        }
+        path.startNewSubPath (point (slot.motion.front().x, 1.0f - slot.motion.front().y));
+        for (size_t i = 1; i < slot.motion.size(); ++i)
+            path.lineTo (point (slot.motion[i].x, 1.0f - slot.motion[i].y));
+    }
+    else
+    {
+        switch (preset)
+        {
+            case PluginStateModel::ScratchPreset::forwardCut:
+                path.startNewSubPath (point (0.02f, .73f)); path.lineTo (point (.28f, .73f)); path.lineTo (point (.36f, .23f)); path.lineTo (point (.69f, .23f)); path.lineTo (point (.78f, .73f)); path.lineTo (point (.98f, .73f)); break;
+            case PluginStateModel::ScratchPreset::backspin:
+                path.startNewSubPath (point (.98f, .32f)); path.cubicTo (point (.73f, .16f), point (.45f, .81f), point (.06f, .70f)); break;
+            case PluginStateModel::ScratchPreset::chirp:
+                path.startNewSubPath (point (.02f, .78f)); path.cubicTo (point (.30f, .77f), point (.64f, .28f), point (.98f, .18f)); break;
+            case PluginStateModel::ScratchPreset::baby:
+                path.startNewSubPath (point (.02f, .70f)); path.cubicTo (point (.23f, .70f), point (.28f, .27f), point (.50f, .35f)); path.cubicTo (point (.70f, .43f), point (.75f, .73f), point (.98f, .70f)); break;
+            case PluginStateModel::ScratchPreset::transform:
+                path.startNewSubPath (point (.02f, .54f)); path.cubicTo (point (.18f, .12f), point (.33f, .93f), point (.50f, .51f)); path.cubicTo (point (.67f, .10f), point (.82f, .91f), point (.98f, .47f)); break;
+            case PluginStateModel::ScratchPreset::drag:
+                path.startNewSubPath (point (.02f, .25f)); path.cubicTo (point (.30f, .27f), point (.63f, .69f), point (.98f, .78f)); break;
+            case PluginStateModel::ScratchPreset::zigzag:
+                path.startNewSubPath (point (.02f, .74f)); path.lineTo (point (.23f, .24f)); path.lineTo (point (.46f, .75f)); path.lineTo (point (.69f, .23f)); path.lineTo (point (.98f, .74f)); break;
+            case PluginStateModel::ScratchPreset::tapeBrake:
+                path.startNewSubPath (point (.02f, .26f)); path.lineTo (point (.28f, .26f)); path.lineTo (point (.39f, .48f)); path.lineTo (point (.61f, .48f)); path.lineTo (point (.73f, .73f)); path.lineTo (point (.98f, .73f)); break;
+            default: break;
+        }
+    }
+
+    g.setColour (colour);
+    g.strokePath (path, juce::PathStrokeType (1.35f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+}
 }
 
 namespace ToyotomiUi
@@ -151,9 +195,7 @@ bool validateEmbeddedImageAssets()
     for (int bar = 0; bar < 64; ++bar)
     {
         const auto& label = barLabelImage (bar);
-        const auto& wave = barWaveImage (bar);
-        if (! label.isValid() || label.getWidth() != 66 || label.getHeight() != 24
-            || ! wave.isValid() || wave.getWidth() != 62 || wave.getHeight() != 30)
+        if (! label.isValid() || label.getWidth() != 66 || label.getHeight() != 24)
         {
             std::cerr << "ASSET_FAIL bar=" << (bar + 1) << '\n';
             return false;
@@ -276,11 +318,12 @@ void BarTabComponent::mouseDown (const juce::MouseEvent& event)
     }
 }
 
-void BarCellComponent::configure (int globalBar, bool isSelected, bool isPlaying)
+void BarCellComponent::configure (int globalBar, bool isSelected, bool isPlaying, PluginStateModel::CountSlot preview)
 {
     globalBarIndex = juce::jlimit (0, 63, globalBar);
     selected = isSelected;
     playing = isPlaying;
+    previewSlot = std::move (preview);
     repaint();
 }
 void BarCellComponent::paint (juce::Graphics& g)
@@ -297,12 +340,13 @@ void BarCellComponent::paint (juce::Graphics& g)
     if (label.isValid() && label.getWidth() == 66 && label.getHeight() == 24)
         g.drawImageAt (label, (getWidth() - label.getWidth()) / 2, 0);
 
-    // Every BAR has its own 1:1 MASTER DEFAULT-derived tile. It is opaque and
-    // replaces the old baked placeholder motion before any future live motion
-    // renderer is connected.
-    const auto& waveform = barWaveImage (globalBarIndex);
-    if (waveform.isValid() && waveform.getWidth() == 62 && waveform.getHeight() == 30)
-        g.drawImageAt (waveform, 5, 33);
+    const auto previewBounds = juce::Rectangle<float> (5.0f, 33.0f, 62.0f, 30.0f);
+    const auto previewColour = playing ? ToyotomiUi::red()
+                                       : (selected ? ToyotomiUi::gold() : ToyotomiUi::ivory());
+    g.saveState();
+    g.reduceClipRegion (previewBounds.toNearestInt());
+    drawPresetPreview (g, previewBounds, previewSlot, previewColour);
+    g.restoreState();
 }
 void BarCellComponent::mouseDown (const juce::MouseEvent&) { if (onSelected) onSelected (globalBarIndex); }
 
@@ -320,6 +364,13 @@ void BarMapComponent::setDisplayState (int selectedTab, int selectedGlobalBar, i
     displayTab = juce::jlimit (0, 3, selectedTab);
     selectedBar = juce::jlimit (0, 63, selectedGlobalBar);
     playingBar = juce::jlimit (-1, 63, playingGlobalBar);
+    refreshCells();
+}
+void BarMapComponent::setPresetPreview (int selectedCount, std::function<PluginStateModel::CountSlot (int, int)> provider)
+{
+    previewCount = juce::jlimit (0, PluginStateModel::kCountsPerBar - 1, selectedCount);
+    for (int bar = 0; bar < PluginStateModel::kNumBars; ++bar)
+        previews[static_cast<size_t> (bar)] = provider (bar, previewCount);
     refreshCells();
 }
 bool BarMapComponent::hasReferenceCellBounds() const
@@ -348,7 +399,8 @@ void BarMapComponent::refreshCells()
     {
         const auto globalBar = displayTab * 16 + i;
         cells[static_cast<size_t> (i)].setVisible (true);
-        cells[static_cast<size_t> (i)].configure (globalBar, globalBar == selectedBar, globalBar == playingBar);
+        cells[static_cast<size_t> (i)].configure (globalBar, globalBar == selectedBar, globalBar == playingBar,
+                                                   previews[static_cast<size_t> (globalBar)]);
     }
 }
 void BarMapComponent::paint (juce::Graphics& g) { juce::ignoreUnused (g); }

@@ -45,6 +45,7 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
     // Page selection is a view-only choice.  It must never mutate the active
     // BAR/COUNT slot or any parameter state.
     barMap.setDisplayState (uiState.selectedTab, uiState.selectedBar, -1);
+    barMap.setPresetPreview (uiState.selectedCount, [&state] (int bar, int count) { return state.getCount (bar, count); });
     countGrid.setSelectedCount (uiState.selectedCount);
     presetPalette.setSelectedPreset (static_cast<int> (state.getCount (uiState.selectedBar, uiState.selectedCount).preset));
     barTabs.onSelectedPage = [this, &state] (int page)
@@ -60,12 +61,12 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
         barMap.setDisplayState (ui.selectedTab, ui.selectedBar, -1);
         presetPalette.setSelectedPreset (static_cast<int> (state.getCount (ui.selectedBar, ui.selectedCount).preset));
     };
-    countGrid.onSelectedCount = [this, &state] (int count) { state.selectCount (count); const auto ui = state.getUiState(); presetPalette.setSelectedPreset (static_cast<int> (state.getCount (ui.selectedBar, ui.selectedCount).preset)); };
-    presetPalette.onPresetSelected = [&state] (int preset) { state.setSelectedPreset ((PluginStateModel::ScratchPreset) preset); };
+    countGrid.onSelectedCount = [this, &state] (int count) { state.selectCount (count); const auto ui = state.getUiState(); barMap.setPresetPreview (ui.selectedCount, [&state] (int bar, int previewCount) { return state.getCount (bar, previewCount); }); presetPalette.setSelectedPreset (static_cast<int> (state.getCount (ui.selectedBar, ui.selectedCount).preset)); };
+    presetPalette.onPresetSelected = [this, &state] (int preset) { state.setSelectedPreset ((PluginStateModel::ScratchPreset) preset); const auto ui = state.getUiState(); barMap.setPresetPreview (ui.selectedCount, [&state] (int bar, int previewCount) { return state.getCount (bar, previewCount); }); };
     countParameters.onLengthSelected = [&state] (int length) { state.setSelectedLength ((PluginStateModel::NoteLength) length); };
-    xyPad.onMotionChanged = [this, &state] (const std::vector<PluginStateModel::MotionPoint>& motion) { state.setSelectedMotion (motion); presetPalette.setSelectedPreset (static_cast<int> (PluginStateModel::ScratchPreset::custom)); };
-    xyPad.onClearMotion = [this, &state] { state.clearSelectedMotion(); const auto ui = state.getUiState(); presetPalette.setSelectedPreset (static_cast<int> (state.getCount (ui.selectedBar, ui.selectedCount).preset)); };
-    xyPad.onResetCount = [this, &state] { const auto ui = state.getUiState(); state.resetCountSlot (ui.selectedBar, ui.selectedCount); presetPalette.setSelectedPreset (static_cast<int> (PluginStateModel::ScratchPreset::off)); };
+    xyPad.onMotionChanged = [this, &state] (const std::vector<PluginStateModel::MotionPoint>& motion) { state.setSelectedMotion (motion); const auto ui = state.getUiState(); barMap.setPresetPreview (ui.selectedCount, [&state] (int bar, int previewCount) { return state.getCount (bar, previewCount); }); presetPalette.setSelectedPreset (static_cast<int> (PluginStateModel::ScratchPreset::custom)); };
+    xyPad.onClearMotion = [this, &state] { state.clearSelectedMotion(); const auto ui = state.getUiState(); barMap.setPresetPreview (ui.selectedCount, [&state] (int bar, int previewCount) { return state.getCount (bar, previewCount); }); presetPalette.setSelectedPreset (static_cast<int> (state.getCount (ui.selectedBar, ui.selectedCount).preset)); };
+    xyPad.onResetCount = [this, &state] { const auto ui = state.getUiState(); state.resetCountSlot (ui.selectedBar, ui.selectedCount); barMap.setPresetPreview (ui.selectedCount, [&state] (int bar, int previewCount) { return state.getCount (bar, previewCount); }); presetPalette.setSelectedPreset (static_cast<int> (PluginStateModel::ScratchPreset::off)); };
     for (auto* component : std::array<juce::Component*, 10> {
              &topBar, &artwork, &barTabs, &barMap, &countGrid,
              &xyPad, &presetPalette, &countParameters, &outputMeter, &bottomStatus })

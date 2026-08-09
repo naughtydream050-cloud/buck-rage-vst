@@ -121,6 +121,18 @@ int main()
     BarMapComponent barMap;
     barMap.setSize (608, 266);
     passed &= require (barMap.hasReferenceCellBounds(), "bar-map-16-reference-cell-bounds");
+    PluginStateModel previewState;
+    previewState.setCountPreset (0, 4, PluginStateModel::ScratchPreset::forwardCut);
+    previewState.setCountPreset (1, 4, PluginStateModel::ScratchPreset::backspin);
+    barMap.setPresetPreview (4, [&previewState] (int bar, int count) { return previewState.getCount (bar, count); });
+    auto countFivePreview = juce::Image (juce::Image::ARGB, 608, 266, true);
+    { juce::Graphics graphics (countFivePreview); barMap.paintEntireComponent (graphics, true); }
+    barMap.setPresetPreview (7, [&previewState] (int bar, int count) { return previewState.getCount (bar, count); });
+    auto countEightPreview = juce::Image (juce::Image::ARGB, 608, 266, true);
+    { juce::Graphics graphics (countEightPreview); barMap.paintEntireComponent (graphics, true); }
+    passed &= require (imageHash (countFivePreview.getClippedImage ({ 6, 32, 147, 94 }))
+                       != imageHash (countEightPreview.getClippedImage ({ 6, 32, 147, 94 })),
+                       "bar-map-preview-follows-selected-count");
     for (const auto& [tab, selectedBar, playingBar, filename] : barMapStates)
     {
         barMap.setDisplayState (tab, selectedBar, playingBar);
@@ -149,7 +161,7 @@ int main()
     for (int i = 0; i < static_cast<int> (labelBars.size()); ++i)
     {
         BarCellComponent cell;
-        cell.configure (labelBars[static_cast<size_t> (i)], false, false);
+        cell.configure (labelBars[static_cast<size_t> (i)], false, false, {});
         cell.setSize (72, 94);
         auto cellImage = juce::Image (juce::Image::ARGB, 72, 94, true);
         juce::Graphics cellGraphics (cellImage);
@@ -159,13 +171,17 @@ int main()
     passed &= require (writePng (labelSheet, "toyotomi-bar-labels-40-64.png"), "bar-labels-40-64-preview");
 
     const std::array<int, 9> waveformBars {{ 0, 1, 2, 3, 4, 5, 39, 48, 63 }};
+    std::array<PluginStateModel::CountSlot, waveformBars.size()> waveformSlots {};
+    for (int i = 0; i < static_cast<int> (waveformSlots.size()); ++i)
+        waveformSlots[static_cast<size_t> (i)].preset = static_cast<PluginStateModel::ScratchPreset> (i + 1);
+    waveformSlots.back().motion = {{ 0.0f, 0.25f }, { 0.4f, 0.75f }, { 1.0f, 0.40f }};
     auto waveformSheet = juce::Image (juce::Image::ARGB, 3 * 72, 3 * 94, true);
     juce::Graphics waveformGraphics (waveformSheet);
     std::array<uint64_t, waveformBars.size()> waveformHashes {};
     for (int i = 0; i < static_cast<int> (waveformBars.size()); ++i)
     {
         BarCellComponent cell;
-        cell.configure (waveformBars[static_cast<size_t> (i)], false, false);
+        cell.configure (waveformBars[static_cast<size_t> (i)], false, false, waveformSlots[static_cast<size_t> (i)]);
         cell.setSize (72, 94);
         auto cellImage = juce::Image (juce::Image::ARGB, 72, 94, true);
         juce::Graphics cellGraphics (cellImage);
@@ -175,7 +191,7 @@ int main()
     }
     std::sort (waveformHashes.begin(), waveformHashes.end());
     const auto uniqueWaveforms = std::distance (waveformHashes.begin(), std::unique (waveformHashes.begin(), waveformHashes.end()));
-    passed &= require (uniqueWaveforms == static_cast<ptrdiff_t> (waveformBars.size()), "bar-waveforms-not-all-identical");
+    passed &= require (uniqueWaveforms == static_cast<ptrdiff_t> (waveformBars.size()), "bar-preset-previews-not-all-identical");
     passed &= require (writePng (waveformSheet, "toyotomi-bar-waveform-comparison.png"), "bar-waveform-comparison-preview");
 
     editor.reset();

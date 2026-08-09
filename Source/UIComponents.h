@@ -65,22 +65,24 @@ class BarCellComponent final : public juce::Component
 {
   public:
       std::function<void (int)> onSelected;
-      void configure (int globalBar, bool isSelected, bool isPlaying);
+       void configure (int globalBar, bool isSelected, bool isPlaying, PluginStateModel::CountSlot preview);
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
 
 private:
       int globalBarIndex = 0;
-    bool selected = false;
-    bool playing = false;
+     bool selected = false;
+     bool playing = false;
+     PluginStateModel::CountSlot previewSlot;
 };
 
 class BarMapComponent final : public juce::Component
 {
 public:
       std::function<void (int)> onSelectedBar;
-      BarMapComponent();
-      void setDisplayState (int selectedTab, int selectedBar, int playingBar);
+       BarMapComponent();
+       void setDisplayState (int selectedTab, int selectedBar, int playingBar);
+       void setPresetPreview (int selectedCount, std::function<PluginStateModel::CountSlot (int, int)> provider);
       bool hasReferenceCellBounds() const;
       void paint (juce::Graphics&) override;
       void resized() override;
@@ -90,8 +92,10 @@ public:
       void refreshCells();
       std::array<BarCellComponent, 16> cells;
       int displayTab = 0;
-      int selectedBar = 0;
-      int playingBar = 5;
+       int selectedBar = 0;
+       int playingBar = 5;
+       int previewCount = 0;
+       std::array<PluginStateModel::CountSlot, PluginStateModel::kNumBars> previews {};
 };
 
 class CountCellComponent final : public juce::Component
