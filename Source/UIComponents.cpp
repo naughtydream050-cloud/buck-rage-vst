@@ -67,13 +67,6 @@ const juce::Image& barLabelImage (int globalBarIndex)
     return labels[static_cast<size_t> (juce::jlimit (0, 63, globalBarIndex))];
 }
 
-const juce::Image& countCellImage (int oneBasedCount, bool selected)
-{
-    static const auto normal = [] { std::array<juce::Image, 16> r; for (int i = 0; i < 16; ++i) r[static_cast<size_t> (i)] = loadAsset (juce::String::formatted ("count_%02d_normal_117x72.png", i + 1)); return r; }();
-    static const auto gold = [] { std::array<juce::Image, 16> r; for (int i = 0; i < 16; ++i) r[static_cast<size_t> (i)] = loadAsset (juce::String::formatted ("count_%02d_selected_117x72.png", i + 1)); return r; }();
-    return (selected ? gold : normal)[static_cast<size_t> (juce::jlimit (1, 16, oneBasedCount) - 1)];
-}
-
 const juce::Image& presetCellImage (int preset, bool selected)
 {
     static const auto normal = [] { const std::array<juce::String, 10> names { "off", "forward_cut", "backspin", "chirp", "baby", "transform", "drag", "zigzag", "tape_brake", "custom" }; std::array<juce::Image, 10> r; for (int i = 0; i < 10; ++i) r[static_cast<size_t> (i)] = loadAsset ("preset_" + names[static_cast<size_t> (i)] + "_normal_102x79.png"); return r; }();
@@ -109,7 +102,7 @@ void drawFrame (juce::Graphics& g, const char* id, juce::Rectangle<int> bounds)
 }
 
 void drawPresetPreview (juce::Graphics& g, juce::Rectangle<float> bounds,
-                        const PluginStateModel::CountSlot& slot, juce::Colour colour)
+                        const PluginStateModel::TimelineSlot& slot, juce::Colour colour)
 {
     const auto preset = slot.preset;
     if (preset == PluginStateModel::ScratchPreset::off)
@@ -318,7 +311,7 @@ void BarTabComponent::mouseDown (const juce::MouseEvent& event)
     }
 }
 
-void BarCellComponent::configure (int globalBar, bool isSelected, bool isPlaying, PluginStateModel::CountSlot preview)
+void BarCellComponent::configure (int globalBar, bool isSelected, bool isPlaying, PluginStateModel::TimelineSlot preview)
 {
     globalBarIndex = juce::jlimit (0, 63, globalBar);
     selected = isSelected;
@@ -361,16 +354,20 @@ BarMapComponent::BarMapComponent()
 }
 void BarMapComponent::setDisplayState (int selectedTab, int selectedGlobalBar, int playingGlobalBar)
 {
-    displayTab = juce::jlimit (0, 3, selectedTab);
-    selectedBar = juce::jlimit (0, 63, selectedGlobalBar);
-    playingBar = juce::jlimit (-1, 63, playingGlobalBar);
+    const auto nextTab = juce::jlimit (0, 3, selectedTab);
+    const auto nextSelected = juce::jlimit (0, 63, selectedGlobalBar);
+    const auto nextPlaying = juce::jlimit (-1, 63, playingGlobalBar);
+    if (nextTab == displayTab && nextSelected == selectedBar && nextPlaying == playingBar)
+        return;
+    displayTab = nextTab;
+    selectedBar = nextSelected;
+    playingBar = nextPlaying;
     refreshCells();
 }
-void BarMapComponent::setPresetPreview (int selectedCount, std::function<PluginStateModel::CountSlot (int, int)> provider)
+void BarMapComponent::setSlotPreview (std::function<PluginStateModel::TimelineSlot (int)> provider)
 {
-    previewCount = juce::jlimit (0, PluginStateModel::kCountsPerBar - 1, selectedCount);
     for (int bar = 0; bar < PluginStateModel::kNumBars; ++bar)
-        previews[static_cast<size_t> (bar)] = provider (bar, previewCount);
+        previews[static_cast<size_t> (bar)] = provider (bar);
     refreshCells();
 }
 bool BarMapComponent::hasReferenceCellBounds() const
@@ -411,55 +408,28 @@ void BarMapComponent::resized()
     refreshCells();
 }
 
-void CountCellComponent::configure (int number, int preset, bool isSelected)
+void QuotePanel::paint (juce::Graphics& g)
 {
-    countNumber = number; presetIndex = preset; selected = isSelected; repaint();
-}
-void CountCellComponent::paint (juce::Graphics& g)
-{
-    drawImage (g, countCellImage (countNumber, selected), getLocalBounds());
-}
-void CountCellComponent::mouseDown (const juce::MouseEvent&) { if (onSelected) onSelected (countNumber); }
-
-CountGridComponent::CountGridComponent()
-{
-    const std::array<int, 16> presets { 0, 1, 2, 3, 2, 7, 6, 8, 1, 3, 0, 7, 7, 6, 3, 0 };
-    for (int i = 0; i < 16; ++i)
-    {
-        cells[static_cast<size_t> (i)].onSelected = [this] (int number) { selectCount (number); };
-        cells[static_cast<size_t> (i)].configure (i + 1, presets[static_cast<size_t> (i)], i + 1 == selectedCount);
-        addAndMakeVisible (cells[static_cast<size_t> (i)]);
-    }
-}
-void CountGridComponent::setSelectedCount (int zeroBasedCount)
-{
-    selectedCount = juce::jlimit (0, 15, zeroBasedCount) + 1;
-    const std::array<int, 16> presets { 0, 1, 2, 3, 2, 7, 6, 8, 1, 3, 0, 7, 7, 6, 3, 0 };
-    for (int i = 0; i < 16; ++i)
-    {
-        cells[static_cast<size_t> (i)].setVisible (true);
-        cells[static_cast<size_t> (i)].configure (i + 1, presets[static_cast<size_t> (i)], i + 1 == selectedCount);
-    }
-}
-void CountGridComponent::selectCount (int number)
-{
-    showOverlay = true;
-    setSelectedCount (number - 1);
-    if (onSelectedCount) onSelectedCount (number - 1);
-}
-void CountGridComponent::paint (juce::Graphics& g) { juce::ignoreUnused (g); }
-void CountGridComponent::resized()
-{
-    // Authored cell assets are final 117 x 72 pixels. Keep input and image
-    // bounds identical on the fixed 1280 x 853 canvas.
-    for (int i = 0; i < 16; ++i)
-        cells[static_cast<size_t> (i)].setBounds (12 + (i % 4) * 122,
-                                                   13 + (i / 4) * 84,
-                                                   117, 72);
+    if (! sourceImage.isValid()) return;
+    const auto bounds = getLocalBounds().toFloat();
+    const auto scale = juce::jmin (bounds.getWidth() / static_cast<float> (sourceImage.getWidth()),
+                                   bounds.getHeight() / static_cast<float> (sourceImage.getHeight()));
+    const auto width = juce::roundToInt (sourceImage.getWidth() * scale);
+    const auto height = juce::roundToInt (sourceImage.getHeight() * scale);
+    // The supplied quote is static art: maintain its authored aspect ratio,
+    // centre it in the old COUNT GRID region, and do not make it interactive.
+    g.drawImageAt (sourceImage, (getWidth() - width) / 2, (getHeight() - height) / 2);
 }
 
 XYMotionPad::XYMotionPad()
 {
+}
+void XYMotionPad::setMotion (const std::vector<PluginStateModel::MotionPoint>& motion)
+{
+    normalizedMotion.clearQuick();
+    for (const auto point : motion)
+        normalizedMotion.add ({ juce::jlimit (0.0f, 1.0f, point.x), juce::jlimit (0.0f, 1.0f, point.y) });
+    repaint();
 }
 juce::Rectangle<float> XYMotionPad::padBounds() const
 {
@@ -468,6 +438,11 @@ juce::Rectangle<float> XYMotionPad::padBounds() const
 void XYMotionPad::paint (juce::Graphics& g)
 {
     drawFrame (g, "xyNeutral", getLocalBounds());
+    g.setColour (ToyotomiUi::background());
+    g.fillRect (50, 0, 190, 22);
+    g.setColour (ToyotomiUi::gold());
+    g.setFont (ToyotomiUi::font (13.0f, false));
+    g.drawText ("XY PAD (BAR " + juce::String (selectedBar + 1) + ")", { 50, 1, 190, 20 }, juce::Justification::centred);
     const auto pad = padBounds();
     g.saveState(); g.reduceClipRegion (pad.toNearestInt());
     juce::Path motion;
@@ -499,7 +474,7 @@ void XYMotionPad::mouseDown (const juce::MouseEvent& event)
     const auto clear = juce::Rectangle<int> (17, 218, 73, 30);
     const auto reset = juce::Rectangle<int> (178, 218, 102, 30);
     if (clear.contains (event.getPosition())) { normalizedMotion.clear(); if (onClearMotion) onClearMotion(); repaint(); return; }
-    if (reset.contains (event.getPosition())) { normalizedMotion.clear(); if (onResetCount) onResetCount(); repaint(); return; }
+    if (reset.contains (event.getPosition())) { normalizedMotion.clear(); if (onResetSlot) onResetSlot(); repaint(); return; }
     if (padBounds().contains (event.position)) { recording = true; normalizedMotion.clear(); appendPoint (event.position); }
 }
 void XYMotionPad::mouseDrag (const juce::MouseEvent& event) { if (recording) appendPoint (event.position); }
@@ -521,6 +496,11 @@ void ScratchPresetPalette::paint (juce::Graphics& g)
         { 7, 205, 102, 79 }, { 112, 205, 102, 79 }, { 217, 205, 102, 79 },
         { 7, 289, 102, 79 }
     }};
+    g.setColour (ToyotomiUi::background());
+    g.fillRect (7, 4, 224, 27);
+    g.setColour (ToyotomiUi::gold());
+    g.setFont (ToyotomiUi::font (14.0f, false));
+    g.drawText ("BAR " + juce::String (selectedBar + 1) + " PRESET", { 8, 6, 220, 23 }, juce::Justification::centredLeft);
     for (int i = 0; i < 10; ++i)
         drawImage (g, presetCellImage (i, i == selectedPreset), cells[static_cast<size_t> (i)]);
 }
@@ -538,7 +518,12 @@ juce::Rectangle<float> CountParameterPanel::knobBounds (int index) const
 void CountParameterPanel::paint (juce::Graphics& g)
 {
     const auto ui = processor.getStateModel().getUiState();
-    const auto& count = processor.getStateModel().getCount (ui.selectedBar, ui.selectedCount);
+    const auto& count = processor.getStateModel().getSlot (ui.selectedBar);
+    g.setColour (ToyotomiUi::background());
+    g.fillRect (6, 4, 238, 36);
+    g.setColour (ToyotomiUi::gold());
+    g.setFont (ToyotomiUi::font (13.0f, false));
+    g.drawText ("BAR PARAMETERS (BAR " + juce::String (selectedBar + 1) + ")", { 8, 7, 235, 27 }, juce::Justification::centredLeft);
     static const std::array<juce::Rectangle<int>, 5> lengths {{ {10,72,40,33}, {55,72,40,33}, {99,72,40,33}, {144,72,40,33}, {192,72,40,33} }};
     for (int i = 0; i < 5; ++i)
         drawImage (g, lengthImage (i, i == static_cast<int> (count.length)), lengths[static_cast<size_t> (i)]);
@@ -559,10 +544,10 @@ void CountParameterPanel::paint (juce::Graphics& g)
 }
 void CountParameterPanel::updateKnob (int index, float delta)
 {
-    auto& state = processor.getStateModel(); const auto ui = state.getUiState(); const auto& count = state.getCount (ui.selectedBar, ui.selectedCount);
-    if (index == 0) state.setCountSpeed (ui.selectedBar, ui.selectedCount, count.speed + delta * 0.012f);
-    if (index == 1) state.setCountPitch (ui.selectedBar, ui.selectedCount, count.pitch + delta * 0.20f);
-    if (index == 2) state.setCountDepth (ui.selectedBar, ui.selectedCount, count.depth + delta * 0.010f);
+    auto& state = processor.getStateModel(); const auto ui = state.getUiState(); const auto& count = state.getSlot (ui.selectedBar);
+    if (index == 0) state.setSlotSpeed (ui.selectedBar, count.speed + delta * 0.012f);
+    if (index == 1) state.setSlotPitch (ui.selectedBar, count.pitch + delta * 0.20f);
+    if (index == 2) state.setSlotDepth (ui.selectedBar, count.depth + delta * 0.010f);
     repaint();
 }
 void CountParameterPanel::mouseDown (const juce::MouseEvent& event)
@@ -577,9 +562,9 @@ void CountParameterPanel::mouseDoubleClick (const juce::MouseEvent& event)
     for (int i = 0; i < 3; ++i)
         if (knobBounds (i).contains (event.position))
         {
-            if (i == 0) processor.getStateModel().setCountSpeed (ui.selectedBar, ui.selectedCount, 1.0f);
-            if (i == 1) processor.getStateModel().setCountPitch (ui.selectedBar, ui.selectedCount, 0.0f);
-            if (i == 2) processor.getStateModel().setCountDepth (ui.selectedBar, ui.selectedCount, 0.5f);
+            if (i == 0) processor.getStateModel().setSlotSpeed (ui.selectedBar, 1.0f);
+            if (i == 1) processor.getStateModel().setSlotPitch (ui.selectedBar, 0.0f);
+            if (i == 2) processor.getStateModel().setSlotDepth (ui.selectedBar, 0.5f);
             repaint();
             return;
         }

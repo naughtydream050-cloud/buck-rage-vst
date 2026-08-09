@@ -65,7 +65,7 @@ class BarCellComponent final : public juce::Component
 {
   public:
       std::function<void (int)> onSelected;
-       void configure (int globalBar, bool isSelected, bool isPlaying, PluginStateModel::CountSlot preview);
+       void configure (int globalBar, bool isSelected, bool isPlaying, PluginStateModel::TimelineSlot preview);
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
 
@@ -73,7 +73,7 @@ private:
       int globalBarIndex = 0;
      bool selected = false;
      bool playing = false;
-     PluginStateModel::CountSlot previewSlot;
+     PluginStateModel::TimelineSlot previewSlot;
 };
 
 class BarMapComponent final : public juce::Component
@@ -82,7 +82,7 @@ public:
       std::function<void (int)> onSelectedBar;
        BarMapComponent();
        void setDisplayState (int selectedTab, int selectedBar, int playingBar);
-       void setPresetPreview (int selectedCount, std::function<PluginStateModel::CountSlot (int, int)> provider);
+       void setSlotPreview (std::function<PluginStateModel::TimelineSlot (int)> provider);
       bool hasReferenceCellBounds() const;
       void paint (juce::Graphics&) override;
       void resized() override;
@@ -93,39 +93,18 @@ public:
       std::array<BarCellComponent, 16> cells;
       int displayTab = 0;
        int selectedBar = 0;
-       int playingBar = 5;
-       int previewCount = 0;
-       std::array<PluginStateModel::CountSlot, PluginStateModel::kNumBars> previews {};
+       int playingBar = -1;
+       std::array<PluginStateModel::TimelineSlot, PluginStateModel::kNumBars> previews {};
 };
 
-class CountCellComponent final : public juce::Component
+class QuotePanel final : public juce::Component
 {
 public:
-    std::function<void (int)> onSelected;
-    void configure (int number, int preset, bool isSelected);
+    explicit QuotePanel (juce::Image source) : sourceImage (std::move (source)) {}
     void paint (juce::Graphics&) override;
-    void mouseDown (const juce::MouseEvent&) override;
 
 private:
-    int countNumber = 1;
-    int presetIndex = 0;
-    bool selected = false;
-};
-
-class CountGridComponent final : public juce::Component
-{
-public:
-    std::function<void (int)> onSelectedCount;
-    CountGridComponent();
-    void setSelectedCount (int zeroBasedCount);
-    void paint (juce::Graphics&) override;
-    void resized() override;
-
-private:
-    void selectCount (int number);
-    std::array<CountCellComponent, 16> cells;
-    int selectedCount = 1;
-    bool showOverlay = true;
+    juce::Image sourceImage;
 };
 
 class XYMotionPad final : public juce::Component
@@ -133,18 +112,21 @@ class XYMotionPad final : public juce::Component
 public:
     std::function<void (const std::vector<PluginStateModel::MotionPoint>&)> onMotionChanged;
     XYMotionPad();
+    void setMotion (const std::vector<PluginStateModel::MotionPoint>&);
+    void setSelectedBar (int bar) { selectedBar = juce::jlimit (0, 63, bar); repaint(); }
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
     std::function<void()> onClearMotion;
-    std::function<void()> onResetCount;
+    std::function<void()> onResetSlot;
 
 private:
     void appendPoint (juce::Point<float>);
     juce::Rectangle<float> padBounds() const;
     juce::Array<juce::Point<float>> normalizedMotion;
     bool recording = false;
+    int selectedBar = 0;
 };
 
 class ScratchPresetPalette final : public juce::Component
@@ -152,11 +134,13 @@ class ScratchPresetPalette final : public juce::Component
 public:
     std::function<void (int)> onPresetSelected;
     void setSelectedPreset (int preset) { selectedPreset = juce::jlimit (0, 9, preset); repaint(); }
+    void setSelectedBar (int bar) { selectedBar = juce::jlimit (0, 63, bar); repaint(); }
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
 
 private:
     int selectedPreset = 0;
+    int selectedBar = 0;
     bool showOverlay = true;
 };
 
@@ -165,6 +149,7 @@ class CountParameterPanel final : public juce::Component
 public:
     std::function<void (int)> onLengthSelected;
     explicit CountParameterPanel (ToyotomiHideyoshiAudioProcessor&);
+    void setSelectedBar (int bar) { selectedBar = juce::jlimit (0, 63, bar); repaint(); }
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDoubleClick (const juce::MouseEvent&) override;
@@ -179,6 +164,7 @@ private:
     int activeKnob = -1;
     float dragStartY = 0.0f;
     bool showLiveValues = false;
+    int selectedBar = 0;
 };
 
 class OutputMeterComponent final : public juce::Component,

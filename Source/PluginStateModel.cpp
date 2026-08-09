@@ -1,16 +1,141 @@
 #include "PluginStateModel.h"
 #include <cmath>
-namespace { constexpr int kStateVersion = 1; const juce::Identifier rootId { "ToyotomiHideyoshiState" }, globalId { "Global" }, barsId { "Bars" }, barId { "Bar" }, countId { "Count" }, pointId { "Point" }; }
+
+namespace
+{
+constexpr int kStateVersion = 2;
+const juce::Identifier rootId { "ToyotomiHideyoshiState" }, globalId { "Global" }, barsId { "Bars" },
+                       barId { "Bar" }, slotId { "Slot" }, countId { "Count" }, pointId { "Point" };
+
+void writeSlot (juce::ValueTree& node, const PluginStateModel::TimelineSlot& slot)
+{
+    node.setProperty ("preset", static_cast<int> (slot.preset), nullptr);
+    node.setProperty ("length", static_cast<int> (slot.length), nullptr);
+    node.setProperty ("speed", slot.speed, nullptr);
+    node.setProperty ("pitch", slot.pitch, nullptr);
+    node.setProperty ("depth", slot.depth, nullptr);
+    node.setProperty ("customMotion", slot.customMotion, nullptr);
+    for (const auto point : slot.motion)
+    {
+        juce::ValueTree child (pointId);
+        child.setProperty ("x", point.x, nullptr);
+        child.setProperty ("y", point.y, nullptr);
+        node.addChild (child, -1, nullptr);
+    }
+}
+}
+
 PluginStateModel::PluginStateModel() { reset(); }
-int PluginStateModel::barIndex (int v) noexcept { return juce::jlimit (0, kNumBars - 1, v); } int PluginStateModel::countIndex (int v) noexcept { return juce::jlimit (0, kCountsPerBar - 1, v); }
-float PluginStateModel::finiteClamp (float v, float lo, float hi, float def) noexcept { return std::isfinite (v) ? juce::jlimit (lo, hi, v) : def; }
-std::vector<PluginStateModel::MotionPoint> PluginStateModel::sanitiseMotion (const std::vector<MotionPoint>& in) { std::vector<MotionPoint> out; out.reserve (juce::jmin ((int) in.size(), kMaxMotionPoints)); for (const auto p : in) { if (! std::isfinite (p.x) || ! std::isfinite (p.y)) continue; const MotionPoint q { juce::jlimit (0.0f,1.0f,p.x), juce::jlimit (0.0f,1.0f,p.y) }; if (out.empty() || std::hypot (q.x-out.back().x,q.y-out.back().y) >= 0.004f) out.push_back(q); if ((int) out.size() == kMaxMotionPoints) break; } return out; }
-std::vector<PluginStateModel::MotionPoint> PluginStateModel::presetMotion (ScratchPreset p) { if (p == ScratchPreset::off) return {}; if (p == ScratchPreset::zigzag) return {{0,.75f},{.25f,.25f},{.5f,.75f},{.75f,.25f},{1,.75f}}; if (p == ScratchPreset::backspin) return {{1,.3f},{.72f,.45f},{.42f,.65f},{.12f,.8f}}; return {{0,.65f},{.35f,.45f},{.7f,.3f},{1,.5f}}; }
-void PluginStateModel::reset() { bars = {}; ui = {}; }
-const PluginStateModel::CountSlot& PluginStateModel::getCount (int b,int c) const noexcept { return bars[(size_t)barIndex(b)].counts[(size_t)countIndex(c)]; } PluginStateModel::CountSlot& PluginStateModel::mutableCount(int b,int c) noexcept { return bars[(size_t)barIndex(b)].counts[(size_t)countIndex(c)]; }
-void PluginStateModel::selectTab(int v){ui.selectedTab=juce::jlimit(0,3,v);} void PluginStateModel::selectBar(int v){ui.selectedBar=barIndex(v);} void PluginStateModel::selectCount(int v){ui.selectedCount=countIndex(v);} void PluginStateModel::setBypass(bool v){ui.bypass=v;}
-void PluginStateModel::setCountPreset(int b,int c,ScratchPreset p){auto& s=mutableCount(b,c);s.preset=p;s.customMotion=false;s.motion=presetMotion(p);} void PluginStateModel::setCountLength(int b,int c,NoteLength v){mutableCount(b,c).length=(NoteLength)juce::jlimit(0,4,(int)v);} void PluginStateModel::setCountSpeed(int b,int c,float v){mutableCount(b,c).speed=finiteClamp(v,kMinSpeed,kMaxSpeed,1);} void PluginStateModel::setCountPitch(int b,int c,float v){mutableCount(b,c).pitch=finiteClamp(v,kMinPitch,kMaxPitch,0);} void PluginStateModel::setCountDepth(int b,int c,float v){mutableCount(b,c).depth=finiteClamp(v,0,1,0.5f);}
-void PluginStateModel::setCountMotion(int b,int c,const std::vector<MotionPoint>& m){auto& s=mutableCount(b,c);s.motion=sanitiseMotion(m);s.customMotion=true;s.preset=ScratchPreset::custom;} void PluginStateModel::clearCountMotion(int b,int c){auto& s=mutableCount(b,c);s.motion.clear();s.customMotion=false;if(s.preset==ScratchPreset::custom)s.preset=ScratchPreset::off;} void PluginStateModel::resetCountSlot(int b,int c){mutableCount(b,c)=CountSlot{};}
-void PluginStateModel::setSelectedPreset(ScratchPreset p){setCountPreset(ui.selectedBar,ui.selectedCount,p);} void PluginStateModel::setSelectedLength(NoteLength v){setCountLength(ui.selectedBar,ui.selectedCount,v);} void PluginStateModel::setSelectedSpeed(float v){setCountSpeed(ui.selectedBar,ui.selectedCount,v);} void PluginStateModel::setSelectedPitch(float v){setCountPitch(ui.selectedBar,ui.selectedCount,v);} void PluginStateModel::setSelectedDepth(float v){setCountDepth(ui.selectedBar,ui.selectedCount,v);} void PluginStateModel::setSelectedMotion(const std::vector<MotionPoint>& m){setCountMotion(ui.selectedBar,ui.selectedCount,m);} void PluginStateModel::clearSelectedMotion(){clearCountMotion(ui.selectedBar,ui.selectedCount);}
-juce::ValueTree PluginStateModel::toValueTree() const { juce::ValueTree root(rootId);root.setProperty("stateVersion",kStateVersion,nullptr);juce::ValueTree g(globalId);g.setProperty("selectedTab",ui.selectedTab,nullptr);g.setProperty("selectedBar",ui.selectedBar,nullptr);g.setProperty("selectedCount",ui.selectedCount,nullptr);g.setProperty("bypass",ui.bypass,nullptr);root.addChild(g,-1,nullptr);juce::ValueTree bs(barsId);for(int b=0;b<kNumBars;++b){juce::ValueTree bt(barId);bt.setProperty("index",b,nullptr);for(int c=0;c<kCountsPerBar;++c){auto&s=bars[(size_t)b].counts[(size_t)c];juce::ValueTree ct(countId);ct.setProperty("index",c,nullptr);ct.setProperty("preset",(int)s.preset,nullptr);ct.setProperty("length",(int)s.length,nullptr);ct.setProperty("speed",s.speed,nullptr);ct.setProperty("pitch",s.pitch,nullptr);ct.setProperty("depth",s.depth,nullptr);ct.setProperty("customMotion",s.customMotion,nullptr);for(auto p:s.motion){juce::ValueTree pt(pointId);pt.setProperty("x",p.x,nullptr);pt.setProperty("y",p.y,nullptr);ct.addChild(pt,-1,nullptr);}bt.addChild(ct,-1,nullptr);}bs.addChild(bt,-1,nullptr);}root.addChild(bs,-1,nullptr);return root; }
-bool PluginStateModel::fromValueTree(const juce::ValueTree& root){if(!root.hasType(rootId))return false;const int version=(int)root.getProperty("stateVersion",0);if(version<1||version>kStateVersion)return false;PluginStateModel parsed;auto g=root.getChildWithName(globalId);if(g.isValid()){parsed.ui.selectedTab=juce::jlimit(0,3,(int)g.getProperty("selectedTab",0));parsed.ui.selectedBar=barIndex((int)g.getProperty("selectedBar",0));parsed.ui.selectedCount=countIndex((int)g.getProperty("selectedCount",0));parsed.ui.bypass=(bool)g.getProperty("bypass",false);}auto bs=root.getChildWithName(barsId);for(int i=0;i<bs.getNumChildren();++i){auto bt=bs.getChild(i);int b=(int)bt.getProperty("index",-1);if(!bt.hasType(barId)||b<0||b>=kNumBars)continue;for(int j=0;j<bt.getNumChildren();++j){auto ct=bt.getChild(j);int c=(int)ct.getProperty("index",-1);if(!ct.hasType(countId)||c<0||c>=kCountsPerBar)continue;auto&s=parsed.mutableCount(b,c);int p=(int)ct.getProperty("preset",0),l=(int)ct.getProperty("length",0);s.preset=(ScratchPreset)juce::jlimit(0,9,p);s.length=(NoteLength)juce::jlimit(0,4,l);s.speed=finiteClamp((float)ct.getProperty("speed",1.0),kMinSpeed,kMaxSpeed,1);s.pitch=finiteClamp((float)ct.getProperty("pitch",0.0),kMinPitch,kMaxPitch,0);s.depth=finiteClamp((float)ct.getProperty("depth",1.0),0,1,1);s.customMotion=(bool)ct.getProperty("customMotion",false);std::vector<MotionPoint> m;for(int q=0;q<ct.getNumChildren();++q){auto pt=ct.getChild(q);if(pt.hasType(pointId))m.push_back({(float)pt.getProperty("x",NAN),(float)pt.getProperty("y",NAN)});}s.motion=sanitiseMotion(m);if(s.customMotion)s.preset=ScratchPreset::custom;}}*this=std::move(parsed);return true; }
+int PluginStateModel::barIndex (int value) noexcept { return juce::jlimit (0, kNumBars - 1, value); }
+float PluginStateModel::finiteClamp (float value, float low, float high, float fallbackValue) noexcept
+{
+    return std::isfinite (value) ? juce::jlimit (low, high, value) : fallbackValue;
+}
+std::vector<PluginStateModel::MotionPoint> PluginStateModel::sanitiseMotion (const std::vector<MotionPoint>& input)
+{
+    std::vector<MotionPoint> output;
+    output.reserve (juce::jmin (static_cast<int> (input.size()), kMaxMotionPoints));
+    for (const auto point : input)
+    {
+        if (! std::isfinite (point.x) || ! std::isfinite (point.y)) continue;
+        const MotionPoint clamped { juce::jlimit (0.0f, 1.0f, point.x), juce::jlimit (0.0f, 1.0f, point.y) };
+        if (output.empty() || std::hypot (clamped.x - output.back().x, clamped.y - output.back().y) >= 0.004f)
+            output.push_back (clamped);
+        if (static_cast<int> (output.size()) == kMaxMotionPoints) break;
+    }
+    return output;
+}
+std::vector<PluginStateModel::MotionPoint> PluginStateModel::presetMotion (ScratchPreset preset)
+{
+    if (preset == ScratchPreset::off) return {};
+    if (preset == ScratchPreset::zigzag) return {{ 0,.75f },{ .25f,.25f },{ .5f,.75f },{ .75f,.25f },{ 1,.75f }};
+    if (preset == ScratchPreset::backspin) return {{ 1,.3f },{ .72f,.45f },{ .42f,.65f },{ .12f,.8f }};
+    return {{ 0,.65f },{ .35f,.45f },{ .7f,.3f },{ 1,.5f }};
+}
+void PluginStateModel::reset() { slots = {}; ui = {}; }
+const PluginStateModel::TimelineSlot& PluginStateModel::getSlot (int bar) const noexcept { return slots[static_cast<size_t> (barIndex (bar))]; }
+PluginStateModel::TimelineSlot& PluginStateModel::mutableSlot (int bar) noexcept { return slots[static_cast<size_t> (barIndex (bar))]; }
+void PluginStateModel::selectTab (int tab) { ui.selectedTab = juce::jlimit (0, 3, tab); }
+void PluginStateModel::selectBar (int bar) { ui.selectedBar = barIndex (bar); }
+void PluginStateModel::setBypass (bool enabled) { ui.bypass = enabled; }
+void PluginStateModel::setSlotPreset (int bar, ScratchPreset preset) { auto& slot = mutableSlot (bar); slot.preset = preset; slot.customMotion = false; slot.motion = presetMotion (preset); }
+void PluginStateModel::setSlotLength (int bar, NoteLength value) { mutableSlot (bar).length = static_cast<NoteLength> (juce::jlimit (0, 4, static_cast<int> (value))); }
+void PluginStateModel::setSlotSpeed (int bar, float value) { mutableSlot (bar).speed = finiteClamp (value, kMinSpeed, kMaxSpeed, 1.0f); }
+void PluginStateModel::setSlotPitch (int bar, float value) { mutableSlot (bar).pitch = finiteClamp (value, kMinPitch, kMaxPitch, 0.0f); }
+void PluginStateModel::setSlotDepth (int bar, float value) { mutableSlot (bar).depth = finiteClamp (value, 0.0f, 1.0f, 0.5f); }
+void PluginStateModel::setSlotMotion (int bar, const std::vector<MotionPoint>& motion) { auto& slot = mutableSlot (bar); slot.motion = sanitiseMotion (motion); slot.customMotion = true; slot.preset = ScratchPreset::custom; }
+void PluginStateModel::clearSlotMotion (int bar) { auto& slot = mutableSlot (bar); slot.motion.clear(); slot.customMotion = false; if (slot.preset == ScratchPreset::custom) slot.preset = ScratchPreset::off; }
+void PluginStateModel::resetSlot (int bar) { mutableSlot (bar) = TimelineSlot {}; }
+void PluginStateModel::setSelectedPreset (ScratchPreset preset) { setSlotPreset (ui.selectedBar, preset); }
+void PluginStateModel::setSelectedLength (NoteLength value) { setSlotLength (ui.selectedBar, value); }
+void PluginStateModel::setSelectedSpeed (float value) { setSlotSpeed (ui.selectedBar, value); }
+void PluginStateModel::setSelectedPitch (float value) { setSlotPitch (ui.selectedBar, value); }
+void PluginStateModel::setSelectedDepth (float value) { setSlotDepth (ui.selectedBar, value); }
+void PluginStateModel::setSelectedMotion (const std::vector<MotionPoint>& motion) { setSlotMotion (ui.selectedBar, motion); }
+void PluginStateModel::clearSelectedMotion() { clearSlotMotion (ui.selectedBar); }
+void PluginStateModel::resetSelectedSlot() { resetSlot (ui.selectedBar); }
+
+juce::ValueTree PluginStateModel::toValueTree() const
+{
+    juce::ValueTree root (rootId);
+    root.setProperty ("stateVersion", kStateVersion, nullptr);
+    juce::ValueTree global (globalId);
+    global.setProperty ("selectedTab", ui.selectedTab, nullptr);
+    global.setProperty ("selectedBar", ui.selectedBar, nullptr);
+    global.setProperty ("bypass", ui.bypass, nullptr);
+    root.addChild (global, -1, nullptr);
+    juce::ValueTree timeline (barsId);
+    for (int bar = 0; bar < kNumBars; ++bar)
+    {
+        juce::ValueTree node (slotId);
+        node.setProperty ("index", bar, nullptr);
+        writeSlot (node, slots[static_cast<size_t> (bar)]);
+        timeline.addChild (node, -1, nullptr);
+    }
+    root.addChild (timeline, -1, nullptr);
+    return root;
+}
+
+bool PluginStateModel::fromValueTree (const juce::ValueTree& root)
+{
+    if (! root.hasType (rootId)) return false;
+    const auto version = static_cast<int> (root.getProperty ("stateVersion", 0));
+    if (version < 1 || version > kStateVersion) return false;
+    PluginStateModel parsed;
+    const auto global = root.getChildWithName (globalId);
+    if (global.isValid())
+    {
+        parsed.ui.selectedTab = juce::jlimit (0, 3, static_cast<int> (global.getProperty ("selectedTab", 0)));
+        parsed.ui.selectedBar = barIndex (static_cast<int> (global.getProperty ("selectedBar", 0)));
+        parsed.ui.bypass = static_cast<bool> (global.getProperty ("bypass", false));
+    }
+    const auto timeline = root.getChildWithName (barsId);
+    for (int i = 0; i < timeline.getNumChildren(); ++i)
+    {
+        const auto node = timeline.getChild (i);
+        const auto bar = static_cast<int> (node.getProperty ("index", -1));
+        if (bar < 0 || bar >= kNumBars) continue;
+        // v1 stored 16 Counts beneath each Bar. Migrate its first Count into
+        // the single v2 timeline slot, preserving a deterministic legacy value.
+        const auto legacyCount = version == 1 ? node.getChildWithName (countId) : juce::ValueTree {};
+        const auto source = version == 1 ? legacyCount : node;
+        if (! source.isValid()) continue;
+        auto& slot = parsed.mutableSlot (bar);
+        slot.preset = static_cast<ScratchPreset> (juce::jlimit (0, 9, static_cast<int> (source.getProperty ("preset", 0))));
+        slot.length = static_cast<NoteLength> (juce::jlimit (0, 4, static_cast<int> (source.getProperty ("length", 0))));
+        slot.speed = finiteClamp (static_cast<float> (source.getProperty ("speed", 1.0)), kMinSpeed, kMaxSpeed, 1.0f);
+        slot.pitch = finiteClamp (static_cast<float> (source.getProperty ("pitch", 0.0)), kMinPitch, kMaxPitch, 0.0f);
+        slot.depth = finiteClamp (static_cast<float> (source.getProperty ("depth", 0.5)), 0.0f, 1.0f, 0.5f);
+        slot.customMotion = static_cast<bool> (source.getProperty ("customMotion", false));
+        std::vector<MotionPoint> motion;
+        for (int p = 0; p < source.getNumChildren(); ++p)
+        {
+            const auto point = source.getChild (p);
+            if (point.hasType (pointId)) motion.push_back ({ static_cast<float> (point.getProperty ("x", NAN)), static_cast<float> (point.getProperty ("y", NAN)) });
+        }
+        slot.motion = sanitiseMotion (motion);
+        if (slot.customMotion) slot.preset = ScratchPreset::custom;
+    }
+    *this = std::move (parsed);
+    return true;
+}

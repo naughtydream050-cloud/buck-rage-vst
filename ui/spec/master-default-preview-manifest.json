@@ -18,7 +18,6 @@
   "stateAssets": {
     "barLabels": "bar-labels/bar_label_01.png through bar_label_64.png; deterministic composition from MASTER DEFAULT BAR/0-9 real-pixel glyphs",
     "barCells": "bar-cells/bar_cell_shell_{normal,selected,playing,selected_playing}_72x94.png",
-    "counts": "count/count_01..16_{normal,selected}_117x72.png",
     "presets": "preset/preset_{off,forward_cut,backspin,chirp,baby,transform,drag,zigzag,tape_brake,custom}_{normal,selected}_*.png",
     "lengths": "length/length_{1_16,1_8,1_4,1_2,1_bar}_{normal,selected}_40x33.png"
   },

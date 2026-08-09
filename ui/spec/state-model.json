@@ -3,7 +3,7 @@
   "implementationStatus": "planned-not-started",
   "dimensions": { "bars": 64, "countsPerBar": 16, "countSlots": 1024 },
   "globalApvts": ["bypass"],
-  "uiState": ["visibleBarPage", "selectedBar", "selectedCount"],
+  "uiState": ["visibleBarPage", "selectedBar"],
   "runtimeHostSnapshot": ["hostSyncAvailable", "playing", "bpm", "timeSignatureNumerator", "timeSignatureDenominator", "playingBar"],
   "countSlot": {
     "preset": { "type": "enum", "values": ["OFF","FORWARD_CUT","BACKSPIN","CHIRP","BABY","TRANSFORM","DRAG","ZIGZAG","TAPE_BRAKE","CUSTOM"] },

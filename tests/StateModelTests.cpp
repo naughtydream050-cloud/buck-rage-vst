@@ -1,13 +1,72 @@
 #include "PluginStateModel.h"
 #include <iostream>
-namespace { bool ok=true; void check(bool v,const char* n){std::cout<<(v?"PASS ":"FAIL ")<<n<<'\n';ok&=v;} juce::MemoryBlock bytes(const PluginStateModel& s){auto x=s.toValueTree().createXml();auto text=x->toString();return {text.toRawUTF8(),(size_t)text.getNumBytesAsUTF8()};} double now(){return juce::Time::getMillisecondCounterHiRes();} }
-int main(){
- PluginStateModel a; a.selectTab(2);a.selectBar(10);check(a.getUiState().selectedTab==2&&a.getUiState().selectedBar==10,"bar selection preserves tab");a.selectCount(4);a.selectTab(0);a.setBypass(true);
- for(int preset=0;preset<10;++preset){const auto bypassBefore=a.getUiState().bypass;a.setSelectedPreset((PluginStateModel::ScratchPreset)preset);check(a.getCount(10,4).preset==(PluginStateModel::ScratchPreset)preset&&a.getUiState().bypass==bypassBefore,"preset single-selection and bypass isolation");}a.setSelectedMotion({{.1f,.2f},{.2f,.3f}});check(a.getCount(10,4).preset==PluginStateModel::ScratchPreset::custom,"custom motion selects custom");const auto presetBeforeBypass=a.getCount(10,4).preset;a.setBypass(false);check(a.getCount(10,4).preset==presetBeforeBypass&&!a.getUiState().bypass,"bypass does not alter preset");
- a.setCountPreset(10,2,PluginStateModel::ScratchPreset::backspin);a.setCountPreset(10,4,PluginStateModel::ScratchPreset::chirp);a.setCountPreset(10,12,PluginStateModel::ScratchPreset::zigzag);
- a.setCountLength(10,4,PluginStateModel::NoteLength::quarter);a.setCountSpeed(10,4,1.75f);a.setCountPitch(10,4,-12);a.setCountDepth(10,4,.5f);a.setCountMotion(10,4,{{.1f,.2f},{.4f,.5f},{.8f,.9f}});
- auto beforeTabSwitch=a.getCount(10,4);for(const int tab:{1,2,3,0})a.selectTab(tab);auto tabSwitchUi=a.getUiState();auto afterTabSwitch=a.getCount(10,4);check(tabSwitchUi.selectedTab==0&&tabSwitchUi.selectedBar==10&&tabSwitchUi.selectedCount==4&&afterTabSwitch.preset==beforeTabSwitch.preset&&afterTabSwitch.length==beforeTabSwitch.length&&afterTabSwitch.speed==beforeTabSwitch.speed&&afterTabSwitch.pitch==beforeTabSwitch.pitch&&afterTabSwitch.depth==beforeTabSwitch.depth&&afterTabSwitch.motion.size()==beforeTabSwitch.motion.size(),"tab switch preserves selected bar count and parameters");
- auto t=a.toValueTree();PluginStateModel b;check(b.fromValueTree(t),"round-trip");auto s=b.getCount(10,4);check(b.getCount(10,2).preset==PluginStateModel::ScratchPreset::backspin&&b.getCount(10,12).preset==PluginStateModel::ScratchPreset::zigzag,"1024-slot independence");check(s.length==PluginStateModel::NoteLength::quarter&&s.speed==1.75f&&s.pitch==-12&&s.depth==.5f&&b.getCount(10,2).speed==1&&b.getCount(10,12).depth==.5f,"parameter independence");check(s.preset==PluginStateModel::ScratchPreset::custom&&s.customMotion&&s.motion.size()==3&&s.motion[1].x==.4f&&s.motion[1].y==.5f,"motion custom round-trip");auto u=b.getUiState();check(u.selectedTab==0&&u.selectedBar==10&&u.selectedCount==4&&!u.bypass,"UI state restore");
- auto bad=t;auto bars=bad.getChildWithName("Bars");auto bar=bars.getChild(10);auto count=bar.getChild(4);count.setProperty("preset",999,nullptr);count.setProperty("length",999,nullptr);count.setProperty("speed",std::numeric_limits<double>::infinity(),nullptr);count.setProperty("pitch",std::numeric_limits<double>::quiet_NaN(),nullptr);count.setProperty("depth",-3.0,nullptr);juce::ValueTree p("Point");p.setProperty("x",999.0,nullptr);p.setProperty("y",-8.0,nullptr);count.addChild(p,-1,nullptr);juce::ValueTree duplicate("Count");duplicate.setProperty("index",4,nullptr);bar.addChild(duplicate,-1,nullptr);PluginStateModel c;check(c.fromValueTree(bad)&&c.getCount(10,4).speed<=4&&c.getCount(10,4).depth>=0,"invalid state clamped safely");
- PluginStateModel preserved=c;juce::ValueTree future("ToyotomiHideyoshiState");future.setProperty("stateVersion",99,nullptr);check(!c.fromValueTree(future)&&c.getCount(10,4).speed==preserved.getCount(10,4).speed,"future version preserves state");juce::ValueTree missing("ToyotomiHideyoshiState");check(!c.fromValueTree(missing),"missing version rejected");PluginStateModel empty;check(empty.fromValueTree(empty.toValueTree()),"empty state");
- auto measure=[](int slots){PluginStateModel x;std::vector<PluginStateModel::MotionPoint> m;for(int i=0;i<256;++i)m.push_back({i/255.f,1.f-i/255.f});for(int i=0;i<slots;++i)x.setCountMotion(i/16,i%16,m);auto st=now();auto tree=x.toValueTree();auto mid=now();auto b=bytes(x);PluginStateModel y;auto rs=now();y.fromValueTree(tree);auto re=now();std::cout<<"MEASURE slots="<<slots<<" bytes="<<b.getSize()<<" serializeMs="<<(mid-st)<<" restoreMs="<<(re-rs)<<'\n';};measure(0);measure(1);measure(16);return ok?0:1; }
+
+namespace
+{
+bool ok = true;
+void check (bool value, const char* label) { std::cout << (value ? "PASS " : "FAIL ") << label << '\n'; ok &= value; }
+}
+
+int main()
+{
+    PluginStateModel model;
+    model.selectBar (4);
+    model.setSelectedPreset (PluginStateModel::ScratchPreset::backspin);
+    model.setSelectedLength (PluginStateModel::NoteLength::quarter);
+    model.setSelectedSpeed (1.75f);
+    model.setSelectedPitch (-3.0f);
+    model.setSelectedDepth (0.70f);
+    model.setSelectedMotion ({ { .1f, .2f }, { .4f, .5f }, { .8f, .9f } });
+    model.selectBar (5);
+    model.setSelectedPreset (PluginStateModel::ScratchPreset::chirp);
+    check (model.getSlot (4).preset == PluginStateModel::ScratchPreset::custom
+           && model.getSlot (5).preset == PluginStateModel::ScratchPreset::chirp,
+           "64-timeline-slots-are-independent");
+
+    const auto beforeTab = model.getSlot (4);
+    for (const int tab : { 1, 2, 3, 0 }) model.selectTab (tab);
+    const auto ui = model.getUiState();
+    check (ui.selectedTab == 0 && ui.selectedBar == 5
+           && model.getSlot (4).preset == beforeTab.preset
+           && model.getSlot (4).motion.size() == beforeTab.motion.size(),
+           "tab-switch-is-view-only");
+
+    const auto bypassBefore = model.getUiState().bypass;
+    for (int preset = 0; preset < 10; ++preset)
+    {
+        model.setSelectedPreset (static_cast<PluginStateModel::ScratchPreset> (preset));
+        check (model.getSlot (5).preset == static_cast<PluginStateModel::ScratchPreset> (preset)
+               && model.getUiState().bypass == bypassBefore,
+               "preset-single-selection-and-bypass-isolation");
+    }
+    model.setBypass (true);
+    check (model.getSlot (5).preset == PluginStateModel::ScratchPreset::custom && model.getUiState().bypass,
+           "bypass-does-not-alter-timeline-slot");
+
+    const auto state = model.toValueTree();
+    PluginStateModel restored;
+    check (restored.fromValueTree (state), "v2-round-trip");
+    check (restored.getSlot (4).customMotion && restored.getSlot (4).motion.size() == 3
+           && restored.getSlot (4).length == PluginStateModel::NoteLength::quarter
+           && restored.getSlot (4).speed == 1.75f && restored.getSlot (4).pitch == -3.0f,
+           "timeline-slot-parameters-round-trip");
+
+    // v1 migration deliberately takes each legacy BAR's Count 0 as its new
+    // timeline slot: the former 1024-slot hierarchy no longer exists in UI.
+    juce::ValueTree legacy ("ToyotomiHideyoshiState");
+    legacy.setProperty ("stateVersion", 1, nullptr);
+    juce::ValueTree global ("Global"); global.setProperty ("selectedBar", 3, nullptr); legacy.addChild (global, -1, nullptr);
+    juce::ValueTree bars ("Bars"), bar ("Bar"), count ("Count");
+    bar.setProperty ("index", 3, nullptr); count.setProperty ("index", 0, nullptr);
+    count.setProperty ("preset", static_cast<int> (PluginStateModel::ScratchPreset::drag), nullptr);
+    bar.addChild (count, -1, nullptr); bars.addChild (bar, -1, nullptr); legacy.addChild (bars, -1, nullptr);
+    PluginStateModel migrated;
+    check (migrated.fromValueTree (legacy) && migrated.getSlot (3).preset == PluginStateModel::ScratchPreset::drag,
+           "v1-first-count-migrates-to-timeline-slot");
+
+    PluginStateModel preserved = restored;
+    juce::ValueTree future ("ToyotomiHideyoshiState"); future.setProperty ("stateVersion", 99, nullptr);
+    check (! restored.fromValueTree (future) && restored.getSlot (4).speed == preserved.getSlot (4).speed,
+           "future-version-preserves-state");
+    return ok ? 0 : 1;
+}

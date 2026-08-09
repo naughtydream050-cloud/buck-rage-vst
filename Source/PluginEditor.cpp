@@ -17,13 +17,24 @@ juce::Image loadMasterDefault()
     // juce_add_binary_data converts the filename into an identifier.  The
     // previous literal filename lookup always returned nullptr in the VST3,
     // leaving the editor with its opaque black clear colour.
-    const auto* data = BinaryData::getNamedResource ("A_default_1280x853_png", size);
+    const auto* data = BinaryData::getNamedResource ("master_timeline_1280x853_png", size);
     const auto image = data != nullptr ? juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (size)) : juce::Image {};
     if (! image.isValid() || image.getWidth() != 1280 || image.getHeight() != 853)
-        std::cerr << "BACKGROUND_ASSET_FAIL resource=A_default_1280x853_png bytes=" << size << '\n';
+        std::cerr << "BACKGROUND_ASSET_FAIL resource=master_timeline_1280x853_png bytes=" << size << '\n';
     return image;
 #else
     return {};
+    return {};
+#endif
+}
+
+juce::Image loadQuoteImage()
+{
+#if TOYOTOMI_HAS_BINARY_DATA
+    int size = 0;
+    const auto* data = BinaryData::getNamedResource ("toyotomi_hideyoshi_quote_jpg", size);
+    return data != nullptr ? juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (size)) : juce::Image {};
+#else
     return {};
 #endif
 }
@@ -36,39 +47,40 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
       referenceImage (loadMasterDefault()),
       topBar (p),
       artwork (referenceImage),
+      quotePanel (loadQuoteImage()),
       countParameters (p),
       outputMeter (p)
 {
     auto& state = processor.getStateModel();
     const auto uiState = state.getUiState();
-    barTabs.setSelectedPage (uiState.selectedTab);
+    displayTab = uiState.selectedTab;
+    barTabs.setSelectedPage (displayTab);
     // Page selection is a view-only choice.  It must never mutate the active
     // BAR/COUNT slot or any parameter state.
-    barMap.setDisplayState (uiState.selectedTab, uiState.selectedBar, -1);
-    barMap.setPresetPreview (uiState.selectedCount, [&state] (int bar, int count) { return state.getCount (bar, count); });
-    countGrid.setSelectedCount (uiState.selectedCount);
-    presetPalette.setSelectedPreset (static_cast<int> (state.getCount (uiState.selectedBar, uiState.selectedCount).preset));
+    barMap.setDisplayState (displayTab, uiState.selectedBar, processor.getCurrentTimelineSlot());
+    barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); });
+    presetPalette.setSelectedPreset (static_cast<int> (state.getSlot (uiState.selectedBar).preset));
     barTabs.onSelectedPage = [this, &state] (int page)
     {
         state.selectTab (page);
+        displayTab = page;
         const auto ui = state.getUiState();
-        barMap.setDisplayState (ui.selectedTab, ui.selectedBar, -1);
+        barMap.setDisplayState (displayTab, ui.selectedBar, processor.getCurrentTimelineSlot());
     };
     barMap.onSelectedBar = [this, &state] (int bar)
     {
         state.selectBar (bar);
         const auto ui = state.getUiState();
-        barMap.setDisplayState (ui.selectedTab, ui.selectedBar, -1);
-        presetPalette.setSelectedPreset (static_cast<int> (state.getCount (ui.selectedBar, ui.selectedCount).preset));
+        barMap.setDisplayState (displayTab, ui.selectedBar, processor.getCurrentTimelineSlot());
+        presetPalette.setSelectedPreset (static_cast<int> (state.getSlot (ui.selectedBar).preset));
     };
-    countGrid.onSelectedCount = [this, &state] (int count) { state.selectCount (count); const auto ui = state.getUiState(); barMap.setPresetPreview (ui.selectedCount, [&state] (int bar, int previewCount) { return state.getCount (bar, previewCount); }); presetPalette.setSelectedPreset (static_cast<int> (state.getCount (ui.selectedBar, ui.selectedCount).preset)); };
-    presetPalette.onPresetSelected = [this, &state] (int preset) { state.setSelectedPreset ((PluginStateModel::ScratchPreset) preset); const auto ui = state.getUiState(); barMap.setPresetPreview (ui.selectedCount, [&state] (int bar, int previewCount) { return state.getCount (bar, previewCount); }); };
+    presetPalette.onPresetSelected = [this, &state] (int preset) { state.setSelectedPreset ((PluginStateModel::ScratchPreset) preset); barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); }); };
     countParameters.onLengthSelected = [&state] (int length) { state.setSelectedLength ((PluginStateModel::NoteLength) length); };
-    xyPad.onMotionChanged = [this, &state] (const std::vector<PluginStateModel::MotionPoint>& motion) { state.setSelectedMotion (motion); const auto ui = state.getUiState(); barMap.setPresetPreview (ui.selectedCount, [&state] (int bar, int previewCount) { return state.getCount (bar, previewCount); }); presetPalette.setSelectedPreset (static_cast<int> (PluginStateModel::ScratchPreset::custom)); };
-    xyPad.onClearMotion = [this, &state] { state.clearSelectedMotion(); const auto ui = state.getUiState(); barMap.setPresetPreview (ui.selectedCount, [&state] (int bar, int previewCount) { return state.getCount (bar, previewCount); }); presetPalette.setSelectedPreset (static_cast<int> (state.getCount (ui.selectedBar, ui.selectedCount).preset)); };
-    xyPad.onResetCount = [this, &state] { const auto ui = state.getUiState(); state.resetCountSlot (ui.selectedBar, ui.selectedCount); barMap.setPresetPreview (ui.selectedCount, [&state] (int bar, int previewCount) { return state.getCount (bar, previewCount); }); presetPalette.setSelectedPreset (static_cast<int> (PluginStateModel::ScratchPreset::off)); };
+    xyPad.onMotionChanged = [this, &state] (const std::vector<PluginStateModel::MotionPoint>& motion) { state.setSelectedMotion (motion); barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); }); presetPalette.setSelectedPreset (static_cast<int> (PluginStateModel::ScratchPreset::custom)); };
+    xyPad.onClearMotion = [this, &state] { state.clearSelectedMotion(); const auto ui = state.getUiState(); barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); }); presetPalette.setSelectedPreset (static_cast<int> (state.getSlot (ui.selectedBar).preset)); };
+    xyPad.onResetSlot = [this, &state] { state.resetSelectedSlot(); barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); }); presetPalette.setSelectedPreset (static_cast<int> (PluginStateModel::ScratchPreset::off)); };
     for (auto* component : std::array<juce::Component*, 10> {
-             &topBar, &artwork, &barTabs, &barMap, &countGrid,
+             &topBar, &artwork, &barTabs, &barMap, &quotePanel,
              &xyPad, &presetPalette, &countParameters, &outputMeter, &bottomStatus })
     {
         addAndMakeVisible (*component);
@@ -78,7 +90,7 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
 
     artwork.toBack();
     topBar.toFront (false); barTabs.toFront (false); barMap.toFront (false);
-    countGrid.toFront (false); xyPad.toFront (false); presetPalette.toFront (false);
+    quotePanel.toFront (false); xyPad.toFront (false); presetPalette.toFront (false);
     countParameters.toFront (false); outputMeter.toFront (false); bottomStatus.toFront (false);
 
     setOpaque (true);
@@ -86,6 +98,8 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
     // makes visual and hit-test geometry diverge in FL Studio.
     setResizable (false, false);
     setSize (uiSpec.getCanvasWidth(), uiSpec.getCanvasHeight());
+    refreshSelectedSlotViews();
+    startTimerHz (30);
 }
 
 void ToyotomiHideyoshiAudioProcessorEditor::paint (juce::Graphics& g)
@@ -112,11 +126,40 @@ void ToyotomiHideyoshiAudioProcessorEditor::resized()
     artwork.setBounds         (uiSpec.scaleRegion ("artwork", viewport));
     barTabs.setBounds         (uiSpec.scaleRegion ("barTabs", viewport));
     barMap.setBounds          (uiSpec.scaleRegion ("barMap", viewport));
-    countGrid.setBounds       (uiSpec.scaleRegion ("countGrid", viewport));
+    quotePanel.setBounds      (uiSpec.scaleRegion ("quotePanel", viewport));
     xyPad.setBounds           (uiSpec.scaleRegion ("xyPad", viewport));
     presetPalette.setBounds   (uiSpec.scaleRegion ("presetPalette", viewport));
     countParameters.setBounds (uiSpec.scaleRegion ("countParameters", viewport));
     outputMeter.setBounds     (uiSpec.scaleRegion ("outputMeter", viewport));
     bottomStatus.setBounds    (uiSpec.scaleRegion ("bottomStatus", viewport));
 
+}
+
+void ToyotomiHideyoshiAudioProcessorEditor::refreshSelectedSlotViews()
+{
+    const auto ui = processor.getStateModel().getUiState();
+    const auto& slot = processor.getStateModel().getSlot (ui.selectedBar);
+    presetPalette.setSelectedBar (ui.selectedBar);
+    presetPalette.setSelectedPreset (static_cast<int> (slot.preset));
+    countParameters.setSelectedBar (ui.selectedBar);
+    xyPad.setSelectedBar (ui.selectedBar);
+    xyPad.setMotion (slot.motion);
+    countParameters.repaint();
+}
+
+void ToyotomiHideyoshiAudioProcessorEditor::timerCallback()
+{
+    const auto playhead = processor.getCurrentTimelineSlot();
+    if (playhead >= 0)
+    {
+        const auto followedTab = playhead / 16;
+        if (followedTab != displayTab)
+        {
+            displayTab = followedTab;
+            barTabs.setSelectedPage (displayTab);
+        }
+    }
+    const auto ui = processor.getStateModel().getUiState();
+    barMap.setDisplayState (displayTab, ui.selectedBar, playhead);
+    refreshSelectedSlotViews();
 }

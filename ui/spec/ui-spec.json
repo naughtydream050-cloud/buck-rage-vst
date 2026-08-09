@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "Toyotomi Hideyoshi",
-  "visualTruth": "Resources/ui-master-default-preview-20260808/previews/A_default_1280x853.png",
+  "visualTruth": "Resources/ui-user-timeline-20260809/master-timeline-1280x853.png",
   "canvas": { "width": 1280, "height": 853, "aspectRatio": 1.5005861665, "resizable": false },
   "font": {
     "family": "Bahnschrift Condensed",
@@ -33,7 +33,7 @@
     "barMap": { "x": 316, "y": 143, "w": 608, "h": 266 },
     "presetPalette": { "x": 942, "y": 87, "w": 333, "h": 350 },
     "xyPad": { "x": 18, "y": 520, "w": 289, "h": 249 },
-    "countGrid": { "x": 332, "y": 432, "w": 512, "h": 360 },
+    "quotePanel": { "x": 332, "y": 432, "w": 512, "h": 360 },
     "countParameters": { "x": 866, "y": 465, "w": 251, "h": 327 },
     "outputMeter": { "x": 1126, "y": 449, "w": 140, "h": 343 },
     "bottomStatus": { "x": 5, "y": 806, "w": 1270, "h": 42 }
@@ -44,7 +44,6 @@
     "projectPresetPrevious": { "x": 1068, "y": 33, "w": 36, "h": 34 },
     "projectPresetNext": { "x": 1110, "y": 33, "w": 36, "h": 34 },
     "barCells": { "x": 328, "y": 160, "w": 559, "h": 197 },
-    "countCells": { "x": 334, "y": 436, "w": 479, "h": 296 },
     "xyPadInput": { "x": 48, "y": 547, "w": 243, "h": 176 },
     "clearMotion": { "x": 36, "y": 731, "w": 124, "h": 33 },
     "resetCount": { "x": 174, "y": 731, "w": 114, "h": 33 },

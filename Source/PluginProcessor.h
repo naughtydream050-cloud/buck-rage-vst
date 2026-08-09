@@ -39,6 +39,7 @@ public:
     int getTimeSignatureDenominator() const noexcept { return timeSignatureDenominator.load (std::memory_order_relaxed); }
     bool getHostSyncAvailable() const noexcept { return hostSyncAvailable.load (std::memory_order_relaxed); }
     bool getHostPlaying() const noexcept { return hostPlaying.load (std::memory_order_relaxed); }
+    int getCurrentTimelineSlot() const noexcept { return currentTimelineSlot.load (std::memory_order_relaxed); }
     PluginStateModel& getStateModel() noexcept { return stateModel; }
     const PluginStateModel& getStateModel() const noexcept { return stateModel; }
 
@@ -52,6 +53,7 @@ private:
     std::atomic<int> timeSignatureDenominator { 4 };
     std::atomic<bool> hostSyncAvailable { false };
     std::atomic<bool> hostPlaying { false };
+    std::atomic<int> currentTimelineSlot { -1 };
     PluginStateModel stateModel;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ToyotomiHideyoshiAudioProcessor)

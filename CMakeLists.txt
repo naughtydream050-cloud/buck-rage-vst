@@ -41,9 +41,7 @@ juce_generate_juce_header(ToyotomiHideyoshi)
 
 file (GLOB_RECURSE TOYOTOMI_MASTER_UI_ASSETS CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/bar-labels/*.png"
-    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/bar-waveforms/*.png"
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/bar-cells/*.png"
-    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/count/*.png"
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/length/*.png"
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/tabs/*.png"
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/xy-buttons/*.png"
@@ -54,7 +52,8 @@ file (GLOB TOYOTOMI_EXACT_PRESET_BYPASS_ASSETS CONFIGURE_DEPENDS
 
 juce_add_binary_data(ToyotomiHideyoshiAssets
     SOURCES
-        Resources/ui-master-default-preview-20260808/previews/A_default_1280x853.png
+        Resources/ui-user-timeline-20260809/master-timeline-1280x853.png
+        Resources/ui-user-quote-20260809/toyotomi-hideyoshi-quote.jpg
         ${TOYOTOMI_MASTER_UI_ASSETS}
         ${TOYOTOMI_EXACT_PRESET_BYPASS_ASSETS}
         ui/spec/ui-spec.json

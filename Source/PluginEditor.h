@@ -5,7 +5,8 @@
 #include "UiSpec.h"
 #include "UIComponents.h"
 
-class ToyotomiHideyoshiAudioProcessorEditor final : public juce::AudioProcessorEditor
+class ToyotomiHideyoshiAudioProcessorEditor final : public juce::AudioProcessorEditor,
+                                                    private juce::Timer
 {
 public:
     explicit ToyotomiHideyoshiAudioProcessorEditor (ToyotomiHideyoshiAudioProcessor&);
@@ -23,12 +24,16 @@ private:
     ArtworkPanel artwork;
     BarTabComponent barTabs;
     BarMapComponent barMap;
-    CountGridComponent countGrid;
+    QuotePanel quotePanel;
     XYMotionPad xyPad;
     ScratchPresetPalette presetPalette;
     CountParameterPanel countParameters;
     OutputMeterComponent outputMeter;
     BottomStatusBar bottomStatus;
+    int displayTab = 0;
+
+    void timerCallback() override;
+    void refreshSelectedSlotViews();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ToyotomiHideyoshiAudioProcessorEditor)
 };
