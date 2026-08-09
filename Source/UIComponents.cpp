@@ -442,7 +442,7 @@ void XYMotionPad::paint (juce::Graphics& g)
     g.fillRect (50, 0, 190, 22);
     g.setColour (ToyotomiUi::gold());
     g.setFont (ToyotomiUi::font (13.0f, false));
-    g.drawText ("XY PAD (BAR " + juce::String (selectedBar + 1) + ")", { 50, 1, 190, 20 }, juce::Justification::centred);
+    g.drawText ("XY PAD (BAR " + juce::String (selectedBar + 1) + ")", juce::Rectangle<int> (50, 1, 190, 20), juce::Justification::centred);
     const auto pad = padBounds();
     g.saveState(); g.reduceClipRegion (pad.toNearestInt());
     juce::Path motion;
@@ -500,7 +500,7 @@ void ScratchPresetPalette::paint (juce::Graphics& g)
     g.fillRect (7, 4, 224, 27);
     g.setColour (ToyotomiUi::gold());
     g.setFont (ToyotomiUi::font (14.0f, false));
-    g.drawText ("BAR " + juce::String (selectedBar + 1) + " PRESET", { 8, 6, 220, 23 }, juce::Justification::centredLeft);
+    g.drawText ("BAR " + juce::String (selectedBar + 1) + " PRESET", juce::Rectangle<int> (8, 6, 220, 23), juce::Justification::centredLeft);
     for (int i = 0; i < 10; ++i)
         drawImage (g, presetCellImage (i, i == selectedPreset), cells[static_cast<size_t> (i)]);
 }
@@ -523,7 +523,7 @@ void CountParameterPanel::paint (juce::Graphics& g)
     g.fillRect (6, 4, 238, 36);
     g.setColour (ToyotomiUi::gold());
     g.setFont (ToyotomiUi::font (13.0f, false));
-    g.drawText ("BAR PARAMETERS (BAR " + juce::String (selectedBar + 1) + ")", { 8, 7, 235, 27 }, juce::Justification::centredLeft);
+    g.drawText ("BAR PARAMETERS (BAR " + juce::String (selectedBar + 1) + ")", juce::Rectangle<int> (8, 7, 235, 27), juce::Justification::centredLeft);
     static const std::array<juce::Rectangle<int>, 5> lengths {{ {10,72,40,33}, {55,72,40,33}, {99,72,40,33}, {144,72,40,33}, {192,72,40,33} }};
     for (int i = 0; i < 5; ++i)
         drawImage (g, lengthImage (i, i == static_cast<int> (count.length)), lengths[static_cast<size_t> (i)]);
