@@ -58,13 +58,14 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
         state.selectBar (bar);
         const auto ui = state.getUiState();
         barMap.setDisplayState (ui.selectedTab, ui.selectedBar, -1);
+        presetPalette.setSelectedPreset (static_cast<int> (state.getCount (ui.selectedBar, ui.selectedCount).preset));
     };
-    countGrid.onSelectedCount = [&state] (int count) { state.selectCount (count); };
+    countGrid.onSelectedCount = [this, &state] (int count) { state.selectCount (count); const auto ui = state.getUiState(); presetPalette.setSelectedPreset (static_cast<int> (state.getCount (ui.selectedBar, ui.selectedCount).preset)); };
     presetPalette.onPresetSelected = [&state] (int preset) { state.setSelectedPreset ((PluginStateModel::ScratchPreset) preset); };
     countParameters.onLengthSelected = [&state] (int length) { state.setSelectedLength ((PluginStateModel::NoteLength) length); };
-    xyPad.onMotionChanged = [&state] (const std::vector<PluginStateModel::MotionPoint>& motion) { state.setSelectedMotion (motion); };
-    xyPad.onClearMotion = [&state] { state.clearSelectedMotion(); };
-    xyPad.onResetCount = [&state] { const auto ui = state.getUiState(); state.resetCountSlot (ui.selectedBar, ui.selectedCount); };
+    xyPad.onMotionChanged = [this, &state] (const std::vector<PluginStateModel::MotionPoint>& motion) { state.setSelectedMotion (motion); presetPalette.setSelectedPreset (static_cast<int> (PluginStateModel::ScratchPreset::custom)); };
+    xyPad.onClearMotion = [this, &state] { state.clearSelectedMotion(); const auto ui = state.getUiState(); presetPalette.setSelectedPreset (static_cast<int> (state.getCount (ui.selectedBar, ui.selectedCount).preset)); };
+    xyPad.onResetCount = [this, &state] { const auto ui = state.getUiState(); state.resetCountSlot (ui.selectedBar, ui.selectedCount); presetPalette.setSelectedPreset (static_cast<int> (PluginStateModel::ScratchPreset::off)); };
     for (auto* component : std::array<juce::Component*, 10> {
              &topBar, &artwork, &barTabs, &barMap, &countGrid,
              &xyPad, &presetPalette, &countParameters, &outputMeter, &bottomStatus })

@@ -1,0 +1,207 @@
+{
+  "source_reference": "/mnt/data/71EE0DDC-E3DB-4400-B327-03872403096D.jpeg",
+  "preset_size": [
+    102,
+    79
+  ],
+  "assets": [
+    {
+      "name": "off",
+      "state": "normal",
+      "file": "preset_off_normal_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "334E1A3A823974EC26B720DC9E832BB0A0BC23E77744F69926D96DE88D6F7546",
+      "alpha": 255
+    },
+    {
+      "name": "off",
+      "state": "selected",
+      "file": "preset_off_selected_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "9CC67C55EF90B3DA2021E496EF730C423049E2677E8FEEA020367880C9CB6CC4",
+      "alpha": 255
+    },
+    {
+      "name": "forward_cut",
+      "state": "normal",
+      "file": "preset_forward_cut_normal_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "FB56D85B9EDB66C6A600943CA57E6CCBA9D57D5F94C5EE66D25426C5666ABECF",
+      "alpha": 255
+    },
+    {
+      "name": "forward_cut",
+      "state": "selected",
+      "file": "preset_forward_cut_selected_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "0A446AB14E1F11FC099B1F18C418B1E5F877AD68A44B413BCCDE3A13565F75D5",
+      "alpha": 255
+    },
+    {
+      "name": "backspin",
+      "state": "normal",
+      "file": "preset_backspin_normal_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "B80A79A7AEF65AE4DC36DF2C14591053756BD82598570B2788C2A05ECCB32CD5",
+      "alpha": 255
+    },
+    {
+      "name": "backspin",
+      "state": "selected",
+      "file": "preset_backspin_selected_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "FFAB7D82D24D2070A881F8A645F05B1DD219A029B625BC8F0E436AC34D4BF37F",
+      "alpha": 255
+    },
+    {
+      "name": "chirp",
+      "state": "normal",
+      "file": "preset_chirp_normal_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "3AABB0FE40A7DF7BFE4E38494FC8B4D60F480905FAAA54A70107491512767D23",
+      "alpha": 255
+    },
+    {
+      "name": "chirp",
+      "state": "selected",
+      "file": "preset_chirp_selected_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "86C1014B6204B313872140E8B856B7994A585BF63A900516D34824BFE6756AB2",
+      "alpha": 255
+    },
+    {
+      "name": "baby",
+      "state": "normal",
+      "file": "preset_baby_normal_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "E41CCC80E46ECF47DD73B8CE19B9EE575F43F3CE0EA0CD77C6DB628C20A3BA7A",
+      "alpha": 255
+    },
+    {
+      "name": "baby",
+      "state": "selected",
+      "file": "preset_baby_selected_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "FB0AA201607D6A06FE457FEDF7619BEE6F6D4839EFD29450A21A37F690989E33",
+      "alpha": 255
+    },
+    {
+      "name": "transform",
+      "state": "normal",
+      "file": "preset_transform_normal_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "1EDC1B3D461EE4C7AA44692021A9B19F9E6E1DE2F99941469BF66766966833D4",
+      "alpha": 255
+    },
+    {
+      "name": "transform",
+      "state": "selected",
+      "file": "preset_transform_selected_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "2ECAA9582968CA9AC20E4E26A51C94783C279AAF3CF688509925BC66BA4EB65B",
+      "alpha": 255
+    },
+    {
+      "name": "drag",
+      "state": "normal",
+      "file": "preset_drag_normal_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "444574526DC5908D6A10B203ED27629F3C5606CA226FB22343D75609A86E066C",
+      "alpha": 255
+    },
+    {
+      "name": "drag",
+      "state": "selected",
+      "file": "preset_drag_selected_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "886BA432DF57254DE14CFAA16534B174058638CA7771D156021706D18191DF84",
+      "alpha": 255
+    },
+    {
+      "name": "zigzag",
+      "state": "normal",
+      "file": "preset_zigzag_normal_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "B5E667EC113967697FF8E468E6959993FBEE4B73930DE2B24E99CE30557CC16F",
+      "alpha": 255
+    },
+    {
+      "name": "zigzag",
+      "state": "selected",
+      "file": "preset_zigzag_selected_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "B8CADE0BF4699D28E1797A0046E801424A2514015F03153653C699B9DDAC00C6",
+      "alpha": 255
+    },
+    {
+      "name": "tape_brake",
+      "state": "normal",
+      "file": "preset_tape_brake_normal_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "7AE246423662EE5B65B3039C4615D1CC8FDCBCE4B2FEE31BB7EC12E451EFD39D",
+      "alpha": 255
+    },
+    {
+      "name": "tape_brake",
+      "state": "selected",
+      "file": "preset_tape_brake_selected_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "3699D63E24C46EDE0D2344B034EE0F8E49E3533A01E30337F6CA48E10DC41BE3",
+      "alpha": 255
+    },
+    {
+      "name": "custom",
+      "state": "normal",
+      "file": "preset_custom_normal_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "C80C44E47A33E4D3FFA0F50BED95B0F08AA64FDFB107C4D0E70F6DBD16331422",
+      "alpha": 255
+    },
+    {
+      "name": "custom",
+      "state": "selected",
+      "file": "preset_custom_selected_102x79.png",
+      "width": 102,
+      "height": 79,
+      "sha256": "3F6B473D95CEFBE07B97279C79DF5C1AE88689A009E8EE576B61D1F3EFD667A4",
+      "alpha": 255
+    },
+    {
+      "name": "bypass",
+      "state": "off",
+      "file": "bypass_off.png",
+      "width": 100,
+      "height": 38,
+      "sha256": "BCBF8B49B22C47CFDA06B0DC9D040ACE29290367D5F9508216A69992A911115D",
+      "alpha": 255
+    },
+    {
+      "name": "bypass",
+      "state": "on",
+      "file": "bypass_on.png",
+      "width": 100,
+      "height": 38,
+      "sha256": "39BC8770AAEE8BC5B4A5AECC382083D0D6254F2AE81327A51CDCF1922AD62D6D",
+      "alpha": 255
+    }
+  ]
+}

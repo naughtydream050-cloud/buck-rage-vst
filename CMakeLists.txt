@@ -44,17 +44,19 @@ file (GLOB_RECURSE TOYOTOMI_MASTER_UI_ASSETS CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/bar-waveforms/*.png"
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/bar-cells/*.png"
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/count/*.png"
-    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/preset/*.png"
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/length/*.png"
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/tabs/*.png"
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/xy-buttons/*.png"
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/knobs/*.png"
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/output/*.png")
+file (GLOB TOYOTOMI_EXACT_PRESET_BYPASS_ASSETS CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-user-exact-preset-bypass-20260809/*.png")
 
 juce_add_binary_data(ToyotomiHideyoshiAssets
     SOURCES
         Resources/ui-master-default-preview-20260808/previews/A_default_1280x853.png
         ${TOYOTOMI_MASTER_UI_ASSETS}
+        ${TOYOTOMI_EXACT_PRESET_BYPASS_ASSETS}
         ui/spec/ui-spec.json
         ui/spec/master-default-preview-manifest.json
 )

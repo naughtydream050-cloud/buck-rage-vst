@@ -88,9 +88,16 @@ const juce::Image& countCellImage (int oneBasedCount, bool selected)
 
 const juce::Image& presetCellImage (int preset, bool selected)
 {
-    static const auto normal = [] { const std::array<juce::String, 10> names { "off", "forward_cut", "backspin", "chirp", "baby", "transform", "drag", "zigzag", "tape_brake", "custom" }; std::array<juce::Image, 10> r; for (int i = 0; i < 10; ++i) r[static_cast<size_t> (i)] = loadAsset ("preset_" + names[static_cast<size_t> (i)] + "_normal_" + (i == 9 ? "102x55.png" : "102x79.png")); return r; }();
+    static const auto normal = [] { const std::array<juce::String, 10> names { "off", "forward_cut", "backspin", "chirp", "baby", "transform", "drag", "zigzag", "tape_brake", "custom" }; std::array<juce::Image, 10> r; for (int i = 0; i < 10; ++i) r[static_cast<size_t> (i)] = loadAsset ("preset_" + names[static_cast<size_t> (i)] + "_normal_102x79.png"); return r; }();
     static const auto gold = [] { const std::array<juce::String, 10> names { "off", "forward_cut", "backspin", "chirp", "baby", "transform", "drag", "zigzag", "tape_brake", "custom" }; std::array<juce::Image, 10> r; for (int i = 0; i < 10; ++i) r[static_cast<size_t> (i)] = loadAsset ("preset_" + names[static_cast<size_t> (i)] + "_selected_102x79.png"); return r; }();
     return (selected ? gold : normal)[static_cast<size_t> (juce::jlimit (0, 9, preset))];
+}
+
+const juce::Image& bypassImage (bool enabled)
+{
+    static const auto off = loadAsset ("bypass_off.png");
+    static const auto on = loadAsset ("bypass_on.png");
+    return enabled ? on : off;
 }
 
 const juce::Image& lengthImage (int length, bool selected)
@@ -152,6 +159,27 @@ bool validateEmbeddedImageAssets()
             return false;
         }
     }
+    for (int preset = 0; preset < 10; ++preset)
+    {
+        const auto& normal = presetCellImage (preset, false);
+        const auto& selected = presetCellImage (preset, true);
+        if (! normal.isValid() || ! selected.isValid()
+            || normal.getWidth() != 102 || normal.getHeight() != 79
+            || selected.getWidth() != 102 || selected.getHeight() != 79)
+        {
+            std::cerr << "ASSET_FAIL preset=" << preset << '\n';
+            return false;
+        }
+    }
+    for (const auto enabled : { false, true })
+    {
+        const auto& image = bypassImage (enabled);
+        if (! image.isValid() || image.getWidth() != 100 || image.getHeight() != 38)
+        {
+            std::cerr << "ASSET_FAIL bypass=" << enabled << '\n';
+            return false;
+        }
+    }
 
     // The approved master-default exports retain their source alpha at a few
     // antialiased tab edges. Validate native dimensions here; drawImageAt keeps
@@ -188,15 +216,22 @@ void TopBarComponent::timerCallback()
     denominator = processor.getTimeSignatureDenominator();
     hostSync = processor.getHostSyncAvailable();
 }
-void TopBarComponent::paint (juce::Graphics& g) { juce::ignoreUnused (g); }
+void TopBarComponent::paint (juce::Graphics& g)
+{
+    // BYPASS is state-isolated from the preset palette and uses its supplied
+    // off/on images at their native 100x38 pixel bounds.
+    const auto& image = bypassImage (processor.getStateModel().getUiState().bypass);
+    if (image.isValid() && image.getWidth() == 100 && image.getHeight() == 38)
+        g.drawImageAt (image, 1159, 13);
+}
 void TopBarComponent::mouseDown (const juce::MouseEvent& event)
 {
-    const auto bypass = juce::Rectangle<int> (getWidth() - juce::roundToInt (98.0f * getWidth() / 1270.0f),
-                                              juce::roundToInt (28.0f * getHeight() / 78.0f),
-                                              juce::roundToInt (68.0f * getWidth() / 1270.0f),
-                                              juce::roundToInt (33.0f * getHeight() / 78.0f));
-    if (bypass.contains (event.getPosition()))
+    const auto bypassBounds = juce::Rectangle<int> (1159, 13, 100, 38);
+    if (bypassBounds.contains (event.getPosition()))
+    {
         processor.getStateModel().setBypass (! processor.getStateModel().getUiState().bypass);
+        repaint (bypassBounds);
+    }
 }
 
 void ArtworkPanel::paint (juce::Graphics& g) { juce::ignoreUnused (g, source); }
@@ -432,14 +467,14 @@ void ScratchPresetPalette::paint (juce::Graphics& g)
         { 7, 37, 102, 79 }, { 112, 37, 102, 79 }, { 217, 37, 102, 79 },
         { 7, 120, 102, 79 }, { 112, 120, 102, 79 }, { 217, 120, 102, 79 },
         { 7, 205, 102, 79 }, { 112, 205, 102, 79 }, { 217, 205, 102, 79 },
-        { 7, 289, 102, 55 }
+        { 7, 289, 102, 79 }
     }};
     for (int i = 0; i < 10; ++i)
-        drawImage (g, presetCellImage (i, i == selectedPreset && i != 9), cells[static_cast<size_t> (i)]);
+        drawImage (g, presetCellImage (i, i == selectedPreset), cells[static_cast<size_t> (i)]);
 }
 void ScratchPresetPalette::mouseDown (const juce::MouseEvent& event)
 {
-    static const std::array<juce::Rectangle<int>, 10> cells {{ { 7,37,102,79 }, {112,37,102,79}, {217,37,102,79}, {7,120,102,79}, {112,120,102,79}, {217,120,102,79}, {7,205,102,79}, {112,205,102,79}, {217,205,102,79}, {7,289,102,55} }};
+    static const std::array<juce::Rectangle<int>, 10> cells {{ { 7,37,102,79 }, {112,37,102,79}, {217,37,102,79}, {7,120,102,79}, {112,120,102,79}, {217,120,102,79}, {7,205,102,79}, {112,205,102,79}, {217,205,102,79}, {7,289,102,79} }};
     for (int i = 0; i < 10; ++i) if (cells[static_cast<size_t> (i)].contains (event.getPosition())) { selectedPreset = i; repaint(); if (onPresetSelected) onPresetSelected (i); return; }
 }
 
