@@ -1,5 +1,6 @@
 param(
-    [string] $ProjectRoot = (Resolve-Path "$PSScriptRoot\..").Path
+    [string] $ProjectRoot = (Resolve-Path "$PSScriptRoot\..").Path,
+    [string] $LabelPreviewPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -35,6 +36,24 @@ function Copy-Region([System.Drawing.Graphics] $graphics, [System.Drawing.Bitmap
     $graphics.DrawImage($source, [System.Drawing.Rectangle]::new($x, $y, $sourceRect.Width, $sourceRect.Height), $sourceRect, [System.Drawing.GraphicsUnit]::Pixel)
 }
 
+function Copy-GlyphPixels([System.Drawing.Bitmap] $target, [System.Drawing.Bitmap] $source, [System.Drawing.Rectangle] $sourceRect, [int] $targetX) {
+    # Label crops come from an opaque cell image. Extract only the existing
+    # bright ivory glyph pixels; cell texture is deliberately not copied.
+    # This is a deterministic pixel transfer, never a font substitution.
+    for ($y = $sourceRect.Top; $y -lt $sourceRect.Bottom; ++$y) {
+        for ($x = $sourceRect.Left; $x -lt $sourceRect.Right; ++$x) {
+            $pixel = $source.GetPixel($x, $y)
+            $luminance = (0.2126 * $pixel.R) + (0.7152 * $pixel.G) + (0.0722 * $pixel.B)
+            if ($luminance -ge 72.0) {
+                $destinationX = $targetX + ($x - $sourceRect.Left)
+                if ($destinationX -ge 0 -and $destinationX -lt $target.Width) {
+                    $target.SetPixel($destinationX, $y, $pixel)
+                }
+            }
+        }
+    }
+}
+
 $master = [System.Drawing.Bitmap]::new($masterPath)
 try {
     if ($master.Width -ne 1280 -or $master.Height -ne 853) { throw 'MASTER DEFAULT must be 1280x853.' }
@@ -49,39 +68,37 @@ try {
         Save-Png $label (Join-Path $labelDir ('bar_label_{0:D2}.png' -f ($index + 1)))
     }
 
-    # Build 17-64 entirely from MASTER DEFAULT label pixels: prefix and digit
-    # glyphs are copied at their final native positions; no fonts are used.
-    $prefixRect = [System.Drawing.Rectangle]::new(0, 0, 41, 22)
-    $firstDigitRect = [System.Drawing.Rectangle]::new(42, 0, 12, 22)
-    $secondDigitRect = [System.Drawing.Rectangle]::new(54, 0, 18, 22)
+    # Build 17-64 entirely from MASTER DEFAULT label pixels. Direct source
+    # crops are opaque, so only their real ivory glyph pixels are transferred.
+    # No font, rasterisation, or runtime text drawing is involved.
+    $prefixRect = [System.Drawing.Rectangle]::new(0, 0, 42, 22)
+    $firstDigitArea = [System.Drawing.Rectangle]::new(42, 0, 7, 22)
+    $secondDigitArea = [System.Drawing.Rectangle]::new(48, 0, 12, 22)
+    $singleDigitArea = [System.Drawing.Rectangle]::new(42, 0, 18, 22)
     for ($number = 17; $number -le 64; ++$number) {
         $tens = [Math]::Floor($number / 10)
         $ones = $number % 10
         $target = New-ArgbBitmap 72 22
-        $g = [System.Drawing.Graphics]::FromImage($target)
-        $g.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceCopy
-        Copy-Region $g $referenceLabels[9] $prefixRect 0 0
+        Copy-GlyphPixels $target $referenceLabels[9] $prefixRect 0
 
-        # 10..16 provide the approved two-digit baseline for 0..6.
+        # The 10..16 labels provide the approved two-digit baseline for 0..6.
         if ($tens -eq 1) {
-            Copy-Region $g $referenceLabels[9] $firstDigitRect 42 0
-        } elseif ($tens -le 6) {
-            # 12..16 provide the real 2..6 glyph in their second-digit slot.
-            Copy-Region $g $referenceLabels[9 + $tens] $secondDigitRect 46 0
+            Copy-GlyphPixels $target $referenceLabels[9] $firstDigitArea 42
         } else {
-            # 7..9 only occur as single digits in the master; position their
-            # real pixels in the established first-digit slot.
-            Copy-Region $g $referenceLabels[$tens - 1] ([System.Drawing.Rectangle]::new(45, 0, 27, 22)) 42 0
+            # 2..6 live in the second position of BAR 12..16. 7..9 are
+            # available as single-digit labels. All are positioned at the
+            # approved first-digit baseline.
+            if ($tens -le 6) {
+                Copy-GlyphPixels $target $referenceLabels[9 + $tens] $secondDigitArea 42
+            } else {
+                Copy-GlyphPixels $target $referenceLabels[$tens - 1] $singleDigitArea 37
+            }
         }
         if ($ones -le 6) {
-            Copy-Region $g $referenceLabels[9 + $ones] $secondDigitRect 54 0
+            Copy-GlyphPixels $target $referenceLabels[9 + $ones] $secondDigitArea 48
         } else {
-            # 7..9 are taken from their real single-digit MASTER DEFAULT labels
-            # and shifted only into the established second-digit slot.
-            $singleDigit = $referenceLabels[$ones - 1]
-            Copy-Region $g $singleDigit ([System.Drawing.Rectangle]::new(45, 0, 27, 22)) 50 0
+            Copy-GlyphPixels $target $referenceLabels[$ones - 1] $singleDigitArea 43
         }
-        $g.Dispose()
         Save-Png $target (Join-Path $labelDir ('bar_label_{0:D2}.png' -f $number))
         $target.Dispose()
     }
@@ -98,6 +115,23 @@ try {
         $wave = Crop-Image $master ([System.Drawing.Rectangle]::new($x, $y, 62, 30))
         Save-Png $wave (Join-Path $waveDir ('bar_wave_{0:D2}.png' -f ($index + 1)))
         $wave.Dispose()
+    }
+
+    if ($LabelPreviewPath) {
+        $preview = New-ArgbBitmap 720 220
+        $g = [System.Drawing.Graphics]::FromImage($preview)
+        $g.Clear([System.Drawing.Color]::Black)
+        $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
+        for ($number = 40; $number -le 64; ++$number) {
+            $label = [System.Drawing.Bitmap]::new((Join-Path $labelDir ('bar_label_{0:D2}.png' -f $number)))
+            $slot = $number - 40
+            $destination = [System.Drawing.Rectangle]::new(($slot % 5) * 144, [Math]::Floor($slot / 5) * 44, 144, 44)
+            $g.DrawImage($label, $destination, [System.Drawing.Rectangle]::new(0, 0, 72, 22), [System.Drawing.GraphicsUnit]::Pixel)
+            $label.Dispose()
+        }
+        $g.Dispose()
+        Save-Png $preview $LabelPreviewPath
+        $preview.Dispose()
     }
 
     # Make the strip overlays fully opaque by compositing their real pixels
