@@ -98,6 +98,8 @@ jobs:
             toyotomi-build.log
             toyotomi-state-tests.log
             toyotomi-runtime-smoke.log
+            state-test-exit.txt
+            runtime-smoke-exit.txt
           if-no-files-found: warn
 
       - name: Run state-model round-trip tests
@@ -110,6 +112,7 @@ jobs:
           $buildExit=$LASTEXITCODE
           if ($buildExit -eq 0) { & 'build-toyotomi-hideyoshi/ToyotomiHideyoshiStateTests_artefacts/Release/ToyotomiHideyoshiStateTests.exe' 2>&1 | Tee-Object -Append toyotomi-state-tests.log; $testExit=$LASTEXITCODE } else { $testExit=$buildExit }
           "STATE_BUILD_EXIT=$buildExit STATE_TEST_EXIT=$testExit" | Tee-Object -Append toyotomi-state-tests.log
+          Set-Content -LiteralPath state-test-exit.txt -Value $testExit -NoNewline
           "exit_code=$testExit" >> $env:GITHUB_OUTPUT
           exit 0
 
@@ -123,6 +126,7 @@ jobs:
           $buildExit=$LASTEXITCODE
           if ($buildExit -eq 0) { & 'build-toyotomi-hideyoshi/ToyotomiHideyoshiRuntimeSmoke_artefacts/Release/ToyotomiHideyoshiRuntimeSmoke.exe' 2>&1 | Tee-Object -Append toyotomi-runtime-smoke.log; $testExit=$LASTEXITCODE } else { $testExit=$buildExit }
           "SMOKE_BUILD_EXIT=$buildExit SMOKE_TEST_EXIT=$testExit" | Tee-Object -Append toyotomi-runtime-smoke.log
+          Set-Content -LiteralPath runtime-smoke-exit.txt -Value $testExit -NoNewline
           "exit_code=$testExit" >> $env:GITHUB_OUTPUT
           exit 0
 
@@ -165,12 +169,15 @@ jobs:
             SOURCE_HEAD.txt
           if-no-files-found: error
 
-      - name: Aggregate BAR MAP validation
+      - name: Aggregate validation
         if: always()
         shell: pwsh
         run: |
-          $stateExit = '${{ steps.state_tests.outputs.exit_code }}'
-          $smokeExit = '${{ steps.runtime_smoke.outputs.exit_code }}'
+          # Step outputs are retained for the Actions UI, but persisted files are
+          # the authoritative inputs here: they survive `if: always()` execution
+          # even when a preceding test command has written stderr.
+          $stateExit = if (Test-Path -LiteralPath state-test-exit.txt) { (Get-Content -LiteralPath state-test-exit.txt -Raw).Trim() } else { 'MISSING' }
+          $smokeExit = if (Test-Path -LiteralPath runtime-smoke-exit.txt) { (Get-Content -LiteralPath runtime-smoke-exit.txt -Raw).Trim() } else { 'MISSING' }
           if ($stateExit -ne '0' -or $smokeExit -ne '0') {
             foreach ($entry in @(@{ name = 'StateModelTests'; exit = $stateExit; log = 'toyotomi-state-tests.log' }, @{ name = 'RuntimeSmoke'; exit = $smokeExit; log = 'toyotomi-runtime-smoke.log' })) {
               if ($entry.exit -ne '0' -and (Test-Path -LiteralPath $entry.log)) {
