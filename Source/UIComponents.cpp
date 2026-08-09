@@ -145,7 +145,7 @@ bool validateEmbeddedImageAssets()
     {
         const auto& label = barLabelImage (bar);
         const auto& wave = barWaveImage (bar);
-        if (! label.isValid() || label.getWidth() != 72 || label.getHeight() != 22
+        if (! label.isValid() || label.getWidth() != 66 || label.getHeight() != 24
             || ! wave.isValid() || wave.getWidth() != 62 || wave.getHeight() != 30)
         {
             std::cerr << "ASSET_FAIL bar=" << (bar + 1) << '\n';
@@ -259,8 +259,8 @@ void BarCellComponent::paint (juce::Graphics& g)
         g.drawImageAt (background, 0, 0);
 
     const auto& label = barLabelImage (globalBarIndex);
-    if (label.isValid() && label.getWidth() == 72 && label.getHeight() == 22)
-        g.drawImageAt (label, 0, 0);
+    if (label.isValid() && label.getWidth() == 66 && label.getHeight() == 24)
+        g.drawImageAt (label, (getWidth() - label.getWidth()) / 2, 0);
 
     // Every BAR has its own 1:1 MASTER DEFAULT-derived tile. It is opaque and
     // replaces the old baked placeholder motion before any future live motion

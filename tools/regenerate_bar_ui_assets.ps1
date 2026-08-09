@@ -1,6 +1,7 @@
 param(
     [string] $ProjectRoot = (Resolve-Path "$PSScriptRoot\..").Path,
-    [string] $LabelPreviewPath = ''
+    [string] $LabelPreviewPath = '',
+    [string] $VerifiedLabelDirectory = 'D:\Development\RAZOR_FACE_COMPANY\01_PLUGINS\archive\legacy-cleanup-20260809\project-output-backups\ToyotomiHideyoshi\legacy-pre-01-ssot-20260809-090700\Resources\ui-bar-map-preview\bar-labels'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -54,6 +55,35 @@ function Copy-GlyphPixels([System.Drawing.Bitmap] $target, [System.Drawing.Bitma
     }
 }
 
+function Get-BrightColumnGroups([System.Drawing.Bitmap] $source, [System.Drawing.Rectangle] $searchArea) {
+    $groups = @()
+    $start = -1
+    for ($x = $searchArea.Left; $x -lt $searchArea.Right; ++$x) {
+        $active = $false
+        for ($y = $searchArea.Top; $y -lt $searchArea.Bottom; ++$y) {
+            $pixel = $source.GetPixel($x, $y)
+            $luminance = (0.2126 * $pixel.R) + (0.7152 * $pixel.G) + (0.0722 * $pixel.B)
+            if ($luminance -ge 72.0) { $active = $true; break }
+        }
+        if ($active -and $start -lt 0) { $start = $x }
+        if (-not $active -and $start -ge 0) {
+            $groups += [System.Drawing.Rectangle]::new($start, $searchArea.Top, $x - $start, $searchArea.Height)
+            $start = -1
+        }
+    }
+    if ($start -ge 0) {
+        $groups += [System.Drawing.Rectangle]::new($start, $searchArea.Top, $searchArea.Right - $start, $searchArea.Height)
+    }
+    if ($groups.Count -eq 0) { throw "No bright glyph group in $searchArea." }
+    return ,$groups
+}
+
+function Copy-DigitGroup([System.Drawing.Bitmap] $target, [System.Drawing.Bitmap] $source, [bool] $useLastGroup, [int] $targetX) {
+    $groups = Get-BrightColumnGroups $source ([System.Drawing.Rectangle]::new(41, 0, 31, 22))
+    $glyph = if ($useLastGroup) { $groups[$groups.Count - 1] } else { $groups[0] }
+    Copy-GlyphPixels $target $source $glyph $targetX
+}
+
 $master = [System.Drawing.Bitmap]::new($masterPath)
 try {
     if ($master.Width -ne 1280 -or $master.Height -ne 853) { throw 'MASTER DEFAULT must be 1280x853.' }
@@ -68,39 +98,18 @@ try {
         Save-Png $label (Join-Path $labelDir ('bar_label_{0:D2}.png' -f ($index + 1)))
     }
 
-    # Build 17-64 entirely from MASTER DEFAULT label pixels. Direct source
-    # crops are opaque, so only their real ivory glyph pixels are transferred.
-    # No font, rasterisation, or runtime text drawing is involved.
-    $prefixRect = [System.Drawing.Rectangle]::new(0, 0, 42, 22)
-    $firstDigitArea = [System.Drawing.Rectangle]::new(42, 0, 7, 22)
-    $secondDigitArea = [System.Drawing.Rectangle]::new(48, 0, 12, 22)
-    $singleDigitArea = [System.Drawing.Rectangle]::new(42, 0, 18, 22)
-    for ($number = 17; $number -le 64; ++$number) {
-        $tens = [Math]::Floor($number / 10)
-        $ones = $number % 10
-        $target = New-ArgbBitmap 72 22
-        Copy-GlyphPixels $target $referenceLabels[9] $prefixRect 0
-
-        # The 10..16 labels provide the approved two-digit baseline for 0..6.
-        if ($tens -eq 1) {
-            Copy-GlyphPixels $target $referenceLabels[9] $firstDigitArea 42
-        } else {
-            # 2..6 live in the second position of BAR 12..16. 7..9 are
-            # available as single-digit labels. All are positioned at the
-            # approved first-digit baseline.
-            if ($tens -le 6) {
-                Copy-GlyphPixels $target $referenceLabels[9 + $tens] $secondDigitArea 42
-            } else {
-                Copy-GlyphPixels $target $referenceLabels[$tens - 1] $singleDigitArea 37
-            }
-        }
-        if ($ones -le 6) {
-            Copy-GlyphPixels $target $referenceLabels[9 + $ones] $secondDigitArea 48
-        } else {
-            Copy-GlyphPixels $target $referenceLabels[$ones - 1] $singleDigitArea 43
-        }
-        Save-Png $target (Join-Path $labelDir ('bar_label_{0:D2}.png' -f $number))
-        $target.Dispose()
+    # The archived preview set contains the reviewed full-size BAR 01..64
+    # pixel labels. Adopt them verbatim rather than re-composing tiny glyphs:
+    # no font, rasterisation, or runtime text drawing is used.
+    if (!(Test-Path -LiteralPath $VerifiedLabelDirectory)) { throw "Verified BAR label source is missing: $VerifiedLabelDirectory" }
+    for ($number = 1; $number -le 64; ++$number) {
+        $name = 'bar_label_{0:D2}.png' -f $number
+        $source = Join-Path $VerifiedLabelDirectory $name
+        if (!(Test-Path -LiteralPath $source)) { throw "Verified BAR label is missing: $source" }
+        $image = [System.Drawing.Bitmap]::new($source)
+        if ($image.Width -ne 66 -or $image.Height -ne 24) { $image.Dispose(); throw "Unexpected verified label size: $name" }
+        Save-Png $image (Join-Path $labelDir $name)
+        $image.Dispose()
     }
 
     # Produce one opaque real-pixel motion tile for every BAR. The 16 source
