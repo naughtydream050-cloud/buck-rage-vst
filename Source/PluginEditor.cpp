@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include <iostream>
 
 #if __has_include(<BinaryData.h>)
  #include <BinaryData.h>
@@ -13,9 +14,16 @@ juce::Image loadMasterDefault()
 {
 #if TOYOTOMI_HAS_BINARY_DATA
     int size = 0;
-    const auto* data = BinaryData::getNamedResource ("A_default_1280x853.png", size);
-    return data != nullptr ? juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (size)) : juce::Image {};
+    // juce_add_binary_data converts the filename into an identifier.  The
+    // previous literal filename lookup always returned nullptr in the VST3,
+    // leaving the editor with its opaque black clear colour.
+    const auto* data = BinaryData::getNamedResource ("A_default_1280x853_png", size);
+    const auto image = data != nullptr ? juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (size)) : juce::Image {};
+    if (! image.isValid() || image.getWidth() != 1280 || image.getHeight() != 853)
+        std::cerr << "BACKGROUND_ASSET_FAIL resource=A_default_1280x853_png bytes=" << size << '\n';
+    return image;
 #else
+    return {};
     return {};
 #endif
 }
@@ -83,6 +91,15 @@ void ToyotomiHideyoshiAudioProcessorEditor::paint (juce::Graphics& g)
     if (referenceImage.isValid())
     {
         g.drawImageAt (referenceImage, 0, 0);
+    }
+    else
+    {
+        static bool logged = false;
+        if (! logged)
+        {
+            std::cerr << "BACKGROUND_PAINT_SKIPPED invalid-master-default\n";
+            logged = true;
+        }
     }
 }
 

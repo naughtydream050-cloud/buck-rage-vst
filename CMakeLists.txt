@@ -41,6 +41,7 @@ juce_generate_juce_header(ToyotomiHideyoshi)
 
 file (GLOB_RECURSE TOYOTOMI_MASTER_UI_ASSETS CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/bar-labels/*.png"
+    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/bar-waveforms/*.png"
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/bar-cells/*.png"
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/count/*.png"
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/preset/*.png"

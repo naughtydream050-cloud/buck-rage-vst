@@ -136,6 +136,8 @@ jobs:
             toyotomi-runtime-smoke.log
             bar-map-render-*.png
             toyotomi-editor-*.png
+            toyotomi-bar-labels-*.png
+            toyotomi-bar-waveform-*.png
             SOURCE_HEAD.txt
           if-no-files-found: error
 

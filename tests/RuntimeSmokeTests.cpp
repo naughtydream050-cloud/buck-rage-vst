@@ -2,8 +2,16 @@
 #include "PluginEditor.h"
 #include "UIComponents.h"
 #include "UiSpec.h"
+#include <algorithm>
 #include <iostream>
 #include <tuple>
+
+#if __has_include(<BinaryData.h>)
+ #include <BinaryData.h>
+ #define TOYOTOMI_HAS_BINARY_DATA 1
+#else
+ #define TOYOTOMI_HAS_BINARY_DATA 0
+#endif
 
 namespace
 {
@@ -12,12 +20,45 @@ bool require (bool condition, const char* label)
     std::cout << (condition ? "PASS " : "FAIL ") << label << '\n';
     return condition;
 }
+
+uint64_t imageHash (const juce::Image& image)
+{
+    uint64_t hash = 1469598103934665603ULL;
+    for (int y = 0; y < image.getHeight(); ++y)
+        for (int x = 0; x < image.getWidth(); ++x)
+        {
+            const auto colour = image.getPixelAt (x, y).getARGB();
+            hash ^= static_cast<uint64_t> (colour);
+            hash *= 1099511628211ULL;
+        }
+    return hash;
+}
 }
 
 int main()
 {
     juce::ScopedJuceInitialiser_GUI gui;
     bool passed = require (ToyotomiUi::validateEmbeddedImageAssets(), "embedded-image-assets");
+
+    const auto writePng = [] (const juce::Image& source, const juce::String& name)
+    {
+        const auto output = juce::File::getCurrentWorkingDirectory().getChildFile (name);
+        juce::FileOutputStream stream (output);
+        return stream.openedOk() && juce::PNGImageFormat().writeImageToStream (source, stream);
+    };
+
+#if TOYOTOMI_HAS_BINARY_DATA
+    int backgroundBytes = 0;
+    const auto* backgroundData = BinaryData::getNamedResource ("A_default_1280x853_png", backgroundBytes);
+    const auto backgroundOnly = backgroundData != nullptr
+                              ? juce::ImageFileFormat::loadFrom (backgroundData, static_cast<size_t> (backgroundBytes))
+                              : juce::Image {};
+    passed &= require (backgroundOnly.isValid() && backgroundOnly.getWidth() == 1280 && backgroundOnly.getHeight() == 853,
+                       "master-default-background-loaded");
+    passed &= require (writePng (backgroundOnly, "toyotomi-editor-background-only.png"), "background-only-preview");
+#else
+    passed &= require (false, "master-default-background-binarydata-unavailable");
+#endif
 
     ToyotomiHideyoshiAudioProcessor processor;
     processor.prepareToPlay (48000.0, 512);
@@ -56,12 +97,6 @@ int main()
     editor->paintEntireComponent (graphics, true);
     passed &= require (image.isValid(), "editor-painted");
 
-    const auto writePng = [] (const juce::Image& source, const juce::String& name)
-    {
-        const auto output = juce::File::getCurrentWorkingDirectory().getChildFile (name);
-        juce::FileOutputStream stream (output);
-        return stream.openedOk() && juce::PNGImageFormat().writeImageToStream (source, stream);
-    };
     passed &= require (writePng (image, "toyotomi-editor-full.png"), "editor-full-preview");
 
     const std::array<std::pair<juce::Rectangle<int>, const char*>, 4> editorCrops {{
@@ -106,6 +141,42 @@ int main()
         // smoke test verifies that every state can be rendered into that frame.
         passed &= require (rendered && output.existsAsFile() && output.getSize() > 0, filename);
     }
+
+    const std::array<int, 25> labelBars {{ 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51,
+                                            52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63 }};
+    auto labelSheet = juce::Image (juce::Image::ARGB, 5 * 72, 5 * 94, true);
+    juce::Graphics labelGraphics (labelSheet);
+    for (int i = 0; i < static_cast<int> (labelBars.size()); ++i)
+    {
+        BarCellComponent cell;
+        cell.configure (labelBars[static_cast<size_t> (i)], false, false);
+        cell.setSize (72, 94);
+        auto cellImage = juce::Image (juce::Image::ARGB, 72, 94, true);
+        juce::Graphics cellGraphics (cellImage);
+        cell.paintEntireComponent (cellGraphics, true);
+        labelGraphics.drawImageAt (cellImage, (i % 5) * 72, (i / 5) * 94);
+    }
+    passed &= require (writePng (labelSheet, "toyotomi-bar-labels-40-64.png"), "bar-labels-40-64-preview");
+
+    const std::array<int, 9> waveformBars {{ 0, 1, 2, 3, 4, 5, 39, 48, 63 }};
+    auto waveformSheet = juce::Image (juce::Image::ARGB, 3 * 72, 3 * 94, true);
+    juce::Graphics waveformGraphics (waveformSheet);
+    std::array<uint64_t, waveformBars.size()> waveformHashes {};
+    for (int i = 0; i < static_cast<int> (waveformBars.size()); ++i)
+    {
+        BarCellComponent cell;
+        cell.configure (waveformBars[static_cast<size_t> (i)], false, false);
+        cell.setSize (72, 94);
+        auto cellImage = juce::Image (juce::Image::ARGB, 72, 94, true);
+        juce::Graphics cellGraphics (cellImage);
+        cell.paintEntireComponent (cellGraphics, true);
+        waveformHashes[static_cast<size_t> (i)] = imageHash (cellImage.getClippedImage ({ 5, 33, 62, 30 }));
+        waveformGraphics.drawImageAt (cellImage, (i % 3) * 72, (i / 3) * 94);
+    }
+    std::sort (waveformHashes.begin(), waveformHashes.end());
+    const auto uniqueWaveforms = std::distance (waveformHashes.begin(), std::unique (waveformHashes.begin(), waveformHashes.end()));
+    passed &= require (uniqueWaveforms == static_cast<ptrdiff_t> (waveformBars.size()), "bar-waveforms-not-all-identical");
+    passed &= require (writePng (waveformSheet, "toyotomi-bar-waveform-comparison.png"), "bar-waveform-comparison-preview");
 
     editor.reset();
     processor.releaseResources();

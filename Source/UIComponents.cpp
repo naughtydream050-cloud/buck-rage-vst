@@ -67,6 +67,18 @@ const juce::Image& barLabelImage (int globalBarIndex)
     return labels[static_cast<size_t> (juce::jlimit (0, 63, globalBarIndex))];
 }
 
+const juce::Image& barWaveImage (int globalBarIndex)
+{
+    static const auto waves = []
+    {
+        std::array<juce::Image, 64> result;
+        for (int i = 0; i < 64; ++i)
+            result[static_cast<size_t> (i)] = loadAsset (juce::String::formatted ("bar_wave_%02d.png", i + 1));
+        return result;
+    }();
+    return waves[static_cast<size_t> (juce::jlimit (0, 63, globalBarIndex))];
+}
+
 const juce::Image& countCellImage (int oneBasedCount, bool selected)
 {
     static const auto normal = [] { std::array<juce::Image, 16> r; for (int i = 0; i < 16; ++i) r[static_cast<size_t> (i)] = loadAsset (juce::String::formatted ("count_%02d_normal_117x72.png", i + 1)); return r; }();
@@ -132,9 +144,11 @@ bool validateEmbeddedImageAssets()
     for (int bar = 0; bar < 64; ++bar)
     {
         const auto& label = barLabelImage (bar);
-        if (! label.isValid() || label.getWidth() != 72 || label.getHeight() != 22)
+        const auto& wave = barWaveImage (bar);
+        if (! label.isValid() || label.getWidth() != 72 || label.getHeight() != 22
+            || ! wave.isValid() || wave.getWidth() != 62 || wave.getHeight() != 30)
         {
-            std::cerr << "ASSET_FAIL barLabel=" << (bar + 1) << '\n';
+            std::cerr << "ASSET_FAIL bar=" << (bar + 1) << '\n';
             return false;
         }
     }
@@ -247,6 +261,13 @@ void BarCellComponent::paint (juce::Graphics& g)
     const auto& label = barLabelImage (globalBarIndex);
     if (label.isValid() && label.getWidth() == 72 && label.getHeight() == 22)
         g.drawImageAt (label, 0, 0);
+
+    // Every BAR has its own 1:1 MASTER DEFAULT-derived tile. It is opaque and
+    // replaces the old baked placeholder motion before any future live motion
+    // renderer is connected.
+    const auto& waveform = barWaveImage (globalBarIndex);
+    if (waveform.isValid() && waveform.getWidth() == 62 && waveform.getHeight() == 30)
+        g.drawImageAt (waveform, 5, 33);
 }
 void BarCellComponent::mouseDown (const juce::MouseEvent&) { if (onSelected) onSelected (globalBarIndex); }
 
