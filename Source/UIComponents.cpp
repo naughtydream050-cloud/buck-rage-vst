@@ -488,13 +488,14 @@ void ScratchPresetPalette::paint (juce::Graphics& g)
         { 7, 205, 102, 79 }, { 112, 205, 102, 79 }, { 217, 205, 102, 79 },
         { 7, 289, 102, 79 }
     }};
+    const auto activePreset = presetProvider != nullptr ? juce::jlimit (0, 9, presetProvider()) : 0;
     for (int i = 0; i < 10; ++i)
-        drawImage (g, presetCellImage (i, i == selectedPreset), cells[static_cast<size_t> (i)]);
+        drawImage (g, presetCellImage (i, i == activePreset), cells[static_cast<size_t> (i)]);
 }
 void ScratchPresetPalette::mouseDown (const juce::MouseEvent& event)
 {
     static const std::array<juce::Rectangle<int>, 10> cells {{ { 7,37,102,79 }, {112,37,102,79}, {217,37,102,79}, {7,120,102,79}, {112,120,102,79}, {217,120,102,79}, {7,205,102,79}, {112,205,102,79}, {217,205,102,79}, {7,289,102,79} }};
-    for (int i = 0; i < 10; ++i) if (cells[static_cast<size_t> (i)].contains (event.getPosition())) { selectedPreset = i; repaint(); if (onPresetSelected) onPresetSelected (i); return; }
+    for (int i = 0; i < 10; ++i) if (cells[static_cast<size_t> (i)].contains (event.getPosition())) { if (onPresetSelected) onPresetSelected (i); repaint(); return; }
 }
 
 CountParameterPanel::CountParameterPanel (ToyotomiHideyoshiAudioProcessor& p) : processor (p) {}

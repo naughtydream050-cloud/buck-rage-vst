@@ -133,15 +133,14 @@ class ScratchPresetPalette final : public juce::Component
 {
 public:
     std::function<void (int)> onPresetSelected;
-    void setSelectedPreset (int preset) { selectedPreset = juce::jlimit (0, 9, preset); repaint(); }
-    void setSelectedBar (int bar) { selectedBar = juce::jlimit (0, 63, bar); repaint(); }
+    // The selected image is derived only from the selected slot's persisted
+    // ScratchPreset.  This component intentionally owns no duplicate state.
+    void setPresetProvider (std::function<int()> provider) { presetProvider = std::move (provider); repaint(); }
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
 
 private:
-    int selectedPreset = 0;
-    int selectedBar = 0;
-    bool showOverlay = true;
+    std::function<int()> presetProvider;
 };
 
 class CountParameterPanel final : public juce::Component

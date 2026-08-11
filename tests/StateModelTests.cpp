@@ -1,4 +1,6 @@
 #include "PluginStateModel.h"
+#include <algorithm>
+#include <array>
 #include <iostream>
 
 namespace
@@ -32,10 +34,15 @@ int main()
            "tab-switch-is-view-only");
 
     const auto bypassBefore = model.getUiState().bypass;
+    std::array<bool, 10> selectedImages {};
     for (int preset = 0; preset < 10; ++preset)
     {
         model.setSelectedPreset (static_cast<PluginStateModel::ScratchPreset> (preset));
+        selectedImages.fill (false);
+        selectedImages[static_cast<size_t> (static_cast<int> (model.getSlot (5).preset))] = true;
         check (model.getSlot (5).preset == static_cast<PluginStateModel::ScratchPreset> (preset)
+               && std::count (selectedImages.begin(), selectedImages.end(), true) == 1
+               && selectedImages[static_cast<size_t> (preset)]
                && model.getUiState().bypass == bypassBefore,
                "preset-single-selection-and-bypass-isolation");
     }

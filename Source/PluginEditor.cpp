@@ -58,7 +58,11 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
     // BAR/COUNT slot or any parameter state.
     barMap.setDisplayState (displayTab, uiState.selectedBar, processor.getCurrentTimelineSlot());
     barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); });
-    presetPalette.setSelectedPreset (static_cast<int> (state.getSlot (uiState.selectedBar).preset));
+    presetPalette.setPresetProvider ([&state]
+    {
+        const auto ui = state.getUiState();
+        return static_cast<int> (state.getSlot (ui.selectedBar).preset);
+    });
     barTabs.onSelectedPage = [this, &state] (int page)
     {
         state.selectTab (page);
@@ -71,13 +75,12 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
         state.selectBar (bar);
         const auto ui = state.getUiState();
         barMap.setDisplayState (displayTab, ui.selectedBar, processor.getCurrentTimelineSlot());
-        presetPalette.setSelectedPreset (static_cast<int> (state.getSlot (ui.selectedBar).preset));
     };
     presetPalette.onPresetSelected = [this, &state] (int preset) { state.setSelectedPreset ((PluginStateModel::ScratchPreset) preset); barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); }); };
     countParameters.onLengthSelected = [&state] (int length) { state.setSelectedLength ((PluginStateModel::NoteLength) length); };
-    xyPad.onMotionChanged = [this, &state] (const std::vector<PluginStateModel::MotionPoint>& motion) { state.setSelectedMotion (motion); barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); }); presetPalette.setSelectedPreset (static_cast<int> (PluginStateModel::ScratchPreset::custom)); };
-    xyPad.onClearMotion = [this, &state] { state.clearSelectedMotion(); const auto ui = state.getUiState(); barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); }); presetPalette.setSelectedPreset (static_cast<int> (state.getSlot (ui.selectedBar).preset)); };
-    xyPad.onResetSlot = [this, &state] { state.resetSelectedSlot(); barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); }); presetPalette.setSelectedPreset (static_cast<int> (PluginStateModel::ScratchPreset::off)); };
+    xyPad.onMotionChanged = [this, &state] (const std::vector<PluginStateModel::MotionPoint>& motion) { state.setSelectedMotion (motion); barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); }); };
+    xyPad.onClearMotion = [this, &state] { state.clearSelectedMotion(); barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); }); };
+    xyPad.onResetSlot = [this, &state] { state.resetSelectedSlot(); barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); }); };
     for (auto* component : std::array<juce::Component*, 10> {
              &topBar, &artwork, &barTabs, &barMap, &quotePanel,
              &xyPad, &presetPalette, &countParameters, &outputMeter, &bottomStatus })
@@ -138,8 +141,6 @@ void ToyotomiHideyoshiAudioProcessorEditor::refreshSelectedSlotViews()
 {
     const auto ui = processor.getStateModel().getUiState();
     const auto& slot = processor.getStateModel().getSlot (ui.selectedBar);
-    presetPalette.setSelectedBar (ui.selectedBar);
-    presetPalette.setSelectedPreset (static_cast<int> (slot.preset));
     countParameters.setSelectedBar (ui.selectedBar);
     xyPad.setSelectedBar (ui.selectedBar);
     xyPad.setMotion (slot.motion);
