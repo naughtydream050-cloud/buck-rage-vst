@@ -42,7 +42,7 @@ int main()
 
 #if TOYOTOMI_HAS_BINARY_DATA
     int backgroundBytes = 0, quoteBytes = 0;
-    const auto* backgroundData = BinaryData::getNamedResource ("A_default_1280x853_png", backgroundBytes);
+    const auto* backgroundData = BinaryData::getNamedResource ("master_default_no_count_grid_title_1280x853_png", backgroundBytes);
     const auto* quoteData = BinaryData::getNamedResource ("quote_panel_512x360_png", quoteBytes);
     const auto background = backgroundData != nullptr ? juce::ImageFileFormat::loadFrom (backgroundData, static_cast<size_t> (backgroundBytes)) : juce::Image {};
     const auto quote = quoteData != nullptr ? juce::ImageFileFormat::loadFrom (quoteData, static_cast<size_t> (quoteBytes)) : juce::Image {};
@@ -66,6 +66,18 @@ int main()
     { juce::Graphics graphics (full); editor->paintEntireComponent (graphics, true); }
     passed &= require (writePng (full, "toyotomi-timeline-editor-full.png"), "full-ui-render");
     passed &= require (writePng (full.getClippedImage ({ 332, 432, 512, 360 }), "toyotomi-quote-panel.png"), "quote-panel-render");
+
+    const auto writePresetPreview = [&] (PluginStateModel::ScratchPreset preset, const juce::String& filename)
+    {
+        processor.getStateModel().setSelectedPreset (preset);
+        auto preview = juce::Image (juce::Image::ARGB, 1280, 853, true);
+        juce::Graphics graphics (preview);
+        editor->paintEntireComponent (graphics, true);
+        return writePng (preview, filename);
+    };
+    passed &= require (writePresetPreview (PluginStateModel::ScratchPreset::off, "toyotomi-preset-preview-off.png"), "preset-preview-off");
+    passed &= require (writePresetPreview (PluginStateModel::ScratchPreset::backspin, "toyotomi-preset-preview-backspin.png"), "preset-preview-backspin");
+    passed &= require (writePresetPreview (PluginStateModel::ScratchPreset::custom, "toyotomi-preset-preview-custom.png"), "preset-preview-custom");
 
     BarMapComponent barMap;
     barMap.setSize (608, 266);

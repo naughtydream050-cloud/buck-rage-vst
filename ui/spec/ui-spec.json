@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "Toyotomi Hideyoshi",
-  "visualTruth": "Resources/ui-master-default-preview-20260808/previews/A_default_1280x853.png",
+  "visualTruth": "Resources/ui-quote-panel-20260810/master_default_no_count_grid_title_1280x853.png",
   "canvas": { "width": 1280, "height": 853, "aspectRatio": 1.5005861665, "resizable": false },
   "font": {
     "family": "Bahnschrift Condensed",

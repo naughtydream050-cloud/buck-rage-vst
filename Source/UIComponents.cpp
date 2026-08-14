@@ -69,7 +69,7 @@ const juce::Image& barLabelImage (int globalBarIndex)
 
 const juce::Image& presetCellImage (int preset, bool selected)
 {
-    static const auto normal = [] { const std::array<juce::String, 10> names { "off", "forward_cut", "backspin", "chirp", "baby", "transform", "drag", "zigzag", "tape_brake", "custom" }; std::array<juce::Image, 10> r; for (int i = 0; i < 10; ++i) r[static_cast<size_t> (i)] = loadAsset ("preset_" + names[static_cast<size_t> (i)] + "_normal_102x79.png"); return r; }();
+    static const auto normal = [] { const std::array<juce::String, 10> names { "off", "forward_cut", "backspin", "chirp", "baby", "transform", "drag", "zigzag", "tape_brake", "custom" }; std::array<juce::Image, 10> r; for (int i = 0; i < 10; ++i) r[static_cast<size_t> (i)] = loadAsset ("preset_" + names[static_cast<size_t> (i)] + "_normal_102x79.png"); r[2] = loadAsset ("preset_backspin_normal_neutral_102x79.png"); return r; }();
     static const auto gold = [] { const std::array<juce::String, 10> names { "off", "forward_cut", "backspin", "chirp", "baby", "transform", "drag", "zigzag", "tape_brake", "custom" }; std::array<juce::Image, 10> r; for (int i = 0; i < 10; ++i) r[static_cast<size_t> (i)] = loadAsset ("preset_" + names[static_cast<size_t> (i)] + "_selected_102x79.png"); return r; }();
     return (selected ? gold : normal)[static_cast<size_t> (juce::jlimit (0, 9, preset))];
 }
@@ -411,7 +411,7 @@ void BarMapComponent::resized()
 void QuotePanel::paint (juce::Graphics& g)
 {
     if (! sourceImage.isValid()) return;
-    // This image was prepared once at the former COUNT GRID dimensions.  Keep
+    // This image was prepared once for the former central panel dimensions. Keep
     // it native-size so it cannot cross into the adjacent parameter panel.
     if (sourceImage.getWidth() != getWidth() || sourceImage.getHeight() != getHeight())
         return;

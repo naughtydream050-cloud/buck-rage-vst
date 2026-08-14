@@ -17,10 +17,10 @@ juce::Image loadMasterDefault()
     // juce_add_binary_data converts the filename into an identifier.  The
     // previous literal filename lookup always returned nullptr in the VST3,
     // leaving the editor with its opaque black clear colour.
-    const auto* data = BinaryData::getNamedResource ("A_default_1280x853_png", size);
+    const auto* data = BinaryData::getNamedResource ("master_default_no_count_grid_title_1280x853_png", size);
     const auto image = data != nullptr ? juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (size)) : juce::Image {};
     if (! image.isValid() || image.getWidth() != 1280 || image.getHeight() != 853)
-        std::cerr << "BACKGROUND_ASSET_FAIL resource=A_default_1280x853_png bytes=" << size << '\n';
+        std::cerr << "BACKGROUND_ASSET_FAIL resource=master_default_no_count_grid_title_1280x853_png bytes=" << size << '\n';
     return image;
 #else
     return {};
