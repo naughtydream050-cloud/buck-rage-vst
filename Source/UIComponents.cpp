@@ -48,8 +48,8 @@ const juce::Image& imageFor (const juce::String& id)
     if (id == "clear") { static const auto i = loadAsset ("clear_normal_73x30.png"); return i; }
     if (id == "reset") { static const auto i = loadAsset ("reset_normal_102x30.png"); return i; }
     if (id == "outputNeutral") { static const auto i = loadAsset ("output_neutral_base_140x343.png"); return i; }
-    if (id == "knobBase") { static const auto i = loadAsset ("knob_ring_67.png"); return i; }
-    if (id == "knobPointer") { static const auto i = loadAsset ("knob_pointer.png"); return i; }
+    if (id == "knobBase") { static const auto i = loadAsset ("knob_ring_60.png"); return i; }
+    if (id == "knobPointer") { static const auto i = loadAsset ("knob_pointer_60.png"); return i; }
     if (id == "meterLed") { static const auto i = loadAsset ("meter_led_strip.png"); return i; }
     static const juce::Image empty;
     return empty;
@@ -172,9 +172,10 @@ void drawPanel (juce::Graphics&, juce::Rectangle<float>, const juce::String&) {}
 void drawMotionGlyph (juce::Graphics&, juce::Rectangle<float>, int) {}
 bool validateEmbeddedImageAssets()
 {
-    static constexpr std::array<const char*, 11> ids {
+    static constexpr std::array<const char*, 13> ids {
         "tabStrip1", "tabStrip2", "tabStrip3", "tabStrip4", "barBaseNormal", "barBaseSelected",
-        "barBasePlaying", "barBaseSelectedPlaying", "xyNeutral", "clear", "outputNeutral"
+        "barBasePlaying", "barBaseSelectedPlaying", "xyNeutral", "clear", "outputNeutral",
+        "knobBase", "knobPointer"
     };
     for (const auto* id : ids)
     {
@@ -236,6 +237,16 @@ bool validateEmbeddedImageAssets()
         {
             std::cerr << "ASSET_DIM_FAIL cell=" << id << ' '
                       << cell.getWidth() << 'x' << cell.getHeight() << '\n';
+            return false;
+        }
+    }
+    for (const auto* id : { "knobBase", "knobPointer" })
+    {
+        const auto& knob = imageFor (id);
+        if (knob.getWidth() != 60 || knob.getHeight() != 60)
+        {
+            std::cerr << "ASSET_DIM_FAIL knob=" << id << ' '
+                      << knob.getWidth() << 'x' << knob.getHeight() << '\n';
             return false;
         }
     }
@@ -501,7 +512,9 @@ void ScratchPresetPalette::mouseDown (const juce::MouseEvent& event)
 CountParameterPanel::CountParameterPanel (ToyotomiHideyoshiAudioProcessor& p) : processor (p) {}
 juce::Rectangle<float> CountParameterPanel::knobBounds (int index) const
 {
-    return { 10.0f + 87.0f * index, 165.0f, 67.0f, 67.0f };
+    // Keep the three established knob centres while swapping the native image
+    // from 67px to 60px.  Values below retain their existing readout positions.
+    return { 14.0f + 87.0f * index, 169.0f, 60.0f, 60.0f };
 }
 void CountParameterPanel::paint (juce::Graphics& g)
 {
@@ -522,7 +535,7 @@ void CountParameterPanel::paint (juce::Graphics& g)
         drawImage (g, imageFor ("knobPointer"), knob.toNearestInt());
         g.restoreState();
         g.setColour (ToyotomiUi::ivory()); g.setFont (juce::Font (11.0f));
-        g.drawText (values[static_cast<size_t> (i)], knob.withY (knob.getBottom() + 11.0f).withHeight (21.0f).toNearestInt(), juce::Justification::centred);
+        g.drawText (values[static_cast<size_t> (i)], { 10 + 87 * i, 243, 67, 21 }, juce::Justification::centred);
     }
 }
 void CountParameterPanel::updateKnob (int index, float delta)

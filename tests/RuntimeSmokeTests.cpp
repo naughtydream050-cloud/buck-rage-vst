@@ -41,13 +41,19 @@ int main()
     bool passed = require (ToyotomiUi::validateEmbeddedImageAssets(), "embedded-image-assets");
 
 #if TOYOTOMI_HAS_BINARY_DATA
-    int backgroundBytes = 0, quoteBytes = 0;
+    int backgroundBytes = 0, quoteBytes = 0, knobRingBytes = 0, knobPointerBytes = 0;
     const auto* backgroundData = BinaryData::getNamedResource ("master_default_no_count_grid_title_1280x853_png", backgroundBytes);
     const auto* quoteData = BinaryData::getNamedResource ("quote_panel_user_20260814_512x360_png", quoteBytes);
+    const auto* knobRingData = BinaryData::getNamedResource ("knob_ring_60_png", knobRingBytes);
+    const auto* knobPointerData = BinaryData::getNamedResource ("knob_pointer_60_png", knobPointerBytes);
     const auto background = backgroundData != nullptr ? juce::ImageFileFormat::loadFrom (backgroundData, static_cast<size_t> (backgroundBytes)) : juce::Image {};
     const auto quote = quoteData != nullptr ? juce::ImageFileFormat::loadFrom (quoteData, static_cast<size_t> (quoteBytes)) : juce::Image {};
+    const auto knobRing = knobRingData != nullptr ? juce::ImageFileFormat::loadFrom (knobRingData, static_cast<size_t> (knobRingBytes)) : juce::Image {};
+    const auto knobPointer = knobPointerData != nullptr ? juce::ImageFileFormat::loadFrom (knobPointerData, static_cast<size_t> (knobPointerBytes)) : juce::Image {};
     passed &= require (background.isValid() && background.getWidth() == 1280 && background.getHeight() == 853, "master-background-loaded");
     passed &= require (quote.isValid() && quote.getWidth() == 512 && quote.getHeight() == 360, "quote-decoration-loaded-native-count-grid-size");
+    passed &= require (knobRing.isValid() && knobRing.getWidth() == 60 && knobRing.getHeight() == 60, "knob-ring-60-loaded-native-size");
+    passed &= require (knobPointer.isValid() && knobPointer.getWidth() == 60 && knobPointer.getHeight() == 60, "knob-pointer-60-loaded-native-size");
 #else
     passed &= require (false, "binarydata-unavailable");
 #endif
@@ -66,6 +72,47 @@ int main()
     { juce::Graphics graphics (full); editor->paintEntireComponent (graphics, true); }
     passed &= require (writePng (full, "toyotomi-timeline-editor-full.png"), "full-ui-render");
     passed &= require (writePng (full.getClippedImage ({ 332, 432, 512, 360 }), "toyotomi-quote-panel.png"), "quote-panel-render");
+
+    const auto renderKnobPanel = [&]
+    {
+        auto preview = juce::Image (juce::Image::ARGB, 1280, 853, true);
+        juce::Graphics graphics (preview);
+        editor->paintEntireComponent (graphics, true);
+        return preview.getClippedImage ({ 866, 465, 251, 327 });
+    };
+    auto& uiState = processor.getStateModel();
+    uiState.setSlotSpeed (0, PluginStateModel::kMinSpeed);
+    const auto speedMin = renderKnobPanel();
+    passed &= require (writePng (speedMin, "toyotomi-editor-knob-speed-min.png"), "knob-speed-min-render");
+    uiState.setSlotSpeed (0, 1.0f);
+    const auto speedDefault = renderKnobPanel();
+    passed &= require (writePng (speedDefault, "toyotomi-editor-knob-speed-default.png"), "knob-speed-default-render");
+    uiState.setSlotSpeed (0, PluginStateModel::kMaxSpeed);
+    const auto speedMax = renderKnobPanel();
+    passed &= require (writePng (speedMax, "toyotomi-editor-knob-speed-max.png"), "knob-speed-max-render");
+    passed &= require (hasDifferentPixels (speedMin, speedMax), "knob-speed-min-max-rotation");
+
+    uiState.setSlotPitch (0, PluginStateModel::kMinPitch);
+    const auto pitchMin = renderKnobPanel();
+    passed &= require (writePng (pitchMin, "toyotomi-editor-knob-pitch-min.png"), "knob-pitch-min-render");
+    uiState.setSlotPitch (0, 0.0f);
+    const auto pitchCentre = renderKnobPanel();
+    passed &= require (writePng (pitchCentre, "toyotomi-editor-knob-pitch-centre.png"), "knob-pitch-centre-render");
+    uiState.setSlotPitch (0, PluginStateModel::kMaxPitch);
+    const auto pitchMax = renderKnobPanel();
+    passed &= require (writePng (pitchMax, "toyotomi-editor-knob-pitch-max.png"), "knob-pitch-max-render");
+    passed &= require (hasDifferentPixels (pitchMin, pitchMax), "knob-pitch-min-max-rotation");
+
+    uiState.setSlotDepth (0, 0.0f);
+    const auto depthMin = renderKnobPanel();
+    passed &= require (writePng (depthMin, "toyotomi-editor-knob-depth-min.png"), "knob-depth-min-render");
+    uiState.setSlotDepth (0, 0.5f);
+    const auto depthCentre = renderKnobPanel();
+    passed &= require (writePng (depthCentre, "toyotomi-editor-knob-depth-centre.png"), "knob-depth-centre-render");
+    uiState.setSlotDepth (0, 1.0f);
+    const auto depthMax = renderKnobPanel();
+    passed &= require (writePng (depthMax, "toyotomi-editor-knob-depth-max.png"), "knob-depth-max-render");
+    passed &= require (hasDifferentPixels (depthMin, depthMax), "knob-depth-min-max-rotation");
 
     const auto writePresetPreview = [&] (PluginStateModel::ScratchPreset preset, const juce::String& filename)
     {
