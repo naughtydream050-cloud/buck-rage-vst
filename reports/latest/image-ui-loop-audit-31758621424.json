@@ -1,0 +1,40 @@
+{
+  "project": "ToyotomiHideyoshi",
+  "commit": "ef9b35233fc4cd7fddfcdd7ac2af67168743a094",
+  "ciRun": 31758621424,
+  "scope": [
+    "remove the legacy COUNT GRID - BAR xx title",
+    "replace only BACKSPIN normal visual asset"
+  ],
+  "nonTargetAreas": [
+    "BAR MAP", "BAR TAB", "PLAYHEAD", "quote bounds", "XY PAD",
+    "parameters", "OUTPUT", "DSP", "StateModel"
+  ],
+  "assetTrace": {
+    "legacyTitle": {
+      "source": "Resources/ui-master-default-preview-20260808/previews/A_default_1280x853.png",
+      "cause": "baked background pixels; no C++ title component or drawText path",
+      "replacement": "Resources/ui-quote-panel-20260810/master_default_no_count_grid_title_1280x853.png",
+      "quoteBoundsUnchanged": [332, 432, 512, 360]
+    },
+    "backspinNormal": {
+      "old": "preset_backspin_normal_102x79.png",
+      "new": "preset_backspin_normal_neutral_102x79.png",
+      "nativeBounds": [102, 79],
+      "selectedAssetUnchanged": "preset_backspin_selected_102x79.png"
+    }
+  },
+  "evidence": {
+    "offPreview": "toyotomi-preset-preview-off.png",
+    "backspinPreview": "toyotomi-preset-preview-backspin.png",
+    "customPreview": "toyotomi-preset-preview-custom.png",
+    "result": "OFF shows only OFF gold; BACKSPIN is neutral; legacy title is absent."
+  },
+  "validation": {
+    "compileLink": "PASS",
+    "stateModelTests": "PASS",
+    "runtimeSmoke": "PASS",
+    "bundleValidation": "PASS",
+    "hostValidation": "pending user FL Studio test"
+  }
+}
