@@ -140,6 +140,8 @@ jobs:
             toyotomi-runtime-smoke.log
             bar-map-render-*.png
             toyotomi-editor-*.png
+            toyotomi-timeline-editor-full.png
+            toyotomi-quote-panel.png
             toyotomi-preset-preview-*.png
             toyotomi-bar-labels-*.png
             toyotomi-bar-waveform-*.png

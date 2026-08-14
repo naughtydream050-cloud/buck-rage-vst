@@ -43,7 +43,7 @@ int main()
 #if TOYOTOMI_HAS_BINARY_DATA
     int backgroundBytes = 0, quoteBytes = 0;
     const auto* backgroundData = BinaryData::getNamedResource ("master_default_no_count_grid_title_1280x853_png", backgroundBytes);
-    const auto* quoteData = BinaryData::getNamedResource ("quote_panel_512x360_png", quoteBytes);
+    const auto* quoteData = BinaryData::getNamedResource ("quote_panel_user_20260814_512x360_png", quoteBytes);
     const auto background = backgroundData != nullptr ? juce::ImageFileFormat::loadFrom (backgroundData, static_cast<size_t> (backgroundBytes)) : juce::Image {};
     const auto quote = quoteData != nullptr ? juce::ImageFileFormat::loadFrom (quoteData, static_cast<size_t> (quoteBytes)) : juce::Image {};
     passed &= require (background.isValid() && background.getWidth() == 1280 && background.getHeight() == 853, "master-background-loaded");

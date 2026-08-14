@@ -31,7 +31,7 @@ juce::Image loadQuoteImage()
 {
 #if TOYOTOMI_HAS_BINARY_DATA
     int size = 0;
-    const auto* data = BinaryData::getNamedResource ("quote_panel_512x360_png", size);
+    const auto* data = BinaryData::getNamedResource ("quote_panel_user_20260814_512x360_png", size);
     return data != nullptr ? juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (size)) : juce::Image {};
 #else
     return {};
@@ -94,6 +94,7 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
     topBar.toFront (false); barTabs.toFront (false); barMap.toFront (false);
     quotePanel.toFront (false); xyPad.toFront (false); presetPalette.toFront (false);
     countParameters.toFront (false); outputMeter.toFront (false); bottomStatus.toFront (false);
+    quotePanel.setInterceptsMouseClicks (false, false);
 
     setOpaque (true);
     // Image cutouts are authored at native pixels.  A fitted/scaled editor

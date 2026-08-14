@@ -53,7 +53,7 @@ file (GLOB TOYOTOMI_EXACT_PRESET_BYPASS_ASSETS CONFIGURE_DEPENDS
 juce_add_binary_data(ToyotomiHideyoshiAssets
     SOURCES
         Resources/ui-quote-panel-20260810/master_default_no_count_grid_title_1280x853.png
-        Resources/ui-quote-panel-20260810/quote_panel_512x360.png
+        Resources/ui-quote-panel-20260810/quote_panel_user_20260814_512x360.png
         ${TOYOTOMI_MASTER_UI_ASSETS}
         ${TOYOTOMI_EXACT_PRESET_BYPASS_ASSETS}
         ui/spec/ui-spec.json
