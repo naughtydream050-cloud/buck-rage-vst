@@ -535,7 +535,7 @@ void CountParameterPanel::paint (juce::Graphics& g)
         drawImage (g, imageFor ("knobPointer"), knob.toNearestInt());
         g.restoreState();
         g.setColour (ToyotomiUi::ivory()); g.setFont (juce::Font (11.0f));
-        g.drawText (values[static_cast<size_t> (i)], { 10 + 87 * i, 243, 67, 21 }, juce::Justification::centred);
+        g.drawText (values[static_cast<size_t> (i)], juce::Rectangle<int> { 10 + 87 * i, 243, 67, 21 }, juce::Justification::centred);
     }
 }
 void CountParameterPanel::updateKnob (int index, float delta)
