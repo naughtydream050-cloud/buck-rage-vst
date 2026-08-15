@@ -81,11 +81,12 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
     xyPad.onMotionChanged = [this, &state] (const std::vector<PluginStateModel::MotionPoint>& motion) { state.setSelectedMotion (motion); barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); }); };
     xyPad.onClearMotion = [this, &state] { state.clearSelectedMotion(); barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); }); };
     xyPad.onResetSlot = [this, &state] { state.resetSelectedSlot(); barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); }); };
+    addAndMakeVisible (content);
     for (auto* component : std::array<juce::Component*, 10> {
              &topBar, &artwork, &barTabs, &barMap, &quotePanel,
              &xyPad, &presetPalette, &countParameters, &outputMeter, &bottomStatus })
     {
-        addAndMakeVisible (*component);
+        content.addAndMakeVisible (*component);
 
         component->setAlpha (1.0f);
     }
@@ -97,10 +98,11 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
     quotePanel.setInterceptsMouseClicks (false, false);
 
     setOpaque (true);
-    // Image cutouts are authored at native pixels.  A fitted/scaled editor
-    // makes visual and hit-test geometry diverge in FL Studio.
+    // The 1280 x 853 reference canvas lives inside one uniformly transformed
+    // content component, so JUCE applies the same inverse transform to mouse
+    // events that it applies to the image controls.
     setResizable (false, false);
-    setSize (uiSpec.getCanvasWidth(), uiSpec.getCanvasHeight());
+    setSize (kEditorWidth, kEditorHeight);
     refreshSelectedSlotViews();
     startTimerHz (30);
 }
@@ -109,6 +111,7 @@ void ToyotomiHideyoshiAudioProcessorEditor::paint (juce::Graphics& g)
 {
     if (referenceImage.isValid())
     {
+        g.addTransform (juce::AffineTransform::scale (kEditorScale));
         g.drawImageAt (referenceImage, 0, 0);
     }
     else
@@ -124,7 +127,10 @@ void ToyotomiHideyoshiAudioProcessorEditor::paint (juce::Graphics& g)
 
 void ToyotomiHideyoshiAudioProcessorEditor::resized()
 {
-    const auto viewport = getLocalBounds();
+    content.setBounds (0, 0, uiSpec.getCanvasWidth(), uiSpec.getCanvasHeight());
+    content.setTransform (juce::AffineTransform::scale (kEditorScale));
+
+    const auto viewport = juce::Rectangle<int> (0, 0, uiSpec.getCanvasWidth(), uiSpec.getCanvasHeight());
     topBar.setBounds          (uiSpec.scaleRegion ("topBar", viewport));
     artwork.setBounds         (uiSpec.scaleRegion ("artwork", viewport));
     barTabs.setBounds         (uiSpec.scaleRegion ("barTabs", viewport));
