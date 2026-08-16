@@ -529,7 +529,29 @@ void ScratchPresetPalette::mouseDown (const juce::MouseEvent& event)
     for (int i = 0; i < 10; ++i) if (cells[static_cast<size_t> (i)].contains (event.getPosition())) { if (onPresetSelected) onPresetSelected (i); repaint(); return; }
 }
 
-CountParameterPanel::CountParameterPanel (ToyotomiHideyoshiAudioProcessor& p) : processor (p) {}
+CountParameterPanel::CountParameterPanel (ToyotomiHideyoshiAudioProcessor& p) : processor (p)
+{
+    static const std::array<const char*, 5> ids {{ "length-1-16", "length-1-8", "length-1-4", "length-1-2", "length-1-bar" }};
+    for (int i = 0; i < static_cast<int> (lengthHitTargets.size()); ++i)
+    {
+        auto target = std::make_unique<TransparentLengthHitTarget> (ids[static_cast<size_t> (i)]);
+        target->onClick = [this, i]
+        {
+            if (onLengthSelected != nullptr)
+                onLengthSelected (i);
+        };
+        addAndMakeVisible (*target);
+        lengthHitTargets[static_cast<size_t> (i)] = std::move (target);
+    }
+}
+
+void CountParameterPanel::resized()
+{
+    const auto& bounds = lengthButtonBounds();
+    for (int i = 0; i < static_cast<int> (lengthHitTargets.size()); ++i)
+        lengthHitTargets[static_cast<size_t> (i)]->setBounds (bounds[static_cast<size_t> (i)]);
+}
+
 juce::Rectangle<float> CountParameterPanel::knobBounds (int index) const
 {
     // Keep the three established knob centres while swapping the native image
@@ -569,8 +591,6 @@ void CountParameterPanel::updateKnob (int index, float delta)
 }
 void CountParameterPanel::mouseDown (const juce::MouseEvent& event)
 {
-    const auto& lengths = lengthButtonBounds();
-    for (int i = 0; i < 5; ++i) if (lengths[static_cast<size_t> (i)].contains (event.getPosition())) { if (onLengthSelected) onLengthSelected (i); repaint(); return; }
     for (int i = 0; i < 3; ++i) if (knobBounds (i).contains (event.position)) { showLiveValues = true; activeKnob = i; dragStartY = event.position.y; repaint(); return; }
 }
 void CountParameterPanel::mouseDoubleClick (const juce::MouseEvent& event)

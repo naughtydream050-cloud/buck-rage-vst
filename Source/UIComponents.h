@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include <array>
 #include <functional>
+#include <memory>
 #include <utility>
 #include "PluginProcessor.h"
 
@@ -143,6 +144,15 @@ private:
     std::function<int()> presetProvider;
 };
 
+class TransparentLengthHitTarget final : public juce::Button
+{
+public:
+    explicit TransparentLengthHitTarget (const juce::String& id) : juce::Button (id) {}
+
+private:
+    void paintButton (juce::Graphics&, bool, bool) override {}
+};
+
 class CountParameterPanel final : public juce::Component
 {
 public:
@@ -150,6 +160,7 @@ public:
     explicit CountParameterPanel (ToyotomiHideyoshiAudioProcessor&);
     void setSelectedBar (int bar) { selectedBar = juce::jlimit (0, 63, bar); repaint(); }
     void paint (juce::Graphics&) override;
+    void resized() override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDoubleClick (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
@@ -164,6 +175,7 @@ private:
     float dragStartY = 0.0f;
     bool showLiveValues = false;
     int selectedBar = 0;
+    std::array<std::unique_ptr<TransparentLengthHitTarget>, 5> lengthHitTargets;
 };
 
 class OutputMeterComponent final : public juce::Component,
