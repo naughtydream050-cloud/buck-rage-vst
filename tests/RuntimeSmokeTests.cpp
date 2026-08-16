@@ -63,22 +63,22 @@ int main()
     std::unique_ptr<juce::AudioProcessorEditor> editor (processor.createEditor());
     passed &= require (editor != nullptr, "editor-created");
     if (editor == nullptr) return 1;
-    editor->setSize (1152, 768);
-    passed &= require (editor->getLocalBounds() == juce::Rectangle<int> (0, 0, 1152, 768), "fixed-editor-size-90-percent");
+    editor->setSize (1024, 683);
+    passed &= require (editor->getLocalBounds() == juce::Rectangle<int> (0, 0, 1024, 683), "fixed-editor-size-80-percent");
 
     UiSpec spec;
     passed &= require (spec.getRegion ("quotePanel") == juce::Rectangle<int> (332, 432, 512, 360), "quote-replaces-count-grid-region");
-    auto full = juce::Image (juce::Image::ARGB, 1152, 768, true);
+    auto full = juce::Image (juce::Image::ARGB, 1024, 683, true);
     { juce::Graphics graphics (full); editor->paintEntireComponent (graphics, true); }
     passed &= require (writePng (full, "toyotomi-timeline-editor-full.png"), "full-ui-render");
-    passed &= require (writePng (full.getClippedImage ({ 299, 389, 461, 324 }), "toyotomi-quote-panel.png"), "quote-panel-render");
+    passed &= require (writePng (full.getClippedImage ({ 266, 346, 410, 288 }), "toyotomi-quote-panel.png"), "quote-panel-render");
 
     const auto renderKnobPanel = [&]
     {
-        auto preview = juce::Image (juce::Image::ARGB, 1152, 768, true);
+        auto preview = juce::Image (juce::Image::ARGB, 1024, 683, true);
         juce::Graphics graphics (preview);
         editor->paintEntireComponent (graphics, true);
-        return preview.getClippedImage ({ 779, 419, 226, 294 });
+        return preview.getClippedImage ({ 693, 372, 201, 262 });
     };
     auto& uiState = processor.getStateModel();
     uiState.setSlotSpeed (0, PluginStateModel::kMinSpeed);
@@ -117,7 +117,7 @@ int main()
     const auto writePresetPreview = [&] (PluginStateModel::ScratchPreset preset, const juce::String& filename)
     {
         processor.getStateModel().setSelectedPreset (preset);
-        auto preview = juce::Image (juce::Image::ARGB, 1152, 768, true);
+        auto preview = juce::Image (juce::Image::ARGB, 1024, 683, true);
         juce::Graphics graphics (preview);
         editor->paintEntireComponent (graphics, true);
         return writePng (preview, filename);

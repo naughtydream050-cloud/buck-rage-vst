@@ -19,9 +19,9 @@ private:
     // The artwork and all hit regions remain authored on the 1280 x 853
     // reference canvas.  This one transform keeps visual and input geometry
     // together in the smaller fixed FL Studio editor.
-    static constexpr float kEditorScale = 0.9f;
-    static constexpr int kEditorWidth = 1152;
-    static constexpr int kEditorHeight = 768;
+    static constexpr float kEditorScale = 0.8f;
+    static constexpr int kEditorWidth = 1024;
+    static constexpr int kEditorHeight = 683;
 
     ToyotomiHideyoshiAudioProcessor& processor;
     UiSpec uiSpec;
