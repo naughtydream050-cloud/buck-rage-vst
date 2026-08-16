@@ -88,6 +88,26 @@ const juce::Image& lengthImage (int length, bool selected)
     return (selected ? gold : normal)[static_cast<size_t> (juce::jlimit (0, 4, length))];
 }
 
+const std::array<juce::Rectangle<int>, 5>& lengthButtonBounds()
+{
+    // These rectangles are the single authority for both painting and hit
+    // testing. Every matching normal/selected PNG is 40 x 33 native pixels.
+    static const std::array<juce::Rectangle<int>, 5> bounds {{
+        { 10, 72, 40, 33 }, { 55, 72, 40, 33 }, { 99, 72, 40, 33 },
+        { 144, 72, 40, 33 }, { 192, 72, 40, 33 }
+    }};
+    return bounds;
+}
+
+const std::array<juce::Rectangle<int>, 3>& parameterReadoutBounds()
+{
+    // The three engraved readout frames are independent, equal-sized bounds.
+    static const std::array<juce::Rectangle<int>, 3> bounds {{
+        { 10, 243, 67, 21 }, { 97, 243, 67, 21 }, { 184, 243, 67, 21 }
+    }};
+    return bounds;
+}
+
 void drawImage (juce::Graphics& g, const juce::Image& image, juce::Rectangle<int> bounds)
 {
     // Every state asset is authored at its final pixel dimensions.  Refuse a
@@ -520,9 +540,10 @@ void CountParameterPanel::paint (juce::Graphics& g)
 {
     const auto ui = processor.getStateModel().getUiState();
     const auto& count = processor.getStateModel().getSlot (ui.selectedBar);
-    static const std::array<juce::Rectangle<int>, 5> lengths {{ {10,72,40,33}, {55,72,40,33}, {99,72,40,33}, {144,72,40,33}, {192,72,40,33} }};
+    const auto& lengths = lengthButtonBounds();
+    const auto selectedLength = juce::jlimit (0, 4, static_cast<int> (count.length));
     for (int i = 0; i < 5; ++i)
-        drawImage (g, lengthImage (i, i == static_cast<int> (count.length)), lengths[static_cast<size_t> (i)]);
+        drawImage (g, lengthImage (i, i == selectedLength), lengths[static_cast<size_t> (i)]);
     const std::array<float, 3> normalized { (count.speed - PluginStateModel::kMinSpeed) / (PluginStateModel::kMaxSpeed - PluginStateModel::kMinSpeed), (count.pitch - PluginStateModel::kMinPitch) / (PluginStateModel::kMaxPitch - PluginStateModel::kMinPitch), count.depth };
     const std::array<juce::String, 3> values { juce::String (count.speed, 2) + "x", juce::String (count.pitch, 1) + " st", juce::String (juce::roundToInt (count.depth * 100.0f)) + " %" };
     for (int i = 0; i < 3; ++i)
@@ -535,7 +556,7 @@ void CountParameterPanel::paint (juce::Graphics& g)
         drawImage (g, imageFor ("knobPointer"), knob.toNearestInt());
         g.restoreState();
         g.setColour (ToyotomiUi::ivory()); g.setFont (juce::Font (11.0f));
-        g.drawText (values[static_cast<size_t> (i)], juce::Rectangle<int> { 10 + 87 * i, 243, 67, 21 }, juce::Justification::centred);
+        g.drawText (values[static_cast<size_t> (i)], parameterReadoutBounds()[static_cast<size_t> (i)], juce::Justification::centred);
     }
 }
 void CountParameterPanel::updateKnob (int index, float delta)
@@ -548,7 +569,7 @@ void CountParameterPanel::updateKnob (int index, float delta)
 }
 void CountParameterPanel::mouseDown (const juce::MouseEvent& event)
 {
-    static const std::array<juce::Rectangle<int>, 5> lengths {{ {10,72,40,33}, {55,72,40,33}, {99,72,40,33}, {144,72,40,33}, {192,72,40,33} }};
+    const auto& lengths = lengthButtonBounds();
     for (int i = 0; i < 5; ++i) if (lengths[static_cast<size_t> (i)].contains (event.getPosition())) { if (onLengthSelected) onLengthSelected (i); repaint(); return; }
     for (int i = 0; i < 3; ++i) if (knobBounds (i).contains (event.position)) { showLiveValues = true; activeKnob = i; dragStartY = event.position.y; repaint(); return; }
 }

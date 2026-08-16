@@ -114,6 +114,28 @@ int main()
     passed &= require (writePng (depthMax, "toyotomi-editor-knob-depth-max.png"), "knob-depth-max-render");
     passed &= require (hasDifferentPixels (depthMin, depthMax), "knob-depth-min-max-rotation");
 
+    const auto renderLengthPanel = [&]
+    {
+        auto preview = juce::Image (juce::Image::ARGB, 1024, 683, true);
+        juce::Graphics graphics (preview);
+        editor->paintEntireComponent (graphics, true);
+        return preview.getClippedImage ({ 693, 372, 201, 262 });
+    };
+    std::array<juce::Image, 5> lengthStates;
+    for (int i = 0; i < 5; ++i)
+    {
+        const auto length = static_cast<PluginStateModel::NoteLength> (i);
+        uiState.setSlotLength (0, length);
+        passed &= require (uiState.getSlot (0).length == length, "length-state-source-is-selected-slot");
+        lengthStates[static_cast<size_t> (i)] = renderLengthPanel();
+        passed &= require (writePng (lengthStates[static_cast<size_t> (i)],
+                                    "toyotomi-length-state-" + juce::String (i) + ".png"),
+                           "length-state-render");
+    }
+    for (int i = 1; i < 5; ++i)
+        passed &= require (hasDifferentPixels (lengthStates[0], lengthStates[static_cast<size_t> (i)]),
+                           "length-state-selected-image-changes");
+
     const auto writePresetPreview = [&] (PluginStateModel::ScratchPreset preset, const juce::String& filename)
     {
         processor.getStateModel().setSelectedPreset (preset);
