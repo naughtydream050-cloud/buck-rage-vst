@@ -169,10 +169,21 @@ int main()
     // The UI is rendered at the established 80% host view in this smoke test.
     // Mask every length button and assert that changing selection does not move
     // any other pixels in the panel.  The native source remains 40 x 33.
-    static const std::array<juce::Rectangle<int>, 5> lengthPreviewBounds {{
-        { 7, 58, 34, 28 }, { 43, 58, 34, 28 }, { 79, 58, 34, 28 },
-        { 115, 58, 34, 28 }, { 151, 58, 34, 28 }
-    }};
+    // Each rectangle is the 40 x 33 native source rectangle transformed into
+    // this 80% smoke preview, with a three-pixel safety margin for its raster
+    // edge.  Only pixels outside every possible selected frame are compared.
+    static const auto lengthPreviewBounds = []
+    {
+        constexpr int baseX = 4;
+        constexpr int baseY = 54;
+        constexpr int width = 42;
+        constexpr int height = 36;
+        constexpr int step = 36;
+        std::array<juce::Rectangle<int>, 5> result;
+        for (int i = 0; i < static_cast<int> (result.size()); ++i)
+            result[static_cast<size_t> (i)] = { baseX + i * step, baseY, width, height };
+        return result;
+    }();
     for (int i = 1; i < 5; ++i)
         passed &= require (hasIdenticalPixelsOutside (lengthStates[0], lengthStates[static_cast<size_t> (i)], lengthPreviewBounds),
                            "length-selection-does-not-shift-other-ui");
@@ -181,10 +192,18 @@ int main()
     // Native-size all-normal contact render: validates that 1/16 is not
     // visually selected when its selected image is not chosen.
     static const std::array<juce::String, 5> lengthNames { "1_16", "1_8", "1_4", "1_2", "1_bar" };
-    static const std::array<juce::Rectangle<int>, 5> lengthBounds {{
-        { 10, 72, 40, 33 }, { 55, 72, 40, 33 }, { 99, 72, 40, 33 },
-        { 144, 72, 40, 33 }, { 192, 72, 40, 33 }
-    }};
+    static const auto lengthBounds = []
+    {
+        constexpr int baseX = 10;
+        constexpr int baseY = 72;
+        constexpr int width = 40;
+        constexpr int height = 33;
+        constexpr int gap = 5;
+        std::array<juce::Rectangle<int>, 5> result;
+        for (int i = 0; i < static_cast<int> (result.size()); ++i)
+            result[static_cast<size_t> (i)] = { baseX + i * (width + gap), baseY, width, height };
+        return result;
+    }();
     auto allNormal = juce::Image (juce::Image::ARGB, 251, 105, true);
     juce::Graphics allNormalGraphics (allNormal);
     for (int i = 0; i < 5; ++i)
