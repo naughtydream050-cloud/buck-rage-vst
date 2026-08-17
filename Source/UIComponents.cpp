@@ -270,6 +270,28 @@ bool validateEmbeddedImageAssets()
             return false;
         }
     }
+    for (int length = 0; length < 5; ++length)
+    {
+        for (const auto selected : { false, true })
+        {
+            const auto& image = lengthImage (length, selected);
+            if (! image.isValid() || image.getWidth() != 40 || image.getHeight() != 33)
+            {
+                std::cerr << "ASSET_DIM_FAIL length=" << length
+                          << " selected=" << selected << '\n';
+                return false;
+            }
+
+            for (int y = 0; y < image.getHeight(); ++y)
+                for (int x = 0; x < image.getWidth(); ++x)
+                    if (image.getPixelAt (x, y).getAlpha() != 255)
+                    {
+                        std::cerr << "ASSET_ALPHA_FAIL length=" << length
+                                  << " selected=" << selected << '\n';
+                        return false;
+                    }
+        }
+    }
     return true;
 }
 }

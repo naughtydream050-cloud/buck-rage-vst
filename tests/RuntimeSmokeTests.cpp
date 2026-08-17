@@ -114,6 +114,19 @@ int main()
     passed &= require (writePng (depthMax, "toyotomi-editor-knob-depth-max.png"), "knob-depth-max-render");
     passed &= require (hasDifferentPixels (depthMin, depthMax), "knob-depth-min-max-rotation");
 
+    // The all-minimum fixture must use the exact parameter minima.  It is a
+    // visual regression asset only; ranges and defaults remain unchanged.
+    uiState.setSlotSpeed (0, PluginStateModel::kMinSpeed);
+    uiState.setSlotPitch (0, PluginStateModel::kMinPitch);
+    uiState.setSlotDepth (0, 0.0f);
+    const auto& minimumSlot = uiState.getSlot (0);
+    passed &= require (minimumSlot.speed == PluginStateModel::kMinSpeed
+                       && minimumSlot.pitch == PluginStateModel::kMinPitch
+                       && minimumSlot.depth == 0.0f,
+                       "knob-all-minimum-fixture-state");
+    passed &= require (writePng (renderKnobPanel(), "toyotomi-editor-knob-all-min.png"),
+                       "knob-all-minimum-render");
+
     const auto renderLengthPanel = [&]
     {
         auto preview = juce::Image (juce::Image::ARGB, 1024, 683, true);
@@ -135,6 +148,31 @@ int main()
     for (int i = 1; i < 5; ++i)
         passed &= require (hasDifferentPixels (lengthStates[0], lengthStates[static_cast<size_t> (i)]),
                            "length-state-selected-image-changes");
+
+#if TOYOTOMI_HAS_BINARY_DATA
+    // Native-size all-normal contact render: validates that 1/16 is not
+    // visually selected when its selected image is not chosen.
+    static const std::array<juce::String, 5> lengthNames { "1_16", "1_8", "1_4", "1_2", "1_bar" };
+    static const std::array<juce::Rectangle<int>, 5> lengthBounds {{
+        { 10, 72, 40, 33 }, { 55, 72, 40, 33 }, { 99, 72, 40, 33 },
+        { 144, 72, 40, 33 }, { 192, 72, 40, 33 }
+    }};
+    auto allNormal = juce::Image (juce::Image::ARGB, 251, 105, true);
+    juce::Graphics allNormalGraphics (allNormal);
+    for (int i = 0; i < 5; ++i)
+    {
+        int bytes = 0;
+        const auto resource = "length_" + lengthNames[static_cast<size_t> (i)] + "_normal_40x33_png";
+        const auto* data = BinaryData::getNamedResource (resource.toRawUTF8(), bytes);
+        const auto image = data != nullptr ? juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (bytes))
+                                           : juce::Image {};
+        passed &= require (image.isValid() && image.getWidth() == 40 && image.getHeight() == 33,
+                           "length-all-normal-native-asset");
+        if (image.isValid()) allNormalGraphics.drawImageAt (image, lengthBounds[static_cast<size_t> (i)].getX(), lengthBounds[static_cast<size_t> (i)].getY());
+    }
+    passed &= require (writePng (allNormal, "toyotomi-length-all-normal-debug.png"),
+                       "length-all-normal-debug-render");
+#endif
 
     const auto writePresetPreview = [&] (PluginStateModel::ScratchPreset preset, const juce::String& filename)
     {
