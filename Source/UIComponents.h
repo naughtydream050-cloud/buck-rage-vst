@@ -20,6 +20,7 @@ juce::Font font (float height, bool bold = false);
 void drawPanel (juce::Graphics&, juce::Rectangle<float>, const juce::String& title = {});
 void drawMotionGlyph (juce::Graphics&, juce::Rectangle<float>, int presetIndex);
 bool validateEmbeddedImageAssets();
+bool validateLengthButtonGeometry();
 }
 
 class TopBarComponent final : public juce::Component,

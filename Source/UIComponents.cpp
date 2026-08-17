@@ -88,14 +88,24 @@ const juce::Image& lengthImage (int length, bool selected)
     return (selected ? gold : normal)[static_cast<size_t> (juce::jlimit (0, 4, length))];
 }
 
+constexpr int kLengthBaseX = 10;
+constexpr int kLengthBaseY = 72;
+constexpr int kLengthButtonWidth = 40;
+constexpr int kLengthButtonHeight = 33;
+constexpr int kLengthButtonGap = 5;
+
 const std::array<juce::Rectangle<int>, 5>& lengthButtonBounds()
 {
-    // These rectangles are the single authority for both painting and hit
-    // testing. Every matching normal/selected PNG is 40 x 33 native pixels.
-    static const std::array<juce::Rectangle<int>, 5> bounds {{
-        { 10, 72, 40, 33 }, { 55, 72, 40, 33 }, { 99, 72, 40, 33 },
-        { 144, 72, 40, 33 }, { 192, 72, 40, 33 }
-    }};
+    // This is the only geometry source for normal paint, selected paint, and
+    // transparent hit targets.  All five assets are native 40 x 33 PNGs.
+    static const std::array<juce::Rectangle<int>, 5> bounds = []
+    {
+        std::array<juce::Rectangle<int>, 5> result;
+        for (int i = 0; i < static_cast<int> (result.size()); ++i)
+            result[static_cast<size_t> (i)] = { kLengthBaseX + i * (kLengthButtonWidth + kLengthButtonGap),
+                                                kLengthBaseY, kLengthButtonWidth, kLengthButtonHeight };
+        return result;
+    }();
     return bounds;
 }
 
@@ -293,6 +303,34 @@ bool validateEmbeddedImageAssets()
         }
     }
     return true;
+}
+
+bool validateLengthButtonGeometry()
+{
+    static constexpr std::array<const char*, 5> labels { "1/16", "1/8", "1/4", "1/2", "1 BAR" };
+
+    const auto& lengthBounds = lengthButtonBounds();
+    bool valid = true;
+    for (int i = 0; i < static_cast<int> (lengthBounds.size()); ++i)
+    {
+        // Every state is rendered from this exact source rectangle.  The hit
+        // target is assigned from the same rectangle in CountParameterPanel::resized.
+        const auto normalBounds = lengthBounds[static_cast<size_t> (i)];
+        const auto selectedBounds = lengthBounds[static_cast<size_t> (i)];
+        const auto hitBounds = lengthBounds[static_cast<size_t> (i)];
+        std::cerr << "LENGTH_GEOMETRY " << labels[static_cast<size_t> (i)]
+                  << " normal=(" << normalBounds.getX() << ',' << normalBounds.getY() << ','
+                  << normalBounds.getWidth() << ',' << normalBounds.getHeight() << ')'
+                  << " selected=(" << selectedBounds.getX() << ',' << selectedBounds.getY() << ','
+                  << selectedBounds.getWidth() << ',' << selectedBounds.getHeight() << ')'
+                  << " hit=(" << hitBounds.getX() << ',' << hitBounds.getY() << ','
+                  << hitBounds.getWidth() << ',' << hitBounds.getHeight() << ")\n";
+
+        valid = valid && normalBounds == selectedBounds && selectedBounds == hitBounds;
+        valid = valid && normalBounds == juce::Rectangle<int> (kLengthBaseX + i * (kLengthButtonWidth + kLengthButtonGap),
+                                                                 kLengthBaseY, kLengthButtonWidth, kLengthButtonHeight);
+    }
+    return valid;
 }
 }
 
@@ -571,7 +609,11 @@ void CountParameterPanel::resized()
 {
     const auto& bounds = lengthButtonBounds();
     for (int i = 0; i < static_cast<int> (lengthHitTargets.size()); ++i)
-        lengthHitTargets[static_cast<size_t> (i)]->setBounds (bounds[static_cast<size_t> (i)]);
+    {
+        const auto lengthBounds = bounds[static_cast<size_t> (i)];
+        lengthHitTargets[static_cast<size_t> (i)]->setBounds (lengthBounds);
+        jassert (lengthHitTargets[static_cast<size_t> (i)]->getBounds() == lengthBounds);
+    }
 }
 
 juce::Rectangle<float> CountParameterPanel::knobBounds (int index) const

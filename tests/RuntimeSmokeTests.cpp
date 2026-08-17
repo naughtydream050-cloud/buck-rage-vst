@@ -33,12 +33,29 @@ bool hasDifferentPixels (const juce::Image& first, const juce::Image& second)
             if (first.getPixelAt (x, y) != second.getPixelAt (x, y)) return true;
     return false;
 }
+
+bool hasIdenticalPixelsOutside (const juce::Image& first, const juce::Image& second,
+                                const std::array<juce::Rectangle<int>, 5>& ignored)
+{
+    if (first.getWidth() != second.getWidth() || first.getHeight() != second.getHeight()) return false;
+    for (int y = 0; y < first.getHeight(); ++y)
+        for (int x = 0; x < first.getWidth(); ++x)
+        {
+            const juce::Point<int> point { x, y };
+            bool isIgnored = false;
+            for (const auto bounds : ignored)
+                isIgnored = isIgnored || bounds.contains (point);
+            if (! isIgnored && first.getPixelAt (x, y) != second.getPixelAt (x, y)) return false;
+        }
+    return true;
+}
 }
 
 int main()
 {
     juce::ScopedJuceInitialiser_GUI gui;
     bool passed = require (ToyotomiUi::validateEmbeddedImageAssets(), "embedded-image-assets");
+    passed &= require (ToyotomiUi::validateLengthButtonGeometry(), "length-geometry-normal-selected-hit-match");
 
 #if TOYOTOMI_HAS_BINARY_DATA
     int backgroundBytes = 0, quoteBytes = 0, knobRingBytes = 0, knobPointerBytes = 0;
@@ -148,6 +165,17 @@ int main()
     for (int i = 1; i < 5; ++i)
         passed &= require (hasDifferentPixels (lengthStates[0], lengthStates[static_cast<size_t> (i)]),
                            "length-state-selected-image-changes");
+
+    // The UI is rendered at the established 80% host view in this smoke test.
+    // Mask every length button and assert that changing selection does not move
+    // any other pixels in the panel.  The native source remains 40 x 33.
+    static const std::array<juce::Rectangle<int>, 5> lengthPreviewBounds {{
+        { 7, 58, 34, 28 }, { 43, 58, 34, 28 }, { 79, 58, 34, 28 },
+        { 115, 58, 34, 28 }, { 151, 58, 34, 28 }
+    }};
+    for (int i = 1; i < 5; ++i)
+        passed &= require (hasIdenticalPixelsOutside (lengthStates[0], lengthStates[static_cast<size_t> (i)], lengthPreviewBounds),
+                           "length-selection-does-not-shift-other-ui");
 
 #if TOYOTOMI_HAS_BINARY_DATA
     // Native-size all-normal contact render: validates that 1/16 is not
