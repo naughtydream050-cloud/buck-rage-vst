@@ -85,10 +85,62 @@ int main()
 
     UiSpec spec;
     passed &= require (spec.getComponent ("QuotePanel") == juce::Rectangle<int> (266, 346, 409, 288), "quote-native-canonical-bounds");
+    static const std::array<juce::String, 18> requiredBounds {
+        "Header", "BarTabs", "BarMap", "PresetPanel", "XYPad", "QuotePanel", "CountParameters", "Output", "Bypass",
+        "Length.1_16", "Length.1_8", "Length.1_4", "Length.1_2", "Length.1_BAR",
+        "Knob.Speed", "Knob.Pitch", "Knob.Depth", "Preset.CUSTOM"
+    };
+    for (const auto& name : requiredBounds)
+    {
+        const auto bounds = spec.getComponent (name);
+        passed &= require (! bounds.isEmpty() && bounds.getX() >= 0 && bounds.getY() >= 0
+                           && bounds.getRight() <= 1024 && bounds.getBottom() <= 683,
+                           "native-layout-bounds-in-canvas");
+    }
     auto full = juce::Image (juce::Image::ARGB, 1024, 683, true);
     { juce::Graphics graphics (full); editor->paintEntireComponent (graphics, true); }
     passed &= require (writePng (full, "toyotomi-timeline-editor-full.png"), "full-ui-render");
     passed &= require (writePng (full.getClippedImage ({ 266, 346, 409, 288 }), "toyotomi-quote-panel.png"), "quote-panel-render");
+
+    // Render every native tab-strip state without a parent scale transform.
+    BarTabComponent tabs;
+    tabs.setSize (RuntimeLayout::bounds ("BarTabs").getWidth(), RuntimeLayout::bounds ("BarTabs").getHeight());
+    for (int page = 0; page < 4; ++page)
+    {
+        tabs.setSelectedPage (page);
+        auto tabImage = juce::Image (juce::Image::ARGB, tabs.getWidth(), tabs.getHeight(), true);
+        juce::Graphics graphics (tabImage);
+        tabs.paintEntireComponent (graphics, true);
+        passed &= require (writePng (tabImage, "toyotomi-native-tab-state-" + juce::String (page + 1) + ".png"),
+                           "native-tab-state-render");
+    }
+
+    // Exercise all ten complete PRESET PNG state swaps at their exact 1024
+    // local rectangles. This has no duplicate selected-state cache.
+    ScratchPresetPalette palette;
+    int visualPreset = 0;
+    palette.setPresetProvider ([&visualPreset] { return visualPreset; });
+    palette.setSize (RuntimeLayout::bounds ("PresetPanel").getWidth(), RuntimeLayout::bounds ("PresetPanel").getHeight());
+    for (visualPreset = 0; visualPreset < 10; ++visualPreset)
+    {
+        auto presetImage = juce::Image (juce::Image::ARGB, palette.getWidth(), palette.getHeight(), true);
+        juce::Graphics graphics (presetImage);
+        palette.paintEntireComponent (graphics, true);
+        passed &= require (writePng (presetImage, "toyotomi-native-preset-state-" + juce::String (visualPreset) + ".png"),
+                           "native-preset-state-render");
+    }
+
+    XYMotionPad xy;
+    xy.setSize (RuntimeLayout::bounds ("XYPad").getWidth(), RuntimeLayout::bounds ("XYPad").getHeight());
+    auto xyImage = juce::Image (juce::Image::ARGB, xy.getWidth(), xy.getHeight(), true);
+    { juce::Graphics graphics (xyImage); xy.paintEntireComponent (graphics, true); }
+    passed &= require (writePng (xyImage, "toyotomi-native-xy.png"), "native-xy-render");
+
+    OutputMeterComponent meter (processor);
+    meter.setSize (RuntimeLayout::bounds ("Output").getWidth(), RuntimeLayout::bounds ("Output").getHeight());
+    auto meterImage = juce::Image (juce::Image::ARGB, meter.getWidth(), meter.getHeight(), true);
+    { juce::Graphics graphics (meterImage); meter.paintEntireComponent (graphics, true); }
+    passed &= require (writePng (meterImage, "toyotomi-native-output.png"), "native-output-render");
 
     const auto renderKnobPanel = [&]
     {
