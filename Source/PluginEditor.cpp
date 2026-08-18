@@ -17,10 +17,10 @@ juce::Image loadMasterDefault()
     // juce_add_binary_data converts the filename into an identifier.  The
     // previous literal filename lookup always returned nullptr in the VST3,
     // leaving the editor with its opaque black clear colour.
-    const auto* data = BinaryData::getNamedResource ("master_default_no_count_grid_title_1280x853_png", size);
+    const auto* data = BinaryData::getNamedResource ("master_default_no_count_grid_title_1024x683_png", size);
     const auto image = data != nullptr ? juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (size)) : juce::Image {};
-    if (! image.isValid() || image.getWidth() != 1280 || image.getHeight() != 853)
-        std::cerr << "BACKGROUND_ASSET_FAIL resource=master_default_no_count_grid_title_1280x853_png bytes=" << size << '\n';
+    if (! image.isValid() || image.getWidth() != 1024 || image.getHeight() != 683)
+        std::cerr << "BACKGROUND_ASSET_FAIL resource=master_default_no_count_grid_title_1024x683_png bytes=" << size << '\n';
     return image;
 #else
     return {};
@@ -31,7 +31,7 @@ juce::Image loadQuoteImage()
 {
 #if TOYOTOMI_HAS_BINARY_DATA
     int size = 0;
-    const auto* data = BinaryData::getNamedResource ("quote_panel_user_20260814_512x360_png", size);
+    const auto* data = BinaryData::getNamedResource ("quote_panel_user_409x288_png", size);
     return data != nullptr ? juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (size)) : juce::Image {};
 #else
     return {};
@@ -98,9 +98,6 @@ ToyotomiHideyoshiAudioProcessorEditor::ToyotomiHideyoshiAudioProcessorEditor (
     quotePanel.setInterceptsMouseClicks (false, false);
 
     setOpaque (true);
-    // The 1280 x 853 reference canvas lives inside one uniformly transformed
-    // content component, so JUCE applies the same inverse transform to mouse
-    // events that it applies to the image controls.
     setResizable (false, false);
     setSize (kEditorWidth, kEditorHeight);
     refreshSelectedSlotViews();
@@ -111,7 +108,6 @@ void ToyotomiHideyoshiAudioProcessorEditor::paint (juce::Graphics& g)
 {
     if (referenceImage.isValid())
     {
-        g.addTransform (juce::AffineTransform::scale (kEditorScale));
         g.drawImageAt (referenceImage, 0, 0);
     }
     else
@@ -127,20 +123,19 @@ void ToyotomiHideyoshiAudioProcessorEditor::paint (juce::Graphics& g)
 
 void ToyotomiHideyoshiAudioProcessorEditor::resized()
 {
-    content.setBounds (0, 0, uiSpec.getCanvasWidth(), uiSpec.getCanvasHeight());
-    content.setTransform (juce::AffineTransform::scale (kEditorScale));
+    content.setBounds (0, 0, kEditorWidth, kEditorHeight);
+    content.setTransform ({});
 
-    const auto viewport = juce::Rectangle<int> (0, 0, uiSpec.getCanvasWidth(), uiSpec.getCanvasHeight());
-    topBar.setBounds          (uiSpec.scaleRegion ("topBar", viewport));
-    artwork.setBounds         (uiSpec.scaleRegion ("artwork", viewport));
-    barTabs.setBounds         (uiSpec.scaleRegion ("barTabs", viewport));
-    barMap.setBounds          (uiSpec.scaleRegion ("barMap", viewport));
-    quotePanel.setBounds      (uiSpec.scaleRegion ("quotePanel", viewport));
-    xyPad.setBounds           (uiSpec.scaleRegion ("xyPad", viewport));
-    presetPalette.setBounds   (uiSpec.scaleRegion ("presetPalette", viewport));
-    countParameters.setBounds (uiSpec.scaleRegion ("countParameters", viewport));
-    outputMeter.setBounds     (uiSpec.scaleRegion ("outputMeter", viewport));
-    bottomStatus.setBounds    (uiSpec.scaleRegion ("bottomStatus", viewport));
+    topBar.setBounds          (uiSpec.getComponent ("Header"));
+    artwork.setBounds         (uiSpec.getComponent ("Artwork"));
+    barTabs.setBounds         (uiSpec.getComponent ("BarTabs"));
+    barMap.setBounds          (uiSpec.getComponent ("BarMap"));
+    quotePanel.setBounds      (uiSpec.getComponent ("QuotePanel"));
+    xyPad.setBounds           (uiSpec.getComponent ("XYPad"));
+    presetPalette.setBounds   (uiSpec.getComponent ("PresetPanel"));
+    countParameters.setBounds (uiSpec.getComponent ("CountParameters"));
+    outputMeter.setBounds     (uiSpec.getComponent ("Output"));
+    bottomStatus.setBounds    (uiSpec.getComponent ("Footer"));
 
 }
 

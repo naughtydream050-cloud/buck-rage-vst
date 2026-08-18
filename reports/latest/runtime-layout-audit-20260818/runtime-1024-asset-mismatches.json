@@ -1,0 +1,291 @@
+{
+  "checked": [
+    {
+      "asset": "background\\master_default_no_count_grid_title_1024x683.png",
+      "component": "Editor",
+      "expectedNativeBounds": [
+        1024,
+        683
+      ],
+      "actualImageSize": [
+        1024,
+        683
+      ],
+      "match": true
+    },
+    {
+      "asset": "quote\\quote_panel_user_409x288.png",
+      "component": "QuotePanel",
+      "expectedNativeBounds": [
+        409,
+        288
+      ],
+      "actualImageSize": [
+        409,
+        288
+      ],
+      "match": true
+    },
+    {
+      "asset": "length\\length_1_16_normal_40x33.png",
+      "component": "Length.*",
+      "expectedNativeBounds": [
+        32,
+        26
+      ],
+      "actualImageSize": [
+        32,
+        26
+      ],
+      "match": true
+    },
+    {
+      "asset": "length\\length_1_16_selected_40x33.png",
+      "component": "Length.*",
+      "expectedNativeBounds": [
+        32,
+        26
+      ],
+      "actualImageSize": [
+        32,
+        26
+      ],
+      "match": true
+    },
+    {
+      "asset": "length\\length_1_2_normal_40x33.png",
+      "component": "Length.*",
+      "expectedNativeBounds": [
+        32,
+        26
+      ],
+      "actualImageSize": [
+        32,
+        26
+      ],
+      "match": true
+    },
+    {
+      "asset": "length\\length_1_2_selected_40x33.png",
+      "component": "Length.*",
+      "expectedNativeBounds": [
+        32,
+        26
+      ],
+      "actualImageSize": [
+        32,
+        26
+      ],
+      "match": true
+    },
+    {
+      "asset": "length\\length_1_4_normal_40x33.png",
+      "component": "Length.*",
+      "expectedNativeBounds": [
+        32,
+        26
+      ],
+      "actualImageSize": [
+        32,
+        26
+      ],
+      "match": true
+    },
+    {
+      "asset": "length\\length_1_4_selected_40x33.png",
+      "component": "Length.*",
+      "expectedNativeBounds": [
+        32,
+        26
+      ],
+      "actualImageSize": [
+        32,
+        26
+      ],
+      "match": true
+    },
+    {
+      "asset": "length\\length_1_8_normal_40x33.png",
+      "component": "Length.*",
+      "expectedNativeBounds": [
+        32,
+        26
+      ],
+      "actualImageSize": [
+        32,
+        26
+      ],
+      "match": true
+    },
+    {
+      "asset": "length\\length_1_8_selected_40x33.png",
+      "component": "Length.*",
+      "expectedNativeBounds": [
+        32,
+        26
+      ],
+      "actualImageSize": [
+        32,
+        26
+      ],
+      "match": true
+    },
+    {
+      "asset": "length\\length_1_bar_normal_40x33.png",
+      "component": "Length.*",
+      "expectedNativeBounds": [
+        32,
+        26
+      ],
+      "actualImageSize": [
+        32,
+        26
+      ],
+      "match": true
+    },
+    {
+      "asset": "length\\length_1_bar_selected_40x33.png",
+      "component": "Length.*",
+      "expectedNativeBounds": [
+        32,
+        26
+      ],
+      "actualImageSize": [
+        32,
+        26
+      ],
+      "match": true
+    },
+    {
+      "asset": "knobs\\knob_ring_48.png",
+      "component": "Knob.*",
+      "expectedNativeBounds": [
+        48,
+        48
+      ],
+      "actualImageSize": [
+        48,
+        48
+      ],
+      "match": true
+    },
+    {
+      "asset": "knobs\\knob_pointer_48.png",
+      "component": "Knob.*",
+      "expectedNativeBounds": [
+        48,
+        48
+      ],
+      "actualImageSize": [
+        48,
+        48
+      ],
+      "match": true
+    },
+    {
+      "asset": "tabs\\tab_strip_selected_1_16.png",
+      "component": "BarTabs",
+      "expectedNativeBounds": [
+        433,
+        27
+      ],
+      "actualImageSize": [
+        433,
+        27
+      ],
+      "match": true
+    },
+    {
+      "asset": "bar-cells\\bar_cell_shell_normal_clean_72x94.png",
+      "component": "BarMap.Cell.*",
+      "expectedNativeBounds": [
+        57,
+        75
+      ],
+      "actualImageSize": [
+        57,
+        75
+      ],
+      "match": true
+    },
+    {
+      "asset": "xy-buttons\\xy_neutral_base_288x256.png",
+      "component": "XYPad",
+      "expectedNativeBounds": [
+        232,
+        200
+      ],
+      "actualImageSize": [
+        232,
+        200
+      ],
+      "match": true
+    },
+    {
+      "asset": "xy-buttons\\clear_normal_73x30.png",
+      "component": "XYPad.Clear",
+      "expectedNativeBounds": [
+        58,
+        24
+      ],
+      "actualImageSize": [
+        58,
+        24
+      ],
+      "match": true
+    },
+    {
+      "asset": "xy-buttons\\reset_normal_102x30.png",
+      "component": "XYPad.Reset",
+      "expectedNativeBounds": [
+        81,
+        24
+      ],
+      "actualImageSize": [
+        81,
+        24
+      ],
+      "match": true
+    },
+    {
+      "asset": "output\\output_neutral_base_140x343.png",
+      "component": "Output",
+      "expectedNativeBounds": [
+        112,
+        274
+      ],
+      "actualImageSize": [
+        112,
+        274
+      ],
+      "match": true
+    },
+    {
+      "asset": "preset-bypass\\preset_off_normal_102x79.png",
+      "component": "Preset.*",
+      "expectedNativeBounds": [
+        82,
+        64
+      ],
+      "actualImageSize": [
+        82,
+        64
+      ],
+      "match": true
+    },
+    {
+      "asset": "preset-bypass\\bypass_off.png",
+      "component": "Bypass",
+      "expectedNativeBounds": [
+        80,
+        31
+      ],
+      "actualImageSize": [
+        80,
+        31
+      ],
+      "match": true
+    }
+  ],
+  "mismatches": []
+}

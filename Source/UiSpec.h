@@ -8,19 +8,22 @@ public:
     UiSpec();
 
     bool isValid() const noexcept { return valid; }
-    juce::Rectangle<int> getRegion (const juce::String& name) const;
-    juce::Rectangle<int> getControl (const juce::String& name) const;
-    juce::Rectangle<int> scaledBounds (juce::Rectangle<int> referenceBounds,
-                                      juce::Rectangle<int> editorBounds) const;
-    juce::Rectangle<int> getScaledCanvasBounds (juce::Rectangle<int> editorBounds) const;
-    juce::Rectangle<int> scaleRegion (const juce::String& name,
-                                      juce::Rectangle<int> viewport) const;
+    juce::Rectangle<int> getComponent (const juce::String& name) const;
     int getCanvasWidth() const noexcept { return canvasWidth; }
     int getCanvasHeight() const noexcept { return canvasHeight; }
 
 private:
     juce::var root;
     bool valid = false;
-    int canvasWidth = 1280;
-    int canvasHeight = 853;
+    int canvasWidth = 1024;
+    int canvasHeight = 683;
 };
+
+// Runtime UI geometry is compiled from ui/spec/runtime-1024-layout.json.
+// Components use these final integer rectangles directly; this helper never
+// scales mouse positions or image bounds at runtime.
+namespace RuntimeLayout
+{
+juce::Rectangle<int> bounds (const juce::String& name);
+juce::Rectangle<int> localBounds (const juce::String& child, const juce::String& parent);
+}

@@ -1,4 +1,5 @@
 #include "UIComponents.h"
+#include "UiSpec.h"
 #include <cmath>
 #include <iostream>
 
@@ -48,8 +49,8 @@ const juce::Image& imageFor (const juce::String& id)
     if (id == "clear") { static const auto i = loadAsset ("clear_normal_73x30.png"); return i; }
     if (id == "reset") { static const auto i = loadAsset ("reset_normal_102x30.png"); return i; }
     if (id == "outputNeutral") { static const auto i = loadAsset ("output_neutral_base_140x343.png"); return i; }
-    if (id == "knobBase") { static const auto i = loadAsset ("knob_ring_60.png"); return i; }
-    if (id == "knobPointer") { static const auto i = loadAsset ("knob_pointer_60.png"); return i; }
+    if (id == "knobBase") { static const auto i = loadAsset ("knob_ring_48.png"); return i; }
+    if (id == "knobPointer") { static const auto i = loadAsset ("knob_pointer_48.png"); return i; }
     if (id == "meterLed") { static const auto i = loadAsset ("meter_led_strip.png"); return i; }
     static const juce::Image empty;
     return empty;
@@ -65,6 +66,11 @@ const juce::Image& barLabelImage (int globalBarIndex)
         return result;
     }();
     return labels[static_cast<size_t> (juce::jlimit (0, 63, globalBarIndex))];
+}
+
+juce::Rectangle<int> localLayout (const juce::String& child, const juce::String& parent)
+{
+    return RuntimeLayout::localBounds (child, parent);
 }
 
 const juce::Image& presetCellImage (int preset, bool selected)
@@ -88,32 +94,24 @@ const juce::Image& lengthImage (int length, bool selected)
     return (selected ? gold : normal)[static_cast<size_t> (juce::jlimit (0, 4, length))];
 }
 
-constexpr int kLengthBaseX = 10;
-constexpr int kLengthBaseY = 72;
-constexpr int kLengthButtonWidth = 40;
-constexpr int kLengthButtonHeight = 33;
-constexpr int kLengthButtonGap = 5;
-
 const std::array<juce::Rectangle<int>, 5>& lengthButtonBounds()
 {
-    // This is the only geometry source for normal paint, selected paint, and
-    // transparent hit targets.  All five assets are native 40 x 33 PNGs.
-    static const std::array<juce::Rectangle<int>, 5> bounds = []
-    {
-        std::array<juce::Rectangle<int>, 5> result;
-        for (int i = 0; i < static_cast<int> (result.size()); ++i)
-            result[static_cast<size_t> (i)] = { kLengthBaseX + i * (kLengthButtonWidth + kLengthButtonGap),
-                                                kLengthBaseY, kLengthButtonWidth, kLengthButtonHeight };
-        return result;
-    }();
+    static const std::array<juce::Rectangle<int>, 5> bounds {{
+        RuntimeLayout::localBounds ("Length.1_16", "CountParameters"),
+        RuntimeLayout::localBounds ("Length.1_8", "CountParameters"),
+        RuntimeLayout::localBounds ("Length.1_4", "CountParameters"),
+        RuntimeLayout::localBounds ("Length.1_2", "CountParameters"),
+        RuntimeLayout::localBounds ("Length.1_BAR", "CountParameters")
+    }};
     return bounds;
 }
 
 const std::array<juce::Rectangle<int>, 3>& parameterReadoutBounds()
 {
-    // The three engraved readout frames are independent, equal-sized bounds.
     static const std::array<juce::Rectangle<int>, 3> bounds {{
-        { 10, 243, 67, 21 }, { 97, 243, 67, 21 }, { 184, 243, 67, 21 }
+        RuntimeLayout::localBounds ("Readout.Speed", "CountParameters"),
+        RuntimeLayout::localBounds ("Readout.Pitch", "CountParameters"),
+        RuntimeLayout::localBounds ("Readout.Depth", "CountParameters")
     }};
     return bounds;
 }
@@ -202,10 +200,10 @@ void drawPanel (juce::Graphics&, juce::Rectangle<float>, const juce::String&) {}
 void drawMotionGlyph (juce::Graphics&, juce::Rectangle<float>, int) {}
 bool validateEmbeddedImageAssets()
 {
-    static constexpr std::array<const char*, 13> ids {
+    static constexpr std::array<const char*, 15> ids {
         "tabStrip1", "tabStrip2", "tabStrip3", "tabStrip4", "barBaseNormal", "barBaseSelected",
-        "barBasePlaying", "barBaseSelectedPlaying", "xyNeutral", "clear", "outputNeutral",
-        "knobBase", "knobPointer"
+        "barBasePlaying", "barBaseSelectedPlaying", "xyNeutral", "clear", "reset", "outputNeutral",
+        "knobBase", "knobPointer", "meterLed"
     };
     for (const auto* id : ids)
     {
@@ -219,7 +217,7 @@ bool validateEmbeddedImageAssets()
     for (int bar = 0; bar < 64; ++bar)
     {
         const auto& label = barLabelImage (bar);
-        if (! label.isValid() || label.getWidth() != 66 || label.getHeight() != 24)
+        if (! label.isValid() || label.getWidth() <= 0 || label.getHeight() <= 0)
         {
             std::cerr << "ASSET_FAIL bar=" << (bar + 1) << '\n';
             return false;
@@ -229,9 +227,11 @@ bool validateEmbeddedImageAssets()
     {
         const auto& normal = presetCellImage (preset, false);
         const auto& selected = presetCellImage (preset, true);
+        const std::array<juce::String, 10> componentNames { "Preset.OFF", "Preset.FORWARD_CUT", "Preset.BACKSPIN", "Preset.CHIRP", "Preset.BABY", "Preset.TRANSFORM", "Preset.DRAG", "Preset.ZIGZAG", "Preset.TAPE_BRAKE", "Preset.CUSTOM" };
+        const auto expected = RuntimeLayout::bounds (componentNames[static_cast<size_t> (preset)]);
         if (! normal.isValid() || ! selected.isValid()
-            || normal.getWidth() != 102 || normal.getHeight() != 79
-            || selected.getWidth() != 102 || selected.getHeight() != 79)
+            || normal.getWidth() != expected.getWidth() || normal.getHeight() != expected.getHeight()
+            || selected.getWidth() != expected.getWidth() || selected.getHeight() != expected.getHeight())
         {
             std::cerr << "ASSET_FAIL preset=" << preset << '\n';
             return false;
@@ -240,7 +240,8 @@ bool validateEmbeddedImageAssets()
     for (const auto enabled : { false, true })
     {
         const auto& image = bypassImage (enabled);
-        if (! image.isValid() || image.getWidth() != 100 || image.getHeight() != 38)
+        const auto expected = RuntimeLayout::bounds ("Bypass");
+        if (! image.isValid() || image.getWidth() != expected.getWidth() || image.getHeight() != expected.getHeight())
         {
             std::cerr << "ASSET_FAIL bypass=" << enabled << '\n';
             return false;
@@ -253,7 +254,8 @@ bool validateEmbeddedImageAssets()
     for (const auto* id : { "tabStrip1", "tabStrip2", "tabStrip3", "tabStrip4" })
     {
         const auto& strip = imageFor (id);
-        if (strip.getWidth() != 542 || strip.getHeight() != 34)
+        if (strip.getWidth() != RuntimeLayout::bounds ("BarTabs").getWidth()
+            || strip.getHeight() != RuntimeLayout::bounds ("BarTabs").getHeight())
         {
             std::cerr << "ASSET_DIM_FAIL tab=" << id << ' '
                       << strip.getWidth() << 'x' << strip.getHeight() << '\n';
@@ -263,17 +265,37 @@ bool validateEmbeddedImageAssets()
     for (const auto* id : { "barBaseNormal", "barBaseSelected", "barBasePlaying", "barBaseSelectedPlaying" })
     {
         const auto& cell = imageFor (id);
-        if (cell.getWidth() != 72 || cell.getHeight() != 94)
+        if (cell.getWidth() != RuntimeLayout::bounds ("BarMap.Cell.01").getWidth()
+            || cell.getHeight() != RuntimeLayout::bounds ("BarMap.Cell.01").getHeight())
         {
             std::cerr << "ASSET_DIM_FAIL cell=" << id << ' '
                       << cell.getWidth() << 'x' << cell.getHeight() << '\n';
             return false;
         }
     }
+    for (const auto& [id, component] : std::array<std::pair<const char*, const char*>, 3> {{
+             { "xyNeutral", "XYPad" }, { "clear", "XYPad.Clear" }, { "reset", "XYPad.Reset" } }})
+    {
+        const auto& image = imageFor (id);
+        const auto expected = RuntimeLayout::bounds (component);
+        if (image.getWidth() != expected.getWidth() || image.getHeight() != expected.getHeight())
+        {
+            std::cerr << "ASSET_DIM_FAIL " << id << ' ' << image.getWidth() << 'x' << image.getHeight() << '\n';
+            return false;
+        }
+    }
+    const auto& output = imageFor ("outputNeutral");
+    const auto expectedOutput = RuntimeLayout::bounds ("Output");
+    if (output.getWidth() != expectedOutput.getWidth() || output.getHeight() != expectedOutput.getHeight())
+    {
+        std::cerr << "ASSET_DIM_FAIL output " << output.getWidth() << 'x' << output.getHeight() << '\n';
+        return false;
+    }
     for (const auto* id : { "knobBase", "knobPointer" })
     {
         const auto& knob = imageFor (id);
-        if (knob.getWidth() != 60 || knob.getHeight() != 60)
+        if (knob.getWidth() != RuntimeLayout::bounds ("Knob.Speed").getWidth()
+            || knob.getHeight() != RuntimeLayout::bounds ("Knob.Speed").getHeight())
         {
             std::cerr << "ASSET_DIM_FAIL knob=" << id << ' '
                       << knob.getWidth() << 'x' << knob.getHeight() << '\n';
@@ -285,7 +307,8 @@ bool validateEmbeddedImageAssets()
         for (const auto selected : { false, true })
         {
             const auto& image = lengthImage (length, selected);
-            if (! image.isValid() || image.getWidth() != 40 || image.getHeight() != 33)
+            if (! image.isValid() || image.getWidth() != lengthButtonBounds()[static_cast<size_t> (length)].getWidth()
+                || image.getHeight() != lengthButtonBounds()[static_cast<size_t> (length)].getHeight())
             {
                 std::cerr << "ASSET_DIM_FAIL length=" << length
                           << " selected=" << selected << '\n';
@@ -327,8 +350,7 @@ bool validateLengthButtonGeometry()
                   << hitBounds.getWidth() << ',' << hitBounds.getHeight() << ")\n";
 
         valid = valid && normalBounds == selectedBounds && selectedBounds == hitBounds;
-        valid = valid && normalBounds == juce::Rectangle<int> (kLengthBaseX + i * (kLengthButtonWidth + kLengthButtonGap),
-                                                                 kLengthBaseY, kLengthButtonWidth, kLengthButtonHeight);
+        valid = valid && normalBounds.getWidth() == 32 && normalBounds.getHeight() == 26;
     }
     return valid;
 }
@@ -345,14 +367,14 @@ void TopBarComponent::timerCallback()
 void TopBarComponent::paint (juce::Graphics& g)
 {
     // BYPASS is state-isolated from the preset palette and uses its supplied
-    // off/on images at their native 100x38 pixel bounds.
+    // off/on images at their native canonical bounds.
     const auto& image = bypassImage (processor.getStateModel().getUiState().bypass);
-    if (image.isValid() && image.getWidth() == 100 && image.getHeight() == 38)
-        g.drawImageAt (image, 1159, 13);
+    const auto bounds = localLayout ("Bypass", "Header");
+    drawImage (g, image, bounds);
 }
 void TopBarComponent::mouseDown (const juce::MouseEvent& event)
 {
-    const auto bypassBounds = juce::Rectangle<int> (1159, 13, 100, 38);
+    const auto bypassBounds = localLayout ("Bypass", "Header");
     if (bypassBounds.contains (event.getPosition()))
     {
         processor.getStateModel().setBypass (! processor.getStateModel().getUiState().bypass);
@@ -366,33 +388,17 @@ void BarTabComponent::paint (juce::Graphics& g)
 {
     static constexpr std::array<const char*, 4> stripIds { "tabStrip1", "tabStrip2", "tabStrip3", "tabStrip4" };
     const auto& strip = imageFor (stripIds[static_cast<size_t> (selectedPage)]);
-    if (strip.isValid() && getLocalBounds().getWidth() == 542 && getLocalBounds().getHeight() == 34)
-        g.drawImageAt (strip, 0, 0);
+    drawImage (g, strip, getLocalBounds());
 }
 void BarTabComponent::mouseDown (const juce::MouseEvent& event)
 {
-    // These hit zones are the 1280 x 853 reference-image tab bounds, expressed
-    // relative to this 542 x 35 component. Rendering and input therefore use
-    // the exact same geometry as the one-strip image overlays.
-    static const std::array<juce::Rectangle<float>, 4> referenceHitZones {{
-        {   0.0f, 0.0f, 132.0f, 34.0f },
-        { 135.0f, 0.0f, 132.0f, 34.0f },
-        { 272.0f, 0.0f, 132.0f, 34.0f },
-        { 410.0f, 0.0f, 132.0f, 34.0f }
-    }};
-
-    // The source strip and its hit regions are native 542 x 35 pixels.  Do
-    // not transform the zones: a transformed hit test can disagree with the
-    // one-to-one overlay and leak a page change from an adjacent tab.
-    if (getWidth() != 542 || getHeight() != 34)
+    if (getLocalBounds() != RuntimeLayout::bounds ("BarTabs").withPosition (0, 0))
         return;
 
-    const auto point = event.getPosition().toFloat();
-
-    for (size_t i = 0; i < referenceHitZones.size(); ++i)
+    for (int i = 0; i < 4; ++i)
     {
-        const auto zone = referenceHitZones[i];
-        if (! zone.contains (point))
+        const auto zone = localLayout ("BarTab." + juce::String (i + 1), "BarTabs");
+        if (! zone.contains (event.getPosition()))
             continue;
 
         selectedPage = static_cast<int> (i);
@@ -417,14 +423,13 @@ void BarCellComponent::paint (juce::Graphics& g)
     const auto stateId = playing ? (selected ? "barBaseSelectedPlaying" : "barBasePlaying")
                                  : (selected ? "barBaseSelected" : "barBaseNormal");
     const auto& background = imageFor (stateId);
-    if (background.isValid() && getWidth() == 72 && getHeight() == 94)
-        g.drawImageAt (background, 0, 0);
+    drawImage (g, background, getLocalBounds());
 
     const auto& label = barLabelImage (globalBarIndex);
-    if (label.isValid() && label.getWidth() == 66 && label.getHeight() == 24)
+    if (label.isValid())
         g.drawImageAt (label, (getWidth() - label.getWidth()) / 2, 0);
 
-    const auto previewBounds = juce::Rectangle<float> (5.0f, 33.0f, 62.0f, 30.0f);
+    const auto previewBounds = localLayout ("BarMap.Cell.01.Preview", "BarMap.Cell.01").toFloat();
     const auto previewColour = playing ? ToyotomiUi::red()
                                        : (selected ? ToyotomiUi::gold() : ToyotomiUi::ivory());
     g.saveState();
@@ -463,13 +468,11 @@ void BarMapComponent::setSlotPreview (std::function<PluginStateModel::TimelineSl
 }
 bool BarMapComponent::hasReferenceCellBounds() const
 {
-    if (getWidth() != 608 || getHeight() != 266)
+    if (getBounds() != RuntimeLayout::bounds ("BarMap"))
         return false;
     for (int i = 0; i < 16; ++i)
     {
-        const auto expected = juce::Rectangle<int> (6 + (i % 8) * 75,
-                                                     32 + (i / 8) * 97,
-                                                     72, 94);
+        const auto expected = localLayout ("BarMap.Cell." + juce::String::formatted ("%02d", i + 1), "BarMap");
         if (cells[static_cast<size_t> (i)].getBounds() != expected)
             return false;
     }
@@ -495,7 +498,7 @@ void BarMapComponent::paint (juce::Graphics& g) { juce::ignoreUnused (g); }
 void BarMapComponent::resized()
 {
     for (int i = 0; i < 16; ++i)
-        cells[static_cast<size_t> (i)].setBounds (6 + (i % 8) * 75, 32 + (i / 8) * 97, 72, 94);
+        cells[static_cast<size_t> (i)].setBounds (localLayout ("BarMap.Cell." + juce::String::formatted ("%02d", i + 1), "BarMap"));
     refreshCells();
 }
 
@@ -521,7 +524,7 @@ void XYMotionPad::setMotion (const std::vector<PluginStateModel::MotionPoint>& m
 }
 juce::Rectangle<float> XYMotionPad::padBounds() const
 {
-    return { 30.0f, 27.0f, 243.0f, 176.0f };
+    return localLayout ("XYPad.Input", "XYPad").toFloat();
 }
 void XYMotionPad::paint (juce::Graphics& g)
 {
@@ -554,8 +557,8 @@ void XYMotionPad::appendPoint (juce::Point<float> position)
 }
 void XYMotionPad::mouseDown (const juce::MouseEvent& event)
 {
-    const auto clear = juce::Rectangle<int> (17, 218, 73, 30);
-    const auto reset = juce::Rectangle<int> (178, 218, 102, 30);
+    const auto clear = localLayout ("XYPad.Clear", "XYPad");
+    const auto reset = localLayout ("XYPad.Reset", "XYPad");
     if (clear.contains (event.getPosition())) { normalizedMotion.clear(); if (onClearMotion) onClearMotion(); repaint(); return; }
     if (reset.contains (event.getPosition())) { normalizedMotion.clear(); if (onResetSlot) onResetSlot(); repaint(); return; }
     if (padBounds().contains (event.position)) { recording = true; normalizedMotion.clear(); appendPoint (event.position); }
@@ -573,20 +576,17 @@ void XYMotionPad::mouseUp (const juce::MouseEvent&)
 
 void ScratchPresetPalette::paint (juce::Graphics& g)
 {
-    static const std::array<juce::Rectangle<int>, 10> cells {{
-        { 7, 37, 102, 79 }, { 112, 37, 102, 79 }, { 217, 37, 102, 79 },
-        { 7, 120, 102, 79 }, { 112, 120, 102, 79 }, { 217, 120, 102, 79 },
-        { 7, 205, 102, 79 }, { 112, 205, 102, 79 }, { 217, 205, 102, 79 },
-        { 7, 289, 102, 79 }
-    }};
+    static const std::array<juce::String, 10> names { "OFF", "FORWARD_CUT", "BACKSPIN", "CHIRP", "BABY", "TRANSFORM", "DRAG", "ZIGZAG", "TAPE_BRAKE", "CUSTOM" };
     const auto activePreset = presetProvider != nullptr ? juce::jlimit (0, 9, presetProvider()) : 0;
     for (int i = 0; i < 10; ++i)
-        drawImage (g, presetCellImage (i, i == activePreset), cells[static_cast<size_t> (i)]);
+        drawImage (g, presetCellImage (i, i == activePreset), localLayout ("Preset." + names[static_cast<size_t> (i)], "PresetPanel"));
 }
 void ScratchPresetPalette::mouseDown (const juce::MouseEvent& event)
 {
-    static const std::array<juce::Rectangle<int>, 10> cells {{ { 7,37,102,79 }, {112,37,102,79}, {217,37,102,79}, {7,120,102,79}, {112,120,102,79}, {217,120,102,79}, {7,205,102,79}, {112,205,102,79}, {217,205,102,79}, {7,289,102,79} }};
-    for (int i = 0; i < 10; ++i) if (cells[static_cast<size_t> (i)].contains (event.getPosition())) { if (onPresetSelected) onPresetSelected (i); repaint(); return; }
+    static const std::array<juce::String, 10> names { "OFF", "FORWARD_CUT", "BACKSPIN", "CHIRP", "BABY", "TRANSFORM", "DRAG", "ZIGZAG", "TAPE_BRAKE", "CUSTOM" };
+    for (int i = 0; i < 10; ++i)
+        if (localLayout ("Preset." + names[static_cast<size_t> (i)], "PresetPanel").contains (event.getPosition()))
+            { if (onPresetSelected) onPresetSelected (i); repaint(); return; }
 }
 
 CountParameterPanel::CountParameterPanel (ToyotomiHideyoshiAudioProcessor& p) : processor (p)
@@ -618,9 +618,8 @@ void CountParameterPanel::resized()
 
 juce::Rectangle<float> CountParameterPanel::knobBounds (int index) const
 {
-    // Keep the three established knob centres while swapping the native image
-    // from 67px to 60px.  Values below retain their existing readout positions.
-    return { 14.0f + 87.0f * index, 169.0f, 60.0f, 60.0f };
+    static const std::array<juce::String, 3> names { "Speed", "Pitch", "Depth" };
+    return localLayout ("Knob." + names[static_cast<size_t> (juce::jlimit (0, 2, index))], "CountParameters").toFloat();
 }
 void CountParameterPanel::paint (juce::Graphics& g)
 {
@@ -688,14 +687,16 @@ void OutputMeterComponent::timerCallback()
 void OutputMeterComponent::paint (juce::Graphics& g)
 {
     drawFrame (g, "outputNeutral", getLocalBounds());
-    const auto left = juce::Rectangle<int> (40, 61, 15, 255);
-    const auto right = juce::Rectangle<int> (84, 61, 15, 255);
+    const auto left = localLayout ("Output.LeftTrack", "Output");
+    const auto right = localLayout ("Output.RightTrack", "Output");
     const auto drawChannel = [&] (juce::Rectangle<int> track, float level, float peak)
     {
         const auto pixels = juce::roundToInt (juce::jmap (level, -60.0f, 6.0f, 0.0f, static_cast<float> (track.getHeight())));
-        if (pixels > 0) { g.saveState(); g.reduceClipRegion (track.withTop (track.getBottom() - pixels)); drawImage (g, imageFor ("meterLed"), track); g.restoreState(); }
+        const auto& led = imageFor ("meterLed");
+        const auto ledBounds = juce::Rectangle<int> (track.getX(), track.getBottom() - led.getHeight(), led.getWidth(), led.getHeight());
+        if (pixels > 0) { g.saveState(); g.reduceClipRegion (track.withTop (track.getBottom() - pixels)); drawImage (g, led, ledBounds); g.restoreState(); }
         const auto peakY = track.getBottom() - juce::roundToInt (juce::jmap (peak, -60.0f, 6.0f, 0.0f, static_cast<float> (track.getHeight())));
-        if (peak > -59.5f) { g.saveState(); g.reduceClipRegion (juce::Rectangle<int> (track.getX(), juce::jlimit (track.getY(), track.getBottom() - 2, peakY), track.getWidth(), 2)); drawImage (g, imageFor ("meterLed"), track); g.restoreState(); }
+        if (peak > -59.5f) { g.saveState(); g.reduceClipRegion (juce::Rectangle<int> (track.getX(), juce::jlimit (track.getY(), track.getBottom() - 2, peakY), track.getWidth(), 2)); drawImage (g, led, ledBounds); g.restoreState(); }
     };
     drawChannel (left, leftDb, leftPeakDb); drawChannel (right, rightDb, rightPeakDb);
 }

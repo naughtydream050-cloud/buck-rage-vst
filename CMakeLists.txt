@@ -39,27 +39,13 @@ juce_add_plugin(ToyotomiHideyoshi
 
 juce_generate_juce_header(ToyotomiHideyoshi)
 
-file (GLOB_RECURSE TOYOTOMI_MASTER_UI_ASSETS CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/bar-labels/*.png"
-    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/bar-cells/*.png"
-    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/length/*.png"
-    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/tabs/*.png"
-    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/xy-buttons/*.png"
-    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/knobs/*.png"
-    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-master-default-preview-20260808/output/*.png")
-file (GLOB TOYOTOMI_EXACT_PRESET_BYPASS_ASSETS CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-user-exact-preset-bypass-20260809/*.png")
+file (GLOB_RECURSE TOYOTOMI_RUNTIME_1024_ASSETS CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-runtime-1024-20260818/*.png")
 
 juce_add_binary_data(ToyotomiHideyoshiAssets
     SOURCES
-        Resources/ui-quote-panel-20260810/master_default_no_count_grid_title_1280x853.png
-        Resources/ui-quote-panel-20260810/quote_panel_user_20260814_512x360.png
-        Resources/knob_ring_60.png
-        Resources/knob_pointer_60.png
-        ${TOYOTOMI_MASTER_UI_ASSETS}
-        ${TOYOTOMI_EXACT_PRESET_BYPASS_ASSETS}
-        ui/spec/ui-spec.json
-        ui/spec/master-default-preview-manifest.json
+        ${TOYOTOMI_RUNTIME_1024_ASSETS}
+        ui/spec/runtime-1024-layout.json
 )
 
 target_sources(ToyotomiHideyoshi PRIVATE

@@ -1,0 +1,1588 @@
+{
+  "schemaVersion": 1,
+  "kind": "canonical-1024-native-layout-draft",
+  "canvas": {
+    "width": 1024,
+    "height": 683,
+    "resizable": false
+  },
+  "conversion": {
+    "x": "round(edge * 1024 / 1280)",
+    "y": "round(edge * 683 / 853)",
+    "runtimeScaling": "none; this file is layout-only until runtime migration is approved"
+  },
+  "components": {
+    "Editor": {
+      "x": 0,
+      "y": 0,
+      "w": 1024,
+      "h": 683,
+      "parent": "root",
+      "visualBounds": [
+        0,
+        0,
+        1024,
+        683
+      ],
+      "hitBounds": [
+        0,
+        0,
+        1024,
+        683
+      ],
+      "role": "visual"
+    },
+    "Header": {
+      "x": 4,
+      "y": 4,
+      "w": 1016,
+      "h": 62,
+      "parent": "content",
+      "visualBounds": [
+        4,
+        4,
+        1016,
+        62
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "Artwork": {
+      "x": 4,
+      "y": 68,
+      "w": 246,
+      "h": 342,
+      "parent": "content",
+      "visualBounds": [
+        4,
+        68,
+        246,
+        342
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarTabs": {
+      "x": 254,
+      "y": 79,
+      "w": 433,
+      "h": 27,
+      "parent": "content",
+      "visualBounds": [
+        254,
+        79,
+        433,
+        27
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap": {
+      "x": 253,
+      "y": 115,
+      "w": 486,
+      "h": 212,
+      "parent": "content",
+      "visualBounds": [
+        253,
+        115,
+        486,
+        212
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "PresetPanel": {
+      "x": 746,
+      "y": 70,
+      "w": 274,
+      "h": 294,
+      "parent": "content",
+      "visualBounds": [
+        746,
+        70,
+        274,
+        294
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "XYPad": {
+      "x": 14,
+      "y": 416,
+      "w": 232,
+      "h": 200,
+      "parent": "content",
+      "visualBounds": [
+        14,
+        416,
+        232,
+        200
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "QuotePanel": {
+      "x": 266,
+      "y": 346,
+      "w": 409,
+      "h": 288,
+      "parent": "content",
+      "visualBounds": [
+        266,
+        346,
+        409,
+        288
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "CountParameters": {
+      "x": 693,
+      "y": 372,
+      "w": 201,
+      "h": 262,
+      "parent": "content",
+      "visualBounds": [
+        693,
+        372,
+        201,
+        262
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "Output": {
+      "x": 901,
+      "y": 360,
+      "w": 112,
+      "h": 274,
+      "parent": "content",
+      "visualBounds": [
+        901,
+        360,
+        112,
+        274
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "Footer": {
+      "x": 4,
+      "y": 645,
+      "w": 1016,
+      "h": 34,
+      "parent": "content",
+      "visualBounds": [
+        4,
+        645,
+        1016,
+        34
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarTab.1": {
+      "x": 254,
+      "y": 79,
+      "w": 105,
+      "h": 27,
+      "parent": "BarTabs",
+      "visualBounds": [
+        254,
+        79,
+        105,
+        27
+      ],
+      "hitBounds": [
+        254,
+        79,
+        105,
+        27
+      ],
+      "role": "visual+hit"
+    },
+    "BarTab.2": {
+      "x": 362,
+      "y": 79,
+      "w": 105,
+      "h": 27,
+      "parent": "BarTabs",
+      "visualBounds": [
+        362,
+        79,
+        105,
+        27
+      ],
+      "hitBounds": [
+        362,
+        79,
+        105,
+        27
+      ],
+      "role": "visual+hit"
+    },
+    "BarTab.3": {
+      "x": 471,
+      "y": 79,
+      "w": 106,
+      "h": 27,
+      "parent": "BarTabs",
+      "visualBounds": [
+        471,
+        79,
+        106,
+        27
+      ],
+      "hitBounds": [
+        471,
+        79,
+        106,
+        27
+      ],
+      "role": "visual+hit"
+    },
+    "BarTab.4": {
+      "x": 582,
+      "y": 79,
+      "w": 105,
+      "h": 27,
+      "parent": "BarTabs",
+      "visualBounds": [
+        582,
+        79,
+        105,
+        27
+      ],
+      "hitBounds": [
+        582,
+        79,
+        105,
+        27
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.01": {
+      "x": 258,
+      "y": 140,
+      "w": 57,
+      "h": 75,
+      "parent": "BarMap",
+      "visualBounds": [
+        258,
+        140,
+        57,
+        75
+      ],
+      "hitBounds": [
+        258,
+        140,
+        57,
+        75
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.01.Label": {
+      "x": 260,
+      "y": 140,
+      "w": 53,
+      "h": 19,
+      "parent": "BarMap.Cell.01",
+      "visualBounds": [
+        260,
+        140,
+        53,
+        19
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.01.Preview": {
+      "x": 262,
+      "y": 167,
+      "w": 49,
+      "h": 24,
+      "parent": "BarMap.Cell.01",
+      "visualBounds": [
+        262,
+        167,
+        49,
+        24
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.02": {
+      "x": 318,
+      "y": 140,
+      "w": 57,
+      "h": 75,
+      "parent": "BarMap",
+      "visualBounds": [
+        318,
+        140,
+        57,
+        75
+      ],
+      "hitBounds": [
+        318,
+        140,
+        57,
+        75
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.02.Label": {
+      "x": 320,
+      "y": 140,
+      "w": 53,
+      "h": 19,
+      "parent": "BarMap.Cell.02",
+      "visualBounds": [
+        320,
+        140,
+        53,
+        19
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.02.Preview": {
+      "x": 322,
+      "y": 167,
+      "w": 49,
+      "h": 24,
+      "parent": "BarMap.Cell.02",
+      "visualBounds": [
+        322,
+        167,
+        49,
+        24
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.03": {
+      "x": 378,
+      "y": 140,
+      "w": 57,
+      "h": 75,
+      "parent": "BarMap",
+      "visualBounds": [
+        378,
+        140,
+        57,
+        75
+      ],
+      "hitBounds": [
+        378,
+        140,
+        57,
+        75
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.03.Label": {
+      "x": 380,
+      "y": 140,
+      "w": 53,
+      "h": 19,
+      "parent": "BarMap.Cell.03",
+      "visualBounds": [
+        380,
+        140,
+        53,
+        19
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.03.Preview": {
+      "x": 382,
+      "y": 167,
+      "w": 49,
+      "h": 24,
+      "parent": "BarMap.Cell.03",
+      "visualBounds": [
+        382,
+        167,
+        49,
+        24
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.04": {
+      "x": 438,
+      "y": 140,
+      "w": 57,
+      "h": 75,
+      "parent": "BarMap",
+      "visualBounds": [
+        438,
+        140,
+        57,
+        75
+      ],
+      "hitBounds": [
+        438,
+        140,
+        57,
+        75
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.04.Label": {
+      "x": 440,
+      "y": 140,
+      "w": 53,
+      "h": 19,
+      "parent": "BarMap.Cell.04",
+      "visualBounds": [
+        440,
+        140,
+        53,
+        19
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.04.Preview": {
+      "x": 442,
+      "y": 167,
+      "w": 49,
+      "h": 24,
+      "parent": "BarMap.Cell.04",
+      "visualBounds": [
+        442,
+        167,
+        49,
+        24
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.05": {
+      "x": 498,
+      "y": 140,
+      "w": 57,
+      "h": 75,
+      "parent": "BarMap",
+      "visualBounds": [
+        498,
+        140,
+        57,
+        75
+      ],
+      "hitBounds": [
+        498,
+        140,
+        57,
+        75
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.05.Label": {
+      "x": 500,
+      "y": 140,
+      "w": 53,
+      "h": 19,
+      "parent": "BarMap.Cell.05",
+      "visualBounds": [
+        500,
+        140,
+        53,
+        19
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.05.Preview": {
+      "x": 502,
+      "y": 167,
+      "w": 49,
+      "h": 24,
+      "parent": "BarMap.Cell.05",
+      "visualBounds": [
+        502,
+        167,
+        49,
+        24
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.06": {
+      "x": 558,
+      "y": 140,
+      "w": 57,
+      "h": 75,
+      "parent": "BarMap",
+      "visualBounds": [
+        558,
+        140,
+        57,
+        75
+      ],
+      "hitBounds": [
+        558,
+        140,
+        57,
+        75
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.06.Label": {
+      "x": 560,
+      "y": 140,
+      "w": 53,
+      "h": 19,
+      "parent": "BarMap.Cell.06",
+      "visualBounds": [
+        560,
+        140,
+        53,
+        19
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.06.Preview": {
+      "x": 562,
+      "y": 167,
+      "w": 49,
+      "h": 24,
+      "parent": "BarMap.Cell.06",
+      "visualBounds": [
+        562,
+        167,
+        49,
+        24
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.07": {
+      "x": 618,
+      "y": 140,
+      "w": 57,
+      "h": 75,
+      "parent": "BarMap",
+      "visualBounds": [
+        618,
+        140,
+        57,
+        75
+      ],
+      "hitBounds": [
+        618,
+        140,
+        57,
+        75
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.07.Label": {
+      "x": 620,
+      "y": 140,
+      "w": 53,
+      "h": 19,
+      "parent": "BarMap.Cell.07",
+      "visualBounds": [
+        620,
+        140,
+        53,
+        19
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.07.Preview": {
+      "x": 622,
+      "y": 167,
+      "w": 49,
+      "h": 24,
+      "parent": "BarMap.Cell.07",
+      "visualBounds": [
+        622,
+        167,
+        49,
+        24
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.08": {
+      "x": 678,
+      "y": 140,
+      "w": 57,
+      "h": 75,
+      "parent": "BarMap",
+      "visualBounds": [
+        678,
+        140,
+        57,
+        75
+      ],
+      "hitBounds": [
+        678,
+        140,
+        57,
+        75
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.08.Label": {
+      "x": 680,
+      "y": 140,
+      "w": 53,
+      "h": 19,
+      "parent": "BarMap.Cell.08",
+      "visualBounds": [
+        680,
+        140,
+        53,
+        19
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.08.Preview": {
+      "x": 682,
+      "y": 167,
+      "w": 49,
+      "h": 24,
+      "parent": "BarMap.Cell.08",
+      "visualBounds": [
+        682,
+        167,
+        49,
+        24
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.09": {
+      "x": 258,
+      "y": 218,
+      "w": 57,
+      "h": 75,
+      "parent": "BarMap",
+      "visualBounds": [
+        258,
+        218,
+        57,
+        75
+      ],
+      "hitBounds": [
+        258,
+        218,
+        57,
+        75
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.09.Label": {
+      "x": 260,
+      "y": 218,
+      "w": 53,
+      "h": 19,
+      "parent": "BarMap.Cell.09",
+      "visualBounds": [
+        260,
+        218,
+        53,
+        19
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.09.Preview": {
+      "x": 262,
+      "y": 244,
+      "w": 49,
+      "h": 24,
+      "parent": "BarMap.Cell.09",
+      "visualBounds": [
+        262,
+        244,
+        49,
+        24
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.10": {
+      "x": 318,
+      "y": 218,
+      "w": 57,
+      "h": 75,
+      "parent": "BarMap",
+      "visualBounds": [
+        318,
+        218,
+        57,
+        75
+      ],
+      "hitBounds": [
+        318,
+        218,
+        57,
+        75
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.10.Label": {
+      "x": 320,
+      "y": 218,
+      "w": 53,
+      "h": 19,
+      "parent": "BarMap.Cell.10",
+      "visualBounds": [
+        320,
+        218,
+        53,
+        19
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.10.Preview": {
+      "x": 322,
+      "y": 244,
+      "w": 49,
+      "h": 24,
+      "parent": "BarMap.Cell.10",
+      "visualBounds": [
+        322,
+        244,
+        49,
+        24
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.11": {
+      "x": 378,
+      "y": 218,
+      "w": 57,
+      "h": 75,
+      "parent": "BarMap",
+      "visualBounds": [
+        378,
+        218,
+        57,
+        75
+      ],
+      "hitBounds": [
+        378,
+        218,
+        57,
+        75
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.11.Label": {
+      "x": 380,
+      "y": 218,
+      "w": 53,
+      "h": 19,
+      "parent": "BarMap.Cell.11",
+      "visualBounds": [
+        380,
+        218,
+        53,
+        19
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.11.Preview": {
+      "x": 382,
+      "y": 244,
+      "w": 49,
+      "h": 24,
+      "parent": "BarMap.Cell.11",
+      "visualBounds": [
+        382,
+        244,
+        49,
+        24
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.12": {
+      "x": 438,
+      "y": 218,
+      "w": 57,
+      "h": 75,
+      "parent": "BarMap",
+      "visualBounds": [
+        438,
+        218,
+        57,
+        75
+      ],
+      "hitBounds": [
+        438,
+        218,
+        57,
+        75
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.12.Label": {
+      "x": 440,
+      "y": 218,
+      "w": 53,
+      "h": 19,
+      "parent": "BarMap.Cell.12",
+      "visualBounds": [
+        440,
+        218,
+        53,
+        19
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.12.Preview": {
+      "x": 442,
+      "y": 244,
+      "w": 49,
+      "h": 24,
+      "parent": "BarMap.Cell.12",
+      "visualBounds": [
+        442,
+        244,
+        49,
+        24
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.13": {
+      "x": 498,
+      "y": 218,
+      "w": 57,
+      "h": 75,
+      "parent": "BarMap",
+      "visualBounds": [
+        498,
+        218,
+        57,
+        75
+      ],
+      "hitBounds": [
+        498,
+        218,
+        57,
+        75
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.13.Label": {
+      "x": 500,
+      "y": 218,
+      "w": 53,
+      "h": 19,
+      "parent": "BarMap.Cell.13",
+      "visualBounds": [
+        500,
+        218,
+        53,
+        19
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.13.Preview": {
+      "x": 502,
+      "y": 244,
+      "w": 49,
+      "h": 24,
+      "parent": "BarMap.Cell.13",
+      "visualBounds": [
+        502,
+        244,
+        49,
+        24
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.14": {
+      "x": 558,
+      "y": 218,
+      "w": 57,
+      "h": 75,
+      "parent": "BarMap",
+      "visualBounds": [
+        558,
+        218,
+        57,
+        75
+      ],
+      "hitBounds": [
+        558,
+        218,
+        57,
+        75
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.14.Label": {
+      "x": 560,
+      "y": 218,
+      "w": 53,
+      "h": 19,
+      "parent": "BarMap.Cell.14",
+      "visualBounds": [
+        560,
+        218,
+        53,
+        19
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.14.Preview": {
+      "x": 562,
+      "y": 244,
+      "w": 49,
+      "h": 24,
+      "parent": "BarMap.Cell.14",
+      "visualBounds": [
+        562,
+        244,
+        49,
+        24
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.15": {
+      "x": 618,
+      "y": 218,
+      "w": 57,
+      "h": 75,
+      "parent": "BarMap",
+      "visualBounds": [
+        618,
+        218,
+        57,
+        75
+      ],
+      "hitBounds": [
+        618,
+        218,
+        57,
+        75
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.15.Label": {
+      "x": 620,
+      "y": 218,
+      "w": 53,
+      "h": 19,
+      "parent": "BarMap.Cell.15",
+      "visualBounds": [
+        620,
+        218,
+        53,
+        19
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.15.Preview": {
+      "x": 622,
+      "y": 244,
+      "w": 49,
+      "h": 24,
+      "parent": "BarMap.Cell.15",
+      "visualBounds": [
+        622,
+        244,
+        49,
+        24
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.16": {
+      "x": 678,
+      "y": 218,
+      "w": 57,
+      "h": 75,
+      "parent": "BarMap",
+      "visualBounds": [
+        678,
+        218,
+        57,
+        75
+      ],
+      "hitBounds": [
+        678,
+        218,
+        57,
+        75
+      ],
+      "role": "visual+hit"
+    },
+    "BarMap.Cell.16.Label": {
+      "x": 680,
+      "y": 218,
+      "w": 53,
+      "h": 19,
+      "parent": "BarMap.Cell.16",
+      "visualBounds": [
+        680,
+        218,
+        53,
+        19
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "BarMap.Cell.16.Preview": {
+      "x": 682,
+      "y": 244,
+      "w": 49,
+      "h": 24,
+      "parent": "BarMap.Cell.16",
+      "visualBounds": [
+        682,
+        244,
+        49,
+        24
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "Preset.OFF": {
+      "x": 759,
+      "y": 99,
+      "w": 82,
+      "h": 64,
+      "parent": "PresetPanel",
+      "visualBounds": [
+        759,
+        99,
+        82,
+        64
+      ],
+      "hitBounds": [
+        759,
+        99,
+        82,
+        64
+      ],
+      "role": "visual+hit"
+    },
+    "Preset.FORWARD_CUT": {
+      "x": 843,
+      "y": 99,
+      "w": 82,
+      "h": 64,
+      "parent": "PresetPanel",
+      "visualBounds": [
+        843,
+        99,
+        82,
+        64
+      ],
+      "hitBounds": [
+        843,
+        99,
+        82,
+        64
+      ],
+      "role": "visual+hit"
+    },
+    "Preset.BACKSPIN": {
+      "x": 927,
+      "y": 99,
+      "w": 82,
+      "h": 64,
+      "parent": "PresetPanel",
+      "visualBounds": [
+        927,
+        99,
+        82,
+        64
+      ],
+      "hitBounds": [
+        927,
+        99,
+        82,
+        64
+      ],
+      "role": "visual+hit"
+    },
+    "Preset.CHIRP": {
+      "x": 759,
+      "y": 166,
+      "w": 82,
+      "h": 63,
+      "parent": "PresetPanel",
+      "visualBounds": [
+        759,
+        166,
+        82,
+        63
+      ],
+      "hitBounds": [
+        759,
+        166,
+        82,
+        63
+      ],
+      "role": "visual+hit"
+    },
+    "Preset.BABY": {
+      "x": 843,
+      "y": 166,
+      "w": 82,
+      "h": 63,
+      "parent": "PresetPanel",
+      "visualBounds": [
+        843,
+        166,
+        82,
+        63
+      ],
+      "hitBounds": [
+        843,
+        166,
+        82,
+        63
+      ],
+      "role": "visual+hit"
+    },
+    "Preset.TRANSFORM": {
+      "x": 927,
+      "y": 166,
+      "w": 82,
+      "h": 63,
+      "parent": "PresetPanel",
+      "visualBounds": [
+        927,
+        166,
+        82,
+        63
+      ],
+      "hitBounds": [
+        927,
+        166,
+        82,
+        63
+      ],
+      "role": "visual+hit"
+    },
+    "Preset.DRAG": {
+      "x": 759,
+      "y": 234,
+      "w": 82,
+      "h": 63,
+      "parent": "PresetPanel",
+      "visualBounds": [
+        759,
+        234,
+        82,
+        63
+      ],
+      "hitBounds": [
+        759,
+        234,
+        82,
+        63
+      ],
+      "role": "visual+hit"
+    },
+    "Preset.ZIGZAG": {
+      "x": 843,
+      "y": 234,
+      "w": 82,
+      "h": 63,
+      "parent": "PresetPanel",
+      "visualBounds": [
+        843,
+        234,
+        82,
+        63
+      ],
+      "hitBounds": [
+        843,
+        234,
+        82,
+        63
+      ],
+      "role": "visual+hit"
+    },
+    "Preset.TAPE_BRAKE": {
+      "x": 927,
+      "y": 234,
+      "w": 82,
+      "h": 63,
+      "parent": "PresetPanel",
+      "visualBounds": [
+        927,
+        234,
+        82,
+        63
+      ],
+      "hitBounds": [
+        927,
+        234,
+        82,
+        63
+      ],
+      "role": "visual+hit"
+    },
+    "Preset.CUSTOM": {
+      "x": 759,
+      "y": 301,
+      "w": 82,
+      "h": 63,
+      "parent": "PresetPanel",
+      "visualBounds": [
+        759,
+        301,
+        82,
+        63
+      ],
+      "hitBounds": [
+        759,
+        301,
+        82,
+        63
+      ],
+      "role": "visual+hit"
+    },
+    "Bypass": {
+      "x": 931,
+      "y": 14,
+      "w": 80,
+      "h": 31,
+      "parent": "Header",
+      "visualBounds": [
+        931,
+        14,
+        80,
+        31
+      ],
+      "hitBounds": [
+        931,
+        14,
+        80,
+        31
+      ],
+      "role": "visual+hit"
+    },
+    "XYPad.Input": {
+      "x": 38,
+      "y": 438,
+      "w": 195,
+      "h": 141,
+      "parent": "XYPad",
+      "visualBounds": [
+        38,
+        438,
+        195,
+        141
+      ],
+      "hitBounds": [
+        38,
+        438,
+        195,
+        141
+      ],
+      "role": "visual+hit"
+    },
+    "XYPad.Clear": {
+      "x": 28,
+      "y": 591,
+      "w": 58,
+      "h": 24,
+      "parent": "XYPad",
+      "visualBounds": [
+        28,
+        591,
+        58,
+        24
+      ],
+      "hitBounds": [
+        28,
+        591,
+        58,
+        24
+      ],
+      "role": "visual+hit"
+    },
+    "XYPad.Reset": {
+      "x": 157,
+      "y": 591,
+      "w": 81,
+      "h": 24,
+      "parent": "XYPad",
+      "visualBounds": [
+        157,
+        591,
+        81,
+        24
+      ],
+      "hitBounds": [
+        157,
+        591,
+        81,
+        24
+      ],
+      "role": "visual+hit"
+    },
+    "Length.1_16": {
+      "x": 701,
+      "y": 430,
+      "w": 32,
+      "h": 26,
+      "parent": "CountParameters",
+      "visualBounds": [
+        701,
+        430,
+        32,
+        26
+      ],
+      "hitBounds": [
+        701,
+        430,
+        32,
+        26
+      ],
+      "role": "visual+hit"
+    },
+    "Length.1_8": {
+      "x": 737,
+      "y": 430,
+      "w": 32,
+      "h": 26,
+      "parent": "CountParameters",
+      "visualBounds": [
+        737,
+        430,
+        32,
+        26
+      ],
+      "hitBounds": [
+        737,
+        430,
+        32,
+        26
+      ],
+      "role": "visual+hit"
+    },
+    "Length.1_4": {
+      "x": 773,
+      "y": 430,
+      "w": 32,
+      "h": 26,
+      "parent": "CountParameters",
+      "visualBounds": [
+        773,
+        430,
+        32,
+        26
+      ],
+      "hitBounds": [
+        773,
+        430,
+        32,
+        26
+      ],
+      "role": "visual+hit"
+    },
+    "Length.1_2": {
+      "x": 809,
+      "y": 430,
+      "w": 32,
+      "h": 26,
+      "parent": "CountParameters",
+      "visualBounds": [
+        809,
+        430,
+        32,
+        26
+      ],
+      "hitBounds": [
+        809,
+        430,
+        32,
+        26
+      ],
+      "role": "visual+hit"
+    },
+    "Length.1_BAR": {
+      "x": 845,
+      "y": 430,
+      "w": 32,
+      "h": 26,
+      "parent": "CountParameters",
+      "visualBounds": [
+        845,
+        430,
+        32,
+        26
+      ],
+      "hitBounds": [
+        845,
+        430,
+        32,
+        26
+      ],
+      "role": "visual+hit"
+    },
+    "Knob.Speed": {
+      "x": 704,
+      "y": 508,
+      "w": 48,
+      "h": 48,
+      "parent": "CountParameters",
+      "visualBounds": [
+        704,
+        508,
+        48,
+        48
+      ],
+      "hitBounds": [
+        704,
+        508,
+        48,
+        48
+      ],
+      "role": "visual+hit"
+    },
+    "Knob.Pitch": {
+      "x": 774,
+      "y": 508,
+      "w": 48,
+      "h": 48,
+      "parent": "CountParameters",
+      "visualBounds": [
+        774,
+        508,
+        48,
+        48
+      ],
+      "hitBounds": [
+        774,
+        508,
+        48,
+        48
+      ],
+      "role": "visual+hit"
+    },
+    "Knob.Depth": {
+      "x": 843,
+      "y": 508,
+      "w": 48,
+      "h": 48,
+      "parent": "CountParameters",
+      "visualBounds": [
+        843,
+        508,
+        48,
+        48
+      ],
+      "hitBounds": [
+        843,
+        508,
+        48,
+        48
+      ],
+      "role": "visual+hit"
+    },
+    "Readout.Speed": {
+      "x": 701,
+      "y": 567,
+      "w": 53,
+      "h": 17,
+      "parent": "CountParameters",
+      "visualBounds": [
+        701,
+        567,
+        53,
+        17
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "Readout.Pitch": {
+      "x": 770,
+      "y": 567,
+      "w": 54,
+      "h": 17,
+      "parent": "CountParameters",
+      "visualBounds": [
+        770,
+        567,
+        54,
+        17
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "Readout.Depth": {
+      "x": 840,
+      "y": 567,
+      "w": 54,
+      "h": 17,
+      "parent": "CountParameters",
+      "visualBounds": [
+        840,
+        567,
+        54,
+        17
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "Output.LeftTrack": {
+      "x": 933,
+      "y": 408,
+      "w": 12,
+      "h": 205,
+      "parent": "Output",
+      "visualBounds": [
+        933,
+        408,
+        12,
+        205
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    },
+    "Output.RightTrack": {
+      "x": 968,
+      "y": 408,
+      "w": 12,
+      "h": 205,
+      "parent": "Output",
+      "visualBounds": [
+        968,
+        408,
+        12,
+        205
+      ],
+      "hitBounds": null,
+      "role": "visual"
+    }
+  },
+  "validation": {
+    "integerBounds": true,
+    "parentContainment": true,
+    "canvasContainment": true,
+    "parentContainmentFailures": [],
+    "canvasFailures": []
+  }
+}

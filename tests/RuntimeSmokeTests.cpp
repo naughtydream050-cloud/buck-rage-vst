@@ -59,18 +59,18 @@ int main()
 
 #if TOYOTOMI_HAS_BINARY_DATA
     int backgroundBytes = 0, quoteBytes = 0, knobRingBytes = 0, knobPointerBytes = 0;
-    const auto* backgroundData = BinaryData::getNamedResource ("master_default_no_count_grid_title_1280x853_png", backgroundBytes);
-    const auto* quoteData = BinaryData::getNamedResource ("quote_panel_user_20260814_512x360_png", quoteBytes);
-    const auto* knobRingData = BinaryData::getNamedResource ("knob_ring_60_png", knobRingBytes);
-    const auto* knobPointerData = BinaryData::getNamedResource ("knob_pointer_60_png", knobPointerBytes);
+    const auto* backgroundData = BinaryData::getNamedResource ("master_default_no_count_grid_title_1024x683_png", backgroundBytes);
+    const auto* quoteData = BinaryData::getNamedResource ("quote_panel_user_409x288_png", quoteBytes);
+    const auto* knobRingData = BinaryData::getNamedResource ("knob_ring_48_png", knobRingBytes);
+    const auto* knobPointerData = BinaryData::getNamedResource ("knob_pointer_48_png", knobPointerBytes);
     const auto background = backgroundData != nullptr ? juce::ImageFileFormat::loadFrom (backgroundData, static_cast<size_t> (backgroundBytes)) : juce::Image {};
     const auto quote = quoteData != nullptr ? juce::ImageFileFormat::loadFrom (quoteData, static_cast<size_t> (quoteBytes)) : juce::Image {};
     const auto knobRing = knobRingData != nullptr ? juce::ImageFileFormat::loadFrom (knobRingData, static_cast<size_t> (knobRingBytes)) : juce::Image {};
     const auto knobPointer = knobPointerData != nullptr ? juce::ImageFileFormat::loadFrom (knobPointerData, static_cast<size_t> (knobPointerBytes)) : juce::Image {};
-    passed &= require (background.isValid() && background.getWidth() == 1280 && background.getHeight() == 853, "master-background-loaded");
-    passed &= require (quote.isValid() && quote.getWidth() == 512 && quote.getHeight() == 360, "quote-decoration-loaded-native-count-grid-size");
-    passed &= require (knobRing.isValid() && knobRing.getWidth() == 60 && knobRing.getHeight() == 60, "knob-ring-60-loaded-native-size");
-    passed &= require (knobPointer.isValid() && knobPointer.getWidth() == 60 && knobPointer.getHeight() == 60, "knob-pointer-60-loaded-native-size");
+    passed &= require (background.isValid() && background.getWidth() == 1024 && background.getHeight() == 683, "native-1024-background-loaded");
+    passed &= require (quote.isValid() && quote.getWidth() == 409 && quote.getHeight() == 288, "quote-decoration-loaded-native-size");
+    passed &= require (knobRing.isValid() && knobRing.getWidth() == 48 && knobRing.getHeight() == 48, "knob-ring-48-loaded-native-size");
+    passed &= require (knobPointer.isValid() && knobPointer.getWidth() == 48 && knobPointer.getHeight() == 48, "knob-pointer-48-loaded-native-size");
 #else
     passed &= require (false, "binarydata-unavailable");
 #endif
@@ -81,14 +81,14 @@ int main()
     passed &= require (editor != nullptr, "editor-created");
     if (editor == nullptr) return 1;
     editor->setSize (1024, 683);
-    passed &= require (editor->getLocalBounds() == juce::Rectangle<int> (0, 0, 1024, 683), "fixed-editor-size-80-percent");
+    passed &= require (editor->getLocalBounds() == juce::Rectangle<int> (0, 0, 1024, 683), "fixed-editor-size-native-1024");
 
     UiSpec spec;
-    passed &= require (spec.getRegion ("quotePanel") == juce::Rectangle<int> (332, 432, 512, 360), "quote-replaces-count-grid-region");
+    passed &= require (spec.getComponent ("QuotePanel") == juce::Rectangle<int> (266, 346, 409, 288), "quote-native-canonical-bounds");
     auto full = juce::Image (juce::Image::ARGB, 1024, 683, true);
     { juce::Graphics graphics (full); editor->paintEntireComponent (graphics, true); }
     passed &= require (writePng (full, "toyotomi-timeline-editor-full.png"), "full-ui-render");
-    passed &= require (writePng (full.getClippedImage ({ 266, 346, 410, 288 }), "toyotomi-quote-panel.png"), "quote-panel-render");
+    passed &= require (writePng (full.getClippedImage ({ 266, 346, 409, 288 }), "toyotomi-quote-panel.png"), "quote-panel-render");
 
     const auto renderKnobPanel = [&]
     {
@@ -166,18 +166,14 @@ int main()
         passed &= require (hasDifferentPixels (lengthStates[0], lengthStates[static_cast<size_t> (i)]),
                            "length-state-selected-image-changes");
 
-    // The UI is rendered at the established 80% host view in this smoke test.
-    // Mask every length button and assert that changing selection does not move
-    // any other pixels in the panel.  The native source remains 40 x 33.
-    // Each rectangle is the 40 x 33 native source rectangle transformed into
-    // this 80% smoke preview, with a three-pixel safety margin for its raster
-    // edge.  Only pixels outside every possible selected frame are compared.
+    // The native runtime has no parent transform. Mask each final 32x26
+    // button and ensure swapping a state image moves no other pixels.
     static const auto lengthPreviewBounds = []
     {
-        constexpr int baseX = 4;
-        constexpr int baseY = 54;
-        constexpr int width = 42;
-        constexpr int height = 36;
+        constexpr int baseX = 8;
+        constexpr int baseY = 58;
+        constexpr int width = 32;
+        constexpr int height = 26;
         constexpr int step = 36;
         std::array<juce::Rectangle<int>, 5> result;
         for (int i = 0; i < static_cast<int> (result.size()); ++i)
@@ -195,16 +191,16 @@ int main()
     static const auto lengthBounds = []
     {
         constexpr int baseX = 10;
-        constexpr int baseY = 72;
-        constexpr int width = 40;
-        constexpr int height = 33;
-        constexpr int gap = 5;
+        constexpr int baseY = 10;
+        constexpr int width = 32;
+        constexpr int height = 26;
+        constexpr int gap = 4;
         std::array<juce::Rectangle<int>, 5> result;
         for (int i = 0; i < static_cast<int> (result.size()); ++i)
             result[static_cast<size_t> (i)] = { baseX + i * (width + gap), baseY, width, height };
         return result;
     }();
-    auto allNormal = juce::Image (juce::Image::ARGB, 251, 105, true);
+    auto allNormal = juce::Image (juce::Image::ARGB, 202, 46, true);
     juce::Graphics allNormalGraphics (allNormal);
     for (int i = 0; i < 5; ++i)
     {
@@ -213,7 +209,7 @@ int main()
         const auto* data = BinaryData::getNamedResource (resource.toRawUTF8(), bytes);
         const auto image = data != nullptr ? juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (bytes))
                                            : juce::Image {};
-        passed &= require (image.isValid() && image.getWidth() == 40 && image.getHeight() == 33,
+        passed &= require (image.isValid() && image.getWidth() == 32 && image.getHeight() == 26,
                            "length-all-normal-native-asset");
         if (image.isValid()) allNormalGraphics.drawImageAt (image, lengthBounds[static_cast<size_t> (i)].getX(), lengthBounds[static_cast<size_t> (i)].getY());
     }
@@ -234,7 +230,7 @@ int main()
     passed &= require (writePresetPreview (PluginStateModel::ScratchPreset::custom, "toyotomi-preset-preview-custom.png"), "preset-preview-custom");
 
     BarMapComponent barMap;
-    barMap.setSize (608, 266);
+    barMap.setBounds (RuntimeLayout::bounds ("BarMap"));
     passed &= require (barMap.hasReferenceCellBounds(), "bar-map-reference-bounds");
     PluginStateModel state;
     state.setSlotPreset (0, PluginStateModel::ScratchPreset::forwardCut);
@@ -242,10 +238,10 @@ int main()
     state.setSlotPreset (39, PluginStateModel::ScratchPreset::chirp);
     barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); });
     barMap.setDisplayState (0, 10, -1);
-    auto stopped = juce::Image (juce::Image::ARGB, 608, 266, true);
+    auto stopped = juce::Image (juce::Image::ARGB, barMap.getWidth(), barMap.getHeight(), true);
     { juce::Graphics graphics (stopped); barMap.paintEntireComponent (graphics, true); }
     barMap.setDisplayState (0, 10, 5);
-    auto playing = juce::Image (juce::Image::ARGB, 608, 266, true);
+    auto playing = juce::Image (juce::Image::ARGB, barMap.getWidth(), barMap.getHeight(), true);
     { juce::Graphics graphics (playing); barMap.paintEntireComponent (graphics, true); }
     passed &= require (hasDifferentPixels (stopped, playing), "playhead-red-state-renders-only-while-playing");
     passed &= require (writePng (playing, "toyotomi-timeline-bar-map.png"), "timeline-bar-map-render");
