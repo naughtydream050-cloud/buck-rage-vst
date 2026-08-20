@@ -40,17 +40,18 @@ juce_add_plugin(ToyotomiHideyoshi
 juce_generate_juce_header(ToyotomiHideyoshi)
 
 file (GLOB_RECURSE TOYOTOMI_RUNTIME_1024_ASSETS CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-runtime-1024-20260818/*.png")
+    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-v2/runtime-1024/*.png")
 
 juce_add_binary_data(ToyotomiHideyoshiAssets
     SOURCES
         ${TOYOTOMI_RUNTIME_1024_ASSETS}
-        ui/spec/runtime-1024-layout.json
+        ui/v2/runtime-manifest.json
 )
 
 target_sources(ToyotomiHideyoshi PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
+    Source/PluginEditorV2.cpp
     Source/UIComponents.cpp
     Source/UiSpec.cpp
     Source/PluginStateModel.cpp
@@ -69,6 +70,7 @@ if (TOYOTOMI_BUILD_STATE_TESTS)
     target_sources(ToyotomiHideyoshiRuntimeSmoke PRIVATE
         Source/PluginProcessor.cpp
         Source/PluginEditor.cpp
+        Source/PluginEditorV2.cpp
         Source/UIComponents.cpp
         Source/UiSpec.cpp
         Source/PluginStateModel.cpp

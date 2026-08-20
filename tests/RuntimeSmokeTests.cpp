@@ -1,314 +1,63 @@
 #include "PluginProcessor.h"
-#include "PluginEditor.h"
-#include "UIComponents.h"
-#include "UiSpec.h"
+#include "PluginEditorV2.h"
 #include <iostream>
 #include <memory>
 
 #if __has_include(<BinaryData.h>)
  #include <BinaryData.h>
- #define TOYOTOMI_HAS_BINARY_DATA 1
-#else
- #define TOYOTOMI_HAS_BINARY_DATA 0
 #endif
 
 namespace
 {
-bool require (bool condition, const char* label)
+bool check (bool ok, const char* name) { std::cout << (ok ? "PASS " : "FAIL ") << name << '\n'; return ok; }
+bool png (const juce::Image& image, const juce::String& name)
 {
-    std::cout << (condition ? "PASS " : "FAIL ") << label << '\n';
-    return condition;
+    juce::FileOutputStream stream (juce::File::getCurrentWorkingDirectory().getChildFile(name));
+    return stream.openedOk() && juce::PNGImageFormat().writeImageToStream(image, stream);
 }
-
-bool writePng (const juce::Image& image, const juce::String& filename)
+juce::Image render (juce::AudioProcessorEditor& editor)
 {
-    juce::FileOutputStream stream (juce::File::getCurrentWorkingDirectory().getChildFile (filename));
-    return stream.openedOk() && juce::PNGImageFormat().writeImageToStream (image, stream);
+    juce::Image image (juce::Image::ARGB, 1024, 683, true); juce::Graphics g (image); editor.paintEntireComponent(g, true); return image;
 }
-
-bool hasDifferentPixels (const juce::Image& first, const juce::Image& second)
+bool different (const juce::Image& a, const juce::Image& b)
 {
-    for (int y = 0; y < first.getHeight(); ++y)
-        for (int x = 0; x < first.getWidth(); ++x)
-            if (first.getPixelAt (x, y) != second.getPixelAt (x, y)) return true;
+    for (int y=0;y<a.getHeight();++y) for (int x=0;x<a.getWidth();++x) if(a.getPixelAt(x,y)!=b.getPixelAt(x,y)) return true;
     return false;
 }
-
-bool hasIdenticalPixelsOutside (const juce::Image& first, const juce::Image& second,
-                                const std::array<juce::Rectangle<int>, 5>& ignored)
+bool resourceIs (const char* name, int w, int h)
 {
-    if (first.getWidth() != second.getWidth() || first.getHeight() != second.getHeight()) return false;
-    for (int y = 0; y < first.getHeight(); ++y)
-        for (int x = 0; x < first.getWidth(); ++x)
-        {
-            const juce::Point<int> point { x, y };
-            bool isIgnored = false;
-            for (const auto bounds : ignored)
-                isIgnored = isIgnored || bounds.contains (point);
-            if (! isIgnored && first.getPixelAt (x, y) != second.getPixelAt (x, y)) return false;
-        }
-    return true;
+   #if __has_include(<BinaryData.h>)
+    int bytes=0; const auto* data=BinaryData::getNamedResource(name,bytes); auto i=data?juce::ImageFileFormat::loadFrom(data,(size_t)bytes):juce::Image{};
+    return i.isValid() && i.getWidth()==w && i.getHeight()==h;
+   #else
+    juce::ignoreUnused(name,w,h); return false;
+   #endif
 }
 }
 
 int main()
 {
-    juce::ScopedJuceInitialiser_GUI gui;
-    bool passed = require (ToyotomiUi::validateEmbeddedImageAssets(), "embedded-image-assets");
-    passed &= require (ToyotomiUi::validateLengthButtonGeometry(), "length-geometry-normal-selected-hit-match");
+    juce::ScopedJuceInitialiser_GUI gui; bool pass=true;
+    pass &= check(resourceIs("neutral_static_background_1024x683_png",1024,683),"v2-static-background-native");
+    pass &= check(resourceIs("knob_ring_60_png",48,48) && resourceIs("knob_pointer_60_png",48,48),"v2-knob-assets-native");
+    pass &= check(resourceIs("xy_neutral_base_288x256_png",192,174),"v2-xy-native");
+    pass &= check(resourceIs("bypass_off_png",80,31) && resourceIs("bypass_on_png",80,31),"v2-bypass-native");
+    pass &= check(resourceIs("rec_normal_png",59,23) && resourceIs("clear_normal_png",59,23) && resourceIs("reset_view_normal_png",82,23),"v2-xy-buttons-native");
+    for (int i=1;i<=64;++i) pass &= check(resourceIs(juce::String::formatted("bar_%02d_normal_png",i).toRawUTF8(),56,80),"v2-bar-cell-native");
 
-#if TOYOTOMI_HAS_BINARY_DATA
-    int backgroundBytes = 0, quoteBytes = 0, knobRingBytes = 0, knobPointerBytes = 0;
-    const auto* backgroundData = BinaryData::getNamedResource ("master_default_no_count_grid_title_1024x683_png", backgroundBytes);
-    const auto* quoteData = BinaryData::getNamedResource ("quote_panel_user_409x288_png", quoteBytes);
-    const auto* knobRingData = BinaryData::getNamedResource ("knob_ring_48_png", knobRingBytes);
-    const auto* knobPointerData = BinaryData::getNamedResource ("knob_pointer_48_png", knobPointerBytes);
-    const auto background = backgroundData != nullptr ? juce::ImageFileFormat::loadFrom (backgroundData, static_cast<size_t> (backgroundBytes)) : juce::Image {};
-    const auto quote = quoteData != nullptr ? juce::ImageFileFormat::loadFrom (quoteData, static_cast<size_t> (quoteBytes)) : juce::Image {};
-    const auto knobRing = knobRingData != nullptr ? juce::ImageFileFormat::loadFrom (knobRingData, static_cast<size_t> (knobRingBytes)) : juce::Image {};
-    const auto knobPointer = knobPointerData != nullptr ? juce::ImageFileFormat::loadFrom (knobPointerData, static_cast<size_t> (knobPointerBytes)) : juce::Image {};
-    passed &= require (background.isValid() && background.getWidth() == 1024 && background.getHeight() == 683, "native-1024-background-loaded");
-    passed &= require (quote.isValid() && quote.getWidth() == 409 && quote.getHeight() == 288, "quote-decoration-loaded-native-size");
-    passed &= require (knobRing.isValid() && knobRing.getWidth() == 48 && knobRing.getHeight() == 48, "knob-ring-48-loaded-native-size");
-    passed &= require (knobPointer.isValid() && knobPointer.getWidth() == 48 && knobPointer.getHeight() == 48, "knob-pointer-48-loaded-native-size");
-#else
-    passed &= require (false, "binarydata-unavailable");
-#endif
+    ToyotomiHideyoshiAudioProcessor processor; processor.prepareToPlay(48000,512);
+    std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
+    pass &= check(editor != nullptr && editor->getWidth()==1024 && editor->getHeight()==683,"v2-editor-native-1024");
+    if(!editor) return 1;
+    auto& state=processor.getStateModel(); auto defaultImage=render(*editor); pass &= check(png(defaultImage,"v2-default-stop.png"),"v2-default-render");
+    pass &= check(processor.getCurrentTimelineSlot()==-1,"v2-stop-has-no-playhead");
 
-    ToyotomiHideyoshiAudioProcessor processor;
-    processor.prepareToPlay (48000.0, 512);
-    std::unique_ptr<juce::AudioProcessorEditor> editor (processor.createEditor());
-    passed &= require (editor != nullptr, "editor-created");
-    if (editor == nullptr) return 1;
-    editor->setSize (1024, 683);
-    passed &= require (editor->getLocalBounds() == juce::Rectangle<int> (0, 0, 1024, 683), "fixed-editor-size-native-1024");
-
-    UiSpec spec;
-    passed &= require (spec.getComponent ("QuotePanel") == juce::Rectangle<int> (266, 346, 409, 288), "quote-native-canonical-bounds");
-    static const std::array<juce::String, 18> requiredBounds {
-        "Header", "BarTabs", "BarMap", "PresetPanel", "XYPad", "QuotePanel", "CountParameters", "Output", "Bypass",
-        "Length.1_16", "Length.1_8", "Length.1_4", "Length.1_2", "Length.1_BAR",
-        "Knob.Speed", "Knob.Pitch", "Knob.Depth", "Preset.CUSTOM"
-    };
-    for (const auto& name : requiredBounds)
-    {
-        const auto bounds = spec.getComponent (name);
-        passed &= require (! bounds.isEmpty() && bounds.getX() >= 0 && bounds.getY() >= 0
-                           && bounds.getRight() <= 1024 && bounds.getBottom() <= 683,
-                           "native-layout-bounds-in-canvas");
-    }
-    auto full = juce::Image (juce::Image::ARGB, 1024, 683, true);
-    { juce::Graphics graphics (full); editor->paintEntireComponent (graphics, true); }
-    passed &= require (writePng (full, "toyotomi-timeline-editor-full.png"), "full-ui-render");
-    passed &= require (writePng (full.getClippedImage ({ 266, 346, 409, 288 }), "toyotomi-quote-panel.png"), "quote-panel-render");
-
-    // Render every native tab-strip state without a parent scale transform.
-    BarTabComponent tabs;
-    tabs.setSize (RuntimeLayout::bounds ("BarTabs").getWidth(), RuntimeLayout::bounds ("BarTabs").getHeight());
-    for (int page = 0; page < 4; ++page)
-    {
-        tabs.setSelectedPage (page);
-        auto tabImage = juce::Image (juce::Image::ARGB, tabs.getWidth(), tabs.getHeight(), true);
-        juce::Graphics graphics (tabImage);
-        tabs.paintEntireComponent (graphics, true);
-        passed &= require (writePng (tabImage, "toyotomi-native-tab-state-" + juce::String (page + 1) + ".png"),
-                           "native-tab-state-render");
-    }
-
-    // Exercise all ten complete PRESET PNG state swaps at their exact 1024
-    // local rectangles. This has no duplicate selected-state cache.
-    ScratchPresetPalette palette;
-    int visualPreset = 0;
-    palette.setPresetProvider ([&visualPreset] { return visualPreset; });
-    palette.setSize (RuntimeLayout::bounds ("PresetPanel").getWidth(), RuntimeLayout::bounds ("PresetPanel").getHeight());
-    for (visualPreset = 0; visualPreset < 10; ++visualPreset)
-    {
-        auto presetImage = juce::Image (juce::Image::ARGB, palette.getWidth(), palette.getHeight(), true);
-        juce::Graphics graphics (presetImage);
-        palette.paintEntireComponent (graphics, true);
-        passed &= require (writePng (presetImage, "toyotomi-native-preset-state-" + juce::String (visualPreset) + ".png"),
-                           "native-preset-state-render");
-    }
-
-    XYMotionPad xy;
-    xy.setSize (RuntimeLayout::bounds ("XYPad").getWidth(), RuntimeLayout::bounds ("XYPad").getHeight());
-    auto xyImage = juce::Image (juce::Image::ARGB, xy.getWidth(), xy.getHeight(), true);
-    { juce::Graphics graphics (xyImage); xy.paintEntireComponent (graphics, true); }
-    passed &= require (writePng (xyImage, "toyotomi-native-xy.png"), "native-xy-render");
-
-    OutputMeterComponent meter (processor);
-    meter.setSize (RuntimeLayout::bounds ("Output").getWidth(), RuntimeLayout::bounds ("Output").getHeight());
-    auto meterImage = juce::Image (juce::Image::ARGB, meter.getWidth(), meter.getHeight(), true);
-    { juce::Graphics graphics (meterImage); meter.paintEntireComponent (graphics, true); }
-    passed &= require (writePng (meterImage, "toyotomi-native-output.png"), "native-output-render");
-
-    const auto renderKnobPanel = [&]
-    {
-        auto preview = juce::Image (juce::Image::ARGB, 1024, 683, true);
-        juce::Graphics graphics (preview);
-        editor->paintEntireComponent (graphics, true);
-        return preview.getClippedImage ({ 693, 372, 201, 262 });
-    };
-    auto& uiState = processor.getStateModel();
-    uiState.setSlotSpeed (0, PluginStateModel::kMinSpeed);
-    const auto speedMin = renderKnobPanel();
-    passed &= require (writePng (speedMin, "toyotomi-editor-knob-speed-min.png"), "knob-speed-min-render");
-    uiState.setSlotSpeed (0, 1.0f);
-    const auto speedDefault = renderKnobPanel();
-    passed &= require (writePng (speedDefault, "toyotomi-editor-knob-speed-default.png"), "knob-speed-default-render");
-    uiState.setSlotSpeed (0, PluginStateModel::kMaxSpeed);
-    const auto speedMax = renderKnobPanel();
-    passed &= require (writePng (speedMax, "toyotomi-editor-knob-speed-max.png"), "knob-speed-max-render");
-    passed &= require (hasDifferentPixels (speedMin, speedMax), "knob-speed-min-max-rotation");
-
-    uiState.setSlotPitch (0, PluginStateModel::kMinPitch);
-    const auto pitchMin = renderKnobPanel();
-    passed &= require (writePng (pitchMin, "toyotomi-editor-knob-pitch-min.png"), "knob-pitch-min-render");
-    uiState.setSlotPitch (0, 0.0f);
-    const auto pitchCentre = renderKnobPanel();
-    passed &= require (writePng (pitchCentre, "toyotomi-editor-knob-pitch-centre.png"), "knob-pitch-centre-render");
-    uiState.setSlotPitch (0, PluginStateModel::kMaxPitch);
-    const auto pitchMax = renderKnobPanel();
-    passed &= require (writePng (pitchMax, "toyotomi-editor-knob-pitch-max.png"), "knob-pitch-max-render");
-    passed &= require (hasDifferentPixels (pitchMin, pitchMax), "knob-pitch-min-max-rotation");
-
-    uiState.setSlotDepth (0, 0.0f);
-    const auto depthMin = renderKnobPanel();
-    passed &= require (writePng (depthMin, "toyotomi-editor-knob-depth-min.png"), "knob-depth-min-render");
-    uiState.setSlotDepth (0, 0.5f);
-    const auto depthCentre = renderKnobPanel();
-    passed &= require (writePng (depthCentre, "toyotomi-editor-knob-depth-centre.png"), "knob-depth-centre-render");
-    uiState.setSlotDepth (0, 1.0f);
-    const auto depthMax = renderKnobPanel();
-    passed &= require (writePng (depthMax, "toyotomi-editor-knob-depth-max.png"), "knob-depth-max-render");
-    passed &= require (hasDifferentPixels (depthMin, depthMax), "knob-depth-min-max-rotation");
-
-    // The all-minimum fixture must use the exact parameter minima.  It is a
-    // visual regression asset only; ranges and defaults remain unchanged.
-    uiState.setSlotSpeed (0, PluginStateModel::kMinSpeed);
-    uiState.setSlotPitch (0, PluginStateModel::kMinPitch);
-    uiState.setSlotDepth (0, 0.0f);
-    const auto& minimumSlot = uiState.getSlot (0);
-    passed &= require (minimumSlot.speed == PluginStateModel::kMinSpeed
-                       && minimumSlot.pitch == PluginStateModel::kMinPitch
-                       && minimumSlot.depth == 0.0f,
-                       "knob-all-minimum-fixture-state");
-    passed &= require (writePng (renderKnobPanel(), "toyotomi-editor-knob-all-min.png"),
-                       "knob-all-minimum-render");
-
-    const auto renderLengthPanel = [&]
-    {
-        auto preview = juce::Image (juce::Image::ARGB, 1024, 683, true);
-        juce::Graphics graphics (preview);
-        editor->paintEntireComponent (graphics, true);
-        return preview.getClippedImage ({ 693, 372, 201, 262 });
-    };
-    std::array<juce::Image, 5> lengthStates;
-    for (int i = 0; i < 5; ++i)
-    {
-        const auto length = static_cast<PluginStateModel::NoteLength> (i);
-        uiState.setSlotLength (0, length);
-        passed &= require (uiState.getSlot (0).length == length, "length-state-source-is-selected-slot");
-        lengthStates[static_cast<size_t> (i)] = renderLengthPanel();
-        passed &= require (writePng (lengthStates[static_cast<size_t> (i)],
-                                    "toyotomi-length-state-" + juce::String (i) + ".png"),
-                           "length-state-render");
-    }
-    for (int i = 1; i < 5; ++i)
-        passed &= require (hasDifferentPixels (lengthStates[0], lengthStates[static_cast<size_t> (i)]),
-                           "length-state-selected-image-changes");
-
-    // The native runtime has no parent transform. Mask each final 32x26
-    // button and ensure swapping a state image moves no other pixels.
-    static const auto lengthPreviewBounds = []
-    {
-        constexpr int baseX = 8;
-        constexpr int baseY = 58;
-        constexpr int width = 32;
-        constexpr int height = 26;
-        constexpr int step = 36;
-        std::array<juce::Rectangle<int>, 5> result;
-        for (int i = 0; i < static_cast<int> (result.size()); ++i)
-            result[static_cast<size_t> (i)] = { baseX + i * step, baseY, width, height };
-        return result;
-    }();
-    for (int i = 1; i < 5; ++i)
-        passed &= require (hasIdenticalPixelsOutside (lengthStates[0], lengthStates[static_cast<size_t> (i)], lengthPreviewBounds),
-                           "length-selection-does-not-shift-other-ui");
-
-#if TOYOTOMI_HAS_BINARY_DATA
-    // Native-size all-normal contact render: validates that 1/16 is not
-    // visually selected when its selected image is not chosen.
-    static const std::array<juce::String, 5> lengthNames { "1_16", "1_8", "1_4", "1_2", "1_bar" };
-    static const auto lengthBounds = []
-    {
-        constexpr int baseX = 10;
-        constexpr int baseY = 10;
-        constexpr int width = 32;
-        constexpr int height = 26;
-        constexpr int gap = 4;
-        std::array<juce::Rectangle<int>, 5> result;
-        for (int i = 0; i < static_cast<int> (result.size()); ++i)
-            result[static_cast<size_t> (i)] = { baseX + i * (width + gap), baseY, width, height };
-        return result;
-    }();
-    auto allNormal = juce::Image (juce::Image::ARGB, 202, 46, true);
-    juce::Graphics allNormalGraphics (allNormal);
-    for (int i = 0; i < 5; ++i)
-    {
-        int bytes = 0;
-        const auto resource = "length_" + lengthNames[static_cast<size_t> (i)] + "_normal_40x33_png";
-        const auto* data = BinaryData::getNamedResource (resource.toRawUTF8(), bytes);
-        const auto image = data != nullptr ? juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (bytes))
-                                           : juce::Image {};
-        passed &= require (image.isValid() && image.getWidth() == 32 && image.getHeight() == 26,
-                           "length-all-normal-native-asset");
-        if (image.isValid()) allNormalGraphics.drawImageAt (image, lengthBounds[static_cast<size_t> (i)].getX(), lengthBounds[static_cast<size_t> (i)].getY());
-    }
-    passed &= require (writePng (allNormal, "toyotomi-length-all-normal-debug.png"),
-                       "length-all-normal-debug-render");
-#endif
-
-    const auto writePresetPreview = [&] (PluginStateModel::ScratchPreset preset, const juce::String& filename)
-    {
-        processor.getStateModel().setSelectedPreset (preset);
-        auto preview = juce::Image (juce::Image::ARGB, 1024, 683, true);
-        juce::Graphics graphics (preview);
-        editor->paintEntireComponent (graphics, true);
-        return writePng (preview, filename);
-    };
-    passed &= require (writePresetPreview (PluginStateModel::ScratchPreset::off, "toyotomi-preset-preview-off.png"), "preset-preview-off");
-    passed &= require (writePresetPreview (PluginStateModel::ScratchPreset::backspin, "toyotomi-preset-preview-backspin.png"), "preset-preview-backspin");
-    passed &= require (writePresetPreview (PluginStateModel::ScratchPreset::custom, "toyotomi-preset-preview-custom.png"), "preset-preview-custom");
-
-    BarMapComponent barMap;
-    barMap.setBounds (RuntimeLayout::bounds ("BarMap"));
-    passed &= require (barMap.hasReferenceCellBounds(), "bar-map-reference-bounds");
-    PluginStateModel state;
-    state.setSlotPreset (0, PluginStateModel::ScratchPreset::forwardCut);
-    state.setSlotPreset (1, PluginStateModel::ScratchPreset::backspin);
-    state.setSlotPreset (39, PluginStateModel::ScratchPreset::chirp);
-    barMap.setSlotPreview ([&state] (int bar) { return state.getSlot (bar); });
-    barMap.setDisplayState (0, 10, -1);
-    auto stopped = juce::Image (juce::Image::ARGB, barMap.getWidth(), barMap.getHeight(), true);
-    { juce::Graphics graphics (stopped); barMap.paintEntireComponent (graphics, true); }
-    barMap.setDisplayState (0, 10, 5);
-    auto playing = juce::Image (juce::Image::ARGB, barMap.getWidth(), barMap.getHeight(), true);
-    { juce::Graphics graphics (playing); barMap.paintEntireComponent (graphics, true); }
-    passed &= require (hasDifferentPixels (stopped, playing), "playhead-red-state-renders-only-while-playing");
-    passed &= require (writePng (playing, "toyotomi-timeline-bar-map.png"), "timeline-bar-map-render");
-
-    const auto selectedBefore = state.getUiState().selectedBar;
-    state.selectTab (3);
-    passed &= require (state.getUiState().selectedBar == selectedBefore, "tab-selection-does-not-change-selected-bar");
-    state.selectBar (39);
-    const auto prior = state.getSlot (0).preset;
-    state.setSelectedPreset (PluginStateModel::ScratchPreset::drag);
-    passed &= require (state.getSlot (39).preset == PluginStateModel::ScratchPreset::drag && state.getSlot (0).preset == prior,
-                       "bar-slot-preset-is-independent");
-
-    editor.reset();
-    processor.releaseResources();
-    passed &= require (true, "editor-and-processor-destroyed");
-    return passed ? 0 : 1;
+    const auto initialBar=state.getUiState().selectedBar; const auto initialSlot=state.getSlot(initialBar);
+    for(int tab=0;tab<4;++tab){state.selectTab(tab);auto image=render(*editor);pass &= check(png(image,"v2-tab-"+juce::String(tab+1)+".png"),"v2-tab-render");pass &= check(state.getUiState().selectedBar==initialBar && state.getSlot(initialBar).preset==initialSlot.preset,"v2-tab-state-isolation");}
+    state.selectTab(0); state.selectBar(10); auto selected=render(*editor); pass &= check(png(selected,"v2-bar-selected.png"),"v2-bar-selected-render");
+    state.selectBar(0); for(int p=0;p<10;++p){state.setSelectedPreset((PluginStateModel::ScratchPreset)p);auto image=render(*editor);pass &= check(png(image,"v2-preset-"+juce::String(p)+".png"),"v2-preset-render");pass &= check(state.getSlot(0).preset==(PluginStateModel::ScratchPreset)p,"v2-preset-single-source");}
+    for(int l=0;l<5;++l){state.setSelectedLength((PluginStateModel::NoteLength)l);auto image=render(*editor);pass &=check(png(image,"v2-length-"+juce::String(l)+".png"),"v2-length-render");}
+    const auto bypassBefore=state.getUiState().bypass; state.setSelectedPreset(PluginStateModel::ScratchPreset::custom);state.setBypass(!bypassBefore);pass &=check(state.getSlot(0).preset==PluginStateModel::ScratchPreset::custom,"v2-bypass-preset-isolation");
+    state.setSlotSpeed(0,PluginStateModel::kMinSpeed);state.setSlotPitch(0,PluginStateModel::kMinPitch);state.setSlotDepth(0,0.f);auto min=render(*editor);state.setSlotSpeed(0,PluginStateModel::kMaxSpeed);state.setSlotPitch(0,PluginStateModel::kMaxPitch);state.setSlotDepth(0,1.f);auto max=render(*editor);pass &=check(different(min,max) && png(min,"v2-knobs-min.png") && png(max,"v2-knobs-max.png"),"v2-knob-min-max-render");
+    editor.reset(); processor.releaseResources(); return pass ? 0 : 1;
 }

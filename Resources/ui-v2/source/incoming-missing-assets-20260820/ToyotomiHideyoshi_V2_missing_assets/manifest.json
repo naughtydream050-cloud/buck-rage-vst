@@ -1,0 +1,822 @@
+{
+  "purpose": "Exact missing V2 assets requested by Codex",
+  "master_source": "5D028A46-E49F-4AED-A1E1-26FEB6D2091E.jpeg",
+  "master_size": [
+    1536,
+    1024
+  ],
+  "runtime_size": [
+    1024,
+    683
+  ],
+  "rules": [
+    "IMAGE 2 was not used.",
+    "REC/CLEAR/RESET VIEW are direct crops from the FINAL MASTER RAW xy_panel.",
+    "BAR 17-64 labels use only digit glyph pixels extracted from FINAL MASTER BAR 1-16.",
+    "BAR 17-64 normal cells use the FINAL MASTER BAR 1 neutral/OFF cell shell.",
+    "The 1024 static background has transparent holes for variable-state controls, so selected/playing states cannot be baked into it.",
+    "Runtime assets are final-size and intended for 1:1 drawing without AffineTransform."
+  ],
+  "buttons": {
+    "rec_normal": {
+      "source_box_in_xy_panel": [
+        16,
+        285,
+        105,
+        320
+      ],
+      "source_size": [
+        89,
+        35
+      ],
+      "runtime_1024_size": [
+        59,
+        23
+      ],
+      "provenance": "direct RAW crop from FINAL MASTER xy_panel.png"
+    },
+    "clear_normal": {
+      "source_box_in_xy_panel": [
+        117,
+        285,
+        206,
+        320
+      ],
+      "source_size": [
+        89,
+        35
+      ],
+      "runtime_1024_size": [
+        59,
+        23
+      ],
+      "provenance": "direct RAW crop from FINAL MASTER xy_panel.png"
+    },
+    "reset_view_normal": {
+      "source_box_in_xy_panel": [
+        213,
+        285,
+        336,
+        320
+      ],
+      "source_size": [
+        123,
+        35
+      ],
+      "runtime_1024_size": [
+        82,
+        23
+      ],
+      "provenance": "direct RAW crop from FINAL MASTER xy_panel.png"
+    }
+  },
+  "bars_17_64": {
+    "17": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "18": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "19": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "20": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "21": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "22": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "23": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "24": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "25": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "26": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "27": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "28": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "29": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "30": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "31": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "32": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "33": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "34": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "35": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "36": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "37": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "38": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "39": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "40": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "41": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "42": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "43": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "44": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "45": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "46": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "47": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "48": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "49": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "50": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "51": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "52": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "53": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "54": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "55": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "56": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "57": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "58": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "59": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "60": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "61": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "62": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "63": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    },
+    "64": {
+      "source_cell_size": [
+        84,
+        120
+      ],
+      "runtime_cell_size": [
+        56,
+        80
+      ]
+    }
+  },
+  "neutral_static_background": {
+    "file": "runtime-1024/neutral_static_background_1024x683.png",
+    "size": [
+      1024,
+      683
+    ],
+    "transparent_dynamic_holes": [
+      [
+        249,
+        73,
+        358,
+        105
+      ],
+      [
+        359,
+        73,
+        471,
+        106
+      ],
+      [
+        469,
+        73,
+        579,
+        106
+      ],
+      [
+        579,
+        73,
+        691,
+        106
+      ],
+      [
+        258,
+        136,
+        315,
+        218
+      ],
+      [
+        315,
+        136,
+        375,
+        218
+      ],
+      [
+        377,
+        136,
+        435,
+        218
+      ],
+      [
+        435,
+        136,
+        492,
+        218
+      ],
+      [
+        493,
+        136,
+        551,
+        218
+      ],
+      [
+        551,
+        136,
+        609,
+        218
+      ],
+      [
+        609,
+        136,
+        669,
+        218
+      ],
+      [
+        669,
+        136,
+        729,
+        218
+      ],
+      [
+        258,
+        220,
+        315,
+        303
+      ],
+      [
+        316,
+        220,
+        375,
+        303
+      ],
+      [
+        377,
+        220,
+        433,
+        303
+      ],
+      [
+        435,
+        220,
+        493,
+        303
+      ],
+      [
+        493,
+        220,
+        551,
+        303
+      ],
+      [
+        551,
+        220,
+        609,
+        303
+      ],
+      [
+        611,
+        220,
+        669,
+        303
+      ],
+      [
+        670,
+        220,
+        729,
+        303
+      ],
+      [
+        749,
+        99,
+        835,
+        165
+      ],
+      [
+        835,
+        99,
+        922,
+        165
+      ],
+      [
+        923,
+        99,
+        1010,
+        165
+      ],
+      [
+        749,
+        164,
+        835,
+        229
+      ],
+      [
+        836,
+        165,
+        922,
+        229
+      ],
+      [
+        923,
+        165,
+        1010,
+        229
+      ],
+      [
+        749,
+        230,
+        834,
+        294
+      ],
+      [
+        836,
+        230,
+        922,
+        294
+      ],
+      [
+        923,
+        230,
+        1011,
+        294
+      ],
+      [
+        749,
+        295,
+        835,
+        354
+      ],
+      [
+        742,
+        425,
+        773,
+        451
+      ],
+      [
+        773,
+        425,
+        803,
+        451
+      ],
+      [
+        803,
+        425,
+        836,
+        451
+      ],
+      [
+        834,
+        425,
+        866,
+        452
+      ],
+      [
+        864,
+        425,
+        895,
+        451
+      ],
+      [
+        744,
+        513,
+        789,
+        558
+      ],
+      [
+        793,
+        511,
+        839,
+        556
+      ],
+      [
+        848,
+        513,
+        893,
+        559
+      ],
+      [
+        40,
+        429,
+        232,
+        603
+      ],
+      [
+        27,
+        600,
+        89,
+        626
+      ],
+      [
+        95,
+        600,
+        157,
+        626
+      ],
+      [
+        159,
+        600,
+        243,
+        626
+      ],
+      [
+        967,
+        22,
+        1008,
+        50
+      ]
+    ]
+  }
+}

@@ -1,0 +1,601 @@
+{
+  "source": "05F766D3-F66F-4864-84BE-1C72F554F239.jpeg",
+  "source_size": [
+    1536,
+    1024
+  ],
+  "role": "RAW direct crops from FINAL MASTER only",
+  "rules": [
+    "No pixels were redrawn, recolored, inpainted, or synthesized.",
+    "These are source/reference crops, not yet the full runtime state set.",
+    "Selected states visible in the FINAL MASTER remain selected in these crops.",
+    "Do not treat reference knob crops as separated knob base/pointer assets."
+  ],
+  "crops": {
+    "header": {
+      "box_xyxy": [
+        5,
+        5,
+        1531,
+        99
+      ],
+      "size": [
+        1526,
+        94
+      ],
+      "file": "header.png"
+    },
+    "footer": {
+      "box_xyxy": [
+        5,
+        958,
+        1531,
+        1018
+      ],
+      "size": [
+        1526,
+        60
+      ],
+      "file": "footer.png"
+    },
+    "quote_panel": {
+      "box_xyxy": [
+        392,
+        512,
+        1090,
+        944
+      ],
+      "size": [
+        698,
+        432
+      ],
+      "file": "quote_panel.png"
+    },
+    "xy_panel": {
+      "box_xyxy": [
+        27,
+        617,
+        379,
+        949
+      ],
+      "size": [
+        352,
+        332
+      ],
+      "file": "xy_panel.png"
+    },
+    "preset_panel": {
+      "box_xyxy": [
+        1116,
+        103,
+        1529,
+        533
+      ],
+      "size": [
+        413,
+        430
+      ],
+      "file": "preset_panel.png"
+    },
+    "parameter_panel": {
+      "box_xyxy": [
+        1105,
+        545,
+        1348,
+        958
+      ],
+      "size": [
+        243,
+        413
+      ],
+      "file": "parameter_panel.png"
+    },
+    "output_panel": {
+      "box_xyxy": [
+        1359,
+        545,
+        1523,
+        947
+      ],
+      "size": [
+        164,
+        402
+      ],
+      "file": "output_panel.png"
+    },
+    "tab_1_16_selected": {
+      "box_xyxy": [
+        376,
+        111,
+        535,
+        155
+      ],
+      "size": [
+        159,
+        44
+      ],
+      "file": "tab_1_16_selected.png"
+    },
+    "tab_17_32_normal": {
+      "box_xyxy": [
+        540,
+        111,
+        704,
+        157
+      ],
+      "size": [
+        164,
+        46
+      ],
+      "file": "tab_17_32_normal.png"
+    },
+    "tab_33_48_normal": {
+      "box_xyxy": [
+        705,
+        111,
+        867,
+        157
+      ],
+      "size": [
+        162,
+        46
+      ],
+      "file": "tab_33_48_normal.png"
+    },
+    "tab_49_64_normal": {
+      "box_xyxy": [
+        870,
+        111,
+        1035,
+        157
+      ],
+      "size": [
+        165,
+        46
+      ],
+      "file": "tab_49_64_normal.png"
+    },
+    "preset_off_normal": {
+      "box_xyxy": [
+        1125,
+        150,
+        1251,
+        245
+      ],
+      "size": [
+        126,
+        95
+      ],
+      "file": "preset_off_normal.png"
+    },
+    "preset_forward_cut_normal": {
+      "box_xyxy": [
+        1254,
+        150,
+        1381,
+        245
+      ],
+      "size": [
+        127,
+        95
+      ],
+      "file": "preset_forward_cut_normal.png"
+    },
+    "preset_backspin_selected": {
+      "box_xyxy": [
+        1386,
+        150,
+        1513,
+        245
+      ],
+      "size": [
+        127,
+        95
+      ],
+      "file": "preset_backspin_selected.png"
+    },
+    "preset_chirp_normal": {
+      "box_xyxy": [
+        1125,
+        248,
+        1251,
+        341
+      ],
+      "size": [
+        126,
+        93
+      ],
+      "file": "preset_chirp_normal.png"
+    },
+    "preset_baby_normal": {
+      "box_xyxy": [
+        1256,
+        249,
+        1381,
+        341
+      ],
+      "size": [
+        125,
+        92
+      ],
+      "file": "preset_baby_normal.png"
+    },
+    "preset_transform_normal": {
+      "box_xyxy": [
+        1387,
+        249,
+        1513,
+        341
+      ],
+      "size": [
+        126,
+        92
+      ],
+      "file": "preset_transform_normal.png"
+    },
+    "preset_drag_normal": {
+      "box_xyxy": [
+        1126,
+        347,
+        1249,
+        439
+      ],
+      "size": [
+        123,
+        92
+      ],
+      "file": "preset_drag_normal.png"
+    },
+    "preset_zigzag_normal": {
+      "box_xyxy": [
+        1256,
+        347,
+        1381,
+        439
+      ],
+      "size": [
+        125,
+        92
+      ],
+      "file": "preset_zigzag_normal.png"
+    },
+    "preset_tape_brake_normal": {
+      "box_xyxy": [
+        1387,
+        347,
+        1514,
+        439
+      ],
+      "size": [
+        127,
+        92
+      ],
+      "file": "preset_tape_brake_normal.png"
+    },
+    "preset_custom_normal": {
+      "box_xyxy": [
+        1125,
+        444,
+        1251,
+        528
+      ],
+      "size": [
+        126,
+        84
+      ],
+      "file": "preset_custom_normal.png"
+    },
+    "length_1_16_normal": {
+      "box_xyxy": [
+        1115,
+        640,
+        1158,
+        674
+      ],
+      "size": [
+        43,
+        34
+      ],
+      "file": "length_1_16_normal.png"
+    },
+    "length_1_8_normal": {
+      "box_xyxy": [
+        1161,
+        640,
+        1203,
+        674
+      ],
+      "size": [
+        42,
+        34
+      ],
+      "file": "length_1_8_normal.png"
+    },
+    "length_1_4_selected": {
+      "box_xyxy": [
+        1206,
+        640,
+        1252,
+        674
+      ],
+      "size": [
+        46,
+        34
+      ],
+      "file": "length_1_4_selected.png"
+    },
+    "length_1_2_normal": {
+      "box_xyxy": [
+        1253,
+        640,
+        1297,
+        675
+      ],
+      "size": [
+        44,
+        35
+      ],
+      "file": "length_1_2_normal.png"
+    },
+    "length_1_bar_normal": {
+      "box_xyxy": [
+        1298,
+        640,
+        1341,
+        674
+      ],
+      "size": [
+        43,
+        34
+      ],
+      "file": "length_1_bar_normal.png"
+    },
+    "knob_speed_reference": {
+      "box_xyxy": [
+        1118,
+        771,
+        1182,
+        835
+      ],
+      "size": [
+        64,
+        64
+      ],
+      "file": "knob_speed_reference.png"
+    },
+    "knob_pitch_reference": {
+      "box_xyxy": [
+        1192,
+        768,
+        1256,
+        832
+      ],
+      "size": [
+        64,
+        64
+      ],
+      "file": "knob_pitch_reference.png"
+    },
+    "knob_depth_reference": {
+      "box_xyxy": [
+        1274,
+        772,
+        1338,
+        836
+      ],
+      "size": [
+        64,
+        64
+      ],
+      "file": "knob_depth_reference.png"
+    },
+    "bar_01_normal": {
+      "box_xyxy": [
+        389,
+        206,
+        471,
+        325
+      ],
+      "size": [
+        82,
+        119
+      ],
+      "file": "bar_01_normal.png"
+    },
+    "bar_02_normal": {
+      "box_xyxy": [
+        475,
+        206,
+        560,
+        325
+      ],
+      "size": [
+        85,
+        119
+      ],
+      "file": "bar_02_normal.png"
+    },
+    "bar_03_normal": {
+      "box_xyxy": [
+        567,
+        206,
+        650,
+        325
+      ],
+      "size": [
+        83,
+        119
+      ],
+      "file": "bar_03_normal.png"
+    },
+    "bar_04_normal": {
+      "box_xyxy": [
+        655,
+        206,
+        736,
+        325
+      ],
+      "size": [
+        81,
+        119
+      ],
+      "file": "bar_04_normal.png"
+    },
+    "bar_05_normal": {
+      "box_xyxy": [
+        741,
+        206,
+        825,
+        325
+      ],
+      "size": [
+        84,
+        119
+      ],
+      "file": "bar_05_normal.png"
+    },
+    "bar_06_normal": {
+      "box_xyxy": [
+        829,
+        206,
+        912,
+        325
+      ],
+      "size": [
+        83,
+        119
+      ],
+      "file": "bar_06_normal.png"
+    },
+    "bar_07_normal": {
+      "box_xyxy": [
+        916,
+        206,
+        1002,
+        325
+      ],
+      "size": [
+        86,
+        119
+      ],
+      "file": "bar_07_normal.png"
+    },
+    "bar_08_normal": {
+      "box_xyxy": [
+        1005,
+        206,
+        1092,
+        325
+      ],
+      "size": [
+        87,
+        119
+      ],
+      "file": "bar_08_normal.png"
+    },
+    "bar_09_normal": {
+      "box_xyxy": [
+        389,
+        332,
+        471,
+        452
+      ],
+      "size": [
+        82,
+        120
+      ],
+      "file": "bar_09_normal.png"
+    },
+    "bar_10_normal": {
+      "box_xyxy": [
+        476,
+        332,
+        560,
+        452
+      ],
+      "size": [
+        84,
+        120
+      ],
+      "file": "bar_10_normal.png"
+    },
+    "bar_11_selected": {
+      "box_xyxy": [
+        567,
+        332,
+        648,
+        452
+      ],
+      "size": [
+        81,
+        120
+      ],
+      "file": "bar_11_selected.png"
+    },
+    "bar_12_normal": {
+      "box_xyxy": [
+        655,
+        332,
+        737,
+        452
+      ],
+      "size": [
+        82,
+        120
+      ],
+      "file": "bar_12_normal.png"
+    },
+    "bar_13_normal": {
+      "box_xyxy": [
+        741,
+        332,
+        824,
+        452
+      ],
+      "size": [
+        83,
+        120
+      ],
+      "file": "bar_13_normal.png"
+    },
+    "bar_14_normal": {
+      "box_xyxy": [
+        829,
+        332,
+        912,
+        452
+      ],
+      "size": [
+        83,
+        120
+      ],
+      "file": "bar_14_normal.png"
+    },
+    "bar_15_normal": {
+      "box_xyxy": [
+        918,
+        332,
+        1002,
+        452
+      ],
+      "size": [
+        84,
+        120
+      ],
+      "file": "bar_15_normal.png"
+    },
+    "bar_16_normal": {
+      "box_xyxy": [
+        1007,
+        332,
+        1092,
+        452
+      ],
+      "size": [
+        85,
+        120
+      ],
+      "file": "bar_16_normal.png"
+    }
+  }
+}

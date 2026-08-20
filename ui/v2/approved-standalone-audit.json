@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "scope": "V2 pre-implementation standalone asset recovery audit",
+  "rules": {
+    "finalMasterRecrop": "FORBIDDEN",
+    "image2DirectCrop": "FORBIDDEN",
+    "newAssetGeneration": "FORBIDDEN",
+    "runtimeOrCandidateChanged": false
+  },
+  "adopted": [
+    {
+      "id": "knob_base",
+      "sourceOriginalPath": "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\projects\\ToyotomiHideyoshi\\Resources\\knob_ring_60.png",
+      "copiedV2Path": "Resources/ui-v2/source/approved-standalone/knob_ring_60.png",
+      "provenance": "approved-standalone",
+      "visualStatus": "approved 60px base/ring; transparent canvas; visual review PASS",
+      "pixelSize": [
+        60,
+        60
+      ],
+      "mode": "RGBA",
+      "alpha": {
+        "present": true,
+        "min": 0,
+        "max": 255
+      },
+      "sourceSha256": "A0002C13EB24FC61CC7FD8F423A420C5E1729056209B2EF562E7C0FB31C39857",
+      "copiedSha256": "A0002C13EB24FC61CC7FD8F423A420C5E1729056209B2EF562E7C0FB31C39857",
+      "copyMatch": true
+    },
+    {
+      "id": "knob_pointer",
+      "sourceOriginalPath": "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\projects\\ToyotomiHideyoshi\\Resources\\knob_pointer_60.png",
+      "copiedV2Path": "Resources/ui-v2/source/approved-standalone/knob_pointer_60.png",
+      "provenance": "approved-standalone",
+      "visualStatus": "approved 60px pointer; transparent canvas; pivot remains (30,30)",
+      "pixelSize": [
+        60,
+        60
+      ],
+      "mode": "RGBA",
+      "alpha": {
+        "present": true,
+        "min": 0,
+        "max": 255
+      },
+      "sourceSha256": "A6A6012338F1C3AD83BBC068A5ED2656E936C9BFE9DCE3ABAF3708F89A57AEA0",
+      "copiedSha256": "A6A6012338F1C3AD83BBC068A5ED2656E936C9BFE9DCE3ABAF3708F89A57AEA0",
+      "copyMatch": true
+    },
+    {
+      "id": "xy_neutral",
+      "sourceOriginalPath": "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\projects\\ToyotomiHideyoshi\\Resources\\ui-master-default-preview-20260808\\xy-buttons\\xy_neutral_base_288x256.png",
+      "copiedV2Path": "Resources/ui-v2/source/approved-standalone/xy_neutral_base_288x256.png",
+      "provenance": "approved-standalone",
+      "visualStatus": "previously approved neutral XY asset; normal controls are baked as static pixels",
+      "pixelSize": [
+        288,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha": {
+        "present": true,
+        "min": 255,
+        "max": 255
+      },
+      "sourceSha256": "2DB9788922228F1836E1D22C35B1507F60A2D85EF3CBDA1ACD465905DDFE39E5",
+      "copiedSha256": "2DB9788922228F1836E1D22C35B1507F60A2D85EF3CBDA1ACD465905DDFE39E5",
+      "copyMatch": true
+    },
+    {
+      "id": "bypass_off",
+      "sourceOriginalPath": "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\projects\\ToyotomiHideyoshi\\Resources\\ui-user-exact-preset-bypass-20260809\\bypass_off.png",
+      "copiedV2Path": "Resources/ui-v2/source/approved-standalone/bypass_off.png",
+      "provenance": "approved-standalone",
+      "visualStatus": "user-provided exact asset",
+      "pixelSize": [
+        100,
+        38
+      ],
+      "mode": "RGBA",
+      "alpha": {
+        "present": true,
+        "min": 255,
+        "max": 255
+      },
+      "sourceSha256": "BCBF8B49B22C47CFDA06B0DC9D040ACE29290367D5F9508216A69992A911115D",
+      "copiedSha256": "BCBF8B49B22C47CFDA06B0DC9D040ACE29290367D5F9508216A69992A911115D",
+      "copyMatch": true
+    },
+    {
+      "id": "bypass_on",
+      "sourceOriginalPath": "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\projects\\ToyotomiHideyoshi\\Resources\\ui-user-exact-preset-bypass-20260809\\bypass_on.png",
+      "copiedV2Path": "Resources/ui-v2/source/approved-standalone/bypass_on.png",
+      "provenance": "approved-standalone",
+      "visualStatus": "user-provided exact asset",
+      "pixelSize": [
+        100,
+        38
+      ],
+      "mode": "RGBA",
+      "alpha": {
+        "present": true,
+        "min": 255,
+        "max": 255
+      },
+      "sourceSha256": "39BC8770AAEE8BC5B4A5AECC382083D0D6254F2AE81327A51CDCF1922AD62D6D",
+      "copiedSha256": "39BC8770AAEE8BC5B4A5AECC382083D0D6254F2AE81327A51CDCF1922AD62D6D",
+      "copyMatch": true
+    }
+  ],
+  "rawSourceCoverage": {
+    "recClearReset": "RAW xy_panel.png contains the three normal controls as part of its supplied panel crop; no direct standalone RAW files exist.",
+    "staticPanels": [
+      "header.png",
+      "footer.png",
+      "quote_panel.png",
+      "xy_panel.png",
+      "preset_panel.png",
+      "parameter_panel.png",
+      "output_panel.png"
+    ]
+  },
+  "foundButNotAdopted": [
+    {
+      "id": "rec_normal",
+      "path": "Resources/ui-v2/assets-1024/xy-buttons/rec-normal.png",
+      "status": "found-but-not-adopted",
+      "reason": "prior V2 generated output; provenance is not an approved standalone source"
+    },
+    {
+      "id": "clear_normal",
+      "path": "Resources/ui-v2/assets-1024/xy-buttons/clear-normal.png",
+      "status": "found-but-not-adopted",
+      "reason": "prior V2 generated output; provenance is not an approved standalone source"
+    },
+    {
+      "id": "reset_view_normal",
+      "path": "Resources/ui-v2/assets-1024/xy-buttons/reset-view-normal.png",
+      "status": "found-but-not-adopted",
+      "reason": "prior V2 generated output; provenance is not an approved standalone source"
+    },
+    {
+      "id": "bar_labels_17_64",
+      "path": "Resources/ui-runtime-1024-20260818/bar-labels/bar_label_17.png … bar_label_64.png",
+      "status": "found-but-not-adopted",
+      "reason": "legacy deterministic glyph-composition set; rejected because it is the previously problematic auto-generated label path"
+    },
+    {
+      "id": "runtime_background",
+      "path": "Resources/ui-runtime-1024-20260818/background/master_default_no_count_grid_title_1024x683.png",
+      "status": "found-but-not-adopted",
+      "reason": "old runtime background may contain legacy mutable-state pixels; not a V2 neutral static source"
+    }
+  ],
+  "trulyMissing": [
+    "neutral static background containing left artwork and main frame, without mutable UI pixels",
+    "independent REC / CLEAR / RESET VIEW normal PNGs that are RAW-source or explicitly approved standalone assets",
+    "BAR 17–64 visual cell/label source assets (the only existing set is rejected legacy auto-composed labels)"
+  ]
+}
