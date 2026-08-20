@@ -145,6 +145,7 @@ jobs:
             toyotomi-preset-preview-*.png
             toyotomi-bar-labels-*.png
             toyotomi-bar-waveform-*.png
+            v2-*.png
             SOURCE_HEAD.txt
           if-no-files-found: error
 
