@@ -50,10 +50,7 @@ juce_add_binary_data(ToyotomiHideyoshiAssets
 
 target_sources(ToyotomiHideyoshi PRIVATE
     Source/PluginProcessor.cpp
-    Source/PluginEditor.cpp
     Source/PluginEditorV2.cpp
-    Source/UIComponents.cpp
-    Source/UiSpec.cpp
     Source/PluginStateModel.cpp
 )
 
@@ -69,10 +66,7 @@ if (TOYOTOMI_BUILD_STATE_TESTS)
     juce_generate_juce_header(ToyotomiHideyoshiRuntimeSmoke)
     target_sources(ToyotomiHideyoshiRuntimeSmoke PRIVATE
         Source/PluginProcessor.cpp
-        Source/PluginEditor.cpp
         Source/PluginEditorV2.cpp
-        Source/UIComponents.cpp
-        Source/UiSpec.cpp
         Source/PluginStateModel.cpp
         tests/RuntimeSmokeTests.cpp)
     target_include_directories(ToyotomiHideyoshiRuntimeSmoke PRIVATE Source)

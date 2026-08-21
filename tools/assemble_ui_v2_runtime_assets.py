@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / 'Resources/ui-v2/assets-raw-source-20260818'
 MISSING = ROOT / 'Resources/ui-v2/source/incoming-missing-assets-20260820/ToyotomiHideyoshi_V2_missing_assets/runtime-1024'
 APPROVED = ROOT / 'Resources/ui-v2/source/approved-standalone'
+MECHANICAL_BAR_SHELLS = ROOT / 'Resources/ui-master-default-preview-20260808/bar-cells'
 OUT = ROOT / 'Resources/ui-v2/runtime-1024'
 MANIFEST = ROOT / 'ui/v2/runtime-manifest.json'
 PRESETS = ['off','forward_cut','backspin','chirp','baby','transform','drag','zigzag','tape_brake','custom']
@@ -25,17 +26,55 @@ def final(im, size): return im if im.size == size else im.resize(size, Image.Res
 def save(im, rel, provenance, state, bounds):
     p=OUT/rel; p.parent.mkdir(parents=True, exist_ok=True); im.save(p)
     a=im.getchannel('A').getextrema(); return {'id':p.stem,'file':str(p.relative_to(ROOT)).replace('\\','/'),'provenance':provenance,'width':im.width,'height':im.height,'alpha':[a[0],a[1]],'state':state,'runtimeBounds':list(bounds),'sha256':sha(p)}
-def shell(content, normal, selected, red=False):
-    normal=final(normal,content.size); selected=final(selected,content.size)
-    diff=ImageOps.grayscale(ImageChops.difference(normal.convert('RGB'),selected.convert('RGB'))).point(lambda v:255 if v>=12 else 0)
-    inset=max(3,min(content.size)//12); ImageDraw.Draw(diff).rectangle((inset,inset,content.width-inset-1,content.height-inset-1),fill=0)
-    if red:
-        px=selected.load()
-        for y in range(selected.height):
-            for x in range(selected.width):
-                r,g,b,a=px[x,y]
-                if a and r>85 and g>55 and r>=b: px[x,y]=(min(236,int(r*1.1)),min(79,int(g*.42)),min(68,int(b*.42)),a)
-    out=content.copy(); out.paste(selected,(0,0),diff); return out
+def cell_state_shell(content, shell, state):
+    """Use a tracked, previously approved state shell without copying BAR text.
+
+    The shell supplies its original gold/red edge, glow and status dot.  The
+    target BAR's own interior is restored over it, so the label and mini
+    preview always remain those of the target BAR.  No shape, text or colour
+    treatment is invented here; this is a deterministic assembly of existing
+    state pixels.
+    """
+    source = final(shell, content.size).convert('RGBA')
+    width, height = content.size
+    result = source.copy()
+    target_interior = content.convert('RGBA').copy()
+    mask = Image.new('L', content.size, 255)
+    draw = ImageDraw.Draw(mask)
+    # Preserve only shell geometry: the reference frame/glow and its supplied
+    # bottom status dot.  The middle is the target's label/mini-preview.
+    draw.rectangle((0, 0, width - 1, height - 1), outline=0, width=4)
+    # The tracked playing shell also contains its old "PLAYING" lettering.
+    # Retain only its coloured status-dot pixels, never an arbitrary rectangle
+    # (which would visibly replace the target's metal texture).
+    source_pixels = source.load()
+    for y in range(height - 16, height - 4):
+        for x in range(width // 2 - 8, width // 2 + 9):
+            r, g, b, a = source_pixels[x, y]
+            is_gold = r > 85 and r > g * 1.10 and g > b * 1.08
+            is_red = r > 90 and r > g * 1.45 and r > b * 1.45
+            if a and ((state == 'selected' and is_gold) or (state != 'selected' and is_red)):
+                draw.point((x, y), fill=0)
+    result.paste(target_interior, (0, 0), mask)
+    return result
+
+def neutralise_selected_source(content):
+    """Convert only the captured gold state pixels back to the existing ivory.
+
+    FINAL MASTER deliberately shows BAR 11 selected.  Its raw crop therefore
+    cannot be used unchanged as BAR 11's neutral state.  This is a mechanical
+    colour-only reversal of the supplied selected pixels: no glyph, border or
+    texture is drawn or moved.
+    """
+    result = content.convert('RGBA').copy()
+    px = result.load()
+    for y in range(result.height):
+        for x in range(result.width):
+            r, g, b, a = px[x, y]
+            if a and r > 92 and r > g * 1.07 and g > b * 1.12:
+                value = max(r, g, b)
+                px[x, y] = (min(235, int(value * 1.05)), min(224, int(value * 1.00)), min(212, int(value * .90)), a)
+    return result
 def main():
     if OUT.exists(): shutil.rmtree(OUT)
     rows=[]
@@ -48,14 +87,21 @@ def main():
             source=RAW/f'tabs/tab_{name}_{state}.png'
             rows.append(save(final(img(source),(w,27)),f'tabs/tab_{name}_{state}.png','raw-final-master/mechanical-state','%s'%state,b))
     # Bars 1-16 are raw/mechanical; supplied package provides 17-64 neutral cells.
-    refnormal=img(RAW/'bar-cells/bar_10_normal.png'); refselected=img(RAW/'bar-cells/bar_11_selected.png')
+    shells = {
+        'selected': img(MECHANICAL_BAR_SHELLS/'bar_cell_shell_selected_72x94.png'),
+        'playing': img(MECHANICAL_BAR_SHELLS/'bar_cell_shell_playing_72x94.png'),
+        'selected_playing': img(MECHANICAL_BAR_SHELLS/'bar_cell_shell_selected_playing_72x94.png'),
+    }
     for bar in range(1,65):
         base=img((RAW/f'bar-cells/bar_{bar:02d}_normal.png') if bar<=16 else (MISSING/f'bar-cells-17-64/bar_{bar:02d}_normal.png'))
-        base=final(base,(56,80)); b=(0,0,56,80)
+        base=final(base,(56,80))
+        if bar == 11:
+            base=neutralise_selected_source(base)
+        b=(0,0,56,80)
         rows.append(save(base,f'bars/bar_{bar:02d}_normal.png','raw-final-master' if bar<=16 else 'user-v2-missing-assets','normal',b))
-        selected=shell(base,refnormal,refselected)
-        playing=shell(base,refnormal,refselected,True)
-        selected_playing=shell(selected,refnormal,refselected,True)
+        selected=cell_state_shell(base,shells['selected'],'selected')
+        playing=cell_state_shell(base,shells['playing'],'playing')
+        selected_playing=cell_state_shell(base,shells['selected_playing'],'selected_playing')
         rows.append(save(selected,f'bars/bar_{bar:02d}_selected.png','mechanical-state-shell','selected',b))
         rows.append(save(playing,f'bars/bar_{bar:02d}_playing.png','mechanical-state-shell','playing',b))
         rows.append(save(selected_playing,f'bars/bar_{bar:02d}_selected_playing.png','mechanical-state-shell','selected+playing',b))

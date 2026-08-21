@@ -13,6 +13,9 @@ public:
     ~ToyotomiHideyoshiAudioProcessorEditorV2() override = default;
     void paint (juce::Graphics&) override;
     void resized() override;
+    // BAR MAP owns the alpha-cut-out region of the faceplate. Keep its asset
+    // contract independently observable by the smoke test.
+    bool hasValidBarMapAssets() const;
 
 private:
     class Surface;
