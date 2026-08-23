@@ -18,10 +18,15 @@ const std::array<juce::Rectangle<int>, 5> kLengths {{{742,425,32,26},{773,425,32
 const std::array<juce::Rectangle<int>, 3> kKnobs {{{744,513,48,48},{793,513,48,48},{848,513,48,48}}};
 const std::array<juce::Rectangle<int>, 3> kReadouts {{{742,563,48,16},{793,563,48,16},{848,563,48,16}}};
 const std::array<const char*, 10> kPresetNames {{"off","forward_cut","backspin","chirp","baby","transform","drag","zigzag","tape_brake","custom"}};
+const std::array<const char*, 10> kMiniPresetNames {{"off","forward_cut","backspin","chirp","baby","transform","drag","zigzag","tape_brake","custom"}};
 const std::array<const char*, 5> kLengthNames {{"1_16","1_8","1_4","1_2","1_bar"}};
 const std::array<const char*, 4> kTabNames {{"1_16","17_32","33_48","49_64"}};
 
-juce::String resourceName (juce::String filename) { return filename.replaceCharacters (".- ", "___"); }
+juce::String resourceName (juce::String filename)
+{
+    return juce::File (filename).getFileName().replaceCharacters (".- ", "___");
+}
+
 juce::Image readAsset (const juce::String& filename)
 {
    #if __has_include(<BinaryData.h>)
@@ -32,6 +37,35 @@ juce::Image readAsset (const juce::String& filename)
     juce::ignoreUnused (filename);
     return {};
    #endif
+}
+
+juce::var readJsonAsset (const juce::String& filename)
+{
+   #if __has_include(<BinaryData.h>)
+    int bytes = 0;
+    const auto* data = BinaryData::getNamedResource (resourceName (filename).toRawUTF8(), bytes);
+    return data != nullptr ? juce::JSON::parse (juce::String::fromUTF8 (static_cast<const char*> (data), bytes)) : juce::var {};
+   #else
+    juce::ignoreUnused (filename);
+    return {};
+   #endif
+}
+
+juce::var property (const juce::var& object, const juce::String& key)
+{
+    if (const auto* dynamic = object.getDynamicObject())
+        return dynamic->getProperty (juce::Identifier (key));
+
+    return {};
+}
+
+bool nativeSizeIs (const juce::var& asset, int width, int height)
+{
+    const auto sizeValue = property (asset, "native_size");
+    if (const auto* size = sizeValue.getArray())
+        return size->size() == 2 && (int) size->getReference (0) == width && (int) size->getReference (1) == height;
+
+    return false;
 }
 
 bool hasNativeSize (const juce::Image& image, juce::Rectangle<int> bounds)
@@ -59,7 +93,9 @@ struct V2AssetCatalog final
 {
     juce::Image background, ring, pointer, xy, bypassOff, bypassOn, rec, clear, reset;
     std::array<std::array<juce::Image, 2>, 4> tabs;
-    std::array<std::array<juce::Image, 4>, 64> bars;
+    std::array<juce::Image, 4> barShells;
+    std::array<juce::Image, 64> barLabels;
+    std::array<juce::Image, 10> barMinis;
     std::array<std::array<juce::Image, 2>, 10> presets;
     std::array<std::array<juce::Image, 2>, 5> lengths;
     bool barMapValid = true;
@@ -70,10 +106,64 @@ struct V2AssetCatalog final
         juce::ignoreUnused (bounds);
     }
 
-    void loadBarMap (juce::Image& destination, const juce::String& name, juce::Rectangle<int> bounds)
+    bool loadBarMap (juce::Image& destination, const juce::String& name, juce::Rectangle<int> bounds)
     {
         destination = readAsset (name);
-        barMapValid = barMapValid && hasNativeSize (destination, bounds);
+        const auto valid = hasNativeSize (destination, bounds);
+        barMapValid = barMapValid && valid;
+        return valid;
+    }
+
+    void loadBarMapContract()
+    {
+        const auto root = readJsonAsset ("runtime-manifest.json");
+        const auto barMap = property (root, "barMap");
+        const auto bars = property (barMap, "bars").getArray();
+        const auto shells = property (barMap, "shells");
+        const auto minis = property (barMap, "mini_preset_mapping");
+        const auto placements = property (barMap, "placements");
+
+        barMapValid = barMapValid
+                   && bars != nullptr && bars->size() == 64
+                   && nativeSizeIs (property (shells, "normal"), 56, 80)
+                   && nativeSizeIs (property (shells, "selected"), 56, 80)
+                   && nativeSizeIs (property (shells, "playing"), 56, 80)
+                   && nativeSizeIs (property (shells, "selected_playing"), 56, 80)
+                   && property (placements, "label").isArray()
+                   && property (placements, "mini").isArray();
+
+        const std::array<const char*, 4> stateNames {{ "normal", "selected", "playing", "selected_playing" }};
+        for (int state = 0; state < 4; ++state)
+        {
+            const auto asset = property (shells, stateNames[(size_t) state]);
+            loadBarMap (barShells[(size_t) state], property (asset, "file").toString(), { 0, 0, 56, 80 });
+        }
+
+        for (int bar = 0; bar < 64; ++bar)
+        {
+            const auto record = bars != nullptr && bar < bars->size() ? bars->getReference (bar) : juce::var {};
+            const auto label = property (record, "label_asset");
+            barMapValid = barMapValid
+                       && (int) property (record, "bar_id") == bar + 1
+                       && nativeSizeIs (label, 56, 12);
+
+            for (const auto* stateName : stateNames)
+            {
+                const auto stateAsset = property (record, juce::String (stateName) + "_asset");
+                barMapValid = barMapValid && nativeSizeIs (stateAsset, 56, 80);
+                juce::Image decodedState;
+                loadBarMap (decodedState, property (stateAsset, "file").toString(), { 0, 0, 56, 80 });
+            }
+
+            loadBarMap (barLabels[(size_t) bar], property (label, "file").toString(), { 0, 0, 56, 12 });
+        }
+
+        for (int preset = 0; preset < 10; ++preset)
+        {
+            const auto asset = property (minis, kMiniPresetNames[(size_t) preset]);
+            barMapValid = barMapValid && nativeSizeIs (asset, 40, 20);
+            loadBarMap (barMinis[(size_t) preset], property (asset, "file").toString(), { 0, 0, 40, 20 });
+        }
     }
 
     V2AssetCatalog()
@@ -84,14 +174,7 @@ struct V2AssetCatalog final
             loadBarMap (tabs[(size_t) index][0], "tab_" + juce::String (kTabNames[(size_t) index]) + "_normal.png", kTabs[(size_t) index]);
             loadBarMap (tabs[(size_t) index][1], "tab_" + juce::String (kTabNames[(size_t) index]) + "_selected.png", kTabs[(size_t) index]);
         }
-        for (int bar = 0; bar < 64; ++bar)
-        {
-            const auto prefix = juce::String::formatted ("bar_%02d_", bar + 1);
-            loadBarMap (bars[(size_t) bar][normalState],          prefix + "normal.png",           cellBounds (0));
-            loadBarMap (bars[(size_t) bar][selectedState],        prefix + "selected.png",         cellBounds (0));
-            loadBarMap (bars[(size_t) bar][playingState],         prefix + "playing.png",          cellBounds (0));
-            loadBarMap (bars[(size_t) bar][selectedPlayingState], prefix + "selected_playing.png", cellBounds (0));
-        }
+        loadBarMapContract();
         for (int index = 0; index < 10; ++index)
         {
             const auto prefix = "preset_" + juce::String (kPresetNames[(size_t) index]) + "_";
@@ -187,7 +270,14 @@ public:
             const auto bar = tab * 16 + index;
             const auto state = bar == playing ? (bar == selected ? selectedPlayingState : playingState)
                                                : (bar == selected ? selectedState : normalState);
-            drawNative (g, assets.bars[(size_t) bar][(size_t) state], cellBounds (index));
+            const auto bounds = cellBounds (index);
+            g.saveState();
+            g.reduceClipRegion (bounds);
+            drawNative (g, assets.barShells[(size_t) state], bounds);
+            drawNative (g, assets.barLabels[(size_t) bar], { bounds.getX(), bounds.getY() + 5, 56, 12 });
+            const auto preset = processor.getStateModel().getSlot (bar).preset;
+            drawNative (g, assets.barMinis[(size_t) preset], { bounds.getX() + 8, bounds.getY() + 36, 40, 20 });
+            g.restoreState();
         }
 
         const auto& slot = processor.getStateModel().getSlot (selected);
