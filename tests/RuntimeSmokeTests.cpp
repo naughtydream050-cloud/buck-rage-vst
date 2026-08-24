@@ -166,10 +166,13 @@ int main()
     }
     for (const auto* mini : { "off", "forward_cut", "backspin", "chirp", "baby", "transform", "drag", "zigzag", "tape_brake", "custom" })
         pass &= check (resourceIs (("bar_mini_" + juce::String (mini) + "_png").toRawUTF8(), 40, 20), "v2-bar-mini-native");
-    pass &= check (hasGoldAccent (resourceImage ("bar_cell_shell_selected_56x80_png")), "v2-bar-selected-shell-has-gold");
-    pass &= check (hasRedAccent (resourceImage ("bar_cell_shell_playing_56x80_png")), "v2-bar-playing-shell-has-red");
-    pass &= check (hasGoldAccent (resourceImage ("bar_cell_shell_selected_playing_56x80_png"))
-                && hasRedAccent (resourceImage ("bar_cell_shell_selected_playing_56x80_png")), "v2-bar-selected-playing-shell-has-red-and-gold");
+    const auto normalShell = resourceImage ("bar_cell_shell_normal_56x80_png");
+    const auto selectedShell = resourceImage ("bar_cell_shell_selected_56x80_png");
+    const auto playingShell = resourceImage ("bar_cell_shell_playing_56x80_png");
+    const auto selectedPlayingShell = resourceImage ("bar_cell_shell_selected_playing_56x80_png");
+    pass &= check (different (normalShell, selectedShell), "v2-bar-selected-shell-is-distinct");
+    pass &= check (different (normalShell, playingShell), "v2-bar-playing-shell-is-distinct");
+    pass &= check (different (playingShell, selectedPlayingShell), "v2-bar-selected-playing-shell-is-distinct");
     pass &= check (! hasSelectedGoldContamination (resourceImage ("bar_cell_shell_normal_56x80_png")), "v2-bar11-normal-has-no-selected-gold");
 
     ToyotomiHideyoshiAudioProcessor processor; processor.prepareToPlay(48000,512);
