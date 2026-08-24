@@ -253,7 +253,7 @@ void writeVisualReport (const juce::var& regions, const juce::Image& actual, con
 int main()
 {
     juce::ScopedJuceInitialiser_GUI gui; bool pass=true;
-    pass &= check(resourceIs("neutral_static_background_1024x683_png",1024,683),"v2-static-background-native");
+    pass &= check(resourceIs("finalmasterreference1024x683_png",1024,683),"v2-static-background-native");
     pass &= check(resourceIs("knob_ring_60_png",48,48) && resourceIs("knob_pointer_60_png",48,48),"v2-knob-assets-native");
     pass &= check(resourceIs("xy_neutral_base_288x256_png",192,174),"v2-xy-native");
     pass &= check(resourceIs("bypass_off_png",80,31) && resourceIs("bypass_on_png",80,31),"v2-bypass-native");

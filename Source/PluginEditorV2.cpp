@@ -174,7 +174,8 @@ struct V2AssetCatalog final
 
     V2AssetCatalog()
     {
-        loadBarMap (background, "neutral_static_background_1024x683.png", { 0, 0, kW, kH });
+        // Use the FINAL MASTER as the V2 static faceplate baseline.
+        loadBarMap (background, "final-master-reference-1024x683.png", { 0, 0, kW, kH });
         for (int index = 0; index < 4; ++index)
         {
             loadBarMap (tabs[(size_t) index][0], "tab_" + juce::String (kTabNames[(size_t) index]) + "_normal.png", kTabs[(size_t) index]);
