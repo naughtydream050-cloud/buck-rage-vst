@@ -255,7 +255,7 @@ int main()
     juce::ScopedJuceInitialiser_GUI gui; bool pass=true;
     pass &= check(resourceIs("neutral_static_background_1024x683_png",1024,683),"v2-static-background-native");
     pass &= check(resourceIs("knob_ring_60_png",48,48) && resourceIs("knob_pointer_60_png",48,48),"v2-knob-assets-native");
-    pass &= check(resourceIs("xy_neutral_base_288x256_png",192,174),"v2-xy-native");
+    pass &= check(resourceIs("xy_neutral_base_288x256_png",232,200),"v2-xy-native");
     pass &= check(resourceIs("bypass_off_png",80,31) && resourceIs("bypass_on_png",80,31),"v2-bypass-native");
     pass &= check(resourceIs("rec_normal_png",59,23) && resourceIs("clear_normal_png",59,23) && resourceIs("reset_view_normal_png",82,23),"v2-xy-buttons-native");
     const std::array<const char*, 4> shellResources {{ "bar_cell_shell_normal_56x80_png", "bar_cell_shell_selected_56x80_png", "bar_cell_shell_playing_56x80_png", "bar_cell_shell_selected_playing_56x80_png" }};
