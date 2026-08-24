@@ -31,7 +31,12 @@ bool hideTestOnlySplashOverlay (juce::Component& parent, juce::Point<int> parent
         if (auto* child = parent.getChildComponent (index); child != nullptr)
         {
             const auto absolute = child->getBounds().translated (parentOrigin.x, parentOrigin.y);
-            if (absolute == splashBounds)
+            // JUCE may round the licensing overlay by a pixel during its
+            // first layout pass.  Match only its confined footer footprint;
+            // no V2 production component occupies this size range.
+            if (absolute.intersects (splashBounds)
+                && child->getWidth() >= 220 && child->getWidth() <= 236
+                && child->getHeight() >= 40 && child->getHeight() <= 48)
             {
                 child->setVisible (false);
                 return true;
