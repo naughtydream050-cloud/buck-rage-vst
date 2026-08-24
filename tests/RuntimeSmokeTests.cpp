@@ -21,16 +21,23 @@ juce::Image render (juce::AudioProcessorEditor& editor)
 {
     juce::Image image (juce::Image::ARGB, 1024, 683, true); juce::Graphics g (image); editor.paintEntireComponent(g, true); return image;
 }
-bool hideTestOnlySplashOverlay (juce::AudioProcessorEditor& editor)
+bool hideTestOnlySplashOverlay (juce::Component& parent, juce::Point<int> parentOrigin = {})
 {
     // JUCE injects its licensing splash as an editor child. It is not part of
     // PluginEditorV2::paint(), so remove it only from this offscreen harness.
+    // It may be nested below the editor, so compare its accumulated bounds.
     const auto splashBounds = juce::Rectangle<int> { 796, 638, 228, 44 };
-    for (int index = 0; index < editor.getNumChildComponents(); ++index)
-        if (auto* child = editor.getChildComponent (index); child != nullptr && child->getBounds() == splashBounds)
+    for (int index = 0; index < parent.getNumChildComponents(); ++index)
+        if (auto* child = parent.getChildComponent (index); child != nullptr)
         {
-            child->setVisible (false);
-            return true;
+            const auto absolute = child->getBounds().translated (parentOrigin.x, parentOrigin.y);
+            if (absolute == splashBounds)
+            {
+                child->setVisible (false);
+                return true;
+            }
+            if (hideTestOnlySplashOverlay (*child, absolute.getPosition()))
+                return true;
         }
     return false;
 }
