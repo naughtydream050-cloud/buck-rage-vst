@@ -122,30 +122,6 @@ bool hasSelectedGoldContamination (const juce::Image& image)
     return false;
 }
 
-bool hasGoldAccent (const juce::Image& image)
-{
-    for (int y = 0; y < image.getHeight(); ++y)
-        for (int x = 0; x < image.getWidth(); ++x)
-        {
-            const auto c = image.getPixelAt (x, y);
-            if (c.getRed() > 105 && c.getGreen() > 75 && c.getBlue() < 90
-                && c.getRed() > c.getGreen() * 1.10f)
-                return true;
-        }
-    return false;
-}
-
-bool hasRedAccent (const juce::Image& image)
-{
-    for (int y = 0; y < image.getHeight(); ++y)
-        for (int x = 0; x < image.getWidth(); ++x)
-        {
-            const auto c = image.getPixelAt (x, y);
-            if (c.getRed() > 135 && c.getGreen() < 100 && c.getBlue() < 100)
-                return true;
-        }
-    return false;
-}
 }
 
 int main()
