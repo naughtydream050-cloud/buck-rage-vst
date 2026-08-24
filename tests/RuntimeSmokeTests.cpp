@@ -21,6 +21,19 @@ juce::Image render (juce::AudioProcessorEditor& editor)
 {
     juce::Image image (juce::Image::ARGB, 1024, 683, true); juce::Graphics g (image); editor.paintEntireComponent(g, true); return image;
 }
+bool hideTestOnlySplashOverlay (juce::AudioProcessorEditor& editor)
+{
+    // JUCE injects its licensing splash as an editor child. It is not part of
+    // PluginEditorV2::paint(), so remove it only from this offscreen harness.
+    const auto splashBounds = juce::Rectangle<int> { 796, 638, 228, 44 };
+    for (int index = 0; index < editor.getNumChildComponents(); ++index)
+        if (auto* child = editor.getChildComponent (index); child != nullptr && child->getBounds() == splashBounds)
+        {
+            child->setVisible (false);
+            return true;
+        }
+    return false;
+}
 bool different (const juce::Image& a, const juce::Image& b)
 {
     for (int y=0;y<a.getHeight();++y) for (int x=0;x<a.getWidth();++x) if(a.getPixelAt(x,y)!=b.getPixelAt(x,y)) return true;
@@ -255,9 +268,7 @@ int main()
     juce::ScopedJuceInitialiser_GUI gui; bool pass=true;
     pass &= check(resourceIs("finalmasterreference1024x683_png",1024,683),"v2-static-background-native");
     pass &= check(resourceIs("knob_ring_60_png",48,48) && resourceIs("knob_pointer_60_png",48,48),"v2-knob-assets-native");
-    pass &= check(resourceIs("xy_neutral_base_288x256_png",192,174),"v2-xy-native");
     pass &= check(resourceIs("bypass_off_png",80,31) && resourceIs("bypass_on_png",80,31),"v2-bypass-native");
-    pass &= check(resourceIs("rec_normal_png",59,23) && resourceIs("clear_normal_png",59,23) && resourceIs("reset_view_normal_png",82,23),"v2-xy-buttons-native");
     const std::array<const char*, 4> shellResources {{ "bar_cell_shell_normal_56x80_png", "bar_cell_shell_selected_56x80_png", "bar_cell_shell_playing_56x80_png", "bar_cell_shell_selected_playing_56x80_png" }};
     for (const auto* resource : shellResources)
         pass &= check (resourceIs (resource, 56, 80), "v2-bar-shell-native");
@@ -281,6 +292,7 @@ int main()
     std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
     pass &= check(editor != nullptr && editor->getWidth()==1024 && editor->getHeight()==683,"v2-editor-native-1024");
     if(!editor) return 1;
+    pass &= check (hideTestOnlySplashOverlay (*editor), "v2-offscreen-test-splash-excluded");
     auto* v2 = dynamic_cast<ToyotomiHideyoshiAudioProcessorEditorV2*> (editor.get());
     pass &= check(v2 != nullptr && v2->hasValidBarMapAssets(), "v2-editor-bar-map-asset-contract");
     const auto visualManifest = jsonResource ("visual_acceptance_manifest_json");
@@ -336,10 +348,10 @@ int main()
     pass &= check (cropMatchesResource (defaultImage, { 750, 100, 84, 64 }, "preset_off_selected_png")
                 && cropMatchesResource (defaultImage, { 924, 100, 84, 64 }, "preset_backspin_normal_png"),
                    "v2-default-off-selected-backspin-neutral");
-    // The V2 neutral source is the complete supplied panel; it owns the
-    // static REC/CLEAR/RESET visuals and is drawn once at native size.
-    pass &= check (cropMatchesResource (defaultImage, { 40, 429, 192, 174 }, "xy_neutral_base_288x256_png"),
-                   "v2-xy-restored-panel-drawn-once");
+    // FINAL MASTER owns the static XY panel and its control visuals; V2 adds
+    // neither a second base nor second REC/CLEAR/RESET images.
+    pass &= check (! cropsDiffer (defaultImage, visualReference, { 14, 416, 232, 200 }),
+                   "v2-xy-static-panel-owned-by-final-master");
 
     state.setSlotPreset (0, PluginStateModel::ScratchPreset::forwardCut);
     const auto forwardCutPreview = render (*editor);
