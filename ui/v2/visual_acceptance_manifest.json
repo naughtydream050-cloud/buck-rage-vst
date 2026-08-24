@@ -1,0 +1,31 @@
+{
+  "reference": {
+    "file": "Resources/ui-v2/reference/final-master-reference-1024x683.png",
+    "native_size": [1024, 683],
+    "source": "Resources/ui-v2/source/final-master-ui.jpg",
+    "normalization": "offline 1280x853 to 1024x683; runtime scale is 1.0"
+  },
+  "regions": [
+    { "name": "HEADER",      "bounds": [0, 0, 1024, 72],   "dynamic_region": false, "accepted_variance": "none" },
+    { "name": "BAR_TABS",    "bounds": [251, 74, 434, 27], "dynamic_region": true,  "accepted_variance": "selected-tab image only" },
+    { "name": "BAR_MAP",     "bounds": [259, 137, 467, 164], "dynamic_region": true, "accepted_variance": "cell shell, label, mini preview and playhead" },
+    { "name": "PRESET",      "bounds": [750, 100, 258, 252], "dynamic_region": true, "accepted_variance": "one selected preset image" },
+    { "name": "XY",          "bounds": [27, 429, 214, 194], "dynamic_region": true, "accepted_variance": "motion trace and buttons" },
+    { "name": "QUOTE_PANEL", "bounds": [268, 337, 409, 288], "dynamic_region": false, "accepted_variance": "none" },
+    { "name": "LENGTH",      "bounds": [742, 425, 154, 26], "dynamic_region": true, "accepted_variance": "one selected length image" },
+    { "name": "SPEED",       "bounds": [742, 513, 48, 66], "dynamic_region": true, "accepted_variance": "pointer and numeric readout" },
+    { "name": "PITCH",       "bounds": [793, 513, 48, 66], "dynamic_region": true, "accepted_variance": "pointer and numeric readout" },
+    { "name": "DEPTH",       "bounds": [848, 513, 48, 66], "dynamic_region": true, "accepted_variance": "pointer and numeric readout" },
+    { "name": "BYPASS",      "bounds": [931, 14, 80, 31], "dynamic_region": true, "accepted_variance": "toggle state" },
+    { "name": "OUTPUT",      "bounds": [910, 370, 98, 255], "dynamic_region": true, "accepted_variance": "meter fill and readout" },
+    { "name": "FOOTER",      "bounds": [0, 638, 1024, 45], "dynamic_region": false, "accepted_variance": "none" }
+  ],
+  "interactive": [
+    { "id":"tab_1_16", "bounds":[251,74,105,27] }, { "id":"tab_17_32", "bounds":[360,74,105,27] }, { "id":"tab_33_48", "bounds":[470,74,106,27] }, { "id":"tab_49_64", "bounds":[580,74,105,27] },
+    { "id":"bar_01", "bounds":[259,137,56,80] }, { "id":"bar_02", "bounds":[317,137,56,80] }, { "id":"bar_03", "bounds":[378,137,56,80] }, { "id":"bar_04", "bounds":[437,137,56,80] }, { "id":"bar_05", "bounds":[494,137,56,80] }, { "id":"bar_06", "bounds":[553,137,56,80] }, { "id":"bar_07", "bounds":[611,137,56,80] }, { "id":"bar_08", "bounds":[670,137,56,80] },
+    { "id":"bar_09", "bounds":[259,221,56,80] }, { "id":"bar_10", "bounds":[317,221,56,80] }, { "id":"bar_11", "bounds":[378,221,56,80] }, { "id":"bar_12", "bounds":[437,221,56,80] }, { "id":"bar_13", "bounds":[494,221,56,80] }, { "id":"bar_14", "bounds":[553,221,56,80] }, { "id":"bar_15", "bounds":[611,221,56,80] }, { "id":"bar_16", "bounds":[670,221,56,80] },
+    { "id":"preset_off", "bounds":[750,100,84,64] }, { "id":"preset_forward_cut", "bounds":[836,100,84,64] }, { "id":"preset_backspin", "bounds":[924,100,84,64] }, { "id":"preset_chirp", "bounds":[750,166,84,64] }, { "id":"preset_baby", "bounds":[836,166,84,64] }, { "id":"preset_transform", "bounds":[924,166,84,64] }, { "id":"preset_drag", "bounds":[750,232,84,64] }, { "id":"preset_zigzag", "bounds":[836,232,84,64] }, { "id":"preset_tape_brake", "bounds":[924,232,84,64] }, { "id":"preset_custom", "bounds":[750,296,84,56] },
+    { "id":"length_1_16", "bounds":[742,425,32,26] }, { "id":"length_1_8", "bounds":[773,425,32,26] }, { "id":"length_1_4", "bounds":[803,425,32,26] }, { "id":"length_1_2", "bounds":[834,425,32,26] }, { "id":"length_1_bar", "bounds":[864,425,32,26] },
+    { "id":"bypass", "bounds":[931,14,80,31] }, { "id":"rec", "bounds":[27,600,59,23] }, { "id":"clear", "bounds":[95,600,59,23] }, { "id":"reset_view", "bounds":[159,600,82,23] }
+  ]
+}

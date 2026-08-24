@@ -1,5 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditorV2.h"
+#include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <memory>
 
@@ -122,6 +124,129 @@ bool hasSelectedGoldContamination (const juce::Image& image)
     return false;
 }
 
+juce::var jsonResource (const char* name)
+{
+   #if __has_include(<BinaryData.h>)
+    int bytes = 0;
+    const auto* data = BinaryData::getNamedResource (name, bytes);
+    return data != nullptr ? juce::JSON::parse (juce::String::fromUTF8 (data, bytes)) : juce::var {};
+   #else
+    juce::ignoreUnused (name); return {};
+   #endif
+}
+
+juce::var jsonProperty (const juce::var& object, const char* key)
+{
+    if (const auto* dynamic = object.getDynamicObject()) return dynamic->getProperty (juce::Identifier (key));
+    return {};
+}
+
+juce::Rectangle<int> jsonBounds (const juce::var& value)
+{
+    if (const auto* array = value.getArray(); array != nullptr && array->size() == 4)
+        return { (int) array->getReference (0), (int) array->getReference (1),
+                 (int) array->getReference (2), (int) array->getReference (3) };
+    return {};
+}
+
+struct DiffStats { int differing = 0, maxChannelError = 0; double mae = 0.0; juce::Rectangle<int> mismatchBounds; };
+
+DiffStats diffImages (const juce::Image& actual, const juce::Image& reference, juce::Rectangle<int> bounds,
+                      const juce::Image* dynamicMask = nullptr)
+{
+    DiffStats stats; auto first = true; uint64_t total = 0; int samples = 0;
+    for (int y = bounds.getY(); y < bounds.getBottom(); ++y)
+        for (int x = bounds.getX(); x < bounds.getRight(); ++x)
+        {
+            if (dynamicMask != nullptr && dynamicMask->getPixelAt (x, y).getAlpha() != 0) continue;
+            const auto a = actual.getPixelAt (x, y), b = reference.getPixelAt (x, y);
+            const int dr = std::abs ((int) a.getRed() - (int) b.getRed());
+            const int dg = std::abs ((int) a.getGreen() - (int) b.getGreen());
+            const int db = std::abs ((int) a.getBlue() - (int) b.getBlue());
+            const int maximum = std::max ({ dr, dg, db });
+            total += (uint64_t) dr + (uint64_t) dg + (uint64_t) db; samples += 3;
+            stats.maxChannelError = std::max (stats.maxChannelError, maximum);
+            if (maximum > 8)
+            {
+                ++stats.differing;
+                const juce::Rectangle<int> pixel { x, y, 1, 1 };
+                stats.mismatchBounds = first ? pixel : stats.mismatchBounds.getUnion (pixel);
+                first = false;
+            }
+        }
+    stats.mae = samples == 0 ? 0.0 : (double) total / (double) samples;
+    return stats;
+}
+
+juce::Image makeDynamicMask (const juce::var& regions)
+{
+    juce::Image mask (juce::Image::ARGB, 1024, 683, true); juce::Graphics g (mask);
+    if (const auto* array = regions.getArray())
+        for (const auto& region : *array)
+            if ((bool) jsonProperty (region, "dynamic_region"))
+            {
+                g.setColour (juce::Colours::white);
+                g.fillRect (jsonBounds (jsonProperty (region, "bounds")));
+            }
+    return mask;
+}
+
+juce::Image makeDiffImage (const juce::Image& actual, const juce::Image& reference)
+{
+    juce::Image diff (juce::Image::ARGB, 1024, 683, true);
+    for (int y = 0; y < 683; ++y) for (int x = 0; x < 1024; ++x)
+    {
+        const auto a = actual.getPixelAt (x, y), b = reference.getPixelAt (x, y);
+        const int error = std::max ({ std::abs ((int) a.getRed() - (int) b.getRed()),
+                                     std::abs ((int) a.getGreen() - (int) b.getGreen()),
+                                     std::abs ((int) a.getBlue() - (int) b.getBlue()) });
+        diff.setPixelAt (x, y, error > 8 ? juce::Colour::fromRGB ((uint8) std::min (255, error * 2), 0, 0)
+                                      : juce::Colour (0x00000000));
+    }
+    return diff;
+}
+
+void writeVisualReport (const juce::var& regions, const juce::Image& actual, const juce::Image& reference,
+                        const juce::Image& mask, const DiffStats& full, const DiffStats& staticOnly)
+{
+    juce::Array<juce::var> reportRegions;
+    if (const auto* array = regions.getArray())
+        for (const auto& region : *array)
+        {
+            const auto bounds = jsonBounds (jsonProperty (region, "bounds"));
+            const auto dynamic = (bool) jsonProperty (region, "dynamic_region");
+            const auto stats = diffImages (actual, reference, bounds, dynamic ? nullptr : &mask);
+            auto* object = new juce::DynamicObject();
+            object->setProperty ("name", jsonProperty (region, "name"));
+            object->setProperty ("bounds", jsonProperty (region, "bounds"));
+            object->setProperty ("dynamic_region", dynamic);
+            object->setProperty ("accepted_variance", jsonProperty (region, "accepted_variance"));
+            object->setProperty ("differing_pixel_count", stats.differing);
+            object->setProperty ("differing_pixel_ratio", bounds.isEmpty() ? 0.0 : (double) stats.differing / (double) bounds.getArea());
+            object->setProperty ("mae", stats.mae);
+            object->setProperty ("max_channel_error", stats.maxChannelError);
+            object->setProperty ("mismatch_bounds", juce::Array<juce::var> { stats.mismatchBounds.getX(), stats.mismatchBounds.getY(), stats.mismatchBounds.getWidth(), stats.mismatchBounds.getHeight() });
+            object->setProperty ("status", dynamic ? "DYNAMIC_REVIEW" : (stats.differing == 0 ? "PASS" : "FAIL"));
+            reportRegions.add (juce::var (object));
+        }
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("canvas", juce::Array<juce::var> { 1024, 683 });
+    root->setProperty ("pixel_threshold", 8);
+    root->setProperty ("full_screen", juce::var (new juce::DynamicObject()));
+    root->setProperty ("static_only", juce::var (new juce::DynamicObject()));
+    auto writeStats = [&] (const char* key, const DiffStats& stats)
+    {
+        const auto value = root->getProperty (key); auto* object = value.getDynamicObject();
+        object->setProperty ("differing_pixel_count", stats.differing);
+        object->setProperty ("differing_pixel_ratio", (double) stats.differing / (1024.0 * 683.0));
+        object->setProperty ("mae", stats.mae); object->setProperty ("max_channel_error", stats.maxChannelError);
+        object->setProperty ("mismatch_bounds", juce::Array<juce::var> { stats.mismatchBounds.getX(), stats.mismatchBounds.getY(), stats.mismatchBounds.getWidth(), stats.mismatchBounds.getHeight() });
+    };
+    writeStats ("full_screen", full); writeStats ("static_only", staticOnly);
+    root->setProperty ("regions", reportRegions);
+    juce::File::getCurrentWorkingDirectory().getChildFile ("v2-visual-acceptance-report.json").replaceWithText (juce::JSON::toString (juce::var (root), true));
+}
+
 }
 
 int main()
@@ -155,9 +280,42 @@ int main()
     std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
     pass &= check(editor != nullptr && editor->getWidth()==1024 && editor->getHeight()==683,"v2-editor-native-1024");
     if(!editor) return 1;
-    const auto* v2 = dynamic_cast<ToyotomiHideyoshiAudioProcessorEditorV2*> (editor.get());
+    auto* v2 = dynamic_cast<ToyotomiHideyoshiAudioProcessorEditorV2*> (editor.get());
     pass &= check(v2 != nullptr && v2->hasValidBarMapAssets(), "v2-editor-bar-map-asset-contract");
-    auto& state=processor.getStateModel(); auto defaultImage=render(*editor); pass &= check(png(defaultImage,"v2-default-stop.png"),"v2-default-render");
+    const auto visualManifest = jsonResource ("visual_acceptance_manifest_json");
+    const auto visualRegions = jsonProperty (visualManifest, "regions");
+    const auto visualInteractive = jsonProperty (visualManifest, "interactive").getArray();
+    const auto visualReference = resourceImage ("finalmasterreference1024x683_png");
+    pass &= check (visualManifest.getDynamicObject() != nullptr && visualRegions.getArray() != nullptr
+                && visualInteractive != nullptr && visualInteractive->size() == 39
+                && visualReference.isValid() && visualReference.getWidth() == 1024 && visualReference.getHeight() == 683,
+                   "v2-visual-acceptance-reference-and-manifest");
+    pass &= check (v2 != nullptr && v2->validateInteractiveBounds(), "v2-visual-hit-bounds-match-manifest");
+    auto& state=processor.getStateModel();
+    state.selectTab (0); state.selectBar (0); state.setSlotPreset (0, PluginStateModel::ScratchPreset::off);
+    state.setSelectedLength ((PluginStateModel::NoteLength) 0); state.setBypass (false); state.clearSelectedMotion();
+    state.setSlotSpeed (0, 1.0f); state.setSlotPitch (0, 0.0f); state.setSlotDepth (0, 0.5f);
+    auto defaultImage=render(*editor); pass &= check(png(defaultImage,"v2-default-stop.png") && png(defaultImage,"v2-full-default-actual.png"),"v2-default-render");
+    pass &= check (png (visualReference, "v2-full-default-reference.png"), "v2-visual-reference-export");
+    const auto dynamicMask = makeDynamicMask (visualRegions);
+    const auto fullDiff = diffImages (defaultImage, visualReference, { 0, 0, 1024, 683 });
+    const auto staticDiff = diffImages (defaultImage, visualReference, { 0, 0, 1024, 683 }, &dynamicMask);
+    pass &= check (png (makeDiffImage (defaultImage, visualReference), "v2-full-default-diff.png")
+                && png (dynamicMask, "v2-full-default-mask.png"), "v2-visual-diff-and-mask-export");
+    writeVisualReport (visualRegions, defaultImage, visualReference, dynamicMask, fullDiff, staticDiff);
+    // The master contains a documented non-default example state.  Dynamic
+    // regions are reported, not silently ignored; only static visual drift is
+    // a visual-acceptance failure for the default comparison.
+    pass &= check (staticDiff.differing == 0, "v2-visual-static-reference-match");
+    if (v2 != nullptr && visualInteractive != nullptr)
+    {
+        bool centresReachHitRegions = true;
+        for (const auto& item : *visualInteractive)
+            centresReachHitRegions &= v2->debugClickAt (jsonBounds (jsonProperty (item, "bounds")).getCentre());
+        pass &= check (centresReachHitRegions, "v2-visual-centre-click-hits-every-image-control");
+        state.selectTab (0); state.selectBar (0); state.setSlotPreset (0, PluginStateModel::ScratchPreset::off);
+        state.setSelectedLength ((PluginStateModel::NoteLength) 0); state.setBypass (false); state.clearSelectedMotion();
+    }
     pass &= check(processor.getCurrentTimelineSlot()==-1,"v2-stop-has-no-playhead");
     // This checks the actual editor paint result, not merely BinaryData decode:
     // BAR cells may never regress to the black holes in the static faceplate.
@@ -184,7 +342,8 @@ int main()
     {
         state.selectTab (tab);
         auto image = render (*editor);
-        pass &= check (png (image, "v2-tab-" + juce::String (tab + 1) + ".png"), "v2-tab-render");
+        pass &= check (png (image, "v2-tab-" + juce::String (tab + 1) + ".png")
+                    && png (image, "v2-full-tab-" + juce::String (tab + 1) + ".png"), "v2-tab-render");
         for (int cell = 0; cell < 16; ++cell)
         {
             const auto bounds = juce::Rectangle<int> { cellX[(size_t) (cell % 8)], cell < 8 ? 137 : 221, 56, 80 };
@@ -211,7 +370,7 @@ int main()
     state.selectTab (0);
     state.selectBar (0);
     auto playing = render (*editor);
-    pass &= check (png (playing, "v2-bar-playing-separated.png"), "v2-playing-render");
+    pass &= check (png (playing, "v2-bar-playing-separated.png") && png (playing, "v2-full-bar-playing.png"), "v2-playing-render");
     pass &= check(processor.getCurrentTimelineSlot() == 5
                && cropsDiffer (defaultImage, playing, {553,137,56,80})
                && cropHasVisibleCellContent (playing, {259,137,56,80})
@@ -220,7 +379,7 @@ int main()
     processor.processBlock (audio, midi);
     state.selectBar (10);
     auto selectedPlaying = render (*editor);
-    pass &= check (png (selectedPlaying, "v2-bar-selected-playing.png"), "v2-selected-playing-render");
+    pass &= check (png (selectedPlaying, "v2-bar-selected-playing.png") && png (selectedPlaying, "v2-full-bar-selected-playing.png"), "v2-selected-playing-render");
     pass &= check(processor.getCurrentTimelineSlot() == 10
                && cropHasVisibleCellContent (selectedPlaying,{378,221,56,80})
                && cropsDiffer (playing, selectedPlaying, {378,221,56,80}), "v2-selected-playing-single-state-image");
@@ -232,9 +391,9 @@ int main()
     pass &= check(processor.getCurrentTimelineSlot() == -1 && noPlayingRed(stopped), "v2-stop-clears-all-playing-red");
     processor.setPlayHead (nullptr);
     state.selectTab(0); state.selectBar(10); auto selected=render(*editor); pass &= check(png(selected,"v2-bar-selected.png"),"v2-bar-selected-render");
-    state.selectBar(0); for(int p=0;p<10;++p){state.setSelectedPreset((PluginStateModel::ScratchPreset)p);auto image=render(*editor);pass &= check(png(image,"v2-preset-"+juce::String(p)+".png"),"v2-preset-render");pass &= check(state.getSlot(0).preset==(PluginStateModel::ScratchPreset)p,"v2-preset-single-source");}
-    for(int l=0;l<5;++l){state.setSelectedLength((PluginStateModel::NoteLength)l);auto image=render(*editor);pass &=check(png(image,"v2-length-"+juce::String(l)+".png"),"v2-length-render");}
-    const auto bypassBefore=state.getUiState().bypass; state.setSelectedPreset(PluginStateModel::ScratchPreset::custom);state.setBypass(!bypassBefore);pass &=check(state.getSlot(0).preset==PluginStateModel::ScratchPreset::custom,"v2-bypass-preset-isolation");
+    state.selectBar(0); for(int p=0;p<10;++p){state.setSelectedPreset((PluginStateModel::ScratchPreset)p);auto image=render(*editor);pass &= check(png(image,"v2-preset-"+juce::String(p)+".png") && png(image,"v2-full-preset-"+juce::String(p)+".png"),"v2-preset-render");pass &= check(state.getSlot(0).preset==(PluginStateModel::ScratchPreset)p,"v2-preset-single-source");}
+    for(int l=0;l<5;++l){state.setSelectedLength((PluginStateModel::NoteLength)l);auto image=render(*editor);pass &=check(png(image,"v2-length-"+juce::String(l)+".png") && png(image,"v2-full-length-"+juce::String(l)+".png"),"v2-length-render");}
+    const auto bypassBefore=state.getUiState().bypass; state.setSelectedPreset(PluginStateModel::ScratchPreset::custom);state.setBypass(!bypassBefore);auto bypassImage=render(*editor);pass &=check(png(bypassImage,"v2-full-bypass-on.png") && state.getSlot(0).preset==PluginStateModel::ScratchPreset::custom,"v2-bypass-preset-isolation");
     state.setSlotSpeed(0,PluginStateModel::kMinSpeed);state.setSlotPitch(0,PluginStateModel::kMinPitch);state.setSlotDepth(0,0.f);auto min=render(*editor);state.setSlotSpeed(0,PluginStateModel::kMaxSpeed);state.setSlotPitch(0,PluginStateModel::kMaxPitch);state.setSlotDepth(0,1.f);auto max=render(*editor);pass &=check(different(min,max) && png(min,"v2-knobs-min.png") && png(max,"v2-knobs-max.png"),"v2-knob-min-max-render");
     editor.reset(); processor.releaseResources(); return pass ? 0 : 1;
 }

@@ -130,6 +130,21 @@ jobs:
           "exit_code=$testExit" >> $env:GITHUB_OUTPUT
           exit 0
 
+      - name: Verify V2 renderer exclusivity
+        if: always()
+        shell: pwsh
+        run: |
+          $cmake = Get-Content -LiteralPath 'CMakeLists.txt' -Raw
+          $forbidden = @('Source/PluginEditor.cpp', 'Source/UIComponents.cpp')
+          $found = @($forbidden | Where-Object { $cmake.Contains($_) })
+          $result = [ordered]@{
+            editor = 'PluginEditorV2'
+            forbidden_production_sources = $found
+            status = if ($found.Count -eq 0) { 'PASS' } else { 'FAIL' }
+          } | ConvertTo-Json
+          Set-Content -LiteralPath 'v2-renderer-exclusivity.json' -Value $result -Encoding utf8
+          if ($found.Count -ne 0) { throw "Retired UI source remains in production target: $($found -join ', ')" }
+
       - name: Upload test diagnostics and BAR MAP render previews
         if: always()
         uses: actions/upload-artifact@v4
@@ -146,6 +161,9 @@ jobs:
             toyotomi-bar-labels-*.png
             toyotomi-bar-waveform-*.png
             v2-*.png
+            v2-*.json
+            ui/v2/runtime-manifest.json
+            ui/v2/visual_acceptance_manifest.json
             SOURCE_HEAD.txt
           if-no-files-found: error
 

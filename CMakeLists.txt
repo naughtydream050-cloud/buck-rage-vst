@@ -46,6 +46,8 @@ juce_add_binary_data(ToyotomiHideyoshiAssets
     SOURCES
         ${TOYOTOMI_RUNTIME_1024_ASSETS}
         ui/v2/runtime-manifest.json
+        ui/v2/visual_acceptance_manifest.json
+        Resources/ui-v2/reference/final-master-reference-1024x683.png
 )
 
 target_sources(ToyotomiHideyoshi PRIVATE

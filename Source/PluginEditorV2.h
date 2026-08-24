@@ -16,6 +16,8 @@ public:
     // BAR MAP owns the alpha-cut-out region of the faceplate. Keep its asset
     // contract independently observable by the smoke test.
     bool hasValidBarMapAssets() const;
+    bool validateInteractiveBounds() const;
+    bool debugClickAt (juce::Point<int> point);
 
 private:
     class Surface;

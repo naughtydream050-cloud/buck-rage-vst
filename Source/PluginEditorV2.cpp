@@ -210,6 +210,12 @@ class ToyotomiHideyoshiAudioProcessorEditorV2::HitRegion final : public juce::Co
 public:
     explicit HitRegion (std::function<void()> callback) : fn (std::move (callback)) { setOpaque (false); }
     void mouseDown (const juce::MouseEvent&) override { if (fn) fn(); }
+    bool activateAt (juce::Point<int> point)
+    {
+        if (! getBounds().contains (point)) return false;
+        if (fn) fn();
+        return true;
+    }
 private:
     std::function<void()> fn;
 };
@@ -374,6 +380,31 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
 }
 
 bool ToyotomiHideyoshiAudioProcessorEditorV2::hasValidBarMapAssets() const { return surface != nullptr && surface->barMapAssetsReady(); }
+bool ToyotomiHideyoshiAudioProcessorEditorV2::validateInteractiveBounds() const
+{
+    std::vector<juce::Rectangle<int>> expected;
+    expected.insert (expected.end(), kTabs.begin(), kTabs.end());
+    for (int index = 0; index < 16; ++index) expected.push_back (cellBounds (index));
+    expected.insert (expected.end(), kPresets.begin(), kPresets.end());
+    expected.insert (expected.end(), kLengths.begin(), kLengths.end());
+    expected.push_back ({ 931, 14, 80, 31 });
+    expected.push_back ({ 27, 600, 59, 23 });
+    expected.push_back ({ 95, 600, 59, 23 });
+    expected.push_back ({ 159, 600, 82, 23 });
+    if ((int) hitRegions.size() != (int) expected.size()) return false;
+    for (int index = 0; index < (int) expected.size(); ++index)
+        if (hitRegions[index]->getBounds() != expected[(size_t) index]) return false;
+    return knobs[0]->getBounds() == kKnobs[0]
+        && knobs[1]->getBounds() == kKnobs[1]
+        && knobs[2]->getBounds() == kKnobs[2]
+        && xyInput->getBounds() == juce::Rectangle<int> { 40, 429, 192, 174 };
+}
+bool ToyotomiHideyoshiAudioProcessorEditorV2::debugClickAt (juce::Point<int> point)
+{
+    for (auto* hit : hitRegions)
+        if (hit->activateAt (point)) return true;
+    return false;
+}
 void ToyotomiHideyoshiAudioProcessorEditorV2::paint (juce::Graphics& g) { juce::ignoreUnused (g); }
 void ToyotomiHideyoshiAudioProcessorEditorV2::resized() { surface->setBounds (getLocalBounds()); }
 void ToyotomiHideyoshiAudioProcessorEditorV2::timerCallback() { surface->repaint(); }
