@@ -299,6 +299,9 @@ int main()
     std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
     pass &= check(editor != nullptr && editor->getWidth()==1024 && editor->getHeight()==683,"v2-editor-native-1024");
     if(!editor) return 1;
+    // The JUCE splash is laid out on its first paint. Prime that test-only
+    // lifecycle step before excluding the child from diagnostic rendering.
+    juce::ignoreUnused (render (*editor));
     pass &= check (hideTestOnlySplashOverlay (*editor), "v2-offscreen-test-splash-excluded");
     auto* v2 = dynamic_cast<ToyotomiHideyoshiAudioProcessorEditorV2*> (editor.get());
     pass &= check(v2 != nullptr && v2->hasValidBarMapAssets(), "v2-editor-bar-map-asset-contract");
