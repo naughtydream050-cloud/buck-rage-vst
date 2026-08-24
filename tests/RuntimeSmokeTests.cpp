@@ -26,17 +26,14 @@ bool hideTestOnlySplashOverlay (juce::Component& parent, juce::Point<int> parent
     // JUCE injects its licensing splash as an editor child. It is not part of
     // PluginEditorV2::paint(), so remove it only from this offscreen harness.
     // It may be nested below the editor, so compare its accumulated bounds.
-    const auto splashBounds = juce::Rectangle<int> { 796, 638, 228, 44 };
+    // JUCE 7 places its splash component in the bottom-right 3x logo area.
+    // The visible logo is smaller, but this is the component's actual bounds.
+    const auto splashBounds = juce::Rectangle<int> { 655, 494, 369, 189 };
     for (int index = 0; index < parent.getNumChildComponents(); ++index)
         if (auto* child = parent.getChildComponent (index); child != nullptr)
         {
             const auto absolute = child->getBounds().translated (parentOrigin.x, parentOrigin.y);
-            // JUCE may round the licensing overlay by a pixel during its
-            // first layout pass.  Match only its confined footer footprint;
-            // no V2 production component occupies this size range.
-            if (absolute.intersects (splashBounds)
-                && child->getWidth() >= 220 && child->getWidth() <= 236
-                && child->getHeight() >= 40 && child->getHeight() <= 48)
+            if (absolute == splashBounds)
             {
                 child->setVisible (false);
                 return true;
