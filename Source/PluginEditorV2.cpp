@@ -97,7 +97,7 @@ enum CellState { normalState, selectedState, playingState, selectedPlayingState 
 // a failed resource can no longer silently expose the black hole behind it.
 struct V2AssetCatalog final
 {
-    juce::Image background, ring, pointer, xy, bypassOff, bypassOn, rec, clear, reset;
+    juce::Image background, ring, pointer, xy, bypassOff, bypassOn;
     std::array<std::array<juce::Image, 2>, 4> tabs;
     std::array<juce::Image, 4> barShells;
     std::array<juce::Image, 64> barLabels;
@@ -197,10 +197,7 @@ struct V2AssetCatalog final
         load (pointer,   "knob_pointer_60.png",          kKnobs[0]);
         load (bypassOff, "bypass_off.png",               { 931, 14, 80, 31 });
         load (bypassOn,  "bypass_on.png",                { 931, 14, 80, 31 });
-        load (xy,        "xy_neutral_base_288x256.png",  { 40, 429, 192, 174 });
-        load (rec,       "rec_normal.png",               { 27, 600, 59, 23 });
-        load (clear,     "clear_normal.png",             { 95, 600, 59, 23 });
-        load (reset,     "reset_view_normal.png",        { 159, 600, 82, 23 });
+        load (xy,        "xy_neutral_base_288x256.png",  { 14, 416, 232, 200 });
     }
 };
 }
@@ -299,10 +296,9 @@ public:
             drawNative (g, assets.lengths[(size_t) index][index == (int) slot.length ? 1 : 0], kLengths[(size_t) index]);
 
         drawNative (g, ui.bypass ? assets.bypassOn : assets.bypassOff, { 931, 14, 80, 31 });
-        drawNative (g, assets.xy, { 40, 429, 192, 174 });
-        drawNative (g, assets.rec, { 27, 600, 59, 23 });
-        drawNative (g, assets.clear, { 95, 600, 59, 23 });
-        drawNative (g, assets.reset, { 159, 600, 82, 23 });
+        // The restored, known-good XY panel is one supplied image. It already
+        // contains the static REC/CLEAR/RESET visuals; only its trace is live.
+        drawNative (g, assets.xy, { 14, 416, 232, 200 });
 
         const std::array<float, 3> normalized {{ (slot.speed - .25f) / 3.75f, (slot.pitch + 12.0f) / 24.0f, slot.depth }};
         const std::array<juce::String, 3> text {{ juce::String (slot.speed, 2) + "x", juce::String (slot.pitch, 1) + " st", juce::String (juce::roundToInt (slot.depth * 100.0f)) + " %" }};
@@ -328,11 +324,11 @@ public:
             for (size_t index = 0; index < slot.motion.size(); ++index)
             {
                 const auto point = slot.motion[index];
-                const auto location = juce::Point<float> (40.0f + point.x * 192.0f, 429.0f + point.y * 174.0f);
+                const auto location = juce::Point<float> (38.0f + point.x * 195.0f, 438.0f + point.y * 141.0f);
                 if (index == 0) trace.startNewSubPath (location); else trace.lineTo (location);
             }
             g.saveState();
-            g.reduceClipRegion ({ 40, 429, 192, 174 });
+            g.reduceClipRegion ({ 38, 438, 195, 141 });
             g.setColour (juce::Colour (0xffd6a446));
             g.strokePath (trace, juce::PathStrokeType (1.5f));
             g.restoreState();
@@ -360,9 +356,9 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
     for (int index = 0; index < 5; ++index)
         addImageHit (kLengths[(size_t) index], [this, index] { processor.getStateModel().setSelectedLength ((PluginStateModel::NoteLength) index); });
     addImageHit ({ 931, 14, 80, 31 }, [this] { auto& state = processor.getStateModel(); state.setBypass (! state.getUiState().bypass); });
-    addImageHit ({ 27, 600, 59, 23 }, [] {});
-    addImageHit ({ 95, 600, 59, 23 }, [this] { processor.getStateModel().clearSelectedMotion(); });
-    addImageHit ({ 159, 600, 82, 23 }, [this] { processor.getStateModel().resetSelectedSlot(); });
+    addImageHit ({ 27, 591, 59, 23 }, [] {});
+    addImageHit ({ 95, 591, 59, 23 }, [this] { processor.getStateModel().clearSelectedMotion(); });
+    addImageHit ({ 159, 591, 82, 23 }, [this] { processor.getStateModel().resetSelectedSlot(); });
 
     for (int index = 0; index < 3; ++index)
     {
@@ -372,7 +368,7 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
     }
     xyInput = std::make_unique<XYRegion> (processor);
     addAndMakeVisible (*xyInput);
-    xyInput->setBounds ({ 40, 429, 192, 174 });
+    xyInput->setBounds ({ 38, 438, 195, 141 });
 
     setResizable (false, false);
     setSize (kW, kH);
@@ -388,16 +384,16 @@ bool ToyotomiHideyoshiAudioProcessorEditorV2::validateInteractiveBounds() const
     expected.insert (expected.end(), kPresets.begin(), kPresets.end());
     expected.insert (expected.end(), kLengths.begin(), kLengths.end());
     expected.push_back ({ 931, 14, 80, 31 });
-    expected.push_back ({ 27, 600, 59, 23 });
-    expected.push_back ({ 95, 600, 59, 23 });
-    expected.push_back ({ 159, 600, 82, 23 });
+    expected.push_back ({ 27, 591, 59, 23 });
+    expected.push_back ({ 95, 591, 59, 23 });
+    expected.push_back ({ 159, 591, 82, 23 });
     if ((int) hitRegions.size() != (int) expected.size()) return false;
     for (int index = 0; index < (int) expected.size(); ++index)
         if (hitRegions[index]->getBounds() != expected[(size_t) index]) return false;
     return knobs[0]->getBounds() == kKnobs[0]
         && knobs[1]->getBounds() == kKnobs[1]
         && knobs[2]->getBounds() == kKnobs[2]
-        && xyInput->getBounds() == juce::Rectangle<int> { 40, 429, 192, 174 };
+        && xyInput->getBounds() == juce::Rectangle<int> { 38, 438, 195, 141 };
 }
 bool ToyotomiHideyoshiAudioProcessorEditorV2::debugClickAt (juce::Point<int> point)
 {

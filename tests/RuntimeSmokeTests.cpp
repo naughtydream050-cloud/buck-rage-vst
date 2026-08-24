@@ -336,6 +336,10 @@ int main()
     pass &= check (cropMatchesResource (defaultImage, { 750, 100, 84, 64 }, "preset_off_selected_png")
                 && cropMatchesResource (defaultImage, { 924, 100, 84, 64 }, "preset_backspin_normal_png"),
                    "v2-default-off-selected-backspin-neutral");
+    // The restored XY source is a complete supplied panel; a second set of
+    // controls below it would make this exact native crop fail.
+    pass &= check (cropMatchesResource (defaultImage, { 14, 416, 232, 200 }, "xy_neutral_base_288x256_png"),
+                   "v2-xy-restored-panel-drawn-once");
 
     state.setSlotPreset (0, PluginStateModel::ScratchPreset::forwardCut);
     const auto forwardCutPreview = render (*editor);

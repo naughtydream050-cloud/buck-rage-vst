@@ -42,6 +42,13 @@ juce_generate_juce_header(ToyotomiHideyoshi)
 file (GLOB_RECURSE TOYOTOMI_RUNTIME_1024_ASSETS CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-v2/runtime-1024/*.png")
 
+# Restore the last approved full XY panel. It already owns its fixed frame and
+# REC/CLEAR/RESET visuals, so the V2 partial panel must not be embedded too.
+list (REMOVE_ITEM TOYOTOMI_RUNTIME_1024_ASSETS
+    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-v2/runtime-1024/standalone/xy_neutral_base_288x256.png")
+list (APPEND TOYOTOMI_RUNTIME_1024_ASSETS
+    "${CMAKE_CURRENT_LIST_DIR}/Resources/ui-runtime-1024-20260818/xy-buttons/xy_neutral_base_288x256.png")
+
 juce_add_binary_data(ToyotomiHideyoshiAssets
     SOURCES
         ${TOYOTOMI_RUNTIME_1024_ASSETS}
