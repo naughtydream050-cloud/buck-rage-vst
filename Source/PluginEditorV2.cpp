@@ -1,6 +1,7 @@
 #include "PluginEditorV2.h"
 #include <array>
 #include <cmath>
+#include <iostream>
 
 #if __has_include(<BinaryData.h>)
  #include <BinaryData.h>
@@ -110,6 +111,8 @@ struct V2AssetCatalog final
     {
         destination = readAsset (name);
         const auto valid = hasNativeSize (destination, bounds);
+        if (! valid)
+            std::cout << "BAR_MAP_ASSET_LOAD_FAIL name=" << name << " expected=" << bounds.getWidth() << "x" << bounds.getHeight() << '\n';
         barMapValid = barMapValid && valid;
         return valid;
     }
@@ -123,14 +126,17 @@ struct V2AssetCatalog final
         const auto minis = property (barMap, "mini_preset_mapping");
         const auto placements = property (barMap, "placements");
 
-        barMapValid = barMapValid
-                   && bars != nullptr && bars->size() == 64
+        const auto manifestShape = bars != nullptr && bars->size() == 64
                    && nativeSizeIs (property (shells, "normal"), 56, 80)
                    && nativeSizeIs (property (shells, "selected"), 56, 80)
                    && nativeSizeIs (property (shells, "playing"), 56, 80)
                    && nativeSizeIs (property (shells, "selected_playing"), 56, 80)
                    && property (placements, "label").isArray()
                    && property (placements, "mini").isArray();
+        if (! manifestShape)
+            std::cout << "BAR_MAP_MANIFEST_SHAPE_FAIL root=" << (root.getDynamicObject() != nullptr)
+                      << " bars=" << (bars != nullptr ? bars->size() : -1) << '\n';
+        barMapValid = barMapValid && manifestShape;
 
         const std::array<const char*, 4> stateNames {{ "normal", "selected", "playing", "selected_playing" }};
         for (int state = 0; state < 4; ++state)
