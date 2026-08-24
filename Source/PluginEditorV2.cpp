@@ -1,7 +1,6 @@
 #include "PluginEditorV2.h"
 #include <array>
 #include <cmath>
-#include <iostream>
 
 #if __has_include(<BinaryData.h>)
  #include <BinaryData.h>
@@ -25,7 +24,13 @@ const std::array<const char*, 4> kTabNames {{"1_16","17_32","33_48","49_64"}};
 
 juce::String resourceName (juce::String filename)
 {
-    return juce::File (filename).getFileName().replaceCharacters (".- ", "___");
+    // Keep this exactly aligned with JUCE's makeBinaryDataIdentifierName():
+    // dots/spaces become underscores and every other non-identifier character
+    // (including '-') is removed.  In particular, runtime-manifest.json is
+    // registered as runtimemanifest_json, not runtime_manifest_json.
+    return juce::File (filename).getFileName()
+        .replaceCharacters (" .", "__")
+        .retainCharacters ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_0123456789");
 }
 
 juce::Image readAsset (const juce::String& filename)
@@ -111,8 +116,6 @@ struct V2AssetCatalog final
     {
         destination = readAsset (name);
         const auto valid = hasNativeSize (destination, bounds);
-        if (! valid)
-            std::cout << "BAR_MAP_ASSET_LOAD_FAIL name=" << name << " expected=" << bounds.getWidth() << "x" << bounds.getHeight() << '\n';
         barMapValid = barMapValid && valid;
         return valid;
     }
@@ -133,9 +136,6 @@ struct V2AssetCatalog final
                    && nativeSizeIs (property (shells, "selected_playing"), 56, 80)
                    && property (placements, "label").isArray()
                    && property (placements, "mini").isArray();
-        if (! manifestShape)
-            std::cout << "BAR_MAP_MANIFEST_SHAPE_FAIL root=" << (root.getDynamicObject() != nullptr)
-                      << " bars=" << (bars != nullptr ? bars->size() : -1) << '\n';
         barMapValid = barMapValid && manifestShape;
 
         const std::array<const char*, 4> stateNames {{ "normal", "selected", "playing", "selected_playing" }};
