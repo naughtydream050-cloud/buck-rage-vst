@@ -5,6 +5,13 @@
     "source": "Resources/ui-v2/source/final-master-ui.jpg",
     "normalization": "offline 1280x853 to 1024x683; runtime scale is 1.0"
   },
+  "reference_example_state": {
+    "note": "FINAL MASTER shows example selections for presentation only; they are not the default-state target.",
+    "tab_1_16": "gold is an example selected tab, not a permanently gold default background",
+    "preset_backspin": "gold is an example selected preset, not a permanently gold normal asset",
+    "bar_11": "gold is an example selected BAR, not the default selected BAR",
+    "length_1_4": "gold is an example selected length, not the default selected length"
+  },
   "regions": [
     { "name": "HEADER",      "bounds": [0, 0, 1024, 72],   "dynamic_region": false, "accepted_variance": "none" },
     { "name": "BAR_TABS",    "bounds": [251, 74, 434, 27], "dynamic_region": true,  "accepted_variance": "selected-tab image only" },

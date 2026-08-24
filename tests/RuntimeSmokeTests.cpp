@@ -331,6 +331,11 @@ int main()
     pass &= check(noPlayingRed(defaultImage), "v2-stop-red-cell-count-zero");
     pass &= check(cropMatchesResource(defaultImage,{251,74,105,27},"tab_1_16_selected_png")
                && cropMatchesResource(defaultImage,{360,74,105,27},"tab_17_32_normal_png"), "v2-tab-images-painted");
+    // The master is an example-state illustration.  Its gold BACKSPIN is not
+    // the default: default is OFF selected and BACKSPIN must be neutral.
+    pass &= check (cropMatchesResource (defaultImage, { 750, 100, 84, 64 }, "preset_off_selected_png")
+                && cropMatchesResource (defaultImage, { 924, 100, 84, 64 }, "preset_backspin_normal_png"),
+                   "v2-default-off-selected-backspin-neutral");
 
     state.setSlotPreset (0, PluginStateModel::ScratchPreset::forwardCut);
     const auto forwardCutPreview = render (*editor);
