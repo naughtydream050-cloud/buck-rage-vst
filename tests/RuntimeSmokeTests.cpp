@@ -255,7 +255,7 @@ int main()
     juce::ScopedJuceInitialiser_GUI gui; bool pass=true;
     pass &= check(resourceIs("neutral_static_background_1024x683_png",1024,683),"v2-static-background-native");
     pass &= check(resourceIs("knob_ring_60_png",48,48) && resourceIs("knob_pointer_60_png",48,48),"v2-knob-assets-native");
-    pass &= check(resourceIs("xy_neutral_base_288x256_png",232,200),"v2-xy-native");
+    pass &= check(resourceIs("xy_neutral_base_288x256_png",192,174),"v2-xy-native");
     pass &= check(resourceIs("bypass_off_png",80,31) && resourceIs("bypass_on_png",80,31),"v2-bypass-native");
     pass &= check(resourceIs("rec_normal_png",59,23) && resourceIs("clear_normal_png",59,23) && resourceIs("reset_view_normal_png",82,23),"v2-xy-buttons-native");
     const std::array<const char*, 4> shellResources {{ "bar_cell_shell_normal_56x80_png", "bar_cell_shell_selected_56x80_png", "bar_cell_shell_playing_56x80_png", "bar_cell_shell_selected_playing_56x80_png" }};
@@ -336,9 +336,9 @@ int main()
     pass &= check (cropMatchesResource (defaultImage, { 750, 100, 84, 64 }, "preset_off_selected_png")
                 && cropMatchesResource (defaultImage, { 924, 100, 84, 64 }, "preset_backspin_normal_png"),
                    "v2-default-off-selected-backspin-neutral");
-    // The restored XY source is a complete supplied panel; a second set of
-    // controls below it would make this exact native crop fail.
-    pass &= check (cropMatchesResource (defaultImage, { 14, 416, 232, 200 }, "xy_neutral_base_288x256_png"),
+    // The V2 neutral source is the complete supplied panel; it owns the
+    // static REC/CLEAR/RESET visuals and is drawn once at native size.
+    pass &= check (cropMatchesResource (defaultImage, { 40, 429, 192, 174 }, "xy_neutral_base_288x256_png"),
                    "v2-xy-restored-panel-drawn-once");
 
     state.setSlotPreset (0, PluginStateModel::ScratchPreset::forwardCut);
