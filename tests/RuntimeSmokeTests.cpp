@@ -222,7 +222,8 @@ void writeVisualReport (const juce::var& regions, const juce::Image& actual, con
             object->setProperty ("dynamic_region", dynamic);
             object->setProperty ("accepted_variance", jsonProperty (region, "accepted_variance"));
             object->setProperty ("differing_pixel_count", stats.differing);
-            object->setProperty ("differing_pixel_ratio", bounds.isEmpty() ? 0.0 : (double) stats.differing / (double) bounds.getArea());
+            const auto area = bounds.getWidth() * bounds.getHeight();
+            object->setProperty ("differing_pixel_ratio", area == 0 ? 0.0 : (double) stats.differing / (double) area);
             object->setProperty ("mae", stats.mae);
             object->setProperty ("max_channel_error", stats.maxChannelError);
             object->setProperty ("mismatch_bounds", juce::Array<juce::var> { stats.mismatchBounds.getX(), stats.mismatchBounds.getY(), stats.mismatchBounds.getWidth(), stats.mismatchBounds.getHeight() });
