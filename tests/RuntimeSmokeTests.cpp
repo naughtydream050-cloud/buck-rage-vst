@@ -163,6 +163,20 @@ juce::var jsonProperty (const juce::var& object, const char* key)
     return {};
 }
 
+juce::var jsonProperty (const juce::var& object, const juce::String& key)
+{
+    return jsonProperty (object, key.toRawUTF8());
+}
+
+juce::String byteFingerprint (const void* data, size_t size)
+{
+    auto hash = uint64_t { 1469598103934665603ull };
+    const auto* bytes = static_cast<const uint8_t*> (data);
+    for (size_t i = 0; i < size; ++i)
+        hash = (hash ^ bytes[i]) * 1099511628211ull;
+    return juce::String::toHexString ((juce::int64) hash);
+}
+
 juce::Rectangle<int> jsonBounds (const juce::var& value)
 {
     if (const auto* array = value.getArray(); array != nullptr && array->size() == 4)
@@ -289,7 +303,7 @@ void appendBarPixelTrace (juce::Array<juce::var>& output, const juce::var& runti
     item->setProperty ("resolved_asset_sha256", jsonProperty (asset, "sha256"));
     juce::MemoryOutputStream encodedActual;
     juce::PNGImageFormat().writeImageToStream (actualCrop, encodedActual);
-    item->setProperty ("actual_crop_sha256", juce::SHA256 (encodedActual.getData(), encodedActual.getDataSize()).toHexString());
+    item->setProperty ("actual_crop_fingerprint", byteFingerprint (encodedActual.getData(), encodedActual.getDataSize()));
     item->setProperty ("differing_pixel_count", stats.differing);
     item->setProperty ("mismatch_bounds", juce::Array<juce::var> { stats.mismatchBounds.getX(), stats.mismatchBounds.getY(), stats.mismatchBounds.getWidth(), stats.mismatchBounds.getHeight() });
     output.add (juce::var (item));
