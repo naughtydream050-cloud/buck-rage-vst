@@ -1,4 +1,6 @@
 name: Build Toyotomi Hideyoshi Windows VST3
+# Verification runs are triggered from this tracked workflow; build outputs are
+# deployed only after artifact provenance validation.
 
 on:
   workflow_dispatch:
