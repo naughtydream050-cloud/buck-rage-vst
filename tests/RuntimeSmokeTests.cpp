@@ -270,6 +270,31 @@ void writeVisualReport (const juce::var& regions, const juce::Image& actual, con
     juce::File::getCurrentWorkingDirectory().getChildFile ("v2-visual-acceptance-report.json").replaceWithText (juce::JSON::toString (juce::var (root), true));
 }
 
+void appendBarPixelTrace (juce::Array<juce::var>& output, const juce::var& runtimeManifest,
+                          const juce::Image& rendered, int bar, juce::Rectangle<int> bounds,
+                          const char* state)
+{
+    const auto bars = jsonProperty (jsonProperty (runtimeManifest, "barMap"), "bars").getArray();
+    const auto record = bars != nullptr && bar >= 0 && bar < bars->size() ? bars->getReference (bar) : juce::var {};
+    const auto asset = jsonProperty (record, juce::String (state) + "_asset");
+    const auto expected = resourceImage (juce::File (jsonProperty (asset, "file").toString()).getFileName()
+                                         .replaceCharacters (" .", "__").retainCharacters ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_0123456789").toRawUTF8());
+    const auto actualCrop = rendered.getClippedImage (bounds);
+    const auto stats = expected.isValid() && actualCrop.isValid()
+        ? diffImages (actualCrop, expected, { 0, 0, 56, 80 }) : DiffStats {};
+    auto* item = new juce::DynamicObject();
+    item->setProperty ("bar_id", bar + 1);
+    item->setProperty ("resolved_state", state);
+    item->setProperty ("resolved_asset_path", jsonProperty (asset, "file"));
+    item->setProperty ("resolved_asset_sha256", jsonProperty (asset, "sha256"));
+    juce::MemoryOutputStream encodedActual;
+    juce::PNGImageFormat().writeImageToStream (actualCrop, encodedActual);
+    item->setProperty ("actual_crop_sha256", juce::SHA256 (encodedActual.getData(), encodedActual.getDataSize()).toHexString());
+    item->setProperty ("differing_pixel_count", stats.differing);
+    item->setProperty ("mismatch_bounds", juce::Array<juce::var> { stats.mismatchBounds.getX(), stats.mismatchBounds.getY(), stats.mismatchBounds.getWidth(), stats.mismatchBounds.getHeight() });
+    output.add (juce::var (item));
+}
+
 }
 
 int main()
@@ -316,6 +341,8 @@ int main()
     const auto visualRegions = jsonProperty (visualManifest, "regions");
     const auto visualInteractive = jsonProperty (visualManifest, "interactive").getArray();
     const auto visualReference = resourceImage ("finalmasterreference1024x683_png");
+    const auto runtimeManifest = jsonResource ("runtimemanifest_json");
+    juce::Array<juce::var> barPixelTrace;
     pass &= check (visualManifest.getDynamicObject() != nullptr && visualRegions.getArray() != nullptr
                 && visualInteractive != nullptr && visualInteractive->size() == 39
                 && visualReference.isValid() && visualReference.getWidth() == 1024 && visualReference.getHeight() == 683,
@@ -363,7 +390,10 @@ int main()
                                  + (index == 0 ? "_selected_png" : "_normal_png");
         pass &= check (cropMatchesResource (defaultImage, bounds, completedCell.toRawUTF8()),
                        "v2-visible-bar-cell-matches-proven-completed-asset");
+        appendBarPixelTrace (barPixelTrace, runtimeManifest, defaultImage, index, bounds, index == 0 ? "selected" : "normal");
     }
+    juce::File::getCurrentWorkingDirectory().getChildFile ("v2-bar-pixel-trace.json")
+        .replaceWithText (juce::JSON::toString (juce::var (barPixelTrace), true));
     pass &= check(noPlayingRed(defaultImage), "v2-stop-red-cell-count-zero");
     pass &= check(cropMatchesResource(defaultImage,{251,74,105,27},"tab_1_16_selected_png")
                && cropMatchesResource(defaultImage,{360,74,105,27},"tab_17_32_normal_png"), "v2-tab-images-painted");

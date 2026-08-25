@@ -91,6 +91,14 @@ juce::Rectangle<int> cellBounds (int index)
 
 enum CellState { normalState, selectedState, playingState, selectedPlayingState };
 
+CellState resolveCellState (bool selected, bool playing) noexcept
+{
+    if (selected && playing) return selectedPlayingState;
+    if (playing) return playingState;
+    if (selected) return selectedState;
+    return normalState;
+}
+
 // Every state image is loaded once, validated against its draw rectangle, and
 // then used directly. This is deliberately not a per-paint resource lookup:
 // a failed resource can no longer silently expose the black hole behind it.
@@ -147,8 +155,11 @@ struct V2AssetCatalog final
 
             for (int state = 0; state < 4; ++state)
             {
-                const auto filename = juce::String::formatted ("bar_%02d_%s.png", bar + 1, stateNames[(size_t) state]);
-                loadBarMap (barCells[(size_t) bar][(size_t) state], filename, { 0, 0, 56, 80 });
+                const auto stateAsset = property (record, juce::String (stateNames[(size_t) state]) + "_asset");
+                barMapValid = barMapValid && nativeSizeIs (stateAsset, 56, 80);
+                loadBarMap (barCells[(size_t) bar][(size_t) state],
+                            juce::File (property (stateAsset, "file").toString()).getFileName(),
+                            { 0, 0, 56, 80 });
             }
         }
     }
@@ -258,8 +269,7 @@ public:
         for (int index = 0; index < 16; ++index)
         {
             const auto bar = tab * 16 + index;
-            const auto state = bar == playing ? (bar == selected ? selectedPlayingState : playingState)
-                                               : (bar == selected ? selectedState : normalState);
+            const auto state = resolveCellState (bar == selected, bar == playing);
             const auto bounds = cellBounds (index);
             g.saveState();
             g.reduceClipRegion (bounds);
