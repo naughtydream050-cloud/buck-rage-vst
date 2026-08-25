@@ -18,7 +18,6 @@ const std::array<juce::Rectangle<int>, 5> kLengths {{{742,425,32,26},{773,425,32
 const std::array<juce::Rectangle<int>, 3> kKnobs {{{744,513,48,48},{793,513,48,48},{848,513,48,48}}};
 const std::array<juce::Rectangle<int>, 3> kReadouts {{{742,563,48,16},{793,563,48,16},{848,563,48,16}}};
 const std::array<const char*, 10> kPresetNames {{"off","forward_cut","backspin","chirp","baby","transform","drag","zigzag","tape_brake","custom"}};
-const std::array<const char*, 10> kMiniPresetNames {{"off","forward_cut","backspin","chirp","baby","transform","drag","zigzag","tape_brake","custom"}};
 const std::array<const char*, 5> kLengthNames {{"1_16","1_8","1_4","1_2","1_bar"}};
 const std::array<const char*, 4> kTabNames {{"1_16","17_32","33_48","49_64"}};
 
@@ -99,9 +98,10 @@ struct V2AssetCatalog final
 {
     juce::Image background, ring, pointer, bypassOff, bypassOn;
     std::array<std::array<juce::Image, 2>, 4> tabs;
-    std::array<juce::Image, 4> barShells;
-    std::array<juce::Image, 64> barLabels;
-    std::array<juce::Image, 10> barMinis;
+    // Retain the proven native 56 x 80 completed BAR cells.  The later
+    // shell/label split introduced a same-basename BinaryData collision and
+    // produced the unreadable labels seen in the editor.
+    std::array<std::array<juce::Image, 4>, 64> barCells;
     std::array<std::array<juce::Image, 2>, 10> presets;
     std::array<std::array<juce::Image, 2>, 5> lengths;
     bool barMapValid = true;
@@ -126,7 +126,6 @@ struct V2AssetCatalog final
         const auto barMap = property (root, "barMap");
         const auto bars = property (barMap, "bars").getArray();
         const auto shells = property (barMap, "shells");
-        const auto minis = property (barMap, "mini_preset_mapping");
         const auto placements = property (barMap, "placements");
 
         const auto manifestShape = bars != nullptr && bars->size() == 64
@@ -139,36 +138,18 @@ struct V2AssetCatalog final
         barMapValid = barMapValid && manifestShape;
 
         const std::array<const char*, 4> stateNames {{ "normal", "selected", "playing", "selected_playing" }};
-        for (int state = 0; state < 4; ++state)
-        {
-            const auto asset = property (shells, stateNames[(size_t) state]);
-            loadBarMap (barShells[(size_t) state], property (asset, "file").toString(), { 0, 0, 56, 80 });
-        }
 
         for (int bar = 0; bar < 64; ++bar)
         {
             const auto record = bars != nullptr && bar < bars->size() ? bars->getReference (bar) : juce::var {};
-            const auto label = property (record, "label_asset");
             barMapValid = barMapValid
-                       && (int) property (record, "bar_id") == bar + 1
-                       && nativeSizeIs (label, 56, 12);
+                       && (int) property (record, "bar_id") == bar + 1;
 
-            for (const auto* stateName : stateNames)
+            for (int state = 0; state < 4; ++state)
             {
-                const auto stateAsset = property (record, juce::String (stateName) + "_asset");
-                barMapValid = barMapValid && nativeSizeIs (stateAsset, 56, 80);
-                juce::Image decodedState;
-                loadBarMap (decodedState, property (stateAsset, "file").toString(), { 0, 0, 56, 80 });
+                const auto filename = juce::String::formatted ("bar_%02d_%s.png", bar + 1, stateNames[(size_t) state]);
+                loadBarMap (barCells[(size_t) bar][(size_t) state], filename, { 0, 0, 56, 80 });
             }
-
-            loadBarMap (barLabels[(size_t) bar], property (label, "file").toString(), { 0, 0, 56, 12 });
-        }
-
-        for (int preset = 0; preset < 10; ++preset)
-        {
-            const auto asset = property (minis, kMiniPresetNames[(size_t) preset]);
-            barMapValid = barMapValid && nativeSizeIs (asset, 40, 20);
-            loadBarMap (barMinis[(size_t) preset], property (asset, "file").toString(), { 0, 0, 40, 20 });
         }
     }
 
@@ -282,10 +263,7 @@ public:
             const auto bounds = cellBounds (index);
             g.saveState();
             g.reduceClipRegion (bounds);
-            drawNative (g, assets.barShells[(size_t) state], bounds);
-            drawNative (g, assets.barLabels[(size_t) bar], { bounds.getX(), bounds.getY() + 5, 56, 12 });
-            const auto preset = processor.getStateModel().getSlot (bar).preset;
-            drawNative (g, assets.barMinis[(size_t) preset], { bounds.getX() + 8, bounds.getY() + 36, 40, 20 });
+            drawNative (g, assets.barCells[(size_t) bar][(size_t) state], bounds);
             g.restoreState();
         }
 

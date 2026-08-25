@@ -285,6 +285,11 @@ int main()
     {
         const auto resource = "bar_label_" + juce::String (i).paddedLeft ('0', 2) + "_png";
         pass &= check (resourceIs (resource.toRawUTF8(), 56, 12), "v2-bar-label-native");
+        for (const auto* state : { "normal", "selected", "playing", "selected_playing" })
+        {
+            const auto completedCell = "bar_" + juce::String (i).paddedLeft ('0', 2) + "_" + state + "_png";
+            pass &= check (resourceIs (completedCell.toRawUTF8(), 56, 80), "v2-completed-bar-cell-native");
+        }
     }
     for (const auto* mini : { "off", "forward_cut", "backspin", "chirp", "baby", "transform", "drag", "zigzag", "tape_brake", "custom" })
         pass &= check (resourceIs (("bar_mini_" + juce::String (mini) + "_png").toRawUTF8(), 40, 20), "v2-bar-mini-native");
@@ -354,6 +359,10 @@ int main()
     {
         const auto bounds = juce::Rectangle<int> { std::array<int, 8> { 259, 317, 378, 437, 494, 553, 611, 670 }[(size_t) (index % 8)], index < 8 ? 137 : 221, 56, 80 };
         pass &= check (cropHasVisibleCellContent (defaultImage, bounds), "v2-visible-bar-cell-populated");
+        const auto completedCell = "bar_" + juce::String (index + 1).paddedLeft ('0', 2)
+                                 + (index == 0 ? "_selected_png" : "_normal_png");
+        pass &= check (cropMatchesResource (defaultImage, bounds, completedCell.toRawUTF8()),
+                       "v2-visible-bar-cell-matches-proven-completed-asset");
     }
     pass &= check(noPlayingRed(defaultImage), "v2-stop-red-cell-count-zero");
     pass &= check(cropMatchesResource(defaultImage,{251,74,105,27},"tab_1_16_selected_png")
@@ -367,11 +376,6 @@ int main()
     // neither a second base nor second REC/CLEAR/RESET images.
     pass &= check (! cropsDiffer (defaultImage, visualReference, { 14, 416, 232, 200 }),
                    "v2-xy-static-panel-owned-by-final-master");
-
-    state.setSlotPreset (0, PluginStateModel::ScratchPreset::forwardCut);
-    const auto forwardCutPreview = render (*editor);
-    pass &= check (cropsDiffer (defaultImage, forwardCutPreview, {259,137,56,80}), "v2-bar-mini-preview-follows-slot-preset");
-    state.setSlotPreset (0, PluginStateModel::ScratchPreset::off);
 
     const auto initialBar=state.getUiState().selectedBar; const auto initialSlot=state.getSlot(initialBar);
     const std::array<int, 8> cellX { 259, 317, 378, 437, 494, 553, 611, 670 };
