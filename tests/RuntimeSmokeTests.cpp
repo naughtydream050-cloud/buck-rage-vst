@@ -82,6 +82,28 @@ bool cropMatchesResource (const juce::Image& rendered, juce::Rectangle<int> boun
     return true;
 }
 
+bool fullyTransparent (const juce::Image& image, juce::Rectangle<int> bounds)
+{
+    if (! image.isValid() || ! image.getBounds().contains (bounds)) return false;
+    for (int y = 0; y < bounds.getHeight(); ++y)
+        for (int x = 0; x < bounds.getWidth(); ++x)
+            if (image.getPixelAt (bounds.getX() + x, bounds.getY() + y).getAlpha() != 0)
+                return false;
+    return true;
+}
+
+bool hasNoDynamicGoldTrace (const juce::Image& image, juce::Rectangle<int> bounds)
+{
+    for (int y = 0; y < bounds.getHeight(); ++y)
+        for (int x = 0; x < bounds.getWidth(); ++x)
+        {
+            const auto c = image.getPixelAt (bounds.getX() + x, bounds.getY() + y);
+            if (c.getRed() > 150 && c.getGreen() > 80 && c.getBlue() < 145 && c.getRed() - c.getGreen() > 25)
+                return false;
+        }
+    return true;
+}
+
 bool cropHasVisibleCellContent (const juce::Image& rendered, juce::Rectangle<int> bounds)
 {
     int nonBlack = 0;
@@ -314,7 +336,7 @@ void appendBarPixelTrace (juce::Array<juce::var>& output, const juce::var& runti
 int main()
 {
     juce::ScopedJuceInitialiser_GUI gui; bool pass=true;
-    pass &= check(resourceIs("finalmasterreference1024x683_png",1024,683),"v2-static-background-native");
+    pass &= check(resourceIs("static_faceplate_1024x683_png",1024,683),"v2-static-faceplate-native");
     pass &= check(resourceIs("knob_ring_60_png",48,48) && resourceIs("knob_pointer_60_png",48,48),"v2-knob-assets-native");
     pass &= check(resourceIs("bypass_off_png",80,31) && resourceIs("bypass_on_png",80,31),"v2-bypass-native");
     const std::array<const char*, 4> shellResources {{ "bar_cell_shell_normal_56x80_png", "bar_cell_shell_selected_56x80_png", "bar_cell_shell_playing_56x80_png", "bar_cell_shell_selected_playing_56x80_png" }};
@@ -354,13 +376,29 @@ int main()
     const auto visualManifest = jsonResource ("visual_acceptance_manifest_json");
     const auto visualRegions = jsonProperty (visualManifest, "regions");
     const auto visualInteractive = jsonProperty (visualManifest, "interactive").getArray();
-    const auto visualReference = resourceImage ("finalmasterreference1024x683_png");
+    const auto staticFaceplate = resourceImage ("static_faceplate_1024x683_png");
+    const auto visualReference = resourceImage ("mastertimelinereference1024x683_png");
     const auto runtimeManifest = jsonResource ("runtimemanifest_json");
     juce::Array<juce::var> barPixelTrace;
     pass &= check (visualManifest.getDynamicObject() != nullptr && visualRegions.getArray() != nullptr
                 && visualInteractive != nullptr && visualInteractive->size() == 39
                 && visualReference.isValid() && visualReference.getWidth() == 1024 && visualReference.getHeight() == 683,
                    "v2-visual-acceptance-reference-and-manifest");
+    bool faceplateClean = staticFaceplate.isValid();
+    if (visualInteractive != nullptr)
+        for (const auto& item : *visualInteractive)
+        {
+            const auto id = jsonProperty (item, "id").toString();
+            if (id.startsWith ("tab_") || id.startsWith ("bar_") || id.startsWith ("preset_")
+                || id.startsWith ("length_") || id == "bypass")
+                faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, jsonBounds (jsonProperty (item, "bounds")));
+        }
+    for (const auto& bounds : std::array<juce::Rectangle<int>, 6> {{{744,513,48,48},{793,513,48,48},{848,513,48,48},{742,563,48,16},{793,563,48,16},{848,563,48,16}}})
+        faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
+    for (const auto& bounds : std::array<juce::Rectangle<int>, 4> {{{938,420,18,174},{971,420,18,174},{923,601,38,21},{963,601,38,21}}})
+        faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
+    faceplateClean = faceplateClean && hasNoDynamicGoldTrace (staticFaceplate, { 56, 450, 157, 120 });
+    pass &= check (faceplateClean, "v2-static-background-clean-gate");
     pass &= check (v2 != nullptr && v2->validateInteractiveBounds(), "v2-visual-hit-bounds-match-manifest");
     auto& state=processor.getStateModel();
     state.selectTab (0); state.selectBar (0); state.setSlotPreset (0, PluginStateModel::ScratchPreset::off);
@@ -416,10 +454,8 @@ int main()
     pass &= check (cropMatchesResource (defaultImage, { 750, 100, 84, 64 }, "preset_off_selected_png")
                 && cropMatchesResource (defaultImage, { 924, 100, 84, 64 }, "preset_backspin_normal_png"),
                    "v2-default-off-selected-backspin-neutral");
-    // FINAL MASTER owns the static XY panel and its control visuals; V2 adds
-    // neither a second base nor second REC/CLEAR/RESET images.
-    pass &= check (! cropsDiffer (defaultImage, visualReference, { 14, 416, 232, 200 }),
-                   "v2-xy-static-panel-owned-by-final-master");
+    pass &= check (hasNoDynamicGoldTrace (defaultImage, { 56, 450, 157, 120 }),
+                   "v2-xy-static-panel-owned-by-faceplate");
 
     const auto initialBar=state.getUiState().selectedBar; const auto initialSlot=state.getSlot(initialBar);
     const std::array<int, 8> cellX { 259, 317, 378, 437, 494, 553, 611, 670 };

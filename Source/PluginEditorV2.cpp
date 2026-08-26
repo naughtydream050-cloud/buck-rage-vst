@@ -13,7 +13,7 @@ constexpr int kCellWidth = 56, kCellHeight = 80;
 const std::array<int, 8> kCellX { 259, 317, 378, 437, 494, 553, 611, 670 };
 const std::array<int, 2> kCellY { 137, 221 };
 const std::array<juce::Rectangle<int>, 4> kTabs {{{251,74,105,27},{360,74,105,27},{470,74,106,27},{580,74,105,27}}};
-const std::array<juce::Rectangle<int>, 10> kPresets {{{750,100,84,64},{836,100,84,64},{924,100,84,64},{750,166,84,64},{836,166,84,64},{924,166,84,64},{750,232,84,64},{836,232,84,64},{924,232,84,64},{750,296,84,56}}};
+const std::array<juce::Rectangle<int>, 10> kPresets {{{750,100,84,64},{836,100,84,64},{924,100,84,64},{750,166,84,64},{836,166,84,64},{924,166,84,64},{750,232,84,64},{836,232,84,64},{924,232,84,64},{750,296,84,64}}};
 const std::array<juce::Rectangle<int>, 5> kLengths {{{742,425,32,26},{773,425,32,26},{803,425,32,26},{834,425,32,26},{864,425,32,26}}};
 const std::array<juce::Rectangle<int>, 3> kKnobs {{{744,513,48,48},{793,513,48,48},{848,513,48,48}}};
 const std::array<juce::Rectangle<int>, 3> kReadouts {{{742,563,48,16},{793,563,48,16},{848,563,48,16}}};
@@ -166,8 +166,7 @@ struct V2AssetCatalog final
 
     V2AssetCatalog()
     {
-        // Use the FINAL MASTER as the V2 static faceplate baseline.
-        loadBarMap (background, "final-master-reference-1024x683.png", { 0, 0, kW, kH });
+        loadBarMap (background, "static_faceplate_1024x683.png", { 0, 0, kW, kH });
         for (int index = 0; index < 4; ++index)
         {
             loadBarMap (tabs[(size_t) index][0], "tab_" + juce::String (kTabNames[(size_t) index]) + "_normal.png", kTabs[(size_t) index]);
@@ -284,8 +283,8 @@ public:
             drawNative (g, assets.lengths[(size_t) index][index == (int) slot.length ? 1 : 0], kLengths[(size_t) index]);
 
         drawNative (g, ui.bypass ? assets.bypassOn : assets.bypassOff, { 931, 14, 80, 31 });
-        // The FINAL MASTER background owns the complete static XY panel and
-        // its REC/CLEAR/RESET visuals. Only motion is dynamic in V2.
+        // The static faceplate owns the neutral XY panel and its fixed button
+        // visuals. Only the trace is dynamic in V2.
 
         const std::array<float, 3> normalized {{ (slot.speed - .25f) / 3.75f, (slot.pitch + 12.0f) / 24.0f, slot.depth }};
         const std::array<juce::String, 3> text {{ juce::String (slot.speed, 2) + "x", juce::String (slot.pitch, 1) + " st", juce::String (juce::roundToInt (slot.depth * 100.0f)) + " %" }};

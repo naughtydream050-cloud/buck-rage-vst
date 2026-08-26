@@ -9,9 +9,9 @@
   "image2Crop": "forbidden",
   "assets": [
     {
-      "id": "neutral_static_background_1024x683",
-      "file": "Resources/ui-v2/runtime-1024/static/neutral_static_background_1024x683.png",
-      "provenance": "user-v2-missing-assets",
+      "id": "static_faceplate_1024x683",
+      "file": "Resources/ui-v2/runtime-1024/static/static_faceplate_1024x683.png",
+      "provenance": "master-timeline-1280x853/mechanical-state-removal",
       "width": 1024,
       "height": 683,
       "alpha": [
@@ -25,7 +25,7 @@
         1024,
         683
       ],
-      "sha256": "08D02D982E68D837A24613537CA9E0F64548E54195BDF4FA955C12E9B13CC75B"
+      "sha256": "86C14EBFDC09143A1D45564813CBAAD3B62D04074907A4E0AF5391F499BF1D30"
     },
     {
       "id": "tab_1_16_normal",
