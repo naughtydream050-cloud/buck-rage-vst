@@ -20,7 +20,7 @@
     { "name": "XY",          "bounds": [14, 416, 232, 200], "dynamic_region": true, "accepted_variance": "motion trace/current point only" },
     { "name": "QUOTE_PANEL", "bounds": [268, 337, 409, 288], "dynamic_region": false, "accepted_variance": "none" },
     { "name": "LENGTH",      "bounds": [742, 425, 154, 26], "dynamic_region": true, "accepted_variance": "one selected length image" },
-    { "name": "SPEED",       "bounds": [742, 513, 48, 66], "dynamic_region": true, "accepted_variance": "pointer and numeric readout" },
+    { "name": "SPEED",       "bounds": [742, 513, 50, 66], "dynamic_region": true, "accepted_variance": "pointer and numeric readout" },
     { "name": "PITCH",       "bounds": [793, 513, 48, 66], "dynamic_region": true, "accepted_variance": "pointer and numeric readout" },
     { "name": "DEPTH",       "bounds": [848, 513, 48, 66], "dynamic_region": true, "accepted_variance": "pointer and numeric readout" },
     { "name": "BYPASS",      "bounds": [931, 14, 80, 31], "dynamic_region": true, "accepted_variance": "toggle state" },
