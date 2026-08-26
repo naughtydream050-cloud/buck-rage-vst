@@ -15,11 +15,44 @@ permissions:
 jobs:
   build-windows-vst3:
     runs-on: windows-2022
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          # The repository has only JUCE. Do not recursively traverse remote
+          # submodules during the main checkout.
+          fetch-depth: 1
+          submodules: false
+
+      - name: Checkout pinned JUCE submodule
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $log = 'toyotomi-checkout.log'
+          "MAIN_HEAD=$(git rev-parse HEAD)" | Tee-Object -FilePath $log
+          git config --local submodule.recurse false
+          git submodule sync -- JUCE 2>&1 | Tee-Object -FilePath $log -Append
+          $expected = (git ls-tree HEAD JUCE | ForEach-Object {
+            if ($_ -match '^160000 commit ([0-9a-f]{40})\s+JUCE$') { $Matches[1] }
+          })
+          if ([string]::IsNullOrWhiteSpace($expected)) { throw 'Pinned JUCE submodule revision was not found.' }
+
+          $stdout = 'toyotomi-juce-checkout.stdout.log'
+          $stderr = 'toyotomi-juce-checkout.stderr.log'
+          $process = Start-Process -FilePath git -ArgumentList @('submodule', 'update', '--init', '--depth', '1', 'JUCE') -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          if (!$process.WaitForExit(600000)) {
+            $process.Kill()
+            Get-Content -LiteralPath $stdout,$stderr -ErrorAction SilentlyContinue | Tee-Object -FilePath $log -Append
+            throw 'JUCE checkout timed out after 10 minutes.'
+          }
+          Get-Content -LiteralPath $stdout,$stderr -ErrorAction SilentlyContinue | Tee-Object -FilePath $log -Append
+          if ($process.ExitCode -ne 0) { throw "JUCE checkout failed with exit code $($process.ExitCode)." }
+
+          $actual = git -C JUCE rev-parse HEAD
+          "JUCE_EXPECTED=$expected" | Tee-Object -FilePath $log -Append
+          "JUCE_ACTUAL=$actual" | Tee-Object -FilePath $log -Append
+          if ($actual -ne $expected) { throw "JUCE revision mismatch: expected $expected actual $actual" }
 
       - name: Record authoritative source snapshot
         shell: pwsh
@@ -97,6 +130,9 @@ jobs:
         with:
           name: ToyotomiHideyoshi-build-diagnostics
           path: |
+            toyotomi-checkout.log
+            toyotomi-juce-checkout.stdout.log
+            toyotomi-juce-checkout.stderr.log
             toyotomi-build.log
             toyotomi-state-tests.log
             toyotomi-runtime-smoke.log
