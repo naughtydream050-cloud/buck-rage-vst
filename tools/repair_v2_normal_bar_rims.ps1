@@ -23,25 +23,26 @@ function Read-PngCopy([string] $path) {
     return $copy
 }
 
-# Each affected cell retains its own approved label/mini content and receives
-# only the 4px rim from an adjacent approved normal cell on the same page.
-foreach ($pair in @(@{ Target = 11; Donor = 10 }, @{ Target = 27; Donor = 26 }, @{ Target = 43; Donor = 42 }, @{ Target = 59; Donor = 58 })) {
-    $targetPath = Join-Path $bars ("bar_{0:D2}_normal.png" -f $pair.Target)
-    $donorPath = Join-Path $bars ("bar_{0:D2}_normal.png" -f $pair.Donor)
+# Each affected cell retains its exact existing label/mini pixels while every
+# other pixel is replaced by the approved 56x80 neutral shell. This removes
+# the full baked selected shell, not merely its outermost four pixels.
+$shellPath = Join-Path $ProjectRoot 'Resources\ui-v2\runtime-1024\bar-map\shells\bar_cell_shell_normal_56x80.png'
+foreach ($targetId in 11, 27, 43, 59) {
+    $targetPath = Join-Path $bars ("bar_{0:D2}_normal.png" -f $targetId)
     $target = Read-PngCopy $targetPath
-    $donor = Read-PngCopy $donorPath
-    if ($target.Width -ne 56 -or $target.Height -ne 80 -or $donor.Width -ne 56 -or $donor.Height -ne 80) {
-        throw "Unexpected BAR cell dimensions for $($pair.Target) / $($pair.Donor)"
+    $shell = Read-PngCopy $shellPath
+    if ($target.Width -ne 56 -or $target.Height -ne 80 -or $shell.Width -ne 56 -or $shell.Height -ne 80) {
+        throw "Unexpected BAR cell dimensions for $targetId"
     }
-    for ($y = 0; $y -lt 80; ++$y) {
-        for ($x = 0; $x -lt 56; ++$x) {
-            if ($x -lt 4 -or $x -ge 52 -or $y -lt 4 -or $y -ge 76) {
-                $target.SetPixel($x, $y, $donor.GetPixel($x, $y))
-            }
-        }
-    }
-    Save-PngAtomically $target $targetPath
-    $target.Dispose(); $donor.Dispose()
+    $result = [System.Drawing.Bitmap]::new($shell)
+    $graphics = [System.Drawing.Graphics]::FromImage($result)
+    $graphics.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceCopy
+    # Approved completed-cell content zones: label and mini preview only.
+    $graphics.DrawImage($target, [System.Drawing.Rectangle]::new(0, 5, 56, 12), 0, 5, 56, 12, [System.Drawing.GraphicsUnit]::Pixel)
+    $graphics.DrawImage($target, [System.Drawing.Rectangle]::new(8, 36, 40, 20), 8, 36, 40, 20, [System.Drawing.GraphicsUnit]::Pixel)
+    $graphics.Dispose()
+    Save-PngAtomically $result $targetPath
+    $result.Dispose(); $target.Dispose(); $shell.Dispose()
 }
 
 # Keep the runtime manifest's provenance hashes authoritative for the four
