@@ -6723,12 +6723,12 @@
             56,
             80
           ],
-          "sha256": "0FAA5A73A4B4F7DD4FB700E2E9F9D08F876AF613C7F632AB32F8D17AE55F6A1B",
+          "sha256": "9DEFE23EEB0A407FC7435F2E6D7232E8375ACFB0EED16809272152F3DCB4C836",
           "alpha": [
             255,
             255
           ],
-          "provenance": "approved-completed-bar-cell-assets"
+          "provenance": "neutral-default-or-approved-normal-rim-replacement"
         },
         "selected_asset": {
           "file": "Resources/ui-v2/runtime-1024/bars/bar_11_selected.png",
@@ -7891,12 +7891,12 @@
             56,
             80
           ],
-          "sha256": "2E89DBA956CA464A1B48A7539689E83505543A3E6A79F9D38396276DB5A464DA",
+          "sha256": "6C0874FC2E05E718CC1E0451E2098590EDA9F8387B4A8407BBDDEC873F65A6E2",
           "alpha": [
             255,
             255
           ],
-          "provenance": "approved-completed-bar-cell-assets"
+          "provenance": "neutral-default-or-approved-normal-rim-replacement"
         },
         "selected_asset": {
           "file": "Resources/ui-v2/runtime-1024/bars/bar_27_selected.png",
@@ -9059,12 +9059,12 @@
             56,
             80
           ],
-          "sha256": "C680DDACABFEB83AF6227F4BCB4DCFEDB74F3290FF2F2215BC74719E49EFC254",
+          "sha256": "23B6830925D69CC9C91FBCC8D5C31D33141543E53C2FD24A837DC208E8120AB5",
           "alpha": [
             255,
             255
           ],
-          "provenance": "approved-completed-bar-cell-assets"
+          "provenance": "neutral-default-or-approved-normal-rim-replacement"
         },
         "selected_asset": {
           "file": "Resources/ui-v2/runtime-1024/bars/bar_43_selected.png",
@@ -10227,12 +10227,12 @@
             56,
             80
           ],
-          "sha256": "307A63BA06C0CFDE43CA342610FF26F261736B7F8C9890DE39F92FED5F08DED1",
+          "sha256": "D0E62A18D83CEDAE1B1D7F65B8FC576BF447F2C5D6107B41C09D9707EB4C476C",
           "alpha": [
             255,
             255
           ],
-          "provenance": "approved-completed-bar-cell-assets"
+          "provenance": "neutral-default-or-approved-normal-rim-replacement"
         },
         "selected_asset": {
           "file": "Resources/ui-v2/runtime-1024/bars/bar_59_selected.png",

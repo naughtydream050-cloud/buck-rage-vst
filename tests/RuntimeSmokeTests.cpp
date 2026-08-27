@@ -82,6 +82,23 @@ bool cropMatchesResource (const juce::Image& rendered, juce::Rectangle<int> boun
     return true;
 }
 
+// The four affected normal cells retain their own label/mini pixels but use
+// the approved neutral normal rim. This prevents a completed-cell asset with
+// a baked selected outline from being accepted as an ordinary normal state.
+bool hasSameOuterRim (const juce::Image& target, const juce::Image& neutral, int thickness = 4)
+{
+    if (! target.isValid() || ! neutral.isValid()
+        || target.getWidth() != neutral.getWidth() || target.getHeight() != neutral.getHeight())
+        return false;
+    for (int y = 0; y < target.getHeight(); ++y)
+        for (int x = 0; x < target.getWidth(); ++x)
+            if (x < thickness || x >= target.getWidth() - thickness
+                || y < thickness || y >= target.getHeight() - thickness)
+                if (target.getPixelAt (x, y) != neutral.getPixelAt (x, y))
+                    return false;
+    return true;
+}
+
 bool fullyTransparent (const juce::Image& image, juce::Rectangle<int> bounds)
 {
     if (! image.isValid() || ! image.getBounds().contains (bounds)) return false;
@@ -632,7 +649,11 @@ int main()
     pass &= check (different (normalShell, selectedShell), "v2-bar-selected-shell-is-distinct");
     pass &= check (different (normalShell, playingShell), "v2-bar-playing-shell-is-distinct");
     pass &= check (different (playingShell, selectedPlayingShell), "v2-bar-selected-playing-shell-is-distinct");
-    pass &= check (! hasSelectedGoldContamination (resourceImage ("bar_cell_shell_normal_56x80_png")), "v2-bar11-normal-has-no-selected-gold");
+    pass &= check (hasSameOuterRim (resourceImage ("bar_11_normal_png"), resourceImage ("bar_10_normal_png"))
+                && hasSameOuterRim (resourceImage ("bar_27_normal_png"), resourceImage ("bar_26_normal_png"))
+                && hasSameOuterRim (resourceImage ("bar_43_normal_png"), resourceImage ("bar_42_normal_png"))
+                && hasSameOuterRim (resourceImage ("bar_59_normal_png"), resourceImage ("bar_58_normal_png")),
+                   "v2-normal-bars-have-no-baked-selected-rims");
 
     ToyotomiHideyoshiAudioProcessor processor; processor.prepareToPlay(48000,512);
     std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
