@@ -306,6 +306,253 @@ void writeVisualReport (const juce::var& regions, const juce::Image& actual, con
     juce::File::getCurrentWorkingDirectory().getChildFile ("v2-visual-acceptance-report.json").replaceWithText (juce::JSON::toString (juce::var (root), true));
 }
 
+constexpr int kGateCellWidth = 56, kGateCellHeight = 80;
+const std::array<int, 8> kGateCellX { 259, 317, 378, 437, 494, 553, 611, 670 };
+const std::array<const char*, 10> kGatePresetNames {{ "off", "forward_cut", "backspin", "chirp", "baby",
+                                                       "transform", "drag", "zigzag", "tape_brake", "custom" }};
+const std::array<const char*, 5> kGateLengthNames {{ "1_16", "1_8", "1_4", "1_2", "1_bar" }};
+const juce::Rectangle<int> kGateBarMapBounds { 259, 137, 467, 164 };
+const juce::Rectangle<int> kGateBypassBounds { 931, 14, 80, 31 };
+
+juce::Rectangle<int> gateCellBounds (int index)
+{
+    return { kGateCellX[(size_t) (index % 8)], index < 8 ? 137 : 221, kGateCellWidth, kGateCellHeight };
+}
+
+int gateCropMismatchPixels (const juce::Image& rendered, juce::Rectangle<int> bounds, const juce::String& resource)
+{
+    const auto expected = resourceImage (resource.toRawUTF8());
+    if (! expected.isValid() || expected.getWidth() != bounds.getWidth() || expected.getHeight() != bounds.getHeight())
+        return -1;
+    int differing = 0;
+    for (int y = 0; y < bounds.getHeight(); ++y)
+        for (int x = 0; x < bounds.getWidth(); ++x)
+            if (rendered.getPixelAt (bounds.getX() + x, bounds.getY() + y) != expected.getPixelAt (x, y))
+                ++differing;
+    return differing;
+}
+
+int gateCountSelectionGold (const juce::Image& image, juce::Rectangle<int> bounds)
+{
+    int count = 0;
+    for (int y = 0; y < bounds.getHeight(); ++y)
+        for (int x = 0; x < bounds.getWidth(); ++x)
+        {
+            const auto c = image.getPixelAt (bounds.getX() + x, bounds.getY() + y);
+            if (c.getRed() > 120 && c.getGreen() > 75 && c.getBlue() < 70 && c.getRed() > c.getGreen() * 1.15f)
+                ++count;
+        }
+    return count;
+}
+
+int gateCountPlayingRed (const juce::Image& image, juce::Rectangle<int> bounds)
+{
+    int count = 0;
+    for (int y = 0; y < bounds.getHeight(); ++y)
+        for (int x = 0; x < bounds.getWidth(); ++x)
+        {
+            const auto c = image.getPixelAt (bounds.getX() + x, bounds.getY() + y);
+            if (c.getRed() > 135 && c.getGreen() < 100 && c.getBlue() < 100)
+                ++count;
+        }
+    return count;
+}
+
+struct GateRegionDiffStats
+{
+    int differingInsideAllowed = 0, differingOutsideAllowed = 0;
+    juce::Rectangle<int> outsideMismatchBounds;
+};
+
+GateRegionDiffStats gateCompareAgainstAllowedRegions (const juce::Image& a, const juce::Image& b,
+                                                      const juce::Array<juce::Rectangle<int>>& allowed,
+                                                      int* differingInsideTotal = nullptr)
+{
+    GateRegionDiffStats stats;
+    bool firstOutside = true;
+    for (int y = 0; y < a.getHeight(); ++y)
+        for (int x = 0; x < a.getWidth(); ++x)
+        {
+            if (a.getPixelAt (x, y) == b.getPixelAt (x, y)) continue;
+            bool inside = false;
+            for (const auto& region : allowed)
+                if ((inside = region.contains (x, y)) == true) break;
+            if (inside)
+                ++stats.differingInsideAllowed;
+            else
+            {
+                ++stats.differingOutsideAllowed;
+                const juce::Rectangle<int> pixel { x, y, 1, 1 };
+                stats.outsideMismatchBounds = firstOutside ? pixel : stats.outsideMismatchBounds.getUnion (pixel);
+                firstOutside = false;
+            }
+        }
+    if (differingInsideTotal != nullptr) *differingInsideTotal = stats.differingInsideAllowed;
+    return stats;
+}
+
+class DynamicStateVisualReporter final
+{
+public:
+    void beginCase (const juce::String& name, const juce::String& description, const juce::var& stateSnapshot)
+    {
+        currentObject = new juce::DynamicObject();
+        currentObject->setProperty ("name", name);
+        currentObject->setProperty ("description", description);
+        currentObject->setProperty ("state", stateSnapshot);
+        currentChecks = juce::Array<juce::var>();
+        currentPass = true;
+        currentSaved = {};
+    }
+
+    void checkValue (const char* expectation, bool ok, int value)
+    {
+        auto* entry = new juce::DynamicObject();
+        entry->setProperty ("expectation", expectation);
+        entry->setProperty ("status", ok ? "PASS" : "FAIL");
+        entry->setProperty ("value", value);
+        currentChecks.add (juce::var (entry));
+        currentPass = currentPass && ok;
+        if (! ok) std::cout << "FAIL " << currentName() << ':' << expectation << '\n';
+    }
+
+    void check (const char* expectation, bool ok) { checkValue (expectation, ok, ok ? 1 : 0); }
+
+    void screenshot (const juce::Image& image, const juce::String& file)
+    {
+        png (image, file);
+        currentSaved.add (file);
+    }
+
+    bool endCase()
+    {
+        currentObject->setProperty ("checks", currentChecks);
+        currentObject->setProperty ("saved_images", currentSaved);
+        currentObject->setProperty ("status", currentPass ? "PASS" : "FAIL");
+        cases.add (juce::var (currentObject));
+        std::cout << (currentPass ? "PASS " : "FAIL ") << "[DYNAMIC_STATE_VISUAL_GATE] "
+                  << currentName() << '\n';
+        overall &= currentPass;
+        if (currentPass) ++passedCases_;
+        return currentPass;
+    }
+
+    bool finishReport() const
+    {
+        auto* root = new juce::DynamicObject();
+        root->setProperty ("gate", "DYNAMIC_STATE_VISUAL_GATE");
+        root->setProperty ("canvas", juce::Array<juce::var> { 1024, 683 });
+        root->setProperty ("cases", cases);
+        root->setProperty ("passed_cases", cases.size() - failedCases());
+        root->setProperty ("failed_cases", failedCases());
+        root->setProperty ("status", overall ? "PASS" : "FAIL");
+        const auto text = juce::JSON::toString (juce::var (root), true);
+        juce::File::getCurrentWorkingDirectory().getChildFile ("dynamic-state-report.json").replaceWithText (text);
+        juce::File::getCurrentWorkingDirectory().getChildFile ("v2-dynamic-state-report.json").replaceWithText (text);
+        return overall;
+    }
+
+private:
+    int failedCases() const { return cases.size() - passedCases_; }
+    juce::String currentName() const
+    {
+        return currentObject != nullptr ? currentObject->getProperty ("name").toString() : juce::String();
+    }
+
+    juce::Array<juce::var> cases, currentChecks, currentSaved;
+    juce::DynamicObject* currentObject = nullptr;
+    bool currentPass = true, overall = true;
+    mutable int passedCases_ = 0;
+};
+
+bool verifyGateBarPage (const juce::Image& image, int tab, DynamicStateVisualReporter& reporter,
+                        int selectedAbsoluteBar, const char* selectedStateSuffix,
+                        bool requireZeroSelectionGoldAnywhere)
+{
+    int mismatchedCells = 0;
+    for (int cell = 0; cell < 16; ++cell)
+    {
+        const auto absolute = tab * 16 + cell;
+        const auto suffix = absolute == selectedAbsoluteBar ? selectedStateSuffix : "normal";
+        const auto resource = "bar_" + juce::String (absolute + 1).paddedLeft ('0', 2) + "_" + suffix + "_png";
+        const auto mismatches = gateCropMismatchPixels (image, gateCellBounds (cell), resource);
+        mismatchedCells += mismatches == 0 ? 0 : 1;
+        reporter.checkValue (("page-cells-match-completed-assets:" + resource).toRawUTF8(),
+                             mismatches == 0, mismatches);
+    }
+    const auto selectedVisible = selectedAbsoluteBar >= tab * 16 && selectedAbsoluteBar < (tab + 1) * 16;
+    const auto totalGold = gateCountSelectionGold (image, kGateBarMapBounds);
+    const auto selectedBounds = selectedVisible ? gateCellBounds (selectedAbsoluteBar - tab * 16)
+                                                : juce::Rectangle<int> {};
+    const auto goldInSelectedCell = selectedVisible ? gateCountSelectionGold (image, selectedBounds) : 0;
+    const auto totalRed = gateCountPlayingRed (image, kGateBarMapBounds);
+    reporter.checkValue ("selection-gold-confined-to-selected-cell-or-zero",
+                         requireZeroSelectionGoldAnywhere ? ! selectedVisible : totalGold == goldInSelectedCell, totalGold);
+    reporter.checkValue ("playing-red-absent-without-playhead", totalRed == 0, totalRed);
+    return mismatchedCells == 0;
+}
+
+juce::var gateStateSnapshot (int tab, int selectedBar, int playingSlot, int presetIndex, int lengthIndex,
+                             bool bypass)
+{
+    auto* object = new juce::DynamicObject();
+    object->setProperty ("tab", tab);
+    object->setProperty ("selected_bar_1based", selectedBar + 1);
+    object->setProperty ("playing_slot", playingSlot);
+    object->setProperty ("playing_bar_1based", playingSlot < 0 ? 0 : playingSlot + 1);
+    object->setProperty ("visible_page", tab + 1);
+    object->setProperty ("expected_selected_cell_count", selectedBar >= tab * 16 && selectedBar < (tab + 1) * 16 ? 1 : 0);
+    object->setProperty ("expected_red_cell_count", playingSlot >= tab * 16 && playingSlot < (tab + 1) * 16 ? 1 : 0);
+    object->setProperty ("preset_index", presetIndex);
+    object->setProperty ("length_index", lengthIndex);
+    object->setProperty ("bypass", bypass);
+    return juce::var (object);
+}
+
+struct GateGeometry
+{
+    juce::Array<juce::Rectangle<int>> presetBounds, lengthBounds;
+    juce::Rectangle<int> bypassBounds, xyRegionBounds, presetRegionBounds,
+                         speedRegionBounds, pitchRegionBounds, depthRegionBounds;
+    bool resolved = false;
+};
+
+GateGeometry resolveGateGeometry (const juce::var& regions, const juce::var& interactive)
+{
+    GateGeometry geometry;
+    auto findById = [interactive] (const juce::String& id) -> juce::Rectangle<int>
+    {
+        if (const auto* array = interactive.getArray())
+            for (const auto& item : *array)
+                if (jsonProperty (item, "id").toString() == id)
+                    return jsonBounds (jsonProperty (item, "bounds"));
+        return {};
+    };
+    auto findRegionByName = [regions] (const char* name) -> juce::Rectangle<int>
+    {
+        if (const auto* array = regions.getArray())
+            for (const auto& item : *array)
+                if (jsonProperty (item, "name").toString() == name)
+                    return jsonBounds (jsonProperty (item, "bounds"));
+        return {};
+    };
+    for (const auto* preset : kGatePresetNames)
+        geometry.presetBounds.add (findById ("preset_" + juce::String (preset)));
+    for (const auto* length : kGateLengthNames)
+        geometry.lengthBounds.add (findById ("length_" + juce::String (length)));
+    geometry.bypassBounds = findById ("bypass");
+    geometry.xyRegionBounds = findRegionByName ("XY");
+    geometry.presetRegionBounds = findRegionByName ("PRESET");
+    geometry.speedRegionBounds = findRegionByName ("SPEED");
+    geometry.pitchRegionBounds = findRegionByName ("PITCH");
+    geometry.depthRegionBounds = findRegionByName ("DEPTH");
+    geometry.resolved = geometry.presetBounds.size() == 10 && geometry.lengthBounds.size() == 5
+                     && ! geometry.bypassBounds.isEmpty() && ! geometry.xyRegionBounds.isEmpty()
+                     && ! geometry.presetRegionBounds.isEmpty() && ! geometry.speedRegionBounds.isEmpty()
+                     && ! geometry.pitchRegionBounds.isEmpty() && ! geometry.depthRegionBounds.isEmpty();
+    return geometry;
+}
+
 void appendBarPixelTrace (juce::Array<juce::var>& output, const juce::var& runtimeManifest,
                           const juce::Image& rendered, int bar, juce::Rectangle<int> bounds,
                           const char* state)
@@ -516,5 +763,105 @@ int main()
     for(int l=0;l<5;++l){state.setSelectedLength((PluginStateModel::NoteLength)l);auto image=render(*editor);pass &=check(png(image,"v2-length-"+juce::String(l)+".png") && png(image,"v2-full-length-"+juce::String(l)+".png"),"v2-length-render");}
     const auto bypassBefore=state.getUiState().bypass; state.setSelectedPreset(PluginStateModel::ScratchPreset::custom);state.setBypass(!bypassBefore);auto bypassImage=render(*editor);pass &=check(png(bypassImage,"v2-full-bypass-on.png") && state.getSlot(0).preset==PluginStateModel::ScratchPreset::custom,"v2-bypass-preset-isolation");
     state.setSlotSpeed(0,PluginStateModel::kMinSpeed);state.setSlotPitch(0,PluginStateModel::kMinPitch);state.setSlotDepth(0,0.f);auto min=render(*editor);state.setSlotSpeed(0,PluginStateModel::kMaxSpeed);state.setSlotPitch(0,PluginStateModel::kMaxPitch);state.setSlotDepth(0,1.f);auto max=render(*editor);pass &=check(different(min,max) && png(min,"v2-knobs-min.png") && png(max,"v2-knobs-max.png"),"v2-knob-min-max-render");
+
+    // DYNAMIC_STATE_VISUAL_GATE: each check is made against the real V2
+    // offscreen renderer and its single selected state PNG, never a cache or
+    // an asset-sheet expectation.
+    DynamicStateVisualReporter dynamicReport;
+    const auto geometry = resolveGateGeometry (visualRegions, jsonProperty (visualManifest, "interactive"));
+    pass &= check (geometry.resolved, "v2-dynamic-state-gate-geometry");
+    auto barCase = [&] (const juce::String& name, int tab, int selectedBar, const juce::String& file)
+    {
+        state.selectTab (tab); state.selectBar (selectedBar);
+        const auto image = render (*editor);
+        dynamicReport.beginCase (name, "absolute BAR state resolution", gateStateSnapshot (tab, selectedBar, -1, (int) state.getSlot (selectedBar).preset, (int) state.getSlot (selectedBar).length, state.getUiState().bypass));
+        dynamicReport.screenshot (image, file);
+        verifyGateBarPage (image, tab, dynamicReport, selectedBar, "selected", selectedBar / 16 != tab);
+        dynamicReport.endCase();
+    };
+    state.setBypass (false);
+    barCase ("bar-page-1-selected-11", 0, 10, "dynamic-bar-page-1.png");
+    barCase ("bar-page-2-selected-11-not-propagated", 1, 10, "dynamic-bar-page-2.png");
+    barCase ("bar-page-2-selected-27", 1, 26, "dynamic-bar-page-2-selected-27.png");
+    barCase ("bar-page-3-selected-35", 2, 34, "dynamic-bar-page-3.png");
+    barCase ("bar-page-4-selected-49", 3, 48, "dynamic-bar-page-4.png");
+
+    TestPlayHead dynamicPlayHead;
+    processor.setPlayHead (&dynamicPlayHead);
+    dynamicPlayHead.set (true, 1.25); // BAR 6
+    processor.processBlock (audio, midi);
+    state.selectTab (0); state.selectBar (10);
+    auto separated = render (*editor);
+    dynamicReport.beginCase ("bar-selected-11-playing-6", "selected GOLD and playing RED use separate absolute BARs", gateStateSnapshot (0, 10, 5, (int) state.getSlot (10).preset, (int) state.getSlot (10).length, state.getUiState().bypass));
+    dynamicReport.screenshot (separated, "dynamic-bar-selected-11-playing-6.png");
+    for (int cell = 0; cell < 16; ++cell)
+    {
+        const auto bar = cell;
+        const auto suffix = bar == 10 ? "selected" : bar == 5 ? "playing" : "normal";
+        const auto resource = "bar_" + juce::String (bar + 1).paddedLeft ('0', 2) + "_" + suffix + "_png";
+        dynamicReport.checkValue ("separate-selected-playing-cell", gateCropMismatchPixels (separated, gateCellBounds (cell), resource) == 0, gateCropMismatchPixels (separated, gateCellBounds (cell), resource));
+    }
+    dynamicReport.endCase();
+    dynamicPlayHead.set (true, 2.5); // BAR 11
+    processor.processBlock (audio, midi);
+    auto combined = render (*editor);
+    dynamicReport.beginCase ("bar-selected-playing-11", "selected+playing resolves to one completed PNG", gateStateSnapshot (0, 10, 10, (int) state.getSlot (10).preset, (int) state.getSlot (10).length, state.getUiState().bypass));
+    dynamicReport.screenshot (combined, "dynamic-bar-selected-playing-11.png");
+    dynamicReport.checkValue ("selected-playing-single-completed-cell", gateCropMismatchPixels (combined, gateCellBounds (10), "bar_11_selected_playing_png") == 0, gateCropMismatchPixels (combined, gateCellBounds (10), "bar_11_selected_playing_png"));
+    dynamicReport.endCase();
+    dynamicPlayHead.set (false, 0.0); processor.processBlock (audio, midi); processor.setPlayHead (nullptr);
+
+    state.selectTab (0); state.selectBar (0);
+    for (int preset = 0; preset < 10; ++preset)
+    {
+        state.setSelectedPreset ((PluginStateModel::ScratchPreset) preset);
+        const auto image = render (*editor);
+        dynamicReport.beginCase ("preset-" + juce::String (kGatePresetNames[(size_t) preset]), "exactly one preset selected", gateStateSnapshot (0, 0, -1, preset, (int) state.getSlot (0).length, state.getUiState().bypass));
+        if (preset == 0) dynamicReport.screenshot (image, "dynamic-preset-off.png");
+        if (preset == 2) dynamicReport.screenshot (image, "dynamic-preset-backspin.png");
+        if (preset == 3) dynamicReport.screenshot (image, "dynamic-preset-chirp.png");
+        int selectedCount = 0;
+        for (int index = 0; index < 10; ++index)
+        {
+            const auto resource = "preset_" + juce::String (kGatePresetNames[(size_t) index]) + (index == preset ? "_selected_png" : "_normal_png");
+            const auto mismatch = gateCropMismatchPixels (image, geometry.presetBounds.getReference (index), resource);
+            dynamicReport.checkValue ("preset-image-state", mismatch == 0, mismatch);
+            selectedCount += gateCropMismatchPixels (image, geometry.presetBounds.getReference (index), "preset_" + juce::String (kGatePresetNames[(size_t) index]) + "_selected_png") == 0 ? 1 : 0;
+        }
+        dynamicReport.checkValue ("preset-selected-count", selectedCount == 1, selectedCount);
+        dynamicReport.endCase();
+    }
+    for (int length = 0; length < 5; ++length)
+    {
+        state.setSelectedLength ((PluginStateModel::NoteLength) length);
+        const auto image = render (*editor);
+        dynamicReport.beginCase ("length-" + juce::String (kGateLengthNames[(size_t) length]), "exactly one length selected", gateStateSnapshot (0, 0, -1, (int) state.getSlot (0).preset, length, state.getUiState().bypass));
+        if (length == 0) dynamicReport.screenshot (image, "dynamic-length-1-16.png");
+        if (length == 2) dynamicReport.screenshot (image, "dynamic-length-1-4.png");
+        if (length == 4) dynamicReport.screenshot (image, "dynamic-length-1bar.png");
+        int selectedCount = 0;
+        for (int index = 0; index < 5; ++index)
+        {
+            const auto resource = "length_" + juce::String (kGateLengthNames[(size_t) index]) + (index == length ? "_selected_png" : "_normal_png");
+            const auto mismatch = gateCropMismatchPixels (image, geometry.lengthBounds.getReference (index), resource);
+            dynamicReport.checkValue ("length-image-state", mismatch == 0, mismatch);
+            selectedCount += gateCropMismatchPixels (image, geometry.lengthBounds.getReference (index), "length_" + juce::String (kGateLengthNames[(size_t) index]) + "_selected_png") == 0 ? 1 : 0;
+        }
+        dynamicReport.checkValue ("length-selected-count", selectedCount == 1, selectedCount);
+        dynamicReport.endCase();
+    }
+    const auto fixedPreset = state.getSlot (0).preset;
+    for (const auto bypass : { false, true })
+    {
+        state.setBypass (bypass);
+        const auto image = render (*editor);
+        dynamicReport.beginCase (bypass ? "bypass-on" : "bypass-off", "bypass is independent from preset", gateStateSnapshot (0, 0, -1, (int) fixedPreset, (int) state.getSlot (0).length, bypass));
+        dynamicReport.screenshot (image, bypass ? "dynamic-bypass-on.png" : "dynamic-bypass-off.png");
+        const auto mismatch = gateCropMismatchPixels (image, kGateBypassBounds, bypass ? "bypass_on_png" : "bypass_off_png");
+        dynamicReport.checkValue ("bypass-single-image", mismatch == 0, mismatch);
+        dynamicReport.check ("bypass-does-not-change-preset", state.getSlot (0).preset == fixedPreset);
+        dynamicReport.endCase();
+    }
+    pass &= check (dynamicReport.finishReport(), "DYNAMIC_STATE_VISUAL_GATE");
     editor.reset(); processor.releaseResources(); return pass ? 0 : 1;
 }

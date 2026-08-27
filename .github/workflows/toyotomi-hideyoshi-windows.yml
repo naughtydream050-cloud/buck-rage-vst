@@ -200,6 +200,8 @@ jobs:
             toyotomi-bar-waveform-*.png
             v2-*.png
             v2-*.json
+            dynamic-*.png
+            dynamic-state-report.json
             ui/v2/runtime-manifest.json
             ui/v2/visual_acceptance_manifest.json
             SOURCE_HEAD.txt
