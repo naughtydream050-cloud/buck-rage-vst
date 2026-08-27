@@ -37,26 +37,13 @@ foreach ($targetId in 11, 27, 43, 59) {
     $result = [System.Drawing.Bitmap]::new($shell)
     $graphics = [System.Drawing.Graphics]::FromImage($result)
     $graphics.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceCopy
-    # Approved completed-cell content zones: label and mini preview only.
-    $graphics.DrawImage($target, [System.Drawing.Rectangle]::new(0, 5, 56, 12), 0, 5, 56, 12, [System.Drawing.GraphicsUnit]::Pixel)
+    # Preserve glyph pixels only; the full label band carries the old gold rim.
+    $graphics.DrawImage($target, [System.Drawing.Rectangle]::new(4, 5, 48, 14), 4, 5, 48, 14, [System.Drawing.GraphicsUnit]::Pixel)
     $graphics.DrawImage($target, [System.Drawing.Rectangle]::new(8, 36, 40, 20), 8, 36, 40, 20, [System.Drawing.GraphicsUnit]::Pixel)
     $graphics.Dispose()
     Save-PngAtomically $result $targetPath
     $result.Dispose(); $target.Dispose(); $shell.Dispose()
 }
-
-# Keep the runtime manifest's provenance hashes authoritative for the four
-# replaced normal assets.
-$manifestPath = Join-Path $ProjectRoot 'ui\v2\runtime-manifest.json'
-$manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json -Depth 100
-foreach ($bar in $manifest.barMap.bars) {
-    if ($bar.bar_id -in 11, 27, 43, 59) {
-        $path = Join-Path $ProjectRoot $bar.normal_asset.file
-        $bar.normal_asset.sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
-        $bar.normal_asset.provenance = 'neutral-default-or-approved-normal-rim-replacement'
-    }
-}
-$manifest | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $manifestPath -Encoding utf8
 
 Get-FileHash -LiteralPath (11, 27, 43, 59 | ForEach-Object { Join-Path $bars ("bar_{0:D2}_normal.png" -f $_) }) -Algorithm SHA256 |
     Select-Object Path, Hash
