@@ -37,9 +37,8 @@ foreach ($targetId in 11, 27, 43, 59) {
     $result = [System.Drawing.Bitmap]::new($shell)
     $graphics = [System.Drawing.Graphics]::FromImage($result)
     $graphics.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceCopy
-    # Keep only the interior label glyphs.  Copying the full label band also
-    # copied the contaminated left/right selected rim into normal cells.
-    $graphics.DrawImage($target, [System.Drawing.Rectangle]::new(4, 5, 48, 14), 4, 5, 48, 14, [System.Drawing.GraphicsUnit]::Pixel)
+    # Approved completed-cell content zones: label and mini preview only.
+    $graphics.DrawImage($target, [System.Drawing.Rectangle]::new(0, 5, 56, 12), 0, 5, 56, 12, [System.Drawing.GraphicsUnit]::Pixel)
     $graphics.DrawImage($target, [System.Drawing.Rectangle]::new(8, 36, 40, 20), 8, 36, 40, 20, [System.Drawing.GraphicsUnit]::Pixel)
     $graphics.Dispose()
     Save-PngAtomically $result $targetPath
@@ -49,7 +48,7 @@ foreach ($targetId in 11, 27, 43, 59) {
 # Keep the runtime manifest's provenance hashes authoritative for the four
 # replaced normal assets.
 $manifestPath = Join-Path $ProjectRoot 'ui\v2\runtime-manifest.json'
-$manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
+$manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json -Depth 100
 foreach ($bar in $manifest.barMap.bars) {
     if ($bar.bar_id -in 11, 27, 43, 59) {
         $path = Join-Path $ProjectRoot $bar.normal_asset.file
