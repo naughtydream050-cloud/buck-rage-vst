@@ -332,6 +332,30 @@ int gateCropMismatchPixels (const juce::Image& rendered, juce::Rectangle<int> bo
     return differing;
 }
 
+// LENGTH's locked manifest has intentional 1–2px shared edges.  Surface::paint
+// draws the later button last, so test the exact visible ownership of every
+// PNG rather than incorrectly expecting a covered edge to remain visible.
+int gateVisibleCropMismatchPixels (const juce::Image& rendered, juce::Rectangle<int> bounds,
+                                   const juce::String& resource,
+                                   const juce::Array<juce::Rectangle<int>>& laterBounds)
+{
+    const auto expected = resourceImage (resource.toRawUTF8());
+    if (! expected.isValid() || expected.getWidth() != bounds.getWidth() || expected.getHeight() != bounds.getHeight())
+        return -1;
+    int differing = 0;
+    for (int y = 0; y < bounds.getHeight(); ++y)
+        for (int x = 0; x < bounds.getWidth(); ++x)
+        {
+            const auto point = juce::Point<int> { bounds.getX() + x, bounds.getY() + y };
+            bool covered = false;
+            for (const auto& later : laterBounds)
+                if (later.contains (point)) { covered = true; break; }
+            if (! covered && rendered.getPixelAt (point.x, point.y) != expected.getPixelAt (x, y))
+                ++differing;
+        }
+    return differing;
+}
+
 int gateCountSelectionGold (const juce::Image& image, juce::Rectangle<int> bounds)
 {
     int count = 0;
@@ -843,9 +867,12 @@ int main()
         for (int index = 0; index < 5; ++index)
         {
             const auto resource = "length_" + juce::String (kGateLengthNames[(size_t) index]) + (index == length ? "_selected_png" : "_normal_png");
-            const auto mismatch = gateCropMismatchPixels (image, geometry.lengthBounds.getReference (index), resource);
+            juce::Array<juce::Rectangle<int>> laterBounds;
+            for (int later = index + 1; later < 5; ++later)
+                laterBounds.add (geometry.lengthBounds.getReference (later));
+            const auto mismatch = gateVisibleCropMismatchPixels (image, geometry.lengthBounds.getReference (index), resource, laterBounds);
             dynamicReport.checkValue ("length-image-state", mismatch == 0, mismatch);
-            selectedCount += gateCropMismatchPixels (image, geometry.lengthBounds.getReference (index), "length_" + juce::String (kGateLengthNames[(size_t) index]) + "_selected_png") == 0 ? 1 : 0;
+            selectedCount += gateVisibleCropMismatchPixels (image, geometry.lengthBounds.getReference (index), "length_" + juce::String (kGateLengthNames[(size_t) index]) + "_selected_png", laterBounds) == 0 ? 1 : 0;
         }
         dynamicReport.checkValue ("length-selected-count", selectedCount == 1, selectedCount);
         dynamicReport.endCase();
