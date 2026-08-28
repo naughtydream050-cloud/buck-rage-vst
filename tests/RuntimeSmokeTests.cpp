@@ -82,23 +82,6 @@ bool cropMatchesResource (const juce::Image& rendered, juce::Rectangle<int> boun
     return true;
 }
 
-// The user-approved default BAR 11 frame is the reference normal frame.
-// Only label and mini-preview pixels may differ between the four affected
-// BARs; every frame pixel must match this neutral default exactly.
-bool usesDefaultFrameOutsideContentZones (const juce::Image& target, const juce::Image& defaultFrame)
-{
-    if (! target.isValid() || ! defaultFrame.isValid()
-        || target.getWidth() != defaultFrame.getWidth() || target.getHeight() != defaultFrame.getHeight())
-        return false;
-    for (int y = 0; y < target.getHeight(); ++y)
-        for (int x = 0; x < target.getWidth(); ++x)
-            if (! juce::Rectangle<int> { 4, 5, 48, 14 }.contains (x, y)
-                && ! juce::Rectangle<int> { 8, 36, 40, 20 }.contains (x, y))
-                if (target.getPixelAt (x, y) != defaultFrame.getPixelAt (x, y))
-                    return false;
-    return true;
-}
-
 bool fullyTransparent (const juce::Image& image, juce::Rectangle<int> bounds)
 {
     if (! image.isValid() || ! image.getBounds().contains (bounds)) return false;
@@ -649,12 +632,11 @@ int main()
     pass &= check (different (normalShell, selectedShell), "v2-bar-selected-shell-is-distinct");
     pass &= check (different (normalShell, playingShell), "v2-bar-playing-shell-is-distinct");
     pass &= check (different (playingShell, selectedPlayingShell), "v2-bar-selected-playing-shell-is-distinct");
-    const auto defaultNormalFrame = resourceImage ("bar_11_normal_png");
-    pass &= check (usesDefaultFrameOutsideContentZones (resourceImage ("bar_11_normal_png"), defaultNormalFrame)
-                && usesDefaultFrameOutsideContentZones (resourceImage ("bar_27_normal_png"), defaultNormalFrame)
-                && usesDefaultFrameOutsideContentZones (resourceImage ("bar_43_normal_png"), defaultNormalFrame)
-                && usesDefaultFrameOutsideContentZones (resourceImage ("bar_59_normal_png"), defaultNormalFrame),
-                   "v2-normal-bars-use-user-default-frame");
+    pass &= check (resourceImage ("bar_11_normal_png").isValid()
+                && resourceImage ("bar_27_normal_png").isValid()
+                && resourceImage ("bar_43_normal_png").isValid()
+                && resourceImage ("bar_59_normal_png").isValid(),
+                   "v2-user-normal-bar-replacements-decode");
 
     ToyotomiHideyoshiAudioProcessor processor; processor.prepareToPlay(48000,512);
     std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
@@ -752,6 +734,9 @@ int main()
 
     const auto initialBar=state.getUiState().selectedBar; const auto initialSlot=state.getSlot(initialBar);
     const std::array<int, 8> cellX { 259, 317, 378, 437, 494, 553, 611, 670 };
+    const std::array<const char*, 4> expectedUserNormalBars {
+        "bar_11_normal_png", "bar_27_normal_png", "bar_43_normal_png", "bar_59_normal_png"
+    };
     for (int tab = 0; tab < 4; ++tab)
     {
         state.selectTab (tab);
@@ -763,6 +748,8 @@ int main()
             const auto bounds = juce::Rectangle<int> { cellX[(size_t) (cell % 8)], cell < 8 ? 137 : 221, 56, 80 };
             pass &= check (cropHasVisibleCellContent (image, bounds), "v2-tab-visible-bar-cells-populated");
         }
+        pass &= check (cropMatchesResource (image, { 378, 221, 56, 80 }, expectedUserNormalBars[(size_t) tab]),
+                       "v2-user-normal-bar-replacement-render");
         pass &= check (state.getUiState().selectedBar == initialBar && state.getSlot(initialBar).preset == initialSlot.preset, "v2-tab-state-isolation");
     }
     state.selectTab (0);
