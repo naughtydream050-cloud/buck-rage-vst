@@ -82,6 +82,22 @@ bool cropMatchesResource (const juce::Image& rendered, juce::Rectangle<int> boun
     return true;
 }
 
+bool usesNeutralBarBase (const juce::Image& target, const juce::Image& neutral)
+{
+    if (! target.isValid() || ! neutral.isValid()
+        || target.getWidth() != 56 || target.getHeight() != 80
+        || neutral.getWidth() != 56 || neutral.getHeight() != 80)
+        return false;
+
+    const std::array<juce::Rectangle<int>, 3> content {{ { 5, 6, 46, 24 }, { 7, 32, 42, 25 }, { 18, 57, 20, 18 } }};
+    for (int y = 0; y < 80; ++y)
+        for (int x = 0; x < 56; ++x)
+            if (! std::any_of (content.begin(), content.end(), [x, y] (auto r) { return r.contains (x, y); })
+                && target.getPixelAt (x, y) != neutral.getPixelAt (x, y))
+                return false;
+    return true;
+}
+
 bool fullyTransparent (const juce::Image& image, juce::Rectangle<int> bounds)
 {
     if (! image.isValid() || ! image.getBounds().contains (bounds)) return false;
@@ -637,6 +653,12 @@ int main()
                 && resourceImage ("bar_43_normal_png").isValid()
                 && resourceImage ("bar_59_normal_png").isValid(),
                    "v2-user-normal-bar-replacements-decode");
+    const auto neutralBarBase = resourceImage ("bar_10_normal_png");
+    pass &= check (usesNeutralBarBase (resourceImage ("bar_11_normal_png"), neutralBarBase)
+                && usesNeutralBarBase (resourceImage ("bar_27_normal_png"), neutralBarBase)
+                && usesNeutralBarBase (resourceImage ("bar_43_normal_png"), neutralBarBase)
+                && usesNeutralBarBase (resourceImage ("bar_59_normal_png"), neutralBarBase),
+                   "v2-four-normal-bars-use-neutral-base");
 
     ToyotomiHideyoshiAudioProcessor processor; processor.prepareToPlay(48000,512);
     std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());

@@ -942,7 +942,7 @@
     {
       "id": "bar_11_normal",
       "file": "Resources/ui-v2/runtime-1024/bars/bar_11_normal.png",
-      "provenance": "user-provided-normal-bar-replacement-20260828-neutral-frame",
+      "provenance": "user-provided-normal-bar-replacement-20260828-neutral-base",
       "width": 56,
       "height": 80,
       "alpha": [
@@ -956,7 +956,7 @@
         56,
         80
       ],
-      "sha256": "D4CB0DEEB3BD078BABD341359E01AEE4D6EA0EBA9B5CC1BF44798746A164587C"
+      "sha256": "8841C28E89C39D2E26B0D47A3B6C66B6C9197EFA508547A8A84865664D9CE4E8"
     },
     {
       "id": "bar_11_selected",
@@ -2158,7 +2158,7 @@
     {
       "id": "bar_27_normal",
       "file": "Resources/ui-v2/runtime-1024/bars/bar_27_normal.png",
-      "provenance": "user-provided-normal-bar-replacement-20260828-neutral-frame",
+      "provenance": "user-provided-normal-bar-replacement-20260828-neutral-base",
       "width": 56,
       "height": 80,
       "alpha": [
@@ -2172,7 +2172,7 @@
         56,
         80
       ],
-      "sha256": "F0C289E88B26DCF0D86E802AD7A708006B9935FCB63FCA975467EF47A0BA814D"
+      "sha256": "AAC48E82612BBE0C469054D4D21A87FFCA5807634B72E13FA307FBD2CE6FA756"
     },
     {
       "id": "bar_27_selected",
@@ -3374,7 +3374,7 @@
     {
       "id": "bar_43_normal",
       "file": "Resources/ui-v2/runtime-1024/bars/bar_43_normal.png",
-      "provenance": "user-provided-normal-bar-replacement-20260828-neutral-frame",
+      "provenance": "user-provided-normal-bar-replacement-20260828-neutral-base",
       "width": 56,
       "height": 80,
       "alpha": [
@@ -3388,7 +3388,7 @@
         56,
         80
       ],
-      "sha256": "3E737117D67C8CBBDC2EAE3FB55C8CB3699E188BE714C4CF16745E2C56514929"
+      "sha256": "CDB786B5CDAB5434C4ED923BCA338788885CC5D5AF719BFF1B63F6826495472D"
     },
     {
       "id": "bar_43_selected",
@@ -4590,7 +4590,7 @@
     {
       "id": "bar_59_normal",
       "file": "Resources/ui-v2/runtime-1024/bars/bar_59_normal.png",
-      "provenance": "user-provided-normal-bar-replacement-20260828-neutral-frame",
+      "provenance": "user-provided-normal-bar-replacement-20260828-neutral-base",
       "width": 56,
       "height": 80,
       "alpha": [
@@ -4604,7 +4604,7 @@
         56,
         80
       ],
-      "sha256": "47BEA984D0A574E024E4E115C07E416E23593D56BEEB6578E660A49A2C68A4A1"
+      "sha256": "A25960046F03E551A2C7FC772FD731D8BA8853C6EA930EBCB189A34A0CFCF977"
     },
     {
       "id": "bar_59_selected",
@@ -6723,12 +6723,12 @@
             56,
             80
           ],
-          "sha256": "D4CB0DEEB3BD078BABD341359E01AEE4D6EA0EBA9B5CC1BF44798746A164587C",
+          "sha256": "8841C28E89C39D2E26B0D47A3B6C66B6C9197EFA508547A8A84865664D9CE4E8",
           "alpha": [
             255,
             255
           ],
-          "provenance": "user-provided-normal-bar-replacement-20260828-neutral-frame"
+          "provenance": "user-provided-normal-bar-replacement-20260828-neutral-base"
         },
         "selected_asset": {
           "file": "Resources/ui-v2/runtime-1024/bars/bar_11_selected.png",
@@ -7891,12 +7891,12 @@
             56,
             80
           ],
-          "sha256": "F0C289E88B26DCF0D86E802AD7A708006B9935FCB63FCA975467EF47A0BA814D",
+          "sha256": "AAC48E82612BBE0C469054D4D21A87FFCA5807634B72E13FA307FBD2CE6FA756",
           "alpha": [
             255,
             255
           ],
-          "provenance": "user-provided-normal-bar-replacement-20260828-neutral-frame"
+          "provenance": "user-provided-normal-bar-replacement-20260828-neutral-base"
         },
         "selected_asset": {
           "file": "Resources/ui-v2/runtime-1024/bars/bar_27_selected.png",
@@ -9059,12 +9059,12 @@
             56,
             80
           ],
-          "sha256": "3E737117D67C8CBBDC2EAE3FB55C8CB3699E188BE714C4CF16745E2C56514929",
+          "sha256": "CDB786B5CDAB5434C4ED923BCA338788885CC5D5AF719BFF1B63F6826495472D",
           "alpha": [
             255,
             255
           ],
-          "provenance": "user-provided-normal-bar-replacement-20260828-neutral-frame"
+          "provenance": "user-provided-normal-bar-replacement-20260828-neutral-base"
         },
         "selected_asset": {
           "file": "Resources/ui-v2/runtime-1024/bars/bar_43_selected.png",
@@ -10227,12 +10227,12 @@
             56,
             80
           ],
-          "sha256": "47BEA984D0A574E024E4E115C07E416E23593D56BEEB6578E660A49A2C68A4A1",
+          "sha256": "A25960046F03E551A2C7FC772FD731D8BA8853C6EA930EBCB189A34A0CFCF977",
           "alpha": [
             255,
             255
           ],
-          "provenance": "user-provided-normal-bar-replacement-20260828-neutral-frame"
+          "provenance": "user-provided-normal-bar-replacement-20260828-neutral-base"
         },
         "selected_asset": {
           "file": "Resources/ui-v2/runtime-1024/bars/bar_59_selected.png",
