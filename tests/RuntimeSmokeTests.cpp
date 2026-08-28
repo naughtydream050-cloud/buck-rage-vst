@@ -626,6 +626,7 @@ int main()
     pass &= check(resourceIs("static_faceplate_1024x683_png",1024,683),"v2-static-faceplate-native");
     pass &= check(resourceIs("knob_ring_60_png",48,48) && resourceIs("knob_pointer_60_png",48,48),"v2-knob-assets-native");
     pass &= check(resourceIs("bypass_off_png",80,31) && resourceIs("bypass_on_png",80,31),"v2-bypass-native");
+    pass &= check(resourceIs("meter_led_strip_png",12,204),"v2-output-meter-led-native");
     const std::array<const char*, 4> shellResources {{ "bar_cell_shell_normal_56x80_png", "bar_cell_shell_selected_56x80_png", "bar_cell_shell_playing_56x80_png", "bar_cell_shell_selected_playing_56x80_png" }};
     for (const auto* resource : shellResources)
         pass &= check (resourceIs (resource, 56, 80), "v2-bar-shell-native");
@@ -661,6 +662,14 @@ int main()
                    "v2-four-normal-bars-use-neutral-base");
 
     ToyotomiHideyoshiAudioProcessor processor; processor.prepareToPlay(48000,512);
+    // The meter tap is the final buffer emitted by processBlock. Verify L/R
+    // transport independently before the UI Timer consumes either peak.
+    juce::AudioBuffer<float> meterProbe (2, 32); meterProbe.clear();
+    meterProbe.setSample (0, 0, 0.75f); meterProbe.setSample (1, 0, 0.25f);
+    juce::MidiBuffer meterMidi; processor.processBlock (meterProbe, meterMidi);
+    pass &= check (std::abs (processor.consumeOutputPeak (0) - 0.75f) < 0.0001f
+                && std::abs (processor.consumeOutputPeak (1) - 0.25f) < 0.0001f,
+                   "v2-output-meter-post-dsp-lr-peak-transport");
     std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
     pass &= check(editor != nullptr && editor->getWidth()==1024 && editor->getHeight()==683,"v2-editor-native-1024");
     if(!editor) return 1;
