@@ -942,7 +942,7 @@
     {
       "id": "bar_11_normal",
       "file": "Resources/ui-v2/runtime-1024/bars/bar_11_normal.png",
-      "provenance": "user-provided-normal-bar-replacement-20260828",
+      "provenance": "user-provided-normal-bar-replacement-20260828-neutral-frame",
       "width": 56,
       "height": 80,
       "alpha": [
@@ -956,7 +956,7 @@
         56,
         80
       ],
-      "sha256": "3082727FBD42E39AC0D9BA595E16B46AE13BE62A1E0CDDFCD805C56D631A2A50"
+      "sha256": "D4CB0DEEB3BD078BABD341359E01AEE4D6EA0EBA9B5CC1BF44798746A164587C"
     },
     {
       "id": "bar_11_selected",
@@ -2158,7 +2158,7 @@
     {
       "id": "bar_27_normal",
       "file": "Resources/ui-v2/runtime-1024/bars/bar_27_normal.png",
-      "provenance": "user-provided-normal-bar-replacement-20260828",
+      "provenance": "user-provided-normal-bar-replacement-20260828-neutral-frame",
       "width": 56,
       "height": 80,
       "alpha": [
@@ -2172,7 +2172,7 @@
         56,
         80
       ],
-      "sha256": "AF8B15A0F76DBC41FD38A8B9F67521C82F96A7D618835B0205A19FD5625A205F"
+      "sha256": "F0C289E88B26DCF0D86E802AD7A708006B9935FCB63FCA975467EF47A0BA814D"
     },
     {
       "id": "bar_27_selected",
@@ -3374,7 +3374,7 @@
     {
       "id": "bar_43_normal",
       "file": "Resources/ui-v2/runtime-1024/bars/bar_43_normal.png",
-      "provenance": "user-provided-normal-bar-replacement-20260828",
+      "provenance": "user-provided-normal-bar-replacement-20260828-neutral-frame",
       "width": 56,
       "height": 80,
       "alpha": [
@@ -3388,7 +3388,7 @@
         56,
         80
       ],
-      "sha256": "BA559A48123AAFDBF9210A01C2617C879B3AD4BF80879CFD89D88F7F681FF1E6"
+      "sha256": "3E737117D67C8CBBDC2EAE3FB55C8CB3699E188BE714C4CF16745E2C56514929"
     },
     {
       "id": "bar_43_selected",
@@ -4590,7 +4590,7 @@
     {
       "id": "bar_59_normal",
       "file": "Resources/ui-v2/runtime-1024/bars/bar_59_normal.png",
-      "provenance": "user-provided-normal-bar-replacement-20260828",
+      "provenance": "user-provided-normal-bar-replacement-20260828-neutral-frame",
       "width": 56,
       "height": 80,
       "alpha": [
@@ -4604,7 +4604,7 @@
         56,
         80
       ],
-      "sha256": "448AC1401B58724A9B90BC0CA136981163A5D40E6787212EE8A4FEB2485D672A"
+      "sha256": "47BEA984D0A574E024E4E115C07E416E23593D56BEEB6578E660A49A2C68A4A1"
     },
     {
       "id": "bar_59_selected",
@@ -6723,12 +6723,12 @@
             56,
             80
           ],
-          "sha256": "3082727FBD42E39AC0D9BA595E16B46AE13BE62A1E0CDDFCD805C56D631A2A50",
+          "sha256": "D4CB0DEEB3BD078BABD341359E01AEE4D6EA0EBA9B5CC1BF44798746A164587C",
           "alpha": [
             255,
             255
           ],
-          "provenance": "user-provided-normal-bar-replacement-20260828"
+          "provenance": "user-provided-normal-bar-replacement-20260828-neutral-frame"
         },
         "selected_asset": {
           "file": "Resources/ui-v2/runtime-1024/bars/bar_11_selected.png",
@@ -7891,12 +7891,12 @@
             56,
             80
           ],
-          "sha256": "AF8B15A0F76DBC41FD38A8B9F67521C82F96A7D618835B0205A19FD5625A205F",
+          "sha256": "F0C289E88B26DCF0D86E802AD7A708006B9935FCB63FCA975467EF47A0BA814D",
           "alpha": [
             255,
             255
           ],
-          "provenance": "user-provided-normal-bar-replacement-20260828"
+          "provenance": "user-provided-normal-bar-replacement-20260828-neutral-frame"
         },
         "selected_asset": {
           "file": "Resources/ui-v2/runtime-1024/bars/bar_27_selected.png",
@@ -9059,12 +9059,12 @@
             56,
             80
           ],
-          "sha256": "BA559A48123AAFDBF9210A01C2617C879B3AD4BF80879CFD89D88F7F681FF1E6",
+          "sha256": "3E737117D67C8CBBDC2EAE3FB55C8CB3699E188BE714C4CF16745E2C56514929",
           "alpha": [
             255,
             255
           ],
-          "provenance": "user-provided-normal-bar-replacement-20260828"
+          "provenance": "user-provided-normal-bar-replacement-20260828-neutral-frame"
         },
         "selected_asset": {
           "file": "Resources/ui-v2/runtime-1024/bars/bar_43_selected.png",
@@ -10227,12 +10227,12 @@
             56,
             80
           ],
-          "sha256": "448AC1401B58724A9B90BC0CA136981163A5D40E6787212EE8A4FEB2485D672A",
+          "sha256": "47BEA984D0A574E024E4E115C07E416E23593D56BEEB6578E660A49A2C68A4A1",
           "alpha": [
             255,
             255
           ],
-          "provenance": "user-provided-normal-bar-replacement-20260828"
+          "provenance": "user-provided-normal-bar-replacement-20260828-neutral-frame"
         },
         "selected_asset": {
           "file": "Resources/ui-v2/runtime-1024/bars/bar_59_selected.png",
