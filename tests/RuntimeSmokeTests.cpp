@@ -82,19 +82,19 @@ bool cropMatchesResource (const juce::Image& rendered, juce::Rectangle<int> boun
     return true;
 }
 
-// Only the label and mini-preview zones belong to a completed normal cell.
-// Every other pixel must be the approved neutral shell, which rules out a
-// baked selected frame regardless of its thickness.
-bool usesNeutralShellOutsideContentZones (const juce::Image& target, const juce::Image& neutral)
+// The user-approved default BAR 11 frame is the reference normal frame.
+// Only label and mini-preview pixels may differ between the four affected
+// BARs; every frame pixel must match this neutral default exactly.
+bool usesDefaultFrameOutsideContentZones (const juce::Image& target, const juce::Image& defaultFrame)
 {
-    if (! target.isValid() || ! neutral.isValid()
-        || target.getWidth() != neutral.getWidth() || target.getHeight() != neutral.getHeight())
+    if (! target.isValid() || ! defaultFrame.isValid()
+        || target.getWidth() != defaultFrame.getWidth() || target.getHeight() != defaultFrame.getHeight())
         return false;
     for (int y = 0; y < target.getHeight(); ++y)
         for (int x = 0; x < target.getWidth(); ++x)
-            if (! juce::Rectangle<int> { 0, 5, 56, 12 }.contains (x, y)
+            if (! juce::Rectangle<int> { 4, 5, 48, 14 }.contains (x, y)
                 && ! juce::Rectangle<int> { 8, 36, 40, 20 }.contains (x, y))
-                if (target.getPixelAt (x, y) != neutral.getPixelAt (x, y))
+                if (target.getPixelAt (x, y) != defaultFrame.getPixelAt (x, y))
                     return false;
     return true;
 }
@@ -649,12 +649,12 @@ int main()
     pass &= check (different (normalShell, selectedShell), "v2-bar-selected-shell-is-distinct");
     pass &= check (different (normalShell, playingShell), "v2-bar-playing-shell-is-distinct");
     pass &= check (different (playingShell, selectedPlayingShell), "v2-bar-selected-playing-shell-is-distinct");
-    const auto normalBarShell = resourceImage ("bar_cell_shell_normal_56x80_png");
-    pass &= check (usesNeutralShellOutsideContentZones (resourceImage ("bar_11_normal_png"), normalBarShell)
-                && usesNeutralShellOutsideContentZones (resourceImage ("bar_27_normal_png"), normalBarShell)
-                && usesNeutralShellOutsideContentZones (resourceImage ("bar_43_normal_png"), normalBarShell)
-                && usesNeutralShellOutsideContentZones (resourceImage ("bar_59_normal_png"), normalBarShell),
-                   "v2-normal-bars-have-no-baked-selected-shell");
+    const auto defaultNormalFrame = resourceImage ("bar_11_normal_png");
+    pass &= check (usesDefaultFrameOutsideContentZones (resourceImage ("bar_11_normal_png"), defaultNormalFrame)
+                && usesDefaultFrameOutsideContentZones (resourceImage ("bar_27_normal_png"), defaultNormalFrame)
+                && usesDefaultFrameOutsideContentZones (resourceImage ("bar_43_normal_png"), defaultNormalFrame)
+                && usesDefaultFrameOutsideContentZones (resourceImage ("bar_59_normal_png"), defaultNormalFrame),
+                   "v2-normal-bars-use-user-default-frame");
 
     ToyotomiHideyoshiAudioProcessor processor; processor.prepareToPlay(48000,512);
     std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
