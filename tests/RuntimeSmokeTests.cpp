@@ -701,7 +701,7 @@ int main()
         }
     for (const auto& bounds : std::array<juce::Rectangle<int>, 6> {{{744,513,48,48},{793,513,48,48},{848,513,48,48},{742,563,48,16},{793,563,48,16},{848,563,48,16}}})
         faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
-    for (const auto& bounds : std::array<juce::Rectangle<int>, 4> {{{938,420,18,174},{971,420,18,174},{923,601,38,21},{963,601,38,21}}})
+    for (const auto& bounds : std::array<juce::Rectangle<int>, 4> {{{933,409,12,204},{968,409,12,204},{923,601,38,21},{963,601,38,21}}})
         faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
     faceplateClean = faceplateClean && hasNoDynamicGoldTrace (staticFaceplate, { 56, 450, 157, 120 });
     pass &= check (faceplateClean, "v2-static-background-clean-gate");

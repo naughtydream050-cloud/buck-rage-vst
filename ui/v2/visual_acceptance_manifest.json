@@ -14,7 +14,7 @@
   },
   "regions": [
     { "name": "HEADER",      "bounds": [0, 0, 1024, 72],   "dynamic_region": false, "accepted_variance": "none" },
-    { "name": "BAR_TABS",    "bounds": [251, 74, 434, 27], "dynamic_region": true,  "accepted_variance": "selected-tab image only" },
+    { "name": "BAR_TABS",    "bounds": [247, 70, 442, 35], "dynamic_region": true,  "accepted_variance": "tab state shell, including the master example's exterior gold border" },
     { "name": "BAR_MAP",     "bounds": [259, 137, 467, 164], "dynamic_region": true, "accepted_variance": "cell shell, label, mini preview and playhead" },
     { "name": "PRESET",      "bounds": [750, 100, 258, 260], "dynamic_region": true, "accepted_variance": "one selected preset image" },
     { "name": "XY",          "bounds": [14, 416, 232, 200], "dynamic_region": true, "accepted_variance": "motion trace/current point only" },
