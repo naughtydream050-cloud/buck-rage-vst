@@ -275,7 +275,10 @@ juce::Image makeDynamicMask (const juce::var& regions)
             if ((bool) jsonProperty (region, "dynamic_region"))
             {
                 g.setColour (juce::Colours::white);
-                g.fillRect (jsonBounds (jsonProperty (region, "bounds")));
+                // State artwork owns its one-pixel exterior rim as well.  The
+                // faceplate clears that rim so a neutral state cannot retain
+                // the master image's gold selection edge.
+                g.fillRect (jsonBounds (jsonProperty (region, "bounds")).expanded (1));
             }
     return mask;
 }
