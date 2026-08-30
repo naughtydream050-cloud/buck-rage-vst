@@ -23,7 +23,10 @@ $stateRects = @(
     @(744,513,48,48), @(793,513,48,48), @(848,513,48,48),
     @(742,563,48,16), @(793,563,48,16), @(848,563,48,16),
     @(931,14,80,31),
-    @(937,409,12,204), @(974,409,12,204), @(923,601,38,21), @(963,601,38,21)
+    # OUTPUT geometry is measured from the 1280x853 SSOT and edge-scaled to
+    # this native canvas. These transparent slots are the same bounds used by
+    # ParameterLayout for the runtime meter/readout owner.
+    @(939,419,12,174), @(974,419,12,174), @(923,601,39,21), @(963,601,39,21)
 )
 $stateIndex = 0
 foreach($r in $stateRects) {

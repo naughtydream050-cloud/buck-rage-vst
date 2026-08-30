@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditorV2.h"
+#include "ParameterLayout.h"
 #include <algorithm>
 #include <cstdint>
 #include <iostream>
@@ -717,9 +718,13 @@ int main()
                 || id.startsWith ("length_") || id == "bypass")
                 faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, jsonBounds (jsonProperty (item, "bounds")));
         }
-    for (const auto& bounds : std::array<juce::Rectangle<int>, 6> {{{744,513,48,48},{793,513,48,48},{848,513,48,48},{742,563,48,16},{793,563,48,16},{848,563,48,16}}})
+    for (const auto& bounds : ParameterLayout::knobBounds())
         faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
-    for (const auto& bounds : std::array<juce::Rectangle<int>, 4> {{{937,409,12,204},{974,409,12,204},{923,601,38,21},{963,601,38,21}}})
+    for (const auto& bounds : ParameterLayout::readoutBounds())
+        faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
+    for (const auto& bounds : ParameterLayout::outputMeterBounds())
+        faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
+    for (const auto& bounds : ParameterLayout::outputReadoutBounds())
         faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
     faceplateClean = faceplateClean && hasNoDynamicGoldTrace (staticFaceplate, { 56, 450, 157, 120 });
     pass &= check (faceplateClean, "v2-static-background-clean-gate");

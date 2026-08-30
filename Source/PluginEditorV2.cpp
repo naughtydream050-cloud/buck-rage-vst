@@ -1,4 +1,5 @@
 #include "PluginEditorV2.h"
+#include "ParameterLayout.h"
 #include <array>
 #include <cmath>
 
@@ -15,13 +16,6 @@ const std::array<int, 2> kCellY { 137, 221 };
 const std::array<juce::Rectangle<int>, 4> kTabs {{{251,74,105,27},{360,74,105,27},{470,74,106,27},{580,74,105,27}}};
 const std::array<juce::Rectangle<int>, 10> kPresets {{{750,100,84,64},{836,100,84,64},{924,100,84,64},{750,166,84,64},{836,166,84,64},{924,166,84,64},{750,232,84,64},{836,232,84,64},{924,232,84,64},{750,296,84,64}}};
 const std::array<juce::Rectangle<int>, 5> kLengths {{{742,425,32,26},{773,425,32,26},{803,425,32,26},{834,425,32,26},{864,425,32,26}}};
-const std::array<juce::Rectangle<int>, 3> kKnobs {{{744,513,48,48},{793,513,48,48},{848,513,48,48}}};
-const std::array<juce::Rectangle<int>, 3> kReadouts {{{742,563,48,16},{793,563,48,16},{848,563,48,16}}};
-struct OutputMeterLayout final
-{
-    static juce::Rectangle<int> panelBounds() { return { 910, 370, 98, 255 }; }
-
-};
 const std::array<const char*, 10> kPresetNames {{"off","forward_cut","backspin","chirp","baby","transform","drag","zigzag","tape_brake","custom"}};
 const std::array<const char*, 5> kLengthNames {{"1_16","1_8","1_4","1_2","1_bar"}};
 const std::array<const char*, 4> kTabNames {{"1_16","17_32","33_48","49_64"}};
@@ -190,8 +184,8 @@ struct V2AssetCatalog final
             load (lengths[(size_t) index][0], prefix + "normal.png",   kLengths[(size_t) index]);
             load (lengths[(size_t) index][1], prefix + "selected.png", kLengths[(size_t) index]);
         }
-        load (ring,      "knob_ring_60.png",             kKnobs[0]);
-        load (pointer,   "knob_pointer_60.png",          kKnobs[0]);
+        load (ring,      "knob_ring_60.png",             ParameterLayout::knobBounds()[0]);
+        load (pointer,   "knob_pointer_60.png",          ParameterLayout::knobBounds()[0]);
         load (bypassOff, "bypass_off.png",               { 931, 14, 80, 31 });
         load (bypassOn,  "bypass_on.png",                { 931, 14, 80, 31 });
     }
@@ -270,8 +264,8 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        const std::array<juce::Rectangle<int>, 2> tracks {{{27,39,12,204}, {64,39,12,204}}};
-        const std::array<juce::Rectangle<int>, 2> readouts {{{13,231,38,21}, {53,231,38,21}}};
+        const auto tracks = ParameterLayout::outputMeterLocalBounds();
+        const auto readouts = ParameterLayout::outputReadoutLocalBounds();
         for (size_t channel = 0; channel < tracks.size(); ++channel)
         {
             const auto track = tracks[channel];
@@ -371,7 +365,7 @@ public:
         const std::array<juce::String, 3> text {{ juce::String (slot.speed, 2) + "x", juce::String (slot.pitch, 1) + " st", juce::String (juce::roundToInt (slot.depth * 100.0f)) + " %" }};
         for (int index = 0; index < 3; ++index)
         {
-            const auto bounds = kKnobs[(size_t) index];
+            const auto bounds = ParameterLayout::knobBounds()[(size_t) index];
             drawNative (g, assets.ring, bounds);
             g.saveState();
             const auto centre = bounds.getCentre().toFloat();
@@ -382,7 +376,7 @@ public:
             g.restoreState();
             g.setColour (juce::Colour (0xffe3d7c5));
             g.setFont (10.0f);
-            g.drawText (text[(size_t) index], kReadouts[(size_t) index], juce::Justification::centred);
+            g.drawText (text[(size_t) index], ParameterLayout::readoutBounds()[(size_t) index], juce::Justification::centred);
         }
 
         if (! slot.motion.empty())
@@ -415,7 +409,7 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
     surface->setInterceptsMouseClicks (false, false);
     outputMeter = std::make_unique<OutputMeter> (processor);
     addAndMakeVisible (*outputMeter);
-    outputMeter->setBounds (OutputMeterLayout::panelBounds());
+    outputMeter->setBounds (ParameterLayout::outputPanelBounds());
 
     for (int index = 0; index < 4; ++index)
         addImageHit (kTabs[(size_t) index], [this, index] { processor.getStateModel().selectTab (index); });
@@ -434,7 +428,7 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
     {
         knobs[(size_t) index] = std::make_unique<KnobRegion> (processor, index);
         addAndMakeVisible (*knobs[(size_t) index]);
-        knobs[(size_t) index]->setBounds (kKnobs[(size_t) index]);
+        knobs[(size_t) index]->setBounds (ParameterLayout::knobBounds()[(size_t) index]);
     }
     xyInput = std::make_unique<XYRegion> (processor);
     addAndMakeVisible (*xyInput);
@@ -460,9 +454,9 @@ bool ToyotomiHideyoshiAudioProcessorEditorV2::validateInteractiveBounds() const
     if ((int) hitRegions.size() != (int) expected.size()) return false;
     for (int index = 0; index < (int) expected.size(); ++index)
         if (hitRegions[index]->getBounds() != expected[(size_t) index]) return false;
-    return knobs[0]->getBounds() == kKnobs[0]
-        && knobs[1]->getBounds() == kKnobs[1]
-        && knobs[2]->getBounds() == kKnobs[2]
+    return knobs[0]->getBounds() == ParameterLayout::knobBounds()[0]
+        && knobs[1]->getBounds() == ParameterLayout::knobBounds()[1]
+        && knobs[2]->getBounds() == ParameterLayout::knobBounds()[2]
         && xyInput->getBounds() == juce::Rectangle<int> { 38, 438, 195, 141 };
 }
 bool ToyotomiHideyoshiAudioProcessorEditorV2::debugClickAt (juce::Point<int> point)
@@ -475,7 +469,7 @@ void ToyotomiHideyoshiAudioProcessorEditorV2::paint (juce::Graphics& g) { juce::
 void ToyotomiHideyoshiAudioProcessorEditorV2::resized()
 {
     surface->setBounds (getLocalBounds());
-    outputMeter->setBounds (OutputMeterLayout::panelBounds());
+    outputMeter->setBounds (ParameterLayout::outputPanelBounds());
 }
 void ToyotomiHideyoshiAudioProcessorEditorV2::timerCallback()
 {
