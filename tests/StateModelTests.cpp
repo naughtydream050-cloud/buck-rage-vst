@@ -12,6 +12,13 @@ void check (bool value, const char* label) { std::cout << (value ? "PASS " : "FA
 int main()
 {
     PluginStateModel model;
+    check (model.getUiState().selectedBar == PluginStateModel::kNoSelectedBar,
+           "fresh-default-has-no-selected-bar");
+    model.setSelectedPreset (PluginStateModel::ScratchPreset::backspin);
+    model.setSelectedLength (PluginStateModel::NoteLength::quarter);
+    check (model.getSlot (0).preset == PluginStateModel::ScratchPreset::off
+           && model.getSlot (0).length == PluginStateModel::NoteLength::sixteenth,
+           "fresh-default-selection-actions-do-not-mutate-slot-zero");
     model.selectBar (4);
     model.setSelectedPreset (PluginStateModel::ScratchPreset::backspin);
     model.setSelectedLength (PluginStateModel::NoteLength::quarter);
@@ -57,6 +64,11 @@ int main()
            && restored.getSlot (4).length == PluginStateModel::NoteLength::quarter
            && restored.getSlot (4).speed == 1.75f && restored.getSlot (4).pitch == -3.0f,
            "timeline-slot-parameters-round-trip");
+    PluginStateModel noSelectionRestored;
+    PluginStateModel freshState;
+    check (noSelectionRestored.fromValueTree (freshState.toValueTree())
+           && noSelectionRestored.getUiState().selectedBar == PluginStateModel::kNoSelectedBar,
+           "none-selection-round-trips");
 
     // v1 migration deliberately takes each legacy BAR's Count 0 as its new
     // timeline slot: the former 1024-slot hierarchy no longer exists in UI.

@@ -243,6 +243,8 @@ public:
         previousY = event.position.y;
         auto& state = processor.getStateModel();
         const auto bar = state.getUiState().selectedBar;
+        if (! PluginStateModel::hasSelectedBar (bar))
+            return;
         const auto& slot = state.getSlot (bar);
         if (index == 0) state.setSlotSpeed (bar, slot.speed + delta * .012f);
         else if (index == 1) state.setSlotPitch (bar, slot.pitch + delta * .20f);
@@ -304,6 +306,7 @@ public:
         const int tab = ui.selectedTab;
         const int selected = ui.selectedBar;
         const int playing = processor.getCurrentTimelineSlot();
+        const bool hasSelection = PluginStateModel::hasSelectedBar (selected);
 
         for (int index = 0; index < 4; ++index)
             drawNative (g, assets.tabs[(size_t) index][index == tab ? 1 : 0], kTabs[(size_t) index]);
@@ -319,11 +322,13 @@ public:
             g.restoreState();
         }
 
-        const auto& slot = processor.getStateModel().getSlot (selected);
+        // Slot zero supplies the existing effective defaults while no BAR is
+        // selected; it never contributes a selected image in that state.
+        const auto& slot = processor.getStateModel().getSlot (hasSelection ? selected : 0);
         for (int index = 0; index < 10; ++index)
-            drawNative (g, assets.presets[(size_t) index][index == (int) slot.preset ? 1 : 0], kPresets[(size_t) index]);
+            drawNative (g, assets.presets[(size_t) index][hasSelection && index == (int) slot.preset ? 1 : 0], kPresets[(size_t) index]);
         for (int index = 0; index < 5; ++index)
-            drawNative (g, assets.lengths[(size_t) index][index == (int) slot.length ? 1 : 0], kLengths[(size_t) index]);
+            drawNative (g, assets.lengths[(size_t) index][hasSelection && index == (int) slot.length ? 1 : 0], kLengths[(size_t) index]);
 
         drawNative (g, ui.bypass ? assets.bypassOn : assets.bypassOff, { 931, 14, 80, 31 });
         // The static faceplate owns the neutral XY panel and its fixed button

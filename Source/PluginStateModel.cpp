@@ -52,11 +52,11 @@ std::vector<PluginStateModel::MotionPoint> PluginStateModel::presetMotion (Scrat
     if (preset == ScratchPreset::backspin) return {{ 1,.3f },{ .72f,.45f },{ .42f,.65f },{ .12f,.8f }};
     return {{ 0,.65f },{ .35f,.45f },{ .7f,.3f },{ 1,.5f }};
 }
-void PluginStateModel::reset() { slots = {}; ui = {}; }
+void PluginStateModel::reset() { slots = {}; ui = UiState {}; }
 const PluginStateModel::TimelineSlot& PluginStateModel::getSlot (int bar) const noexcept { return slots[static_cast<size_t> (barIndex (bar))]; }
 PluginStateModel::TimelineSlot& PluginStateModel::mutableSlot (int bar) noexcept { return slots[static_cast<size_t> (barIndex (bar))]; }
 void PluginStateModel::selectTab (int tab) { ui.selectedTab = juce::jlimit (0, 3, tab); }
-void PluginStateModel::selectBar (int bar) { ui.selectedBar = barIndex (bar); }
+void PluginStateModel::selectBar (int bar) { ui.selectedBar = bar == kNoSelectedBar ? kNoSelectedBar : barIndex (bar); }
 void PluginStateModel::setBypass (bool enabled) { ui.bypass = enabled; }
 void PluginStateModel::setSlotPreset (int bar, ScratchPreset preset) { auto& slot = mutableSlot (bar); slot.preset = preset; slot.customMotion = false; slot.motion = presetMotion (preset); }
 void PluginStateModel::setSlotLength (int bar, NoteLength value) { mutableSlot (bar).length = static_cast<NoteLength> (juce::jlimit (0, 4, static_cast<int> (value))); }
@@ -66,14 +66,14 @@ void PluginStateModel::setSlotDepth (int bar, float value) { mutableSlot (bar).d
 void PluginStateModel::setSlotMotion (int bar, const std::vector<MotionPoint>& motion) { auto& slot = mutableSlot (bar); slot.motion = sanitiseMotion (motion); slot.customMotion = true; slot.preset = ScratchPreset::custom; }
 void PluginStateModel::clearSlotMotion (int bar) { auto& slot = mutableSlot (bar); slot.motion.clear(); slot.customMotion = false; if (slot.preset == ScratchPreset::custom) slot.preset = ScratchPreset::off; }
 void PluginStateModel::resetSlot (int bar) { mutableSlot (bar) = TimelineSlot {}; }
-void PluginStateModel::setSelectedPreset (ScratchPreset preset) { setSlotPreset (ui.selectedBar, preset); }
-void PluginStateModel::setSelectedLength (NoteLength value) { setSlotLength (ui.selectedBar, value); }
-void PluginStateModel::setSelectedSpeed (float value) { setSlotSpeed (ui.selectedBar, value); }
-void PluginStateModel::setSelectedPitch (float value) { setSlotPitch (ui.selectedBar, value); }
-void PluginStateModel::setSelectedDepth (float value) { setSlotDepth (ui.selectedBar, value); }
-void PluginStateModel::setSelectedMotion (const std::vector<MotionPoint>& motion) { setSlotMotion (ui.selectedBar, motion); }
-void PluginStateModel::clearSelectedMotion() { clearSlotMotion (ui.selectedBar); }
-void PluginStateModel::resetSelectedSlot() { resetSlot (ui.selectedBar); }
+void PluginStateModel::setSelectedPreset (ScratchPreset preset) { if (hasSelectedBar (ui.selectedBar)) setSlotPreset (ui.selectedBar, preset); }
+void PluginStateModel::setSelectedLength (NoteLength value) { if (hasSelectedBar (ui.selectedBar)) setSlotLength (ui.selectedBar, value); }
+void PluginStateModel::setSelectedSpeed (float value) { if (hasSelectedBar (ui.selectedBar)) setSlotSpeed (ui.selectedBar, value); }
+void PluginStateModel::setSelectedPitch (float value) { if (hasSelectedBar (ui.selectedBar)) setSlotPitch (ui.selectedBar, value); }
+void PluginStateModel::setSelectedDepth (float value) { if (hasSelectedBar (ui.selectedBar)) setSlotDepth (ui.selectedBar, value); }
+void PluginStateModel::setSelectedMotion (const std::vector<MotionPoint>& motion) { if (hasSelectedBar (ui.selectedBar)) setSlotMotion (ui.selectedBar, motion); }
+void PluginStateModel::clearSelectedMotion() { if (hasSelectedBar (ui.selectedBar)) clearSlotMotion (ui.selectedBar); }
+void PluginStateModel::resetSelectedSlot() { if (hasSelectedBar (ui.selectedBar)) resetSlot (ui.selectedBar); }
 
 juce::ValueTree PluginStateModel::toValueTree() const
 {
@@ -106,7 +106,8 @@ bool PluginStateModel::fromValueTree (const juce::ValueTree& root)
     if (global.isValid())
     {
         parsed.ui.selectedTab = juce::jlimit (0, 3, static_cast<int> (global.getProperty ("selectedTab", 0)));
-        parsed.ui.selectedBar = barIndex (static_cast<int> (global.getProperty ("selectedBar", 0)));
+        const auto restoredBar = static_cast<int> (global.getProperty ("selectedBar", 0));
+        parsed.ui.selectedBar = restoredBar == kNoSelectedBar ? kNoSelectedBar : barIndex (restoredBar);
         parsed.ui.bypass = static_cast<bool> (global.getProperty ("bypass", false));
     }
     const auto timeline = root.getChildWithName (barsId);

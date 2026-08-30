@@ -9,6 +9,7 @@ class PluginStateModel final
 {
 public:
     static constexpr int kNumBars = 64, kMaxMotionPoints = 256;
+    static constexpr int kNoSelectedBar = -1;
     enum class ScratchPreset { off, forwardCut, backspin, chirp, baby, transform, drag, zigzag, tapeBrake, custom };
     enum class NoteLength { sixteenth, eighth, quarter, half, oneBar };
 
@@ -21,11 +22,12 @@ public:
         bool customMotion = false;
         std::vector<MotionPoint> motion;
     };
-    struct UiState { int selectedTab = 0, selectedBar = 0; bool bypass = false; };
+    struct UiState { int selectedTab = 0, selectedBar = kNoSelectedBar; bool bypass = false; };
 
     PluginStateModel();
     const TimelineSlot& getSlot (int bar) const noexcept;
     UiState getUiState() const noexcept { return ui; }
+    static bool hasSelectedBar (int bar) noexcept { return bar >= 0 && bar < kNumBars; }
 
     void selectTab (int); // view page only
     void selectBar (int);

@@ -725,6 +725,29 @@ int main()
                    "v2-output-meter-old-hole-restored");
     pass &= check (v2 != nullptr && v2->validateInteractiveBounds(), "v2-visual-hit-bounds-match-manifest");
     auto& state=processor.getStateModel();
+    // A fresh instance owns no selected timeline slot. Defaults remain valid
+    // values, but no BAR/PRESET/LENGTH state image may be gold.
+    state.selectTab (0); state.setBypass (false);
+    const auto freshImage = render (*editor);
+    int freshGoldBars = 0, freshGoldPresets = 0, freshGoldLengths = 0;
+    for (int index = 0; index < 16; ++index)
+    {
+        const auto bounds = juce::Rectangle<int> { std::array<int, 8> { 259, 317, 378, 437, 494, 553, 611, 670 }[(size_t) (index % 8)], index < 8 ? 137 : 221, 56, 80 };
+        freshGoldBars += cropMatchesResource (freshImage, bounds,
+            ("bar_" + juce::String (index + 1).paddedLeft ('0', 2) + "_selected_png").toRawUTF8()) ? 1 : 0;
+    }
+    const std::array<juce::Rectangle<int>, 10> freshPresetBounds {{{750,100,84,64},{836,100,84,64},{924,100,84,64},{750,166,84,64},{836,166,84,64},{924,166,84,64},{750,232,84,64},{836,232,84,64},{924,232,84,64},{750,296,84,64}}};
+    const std::array<juce::Rectangle<int>, 5> freshLengthBounds {{{742,425,32,26},{773,425,32,26},{803,425,32,26},{834,425,32,26},{864,425,32,26}}};
+    for (int index = 0; index < 10; ++index)
+        freshGoldPresets += cropMatchesResource (freshImage, freshPresetBounds[(size_t) index],
+            ("preset_" + juce::String (kGatePresetNames[(size_t) index]) + "_selected_png").toRawUTF8()) ? 1 : 0;
+    for (int index = 0; index < 5; ++index)
+        freshGoldLengths += cropMatchesResource (freshImage, freshLengthBounds[(size_t) index],
+            ("length_" + juce::String (kGateLengthNames[(size_t) index]) + "_selected_png").toRawUTF8()) ? 1 : 0;
+    pass &= check (state.getUiState().selectedBar == PluginStateModel::kNoSelectedBar && freshGoldBars == 0,
+                   "fresh-default-no-selected-bar");
+    pass &= check (freshGoldPresets == 0, "fresh-default-no-selected-preset");
+    pass &= check (freshGoldLengths == 0, "fresh-default-no-selected-length");
     state.selectTab (0); state.selectBar (0); state.setSlotPreset (0, PluginStateModel::ScratchPreset::off);
     state.setSelectedLength ((PluginStateModel::NoteLength) 0); state.setBypass (false); state.clearSelectedMotion();
     state.setSlotSpeed (0, 1.0f); state.setSlotPitch (0, 0.0f); state.setSlotDepth (0, 0.5f);
