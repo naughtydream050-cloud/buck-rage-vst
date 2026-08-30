@@ -25,7 +25,14 @@ $stateRects = @(
     @(931,14,80,31),
     @(937,409,12,204), @(974,409,12,204), @(923,601,38,21), @(963,601,38,21)
 )
-foreach($r in $stateRects) { $g.FillRectangle($clear,[System.Drawing.Rectangle]::new($r[0],$r[1],$r[2],$r[3])) }
+$stateIndex = 0
+foreach($r in $stateRects) {
+    # The first 35 rectangles are tab/BAR/PRESET/LENGTH assets. Their source
+    # artwork includes a one-pixel outer state rim, so clear the complete rim.
+    $pad = if ($stateIndex -lt 35) { 1 } else { 0 }
+    $g.FillRectangle($clear,[System.Drawing.Rectangle]::new($r[0]-$pad,$r[1]-$pad,$r[2]+2*$pad,$r[3]+2*$pad))
+    ++$stateIndex
+}
 
 $g.Dispose()
 
