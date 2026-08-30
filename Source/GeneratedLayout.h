@@ -14,8 +14,14 @@ inline juce::Rectangle<int> speedReadoutBounds()    { return { 742, 563, 48, 16 
 inline juce::Rectangle<int> pitchReadoutBounds()    { return { 793, 563, 48, 16 }; }
 inline juce::Rectangle<int> depthReadoutBounds()    { return { 848, 563, 48, 16 }; }
 inline juce::Rectangle<int> outputPanelBounds()     { return { 907, 364, 107, 270 }; }
+inline int outputLLabelCenterX()                    { return 945; }
+inline int outputRLabelCenterX()                    { return 980; }
 inline juce::Rectangle<int> outputLBounds()         { return { 939, 419, 12, 174 }; }
 inline juce::Rectangle<int> outputRBounds()         { return { 974, 419, 12, 174 }; }
-inline juce::Rectangle<int> outputLReadoutBounds()  { return { 923, 601, 39, 21 }; }
-inline juce::Rectangle<int> outputRReadoutBounds()  { return { 963, 601, 39, 21 }; }
+inline juce::Rectangle<int> outputLReadoutBounds()  { return { 925, 601, 39, 21 }; }
+inline juce::Rectangle<int> outputRReadoutBounds()  { return { 960, 601, 39, 21 }; }
+// Static faceplate ownership is unchanged: these are its pre-existing alpha
+// windows, not runtime draw bounds.
+inline juce::Rectangle<int> outputLFaceplateHoleBounds() { return { 923, 601, 39, 21 }; }
+inline juce::Rectangle<int> outputRFaceplateHoleBounds() { return { 963, 601, 39, 21 }; }
 }

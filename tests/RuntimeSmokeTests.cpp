@@ -722,7 +722,7 @@ int main()
         GeneratedLayout::speedKnobBounds(), GeneratedLayout::pitchKnobBounds(), GeneratedLayout::depthKnobBounds(),
         GeneratedLayout::speedReadoutBounds(), GeneratedLayout::pitchReadoutBounds(), GeneratedLayout::depthReadoutBounds(),
         GeneratedLayout::outputLBounds(), GeneratedLayout::outputRBounds(),
-        GeneratedLayout::outputLReadoutBounds(), GeneratedLayout::outputRReadoutBounds()
+        GeneratedLayout::outputLFaceplateHoleBounds(), GeneratedLayout::outputRFaceplateHoleBounds()
     }})
         faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
     faceplateClean = faceplateClean && hasNoDynamicGoldTrace (staticFaceplate, { 56, 450, 157, 120 });
@@ -736,6 +736,17 @@ int main()
     // values, but no BAR/PRESET/LENGTH state image may be gold.
     state.selectTab (0); state.setBypass (false);
     const auto freshImage = render (*editor);
+    const auto centerX2 = [] (juce::Rectangle<int> bounds) { return 2 * bounds.getX() + bounds.getWidth(); };
+    const auto outputCentersAligned = [&]
+    {
+        const auto labelL = 2 * GeneratedLayout::outputLLabelCenterX();
+        const auto labelR = 2 * GeneratedLayout::outputRLabelCenterX();
+        return std::abs (labelL - centerX2 (GeneratedLayout::outputLBounds())) <= 2
+            && std::abs (labelL - centerX2 (GeneratedLayout::outputLReadoutBounds())) <= 2
+            && std::abs (labelR - centerX2 (GeneratedLayout::outputRBounds())) <= 2
+            && std::abs (labelR - centerX2 (GeneratedLayout::outputRReadoutBounds())) <= 2;
+    };
+    pass &= check (freshImage.isValid() && outputCentersAligned(), "v2-output-final-composite-center-alignment");
     int freshGoldBars = 0, freshGoldPresets = 0, freshGoldLengths = 0;
     for (int index = 0; index < 16; ++index)
     {
