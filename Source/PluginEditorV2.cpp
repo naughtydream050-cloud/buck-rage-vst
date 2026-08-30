@@ -17,11 +17,29 @@ const std::array<juce::Rectangle<int>, 10> kPresets {{{750,100,84,64},{836,100,8
 const std::array<juce::Rectangle<int>, 5> kLengths {{{742,425,32,26},{773,425,32,26},{803,425,32,26},{834,425,32,26},{864,425,32,26}}};
 const std::array<juce::Rectangle<int>, 3> kKnobs {{{744,513,48,48},{793,513,48,48},{848,513,48,48}}};
 const std::array<juce::Rectangle<int>, 3> kReadouts {{{742,563,48,16},{793,563,48,16},{848,563,48,16}}};
-// These are the native openings in the approved V2 output faceplate.  The
-// LED texture is exactly 12 x 204; the one-pixel frame edge remains owned by
-// the faceplate rather than being stretched by the renderer.
-const std::array<juce::Rectangle<int>, 2> kOutputTracks {{{933,409,12,204},{968,409,12,204}}};
-const std::array<juce::Rectangle<int>, 2> kOutputReadouts {{{923,601,38,21},{963,601,38,21}}};
+struct OutputMeterLayout final
+{
+    static juce::Rectangle<int> panelBounds() { return { 910, 370, 98, 255 }; }
+
+    static std::array<juce::Rectangle<int>, 2> trackBounds()
+    {
+        const auto panel = panelBounds();
+        // Measured from the approved SSOT: the 12 px LED texture occupies
+        // only the inner slot; its surrounding engraved rail stays faceplate-owned.
+        return {{{ panel.getX() + 27, panel.getY() + 39, 12, 204 },
+                 { panel.getX() + 64, panel.getY() + 39, 12, 204 }}};
+    }
+
+    static std::array<juce::Rectangle<int>, 2> readoutBounds()
+    {
+        const auto panel = panelBounds();
+        return {{{ panel.getX() + 13, panel.getY() + 231, 38, 21 },
+                 { panel.getX() + 53, panel.getY() + 231, 38, 21 }}};
+    }
+};
+
+const auto kOutputTracks = OutputMeterLayout::trackBounds();
+const auto kOutputReadouts = OutputMeterLayout::readoutBounds();
 const std::array<const char*, 10> kPresetNames {{"off","forward_cut","backspin","chirp","baby","transform","drag","zigzag","tape_brake","custom"}};
 const std::array<const char*, 5> kLengthNames {{"1_16","1_8","1_4","1_2","1_bar"}};
 const std::array<const char*, 4> kTabNames {{"1_16","17_32","33_48","49_64"}};

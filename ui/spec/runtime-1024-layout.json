@@ -1548,31 +1548,31 @@
       "role": "visual"
     },
     "Output.LeftTrack": {
-      "x": 933,
-      "y": 408,
+      "x": 937,
+      "y": 409,
       "w": 12,
-      "h": 205,
+      "h": 204,
       "parent": "Output",
       "visualBounds": [
-        933,
-        408,
+        937,
+        409,
         12,
-        205
+        204
       ],
       "hitBounds": null,
       "role": "visual"
     },
     "Output.RightTrack": {
-      "x": 968,
-      "y": 408,
+      "x": 974,
+      "y": 409,
       "w": 12,
-      "h": 205,
+      "h": 204,
       "parent": "Output",
       "visualBounds": [
-        968,
-        408,
+        974,
+        409,
         12,
-        205
+        204
       ],
       "hitBounds": null,
       "role": "visual"

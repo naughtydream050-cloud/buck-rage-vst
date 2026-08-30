@@ -108,6 +108,21 @@ bool fullyTransparent (const juce::Image& image, juce::Rectangle<int> bounds)
     return true;
 }
 
+bool opaqueRgbMatches (const juce::Image& actual, const juce::Image& reference, juce::Rectangle<int> bounds)
+{
+    if (! actual.isValid() || ! reference.isValid() || ! actual.getBounds().contains (bounds)
+        || ! reference.getBounds().contains (bounds)) return false;
+    for (int y = 0; y < bounds.getHeight(); ++y)
+        for (int x = 0; x < bounds.getWidth(); ++x)
+        {
+            const auto a = actual.getPixelAt (bounds.getX() + x, bounds.getY() + y);
+            const auto b = reference.getPixelAt (bounds.getX() + x, bounds.getY() + y);
+            if (a.getAlpha() != 255 || a.getRed() != b.getRed() || a.getGreen() != b.getGreen() || a.getBlue() != b.getBlue())
+                return false;
+        }
+    return true;
+}
+
 bool hasNoDynamicGoldTrace (const juce::Image& image, juce::Rectangle<int> bounds)
 {
     for (int y = 0; y < bounds.getHeight(); ++y)
@@ -701,10 +716,13 @@ int main()
         }
     for (const auto& bounds : std::array<juce::Rectangle<int>, 6> {{{744,513,48,48},{793,513,48,48},{848,513,48,48},{742,563,48,16},{793,563,48,16},{848,563,48,16}}})
         faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
-    for (const auto& bounds : std::array<juce::Rectangle<int>, 4> {{{933,409,12,204},{968,409,12,204},{923,601,38,21},{963,601,38,21}}})
+    for (const auto& bounds : std::array<juce::Rectangle<int>, 4> {{{937,409,12,204},{974,409,12,204},{923,601,38,21},{963,601,38,21}}})
         faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
     faceplateClean = faceplateClean && hasNoDynamicGoldTrace (staticFaceplate, { 56, 450, 157, 120 });
     pass &= check (faceplateClean, "v2-static-background-clean-gate");
+    pass &= check (opaqueRgbMatches (staticFaceplate, visualReference, { 933, 409, 4, 192 })
+                && opaqueRgbMatches (staticFaceplate, visualReference, { 968, 409, 6, 192 }),
+                   "v2-output-meter-old-hole-restored");
     pass &= check (v2 != nullptr && v2->validateInteractiveBounds(), "v2-visual-hit-bounds-match-manifest");
     auto& state=processor.getStateModel();
     state.selectTab (0); state.selectBar (0); state.setSlotPreset (0, PluginStateModel::ScratchPreset::off);
