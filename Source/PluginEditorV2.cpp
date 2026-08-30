@@ -21,25 +21,7 @@ struct OutputMeterLayout final
 {
     static juce::Rectangle<int> panelBounds() { return { 910, 370, 98, 255 }; }
 
-    static std::array<juce::Rectangle<int>, 2> trackBounds()
-    {
-        const auto panel = panelBounds();
-        // Measured from the approved SSOT: the 12 px LED texture occupies
-        // only the inner slot; its surrounding engraved rail stays faceplate-owned.
-        return {{{ panel.getX() + 27, panel.getY() + 39, 12, 204 },
-                 { panel.getX() + 64, panel.getY() + 39, 12, 204 }}};
-    }
-
-    static std::array<juce::Rectangle<int>, 2> readoutBounds()
-    {
-        const auto panel = panelBounds();
-        return {{{ panel.getX() + 13, panel.getY() + 231, 38, 21 },
-                 { panel.getX() + 53, panel.getY() + 231, 38, 21 }}};
-    }
 };
-
-const auto kOutputTracks = OutputMeterLayout::trackBounds();
-const auto kOutputReadouts = OutputMeterLayout::readoutBounds();
 const std::array<const char*, 10> kPresetNames {{"off","forward_cut","backspin","chirp","baby","transform","drag","zigzag","tape_brake","custom"}};
 const std::array<const char*, 5> kLengthNames {{"1_16","1_8","1_4","1_2","1_bar"}};
 const std::array<const char*, 4> kTabNames {{"1_16","17_32","33_48","49_64"}};
@@ -127,7 +109,7 @@ CellState resolveCellState (bool selected, bool playing) noexcept
 // a failed resource can no longer silently expose the black hole behind it.
 struct V2AssetCatalog final
 {
-    juce::Image background, ring, pointer, bypassOff, bypassOn, meterLed;
+    juce::Image background, ring, pointer, bypassOff, bypassOn;
     std::array<std::array<juce::Image, 2>, 4> tabs;
     // Retain the proven native 56 x 80 completed BAR cells.  The later
     // shell/label split introduced a same-basename BinaryData collision and
@@ -212,7 +194,6 @@ struct V2AssetCatalog final
         load (pointer,   "knob_pointer_60.png",          kKnobs[0]);
         load (bypassOff, "bypass_off.png",               { 931, 14, 80, 31 });
         load (bypassOn,  "bypass_on.png",                { 931, 14, 80, 31 });
-        load (meterLed,  "meter_led_strip.png",           { 0, 0, 12, 204 });
     }
 };
 }
@@ -274,15 +255,55 @@ private:
     std::vector<PluginStateModel::MotionPoint> points;
 };
 
-class ToyotomiHideyoshiAudioProcessorEditorV2::Surface final : public juce::Component
+// Same ownership pattern as Buck Raw Shit's StereoMeter: one child owns the
+// entire OUTPUT panel and derives both channels in local coordinates.
+class ToyotomiHideyoshiAudioProcessorEditorV2::OutputMeter final : public juce::Component,
+                                                                    private juce::Timer
 {
 public:
-    explicit Surface (ToyotomiHideyoshiAudioProcessor& source) : processor (source) {}
-    bool barMapAssetsReady() const { return assets.barMapValid; }
+    explicit OutputMeter (ToyotomiHideyoshiAudioProcessor& source)
+        : processor (source), meterLed (readAsset ("meter_led_strip.png"))
+    {
+        setOpaque (false);
+        startTimerHz (30);
+    }
 
-    // Called only by the editor Timer. processBlock publishes the post-DSP
-    // L/R peaks atomically; all smoothing and paint state stay on the UI thread.
-    void advanceOutputMeter()
+    void paint (juce::Graphics& g) override
+    {
+        const std::array<juce::Rectangle<int>, 2> tracks {{{27,39,12,204}, {64,39,12,204}}};
+        const std::array<juce::Rectangle<int>, 2> readouts {{{13,231,38,21}, {53,231,38,21}}};
+        for (size_t channel = 0; channel < tracks.size(); ++channel)
+        {
+            const auto track = tracks[channel];
+            const auto pixels = juce::roundToInt (juce::jmap (outputDb[channel], -60.0f, 6.0f,
+                                                               0.0f, (float) track.getHeight()));
+            const auto stripBounds = juce::Rectangle<int> (track.getX(), track.getY(),
+                                                             meterLed.getWidth(), meterLed.getHeight());
+            if (pixels > 0)
+            {
+                g.saveState();
+                g.reduceClipRegion (track.withTop (track.getBottom() - pixels));
+                drawNative (g, meterLed, stripBounds);
+                g.restoreState();
+            }
+            if (outputPeakDb[channel] > -59.5f)
+            {
+                const auto peakY = track.getBottom() - juce::roundToInt (
+                    juce::jmap (outputPeakDb[channel], -60.0f, 6.0f, 0.0f, (float) track.getHeight()));
+                g.saveState();
+                g.reduceClipRegion ({ track.getX(), juce::jlimit (track.getY(), track.getBottom() - 2, peakY), track.getWidth(), 2 });
+                drawNative (g, meterLed, stripBounds);
+                g.restoreState();
+            }
+            g.setColour (juce::Colour (0xffe3d7c5));
+            g.setFont (9.0f);
+            g.drawText (outputDb[channel] <= -59.5f ? "-Inf" : juce::String (outputDb[channel], 1),
+                        readouts[channel], juce::Justification::centred);
+        }
+    }
+
+private:
+    void timerCallback() override
     {
         const auto toDb = [] (float peak)
         {
@@ -293,11 +314,23 @@ public:
                                                toDb (processor.consumeOutputPeak (1)) }};
         for (size_t channel = 0; channel < target.size(); ++channel)
         {
-            const auto coefficient = target[channel] > outputDb[channel] ? 0.62f : 0.10f;
-            outputDb[channel] += (target[channel] - outputDb[channel]) * coefficient;
+            outputDb[channel] += (target[channel] - outputDb[channel]) * (target[channel] > outputDb[channel] ? 0.62f : 0.10f);
             outputPeakDb[channel] = juce::jmax (target[channel], outputPeakDb[channel] - 0.70f);
         }
+        repaint();
     }
+
+    ToyotomiHideyoshiAudioProcessor& processor;
+    juce::Image meterLed;
+    std::array<float, 2> outputDb {{ -60.0f, -60.0f }};
+    std::array<float, 2> outputPeakDb {{ -60.0f, -60.0f }};
+};
+
+class ToyotomiHideyoshiAudioProcessorEditorV2::Surface final : public juce::Component
+{
+public:
+    explicit Surface (ToyotomiHideyoshiAudioProcessor& source) : processor (source) {}
+    bool barMapAssetsReady() const { return assets.barMapValid; }
 
     void paint (juce::Graphics& g) override
     {
@@ -333,39 +366,6 @@ public:
         drawNative (g, ui.bypass ? assets.bypassOn : assets.bypassOff, { 931, 14, 80, 31 });
         // The static faceplate owns the neutral XY panel and its fixed button
         // visuals. Only the trace is dynamic in V2.
-
-        // The faceplate owns the meter frame, scale, labels and readout boxes.
-        // Reveal the approved LED texture through the two native track openings.
-        const auto drawMeter = [&] (size_t channel)
-        {
-            const auto track = kOutputTracks[channel];
-            const auto pixels = juce::roundToInt (juce::jmap (outputDb[channel], -60.0f, 6.0f,
-                                                               0.0f, (float) track.getHeight()));
-            const auto stripBounds = juce::Rectangle<int> (track.getX(), track.getY(),
-                                                             assets.meterLed.getWidth(), assets.meterLed.getHeight());
-            if (pixels > 0)
-            {
-                g.saveState();
-                g.reduceClipRegion (track.withTop (track.getBottom() - pixels));
-                drawNative (g, assets.meterLed, stripBounds);
-                g.restoreState();
-            }
-            if (outputPeakDb[channel] > -59.5f)
-            {
-                const auto peakY = track.getBottom() - juce::roundToInt (
-                    juce::jmap (outputPeakDb[channel], -60.0f, 6.0f, 0.0f, (float) track.getHeight()));
-                g.saveState();
-                g.reduceClipRegion ({ track.getX(), juce::jlimit (track.getY(), track.getBottom() - 2, peakY), track.getWidth(), 2 });
-                drawNative (g, assets.meterLed, stripBounds);
-                g.restoreState();
-            }
-            g.setColour (juce::Colour (0xffe3d7c5));
-            g.setFont (9.0f);
-            const auto readout = outputDb[channel] <= -59.5f ? "-Inf" : juce::String (outputDb[channel], 1);
-            g.drawText (readout, kOutputReadouts[channel], juce::Justification::centred);
-        };
-        drawMeter (0);
-        drawMeter (1);
 
         const std::array<float, 3> normalized {{ (slot.speed - .25f) / 3.75f, (slot.pitch + 12.0f) / 24.0f, slot.depth }};
         const std::array<juce::String, 3> text {{ juce::String (slot.speed, 2) + "x", juce::String (slot.pitch, 1) + " st", juce::String (juce::roundToInt (slot.depth * 100.0f)) + " %" }};
@@ -405,8 +405,6 @@ public:
 private:
     ToyotomiHideyoshiAudioProcessor& processor;
     V2AssetCatalog assets;
-    std::array<float, 2> outputDb {{ -60.0f, -60.0f }};
-    std::array<float, 2> outputPeakDb {{ -60.0f, -60.0f }};
 };
 
 ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2 (ToyotomiHideyoshiAudioProcessor& source)
@@ -415,6 +413,9 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
     surface = std::make_unique<Surface> (processor);
     addAndMakeVisible (*surface);
     surface->setInterceptsMouseClicks (false, false);
+    outputMeter = std::make_unique<OutputMeter> (processor);
+    addAndMakeVisible (*outputMeter);
+    outputMeter->setBounds (OutputMeterLayout::panelBounds());
 
     for (int index = 0; index < 4; ++index)
         addImageHit (kTabs[(size_t) index], [this, index] { processor.getStateModel().selectTab (index); });
@@ -471,10 +472,13 @@ bool ToyotomiHideyoshiAudioProcessorEditorV2::debugClickAt (juce::Point<int> poi
     return false;
 }
 void ToyotomiHideyoshiAudioProcessorEditorV2::paint (juce::Graphics& g) { juce::ignoreUnused (g); }
-void ToyotomiHideyoshiAudioProcessorEditorV2::resized() { surface->setBounds (getLocalBounds()); }
+void ToyotomiHideyoshiAudioProcessorEditorV2::resized()
+{
+    surface->setBounds (getLocalBounds());
+    outputMeter->setBounds (OutputMeterLayout::panelBounds());
+}
 void ToyotomiHideyoshiAudioProcessorEditorV2::timerCallback()
 {
-    surface->advanceOutputMeter();
     surface->repaint();
 }
 

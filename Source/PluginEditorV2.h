@@ -21,11 +21,13 @@ public:
 
 private:
     class Surface;
+    class OutputMeter;
     class HitRegion;
     class KnobRegion;
     class XYRegion;
     ToyotomiHideyoshiAudioProcessor& processor;
     std::unique_ptr<Surface> surface;
+    std::unique_ptr<OutputMeter> outputMeter;
     juce::OwnedArray<HitRegion> hitRegions;
     std::array<std::unique_ptr<KnobRegion>, 3> knobs;
     std::unique_ptr<XYRegion> xyInput;
