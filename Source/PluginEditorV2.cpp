@@ -1,5 +1,5 @@
 #include "PluginEditorV2.h"
-#include "ParameterLayout.h"
+#include "GeneratedLayout.h"
 #include <array>
 #include <cmath>
 
@@ -184,8 +184,8 @@ struct V2AssetCatalog final
             load (lengths[(size_t) index][0], prefix + "normal.png",   kLengths[(size_t) index]);
             load (lengths[(size_t) index][1], prefix + "selected.png", kLengths[(size_t) index]);
         }
-        load (ring,      "knob_ring_60.png",             ParameterLayout::knobBounds()[0]);
-        load (pointer,   "knob_pointer_60.png",          ParameterLayout::knobBounds()[0]);
+        load (ring,      "knob_ring_60.png",             GeneratedLayout::speedKnobBounds());
+        load (pointer,   "knob_pointer_60.png",          GeneratedLayout::speedKnobBounds());
         load (bypassOff, "bypass_off.png",               { 931, 14, 80, 31 });
         load (bypassOn,  "bypass_on.png",                { 931, 14, 80, 31 });
     }
@@ -264,8 +264,15 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        const auto tracks = ParameterLayout::outputMeterLocalBounds();
-        const auto readouts = ParameterLayout::outputReadoutLocalBounds();
+        const auto origin = GeneratedLayout::outputPanelBounds().getPosition();
+        const std::array<juce::Rectangle<int>, 2> tracks {{
+            GeneratedLayout::outputLBounds().translated (-origin.x, -origin.y),
+            GeneratedLayout::outputRBounds().translated (-origin.x, -origin.y)
+        }};
+        const std::array<juce::Rectangle<int>, 2> readouts {{
+            GeneratedLayout::outputLReadoutBounds().translated (-origin.x, -origin.y),
+            GeneratedLayout::outputRReadoutBounds().translated (-origin.x, -origin.y)
+        }};
         for (size_t channel = 0; channel < tracks.size(); ++channel)
         {
             const auto track = tracks[channel];
@@ -365,18 +372,23 @@ public:
         const std::array<juce::String, 3> text {{ juce::String (slot.speed, 2) + "x", juce::String (slot.pitch, 1) + " st", juce::String (juce::roundToInt (slot.depth * 100.0f)) + " %" }};
         for (int index = 0; index < 3; ++index)
         {
-            const auto bounds = ParameterLayout::knobBounds()[(size_t) index];
-            drawNative (g, assets.ring, bounds);
+            const auto knobBounds = index == 0 ? GeneratedLayout::speedKnobBounds()
+                                 : index == 1 ? GeneratedLayout::pitchKnobBounds()
+                                              : GeneratedLayout::depthKnobBounds();
+            const auto readoutBounds = index == 0 ? GeneratedLayout::speedReadoutBounds()
+                                     : index == 1 ? GeneratedLayout::pitchReadoutBounds()
+                                                  : GeneratedLayout::depthReadoutBounds();
+            drawNative (g, assets.ring, knobBounds);
             g.saveState();
-            const auto centre = bounds.getCentre().toFloat();
+            const auto centre = knobBounds.getCentre().toFloat();
             const auto angle = juce::MathConstants<float>::pi * 1.25f
                              + juce::MathConstants<float>::pi * 1.5f * juce::jlimit (0.0f, 1.0f, normalized[(size_t) index]);
             g.addTransform (juce::AffineTransform::rotation (angle + juce::MathConstants<float>::halfPi, centre.x, centre.y));
-            drawNative (g, assets.pointer, bounds);
+            drawNative (g, assets.pointer, knobBounds);
             g.restoreState();
             g.setColour (juce::Colour (0xffe3d7c5));
             g.setFont (10.0f);
-            g.drawText (text[(size_t) index], ParameterLayout::readoutBounds()[(size_t) index], juce::Justification::centred);
+            g.drawText (text[(size_t) index], readoutBounds, juce::Justification::centred);
         }
 
         if (! slot.motion.empty())
@@ -409,7 +421,7 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
     surface->setInterceptsMouseClicks (false, false);
     outputMeter = std::make_unique<OutputMeter> (processor);
     addAndMakeVisible (*outputMeter);
-    outputMeter->setBounds (ParameterLayout::outputPanelBounds());
+    outputMeter->setBounds (GeneratedLayout::outputPanelBounds());
 
     for (int index = 0; index < 4; ++index)
         addImageHit (kTabs[(size_t) index], [this, index] { processor.getStateModel().selectTab (index); });
@@ -428,7 +440,9 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
     {
         knobs[(size_t) index] = std::make_unique<KnobRegion> (processor, index);
         addAndMakeVisible (*knobs[(size_t) index]);
-        knobs[(size_t) index]->setBounds (ParameterLayout::knobBounds()[(size_t) index]);
+        knobs[(size_t) index]->setBounds (index == 0 ? GeneratedLayout::speedKnobBounds()
+                                      : index == 1 ? GeneratedLayout::pitchKnobBounds()
+                                                   : GeneratedLayout::depthKnobBounds());
     }
     xyInput = std::make_unique<XYRegion> (processor);
     addAndMakeVisible (*xyInput);
@@ -454,9 +468,9 @@ bool ToyotomiHideyoshiAudioProcessorEditorV2::validateInteractiveBounds() const
     if ((int) hitRegions.size() != (int) expected.size()) return false;
     for (int index = 0; index < (int) expected.size(); ++index)
         if (hitRegions[index]->getBounds() != expected[(size_t) index]) return false;
-    return knobs[0]->getBounds() == ParameterLayout::knobBounds()[0]
-        && knobs[1]->getBounds() == ParameterLayout::knobBounds()[1]
-        && knobs[2]->getBounds() == ParameterLayout::knobBounds()[2]
+    return knobs[0]->getBounds() == GeneratedLayout::speedKnobBounds()
+        && knobs[1]->getBounds() == GeneratedLayout::pitchKnobBounds()
+        && knobs[2]->getBounds() == GeneratedLayout::depthKnobBounds()
         && xyInput->getBounds() == juce::Rectangle<int> { 38, 438, 195, 141 };
 }
 bool ToyotomiHideyoshiAudioProcessorEditorV2::debugClickAt (juce::Point<int> point)
@@ -469,7 +483,7 @@ void ToyotomiHideyoshiAudioProcessorEditorV2::paint (juce::Graphics& g) { juce::
 void ToyotomiHideyoshiAudioProcessorEditorV2::resized()
 {
     surface->setBounds (getLocalBounds());
-    outputMeter->setBounds (ParameterLayout::outputPanelBounds());
+    outputMeter->setBounds (GeneratedLayout::outputPanelBounds());
 }
 void ToyotomiHideyoshiAudioProcessorEditorV2::timerCallback()
 {

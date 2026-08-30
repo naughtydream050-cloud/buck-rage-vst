@@ -1,6 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditorV2.h"
-#include "ParameterLayout.h"
+#include "GeneratedLayout.h"
 #include <algorithm>
 #include <cstdint>
 #include <iostream>
@@ -718,13 +718,12 @@ int main()
                 || id.startsWith ("length_") || id == "bypass")
                 faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, jsonBounds (jsonProperty (item, "bounds")));
         }
-    for (const auto& bounds : ParameterLayout::knobBounds())
-        faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
-    for (const auto& bounds : ParameterLayout::readoutBounds())
-        faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
-    for (const auto& bounds : ParameterLayout::outputMeterBounds())
-        faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
-    for (const auto& bounds : ParameterLayout::outputReadoutBounds())
+    for (const auto& bounds : std::array<juce::Rectangle<int>, 10> {{
+        GeneratedLayout::speedKnobBounds(), GeneratedLayout::pitchKnobBounds(), GeneratedLayout::depthKnobBounds(),
+        GeneratedLayout::speedReadoutBounds(), GeneratedLayout::pitchReadoutBounds(), GeneratedLayout::depthReadoutBounds(),
+        GeneratedLayout::outputLBounds(), GeneratedLayout::outputRBounds(),
+        GeneratedLayout::outputLReadoutBounds(), GeneratedLayout::outputRReadoutBounds()
+    }})
         faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
     faceplateClean = faceplateClean && hasNoDynamicGoldTrace (staticFaceplate, { 56, 450, 157, 120 });
     pass &= check (faceplateClean, "v2-static-background-clean-gate");
