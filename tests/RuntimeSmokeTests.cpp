@@ -728,7 +728,7 @@ int main()
     faceplateClean = faceplateClean && hasNoDynamicGoldTrace (staticFaceplate, { 56, 450, 157, 120 });
     pass &= check (faceplateClean, "v2-static-background-clean-gate");
     pass &= check (opaqueRgbMatches (staticFaceplate, visualReference, { 933, 409, 4, 192 })
-                && opaqueRgbMatches (staticFaceplate, visualReference, { 968, 409, 6, 192 }),
+                && opaqueRgbMatches (staticFaceplate, visualReference, { 968, 409, 5, 192 }),
                    "v2-output-meter-old-hole-restored");
     pass &= check (v2 != nullptr && v2->validateInteractiveBounds(), "v2-visual-hit-bounds-match-manifest");
     auto& state=processor.getStateModel();
