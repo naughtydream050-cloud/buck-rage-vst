@@ -721,8 +721,8 @@ int main()
     for (const auto& bounds : std::array<juce::Rectangle<int>, 10> {{
         GeneratedLayout::speedKnobBounds(), GeneratedLayout::pitchKnobBounds(), GeneratedLayout::depthKnobBounds(),
         GeneratedLayout::speedReadoutBounds(), GeneratedLayout::pitchReadoutBounds(), GeneratedLayout::depthReadoutBounds(),
-        GeneratedLayout::outputLFaceplateMeterHoleBounds(), GeneratedLayout::outputRFaceplateMeterHoleBounds(),
-        GeneratedLayout::outputLFaceplateHoleBounds(), GeneratedLayout::outputRFaceplateHoleBounds()
+        GeneratedLayout::outputLBounds(), GeneratedLayout::outputRBounds(),
+        GeneratedLayout::outputLReadoutBounds(), GeneratedLayout::outputRReadoutBounds()
     }})
         faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
     faceplateClean = faceplateClean && hasNoDynamicGoldTrace (staticFaceplate, { 56, 450, 157, 120 });

@@ -20,10 +20,4 @@ inline juce::Rectangle<int> outputLBounds()         { return { 937, 419, 12, 174
 inline juce::Rectangle<int> outputRBounds()         { return { 973, 419, 12, 174 }; }
 inline juce::Rectangle<int> outputLReadoutBounds()  { return { 923, 601, 39, 21 }; }
 inline juce::Rectangle<int> outputRReadoutBounds()  { return { 960, 601, 39, 21 }; }
-// Static faceplate ownership is unchanged: these are its pre-existing alpha
-// windows, not runtime draw bounds.
-inline juce::Rectangle<int> outputLFaceplateMeterHoleBounds() { return { 939, 419, 12, 174 }; }
-inline juce::Rectangle<int> outputRFaceplateMeterHoleBounds() { return { 974, 419, 12, 174 }; }
-inline juce::Rectangle<int> outputLFaceplateHoleBounds() { return { 923, 601, 39, 21 }; }
-inline juce::Rectangle<int> outputRFaceplateHoleBounds() { return { 963, 601, 39, 21 }; }
 }
