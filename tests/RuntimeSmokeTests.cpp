@@ -761,7 +761,8 @@ int main()
     juce::AudioBuffer<float> outputLayoutProbe (2, 32); outputLayoutProbe.clear();
     outputLayoutProbe.setSample (0, 0, 1.0f); outputLayoutProbe.setSample (1, 0, 1.0f);
     juce::MidiBuffer outputLayoutMidi; processor.processBlock (outputLayoutProbe, outputLayoutMidi);
-    juce::MessageManager::getInstance()->runDispatchLoopUntil (50);
+    juce::Thread::sleep (50);
+    juce::Timer::callPendingTimersSynchronously();
     const auto outputLayoutImage = render (*editor);
     const auto renderedLeftMeter = visibleMeterBounds (outputLayoutImage, GeneratedLayout::outputLBounds());
     const auto renderedRightMeter = visibleMeterBounds (outputLayoutImage, GeneratedLayout::outputRBounds());
