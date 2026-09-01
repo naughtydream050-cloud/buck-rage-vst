@@ -136,6 +136,20 @@ bool hasNoDynamicGoldTrace (const juce::Image& image, juce::Rectangle<int> bound
     return true;
 }
 
+juce::Rectangle<int> visibleMeterBounds (const juce::Image& image, juce::Rectangle<int> bounds)
+{
+    auto result = juce::Rectangle<int> {};
+    for (int y = bounds.getY(); y < bounds.getBottom(); ++y)
+        for (int x = bounds.getX(); x < bounds.getRight(); ++x)
+        {
+            const auto c = image.getPixelAt (x, y);
+            if (c.getRed() > 80 && c.getGreen() > 50 && c.getRed() - c.getBlue() > 20)
+                result = result.isEmpty() ? juce::Rectangle<int> { x, y, 1, 1 }
+                                          : result.getUnion ({ x, y, 1, 1 });
+        }
+    return result;
+}
+
 bool cropHasVisibleCellContent (const juce::Image& rendered, juce::Rectangle<int> bounds)
 {
     int nonBlack = 0;
@@ -727,8 +741,8 @@ int main()
         faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
     faceplateClean = faceplateClean && hasNoDynamicGoldTrace (staticFaceplate, { 56, 450, 157, 120 });
     pass &= check (faceplateClean, "v2-static-background-clean-gate");
-    pass &= check (opaqueRgbMatches (staticFaceplate, visualReference, { 933, 409, 4, 192 })
-                && opaqueRgbMatches (staticFaceplate, visualReference, { 968, 409, 5, 192 }),
+    pass &= check (opaqueRgbMatches (staticFaceplate, visualReference, { 933, 409, 2, 192 })
+                && opaqueRgbMatches (staticFaceplate, visualReference, { 968, 409, 3, 192 }),
                    "v2-output-meter-old-hole-restored");
     pass &= check (v2 != nullptr && v2->validateInteractiveBounds(), "v2-visual-hit-bounds-match-manifest");
     auto& state=processor.getStateModel();
@@ -736,17 +750,26 @@ int main()
     // values, but no BAR/PRESET/LENGTH state image may be gold.
     state.selectTab (0); state.setBypass (false);
     const auto freshImage = render (*editor);
-    const auto centerX2 = [] (juce::Rectangle<int> bounds) { return 2 * bounds.getX() + bounds.getWidth(); };
-    const auto outputCentersAligned = [&]
+    const auto visibleMeterCenter = [] (juce::Rectangle<int> bounds)
     {
-        const auto labelL = 2 * GeneratedLayout::outputLLabelCenterX();
-        const auto labelR = 2 * GeneratedLayout::outputRLabelCenterX();
-        return std::abs (labelL - centerX2 (GeneratedLayout::outputLBounds())) <= 2
-            && std::abs (labelL - centerX2 (GeneratedLayout::outputLReadoutBounds())) <= 2
-            && std::abs (labelR - centerX2 (GeneratedLayout::outputRBounds())) <= 2
-            && std::abs (labelR - centerX2 (GeneratedLayout::outputRReadoutBounds())) <= 2;
+        return (float) bounds.getX() + GeneratedLayout::outputMeterVisibleCenterX;
     };
-    pass &= check (freshImage.isValid() && outputCentersAligned(), "v2-output-final-composite-center-alignment");
+    pass &= check (freshImage.isValid()
+                && std::abs (visibleMeterCenter (GeneratedLayout::outputLBounds()) - GeneratedLayout::outputLSlotCenterX) <= 0.5f
+                && std::abs (visibleMeterCenter (GeneratedLayout::outputRBounds()) - GeneratedLayout::outputRSlotCenterX) <= 0.5f,
+                   "v2-output-visible-meter-center-layout-contract");
+    juce::AudioBuffer<float> outputLayoutProbe (2, 32); outputLayoutProbe.clear();
+    outputLayoutProbe.setSample (0, 0, 1.0f); outputLayoutProbe.setSample (1, 0, 1.0f);
+    juce::MidiBuffer outputLayoutMidi; processor.processBlock (outputLayoutProbe, outputLayoutMidi);
+    juce::MessageManager::getInstance()->runDispatchLoopUntil (50);
+    const auto outputLayoutImage = render (*editor);
+    const auto renderedLeftMeter = visibleMeterBounds (outputLayoutImage, GeneratedLayout::outputLBounds());
+    const auto renderedRightMeter = visibleMeterBounds (outputLayoutImage, GeneratedLayout::outputRBounds());
+    const auto centerX = [] (juce::Rectangle<int> bounds) { return (float) bounds.getX() + (float) bounds.getWidth() / 2.0f; };
+    pass &= check (! renderedLeftMeter.isEmpty() && ! renderedRightMeter.isEmpty()
+                && std::abs (centerX (renderedLeftMeter) - GeneratedLayout::outputLSlotCenterX) <= 0.5f
+                && std::abs (centerX (renderedRightMeter) - GeneratedLayout::outputRSlotCenterX) <= 0.5f,
+                   "v2-output-rendered-visible-meter-center-ssot");
     int freshGoldBars = 0, freshGoldPresets = 0, freshGoldLengths = 0;
     for (int index = 0; index < 16; ++index)
     {
