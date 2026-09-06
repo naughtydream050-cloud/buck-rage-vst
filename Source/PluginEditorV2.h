@@ -18,6 +18,7 @@ public:
     bool hasValidBarMapAssets() const;
     bool validateInteractiveBounds() const;
     bool debugClickAt (juce::Point<int> point);
+    void debugSetOutputMeterDb (float left, float right);
 
 private:
     class Surface;

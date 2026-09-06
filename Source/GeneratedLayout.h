@@ -14,12 +14,10 @@ inline juce::Rectangle<int> speedReadoutBounds()    { return { 742, 563, 48, 16 
 inline juce::Rectangle<int> pitchReadoutBounds()    { return { 793, 563, 48, 16 }; }
 inline juce::Rectangle<int> depthReadoutBounds()    { return { 848, 563, 48, 16 }; }
 inline juce::Rectangle<int> outputPanelBounds()     { return { 907, 364, 107, 270 }; }
-inline constexpr float outputMeterVisibleCenterX = 7.5f;
-inline constexpr float outputLSlotCenterX = 942.5f;
-inline constexpr float outputRSlotCenterX = 978.5f;
-inline int outputMeterXForSlotCenter (float slotCenterX) { return juce::roundToInt (slotCenterX - outputMeterVisibleCenterX); }
-inline juce::Rectangle<int> outputLBounds()         { return { outputMeterXForSlotCenter (outputLSlotCenterX), 419, 12, 174 }; }
-inline juce::Rectangle<int> outputRBounds()         { return { outputMeterXForSlotCenter (outputRSlotCenterX), 419, 12, 174 }; }
+// Visible slot pixels measured from the approved reference, not label centres.
+// Channel PNGs are prepared at these native sizes with no dark side margins.
+inline juce::Rectangle<int> outputLBounds()         { return { 940, 419, 16, 174 }; }
+inline juce::Rectangle<int> outputRBounds()         { return { 974, 419, 15, 174 }; }
 inline juce::Rectangle<int> outputLReadoutBounds()  { return { 923, 601, 39, 21 }; }
-inline juce::Rectangle<int> outputRReadoutBounds()  { return { 960, 601, 39, 21 }; }
+inline juce::Rectangle<int> outputRReadoutBounds()  { return { 963, 601, 39, 21 }; }
 }

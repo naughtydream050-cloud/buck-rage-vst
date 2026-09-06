@@ -750,27 +750,45 @@ int main()
     // values, but no BAR/PRESET/LENGTH state image may be gold.
     state.selectTab (0); state.setBypass (false);
     const auto freshImage = render (*editor);
-    const auto visibleMeterCenter = [] (juce::Rectangle<int> bounds)
+    // Measure the independent reference's bottom lit segments. Do not compare
+    // implementation coordinates against constants from the same header.
+    const std::array<juce::Rectangle<int>, 2> referenceSearch {{{936,592,24,1},{970,592,23,1}}};
+    std::array<juce::Rectangle<int>, 2> expectedSlots;
+    for (int ch = 0; ch < 2; ++ch)
     {
-        return (float) bounds.getX() + GeneratedLayout::outputMeterVisibleCenterX;
-    };
-    pass &= check (freshImage.isValid()
-                && std::abs (visibleMeterCenter (GeneratedLayout::outputLBounds()) - GeneratedLayout::outputLSlotCenterX) <= 0.5f
-                && std::abs (visibleMeterCenter (GeneratedLayout::outputRBounds()) - GeneratedLayout::outputRSlotCenterX) <= 0.5f,
-                   "v2-output-visible-meter-center-layout-contract");
-    juce::AudioBuffer<float> outputLayoutProbe (2, 32); outputLayoutProbe.clear();
-    outputLayoutProbe.setSample (0, 0, 1.0f); outputLayoutProbe.setSample (1, 0, 1.0f);
-    juce::MidiBuffer outputLayoutMidi; processor.processBlock (outputLayoutProbe, outputLayoutMidi);
-    juce::Thread::sleep (50);
-    juce::Timer::callPendingTimersSynchronously();
-    const auto outputLayoutImage = render (*editor);
-    const auto renderedLeftMeter = visibleMeterBounds (outputLayoutImage, GeneratedLayout::outputLBounds());
-    const auto renderedRightMeter = visibleMeterBounds (outputLayoutImage, GeneratedLayout::outputRBounds());
-    const auto centerX = [] (juce::Rectangle<int> bounds) { return (float) bounds.getX() + (float) bounds.getWidth() / 2.0f; };
-    pass &= check (! renderedLeftMeter.isEmpty() && ! renderedRightMeter.isEmpty()
-                && std::abs (centerX (renderedLeftMeter) - GeneratedLayout::outputLSlotCenterX) <= 0.5f
-                && std::abs (centerX (renderedRightMeter) - GeneratedLayout::outputRSlotCenterX) <= 0.5f,
-                   "v2-output-rendered-visible-meter-center-ssot");
+        const auto edge = visibleMeterBounds (visualReference, referenceSearch[(size_t) ch]);
+        expectedSlots[(size_t) ch] = {edge.getX(),419,edge.getWidth(),174};
+    }
+    pass &= check (GeneratedLayout::outputLBounds() == expectedSlots[0]
+                && GeneratedLayout::outputRBounds() == expectedSlots[1], "v2-output-reference-slot-geometry");
+    const std::array<juce::Image, 2> preparedLeds {{resourceImage("output_meter_left_png"),resourceImage("output_meter_right_png")}};
+    for (int ch = 0; ch < 2; ++ch)
+        pass &= check (preparedLeds[(size_t) ch].getWidth() == expectedSlots[(size_t) ch].getWidth()
+                    && preparedLeds[(size_t) ch].getHeight() == expectedSlots[(size_t) ch].getHeight(),
+                       "v2-output-prepared-native-size");
+    for (const auto levels : std::array<std::array<float,2>,6> {{{{-60,-60}},{{6,-60}},{{-60,6}},{{-30,-30}},{{0,0}},{{6,6}}}})
+    {
+        v2->debugSetOutputMeterDb (levels[0],levels[1]);
+        const auto actual = render (*editor);
+        bool pixelsMatch = true;
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            const auto slot = expectedSlots[(size_t) ch];
+            const auto fill = juce::roundToInt(juce::jmap(levels[(size_t) ch],-60.0f,6.0f,0.0f,(float)slot.getHeight()));
+            for (int y=0; y<slot.getHeight(); ++y)
+                for (int x=0; x<slot.getWidth(); ++x)
+                {
+                    // Peak hold may light two pixels immediately above fill.
+                    if (fill > 0 && y >= slot.getHeight()-fill)
+                        pixelsMatch &= actual.getPixelAt(slot.getX()+x,slot.getY()+y) == preparedLeds[(size_t) ch].getPixelAt(x,y);
+                    else if (fill == 0)
+                        pixelsMatch &= actual.getPixelAt(slot.getX()+x,slot.getY()+y).getBrightness() < 0.01f;
+                }
+        }
+        pass &= check(pixelsMatch,"v2-output-final-composite-fill-pixels");
+        pass &= check(png(actual,"v2-output-layout-"+juce::String((int)levels[0])+"-"+juce::String((int)levels[1])+".png"),"v2-output-layout-proof");
+    }
+    v2->debugSetOutputMeterDb(-60,-60);
     int freshGoldBars = 0, freshGoldPresets = 0, freshGoldLengths = 0;
     for (int index = 0; index < 16; ++index)
     {

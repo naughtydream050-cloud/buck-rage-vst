@@ -256,10 +256,16 @@ class ToyotomiHideyoshiAudioProcessorEditorV2::OutputMeter final : public juce::
 {
 public:
     explicit OutputMeter (ToyotomiHideyoshiAudioProcessor& source)
-        : processor (source), meterLed (readAsset ("meter_led_strip.png"))
+        : processor (source), meterLeds {{ readAsset ("output_meter_left.png"), readAsset ("output_meter_right.png") }}
     {
         setOpaque (false);
         startTimerHz (30);
+    }
+
+    void setLevelsForVisualTest (float left, float right)
+    {
+        outputDb = {{ juce::jlimit (-60.0f, 6.0f, left), juce::jlimit (-60.0f, 6.0f, right) }};
+        outputPeakDb = outputDb;
     }
 
     void paint (juce::Graphics& g) override
@@ -275,6 +281,7 @@ public:
         }};
         for (size_t channel = 0; channel < tracks.size(); ++channel)
         {
+            const auto& meterLed = meterLeds[channel];
             const auto track = tracks[channel];
             const auto pixels = juce::roundToInt (juce::jmap (outputDb[channel], -60.0f, 6.0f,
                                                                0.0f, (float) track.getHeight()));
@@ -322,7 +329,7 @@ private:
     }
 
     ToyotomiHideyoshiAudioProcessor& processor;
-    juce::Image meterLed;
+    std::array<juce::Image, 2> meterLeds;
     std::array<float, 2> outputDb {{ -60.0f, -60.0f }};
     std::array<float, 2> outputPeakDb {{ -60.0f, -60.0f }};
 };
@@ -454,6 +461,7 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
 }
 
 bool ToyotomiHideyoshiAudioProcessorEditorV2::hasValidBarMapAssets() const { return surface != nullptr && surface->barMapAssetsReady(); }
+void ToyotomiHideyoshiAudioProcessorEditorV2::debugSetOutputMeterDb (float left, float right) { outputMeter->setLevelsForVisualTest (left, right); }
 bool ToyotomiHideyoshiAudioProcessorEditorV2::validateInteractiveBounds() const
 {
     std::vector<juce::Rectangle<int>> expected;

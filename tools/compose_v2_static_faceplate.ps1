@@ -14,6 +14,12 @@ $g = [System.Drawing.Graphics]::FromImage($bitmap)
 $g.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceCopy
 
 $clear = [System.Drawing.Brushes]::Transparent
+$layout = Get-Content (Join-Path $root 'Source\GeneratedLayout.h') -Raw
+$outputRects = foreach ($name in @('outputLBounds','outputRBounds','outputLReadoutBounds','outputRReadoutBounds')) {
+    $match = [regex]::Match($layout, ($name + '\(\)\s*\{\s*return\s*\{\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)'))
+    if (!$match.Success) { throw "Missing OUTPUT layout: $name" }
+    ,@([int]$match.Groups[1].Value,[int]$match.Groups[2].Value,[int]$match.Groups[3].Value,[int]$match.Groups[4].Value)
+}
 $stateRects = @(
     @(251,74,105,27), @(360,74,105,27), @(470,74,106,27), @(580,74,105,27),
     @(259,137,56,80), @(317,137,56,80), @(378,137,56,80), @(437,137,56,80), @(494,137,56,80), @(553,137,56,80), @(611,137,56,80), @(670,137,56,80),
@@ -22,10 +28,8 @@ $stateRects = @(
     @(742,425,32,26), @(773,425,32,26), @(803,425,32,26), @(834,425,32,26), @(864,425,32,26),
     @(744,513,48,48), @(793,513,48,48), @(848,513,48,48),
     @(742,563,48,16), @(793,563,48,16), @(848,563,48,16),
-    @(931,14,80,31),
-    # OUTPUT has one geometry contract: faceplate holes equal runtime bounds.
-    @(935,419,12,174), @(971,419,12,174), @(923,601,39,21), @(960,601,39,21)
-)
+    @(931,14,80,31)
+) + $outputRects
 $stateIndex = 0
 foreach($r in $stateRects) {
     # The first 35 rectangles are tab/BAR/PRESET/LENGTH assets. Their source
