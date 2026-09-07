@@ -982,10 +982,17 @@ int main()
     pass &= check (png (render (*editor), "v2-xy-recording-buttons.png"), "v2-xy-recording-buttons-proof");
     v2->debugClickAt (juce::Point<int> { 465, 261 }); // BAR 12; stops REC
     v2->debugXYAt (xyPad.getCentre(), 1.0);
-    pass &= check (state.getSlot (10).xyMotionExists && state.getSlot (10).xyMotion.size() == 2
-                && state.getSlot (10).currentX > .9f && state.getSlot (10).currentY > .85f
-                && state.getSlot (10).xyMotion[1].timeSeconds == .5
-                && ! state.getSlot (11).xyMotionExists,
+    const auto& recordedBar11 = state.getSlot (10);
+    const auto& switchedBar12 = state.getSlot (11);
+    std::cout << "XY_SMOKE_SWITCH selected=" << state.getUiState().selectedBar
+              << " bar11_points=" << recordedBar11.xyMotion.size()
+              << " bar11_exists=" << recordedBar11.xyMotionExists
+              << " bar12_points=" << switchedBar12.xyMotion.size()
+              << " bar12_exists=" << switchedBar12.xyMotionExists << '\n';
+    pass &= check (recordedBar11.xyMotionExists && recordedBar11.xyMotion.size() == 2
+                && recordedBar11.currentX > .9f && recordedBar11.currentY > .85f
+                && recordedBar11.xyMotion[1].timeSeconds == .5
+                && ! switchedBar12.xyMotionExists,
                    "v2-xy-rec-stops-on-absolute-bar-change");
     v2->debugClickAt (juce::Point<int> { 406, 261 }); // return BAR 11
     const auto traceOn = render (*editor);
