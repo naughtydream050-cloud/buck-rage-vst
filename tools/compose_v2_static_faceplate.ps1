@@ -68,3 +68,7 @@ for ($y = 450; $y -lt 570; ++$y) {
 
 $bitmap.Save($destination,[System.Drawing.Imaging.ImageFormat]::Png)
 $bitmap.Dispose()
+
+# Finish parameter corners/readout backing from the shared runtime layout.
+python (Join-Path $PSScriptRoot 'prepare_parameter_backing.py')
+if ($LASTEXITCODE -ne 0) { throw 'Parameter backing preparation failed.' }

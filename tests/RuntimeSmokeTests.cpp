@@ -732,13 +732,28 @@ int main()
                 || id.startsWith ("length_") || id == "bypass")
                 faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, jsonBounds (jsonProperty (item, "bounds")));
         }
-    for (const auto& bounds : std::array<juce::Rectangle<int>, 10> {{
-        GeneratedLayout::speedKnobBounds(), GeneratedLayout::pitchKnobBounds(), GeneratedLayout::depthKnobBounds(),
-        GeneratedLayout::speedReadoutBounds(), GeneratedLayout::pitchReadoutBounds(), GeneratedLayout::depthReadoutBounds(),
+    for (const auto& bounds : std::array<juce::Rectangle<int>, 4> {{
         GeneratedLayout::outputLBounds(), GeneratedLayout::outputRBounds(),
         GeneratedLayout::outputLReadoutBounds(), GeneratedLayout::outputRReadoutBounds()
     }})
         faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
+    const auto nativeRing = resourceImage("knob_ring_60_png");
+    for (const auto b : {GeneratedLayout::speedKnobBounds(),GeneratedLayout::pitchKnobBounds(),GeneratedLayout::depthKnobBounds()})
+    {
+        bool alphaMatches = nativeRing.getWidth()==b.getWidth() && nativeRing.getHeight()==b.getHeight();
+        for (int y=0;y<b.getHeight();++y)
+            for (int x=0;x<b.getWidth();++x)
+                alphaMatches &= staticFaceplate.getPixelAt(b.getX()+x,b.getY()+y).getAlpha() == 255-nativeRing.getPixelAt(x,y).getAlpha();
+        pass &= check(alphaMatches,"v2-knob-backing-matches-native-alpha");
+    }
+    for (const auto b : {GeneratedLayout::speedReadoutBounds(),GeneratedLayout::pitchReadoutBounds(),GeneratedLayout::depthReadoutBounds()})
+    {
+        bool clean = true;
+        for (int y=b.getY();y<b.getBottom();++y)
+            for (int x=b.getX();x<b.getRight();++x)
+                clean &= staticFaceplate.getPixelAt(x,y).getAlpha()==255 && staticFaceplate.getPixelAt(x,y).getBrightness()<0.22f;
+        pass &= check(clean,"v2-readout-backing-opaque-no-baked-glyphs");
+    }
     faceplateClean = faceplateClean && hasNoDynamicGoldTrace (staticFaceplate, { 56, 450, 157, 120 });
     pass &= check (faceplateClean, "v2-static-background-clean-gate");
     pass &= check (opaqueRgbMatches (staticFaceplate, visualReference, { 933, 409, 2, 192 })

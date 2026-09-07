@@ -10,9 +10,9 @@ namespace GeneratedLayout
 inline juce::Rectangle<int> speedKnobBounds()       { return { 744, 513, 48, 48 }; }
 inline juce::Rectangle<int> pitchKnobBounds()       { return { 793, 513, 48, 48 }; }
 inline juce::Rectangle<int> depthKnobBounds()       { return { 848, 513, 48, 48 }; }
-inline juce::Rectangle<int> speedReadoutBounds()    { return { 742, 563, 48, 16 }; }
-inline juce::Rectangle<int> pitchReadoutBounds()    { return { 793, 563, 48, 16 }; }
-inline juce::Rectangle<int> depthReadoutBounds()    { return { 848, 563, 48, 16 }; }
+inline juce::Rectangle<int> speedReadoutBounds()    { return { 745, 571, 43, 17 }; }
+inline juce::Rectangle<int> pitchReadoutBounds()    { return { 797, 571, 45, 17 }; }
+inline juce::Rectangle<int> depthReadoutBounds()    { return { 849, 571, 43, 17 }; }
 inline juce::Rectangle<int> outputPanelBounds()     { return { 907, 364, 107, 270 }; }
 // Visible slot pixels measured from the approved reference, not label centres.
 // Channel PNGs are prepared at these native sizes with no dark side margins.
