@@ -706,6 +706,8 @@ int main()
     std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
     pass &= check(editor != nullptr && editor->getWidth()==1024 && editor->getHeight()==683,"v2-editor-native-1024");
     if(!editor) return 1;
+    // getComponentAt follows JUCE visibility; no native window is required.
+    editor->setVisible (true);
     // The JUCE splash is laid out on its first paint. Prime that test-only
     // lifecycle step before excluding the child from diagnostic rendering.
     juce::ignoreUnused (render (*editor));

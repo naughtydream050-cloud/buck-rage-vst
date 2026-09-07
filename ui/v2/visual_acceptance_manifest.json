@@ -18,6 +18,7 @@
     { "name": "BAR_MAP",     "bounds": [259, 137, 467, 164], "dynamic_region": true, "accepted_variance": "cell shell, label, mini preview and playhead" },
     { "name": "PRESET",      "bounds": [750, 100, 258, 260], "dynamic_region": true, "accepted_variance": "one selected preset image" },
     { "name": "XY",          "bounds": [14, 416, 232, 200], "dynamic_region": true, "accepted_variance": "motion trace/current point only" },
+    { "name": "XY_BUTTONS",  "bounds": [29, 601, 213, 24], "dynamic_region": true, "accepted_variance": "REC and VIEW runtime active feedback inside printed button frames" },
     { "name": "QUOTE_PANEL", "bounds": [268, 337, 409, 288], "dynamic_region": false, "accepted_variance": "none" },
     { "name": "LENGTH",      "bounds": [742, 425, 154, 26], "dynamic_region": true, "accepted_variance": "one selected length image" },
     { "name": "SPEED",       "bounds": [742, 513, 50, 75], "dynamic_region": true, "accepted_variance": "native alpha-backed knob and numeric text inside reference value box" },
