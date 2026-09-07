@@ -504,7 +504,8 @@ bool ToyotomiHideyoshiAudioProcessorEditorV2::validateInteractiveBounds() const
 bool ToyotomiHideyoshiAudioProcessorEditorV2::debugXYAt (juce::Point<int> point, double elapsedSeconds)
 {
     const auto bounds = GeneratedLayout::xyPadBounds();
-    if (! bounds.contains (point)) return false;
+    if (! bounds.contains (point)
+        || ! PluginStateModel::hasSelectedBar (processor.getStateModel().getUiState().selectedBar)) return false;
     updateXYFromPad ((point - bounds.getPosition()).toFloat(), elapsedSeconds);
     return true;
 }
