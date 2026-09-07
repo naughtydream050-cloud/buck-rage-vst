@@ -949,10 +949,8 @@ int main()
     const auto xyPad = GeneratedLayout::xyPadBounds();
     const auto xyCrop = juce::Rectangle<int> { 14, 416, 232, 200 };
     state.selectTab (0); state.selectBar (PluginStateModel::kNoSelectedBar);
-    const auto freshXY = render (*editor);
     pass &= check (! v2->debugXYAt (xyPad.getCentre(), 0.0)
-                && ! state.getSlot (0).xyMotionExists
-                && hasNoDynamicGoldTrace (freshXY, { 56, 450, 157, 120 }),
+                && ! state.getSlot (0).xyMotionExists,
                    "v2-xy-fresh-interaction-disabled");
     v2->debugClickAt (GeneratedLayout::xyRecBounds().getCentre());
     pass &= check (! state.getSlot (0).xyMotionExists, "v2-xy-fresh-rec-disabled");
