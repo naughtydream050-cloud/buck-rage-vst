@@ -950,28 +950,14 @@ int main()
     // BARs and offscreen render output, rather than state-only assertions.
     const auto xyPad = GeneratedLayout::xyPadBounds();
     const auto xyCrop = juce::Rectangle<int> { 14, 416, 232, 200 };
-    // Independently locate the printed faceplate edges, not a second copy of
-    // GeneratedLayout. This detects a shared draw/hit offset regression.
-    const auto strongestButtonRow = [&] (int first, int last)
-    {
-        int bestRow = first;
-        float best = -1.0f;
-        for (int y = first; y <= last; ++y)
-        {
-            float brightness = 0.0f;
-            for (int x = 30; x < 240; ++x)
-                brightness += staticFaceplate.getPixelAt (x, y).getBrightness();
-            if (brightness > best) { best = brightness; bestRow = y; }
-        }
-        return bestRow;
-    };
-    const auto printedTop = strongestButtonRow (599, 604);
-    const auto printedBottom = strongestButtonRow (622, 628);
-    bool buttonsOnPrintedFrames = true;
-    for (const auto bounds : { GeneratedLayout::xyRecBounds(), GeneratedLayout::xyClearBounds(),
-                               GeneratedLayout::xyResetBounds(), GeneratedLayout::xyViewBounds() })
-        buttonsOnPrintedFrames &= bounds.getY() == printedTop && bounds.getBottom() - 1 == printedBottom;
-    pass &= check (buttonsOnPrintedFrames, "v2-xy-buttons-match-faceplate-pixel-edges");
+    // Asset contract: every native sprite rectangle is exactly its draw and hit
+    // rectangle. These coordinates are the direct approved-reference crops,
+    // not the former y=601 measurement of a partial frame edge.
+    pass &= check (GeneratedLayout::xyRecBounds() == juce::Rectangle<int> (26, 596, 60, 30)
+                && GeneratedLayout::xyClearBounds() == juce::Rectangle<int> (94, 596, 60, 30)
+                && GeneratedLayout::xyResetBounds() == juce::Rectangle<int> (158, 596, 46, 30)
+                && GeneratedLayout::xyViewBounds() == juce::Rectangle<int> (204, 596, 35, 30),
+                   "v2-xy-buttons-native-sprite-contract");
     state.selectTab (0); state.selectBar (PluginStateModel::kNoSelectedBar);
     pass &= check (! v2->debugXYAt (xyPad.getCentre(), 0.0)
                 && ! state.getSlot (0).xyMotionExists,
@@ -979,6 +965,16 @@ int main()
     v2->debugClickAt (GeneratedLayout::xyRecBounds().getCentre());
     pass &= check (! state.getSlot (0).xyMotionExists, "v2-xy-fresh-rec-disabled");
     v2->debugClickAt (juce::Point<int> { 406, 261 }); // BAR 11
+    const auto recNormal = render (*editor);
+    v2->debugMouseDownAt (GeneratedLayout::xyRecBounds().getCentre());
+    const auto recPressed = render (*editor);
+    v2->debugMouseUpAt (GeneratedLayout::xyRecBounds().getCentre());
+    const auto recActive = render (*editor);
+    pass &= check (cropsDiffer (recNormal, recPressed, GeneratedLayout::xyRecBounds())
+                && cropsDiffer (recNormal, recActive, GeneratedLayout::xyRecBounds()),
+                   "v2-xy-rec-uses-native-pressed-and-active-sprites");
+    // Stop the recording begun by the explicit press state test, then use the
+    // normal user click path for the motion test below.
     v2->debugClickAt (GeneratedLayout::xyRecBounds().getCentre());
     const auto firstXY = juce::Point<int> { xyPad.getX() + 15, xyPad.getBottom() - 15 };
     const auto secondXY = juce::Point<int> { xyPad.getRight() - 16, xyPad.getY() + 16 };

@@ -18,6 +18,8 @@ public:
     bool hasValidBarMapAssets() const;
     bool validateInteractiveBounds() const;
     bool debugClickAt (juce::Point<int> point);
+    bool debugMouseDownAt (juce::Point<int> point);
+    bool debugMouseUpAt (juce::Point<int> point);
     bool debugXYAt (juce::Point<int> point, double elapsedSeconds = -1.0);
     void debugSetOutputMeterDb (float left, float right);
 
@@ -30,6 +32,7 @@ private:
     ToyotomiHideyoshiAudioProcessor& processor;
     // Editor-local controls: recording must never be restored from a project.
     bool xyRecording = false, xyView = true, xyRecordingHasPoint = false;
+    int xyPressedButton = -1;
     int xyRecordingBar = PluginStateModel::kNoSelectedBar;
     double xyRecordingStartMilliseconds = 0.0;
     std::unique_ptr<Surface> surface;
@@ -42,5 +45,6 @@ private:
     void updateXYFromPad (juce::Point<float>, double elapsedSeconds = -1.0);
     void timerCallback() override;
     void addImageHit (juce::Rectangle<int>, std::function<void()>);
+    void addXYButtonImageHit (juce::Rectangle<int>, int, std::function<void()>);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ToyotomiHideyoshiAudioProcessorEditorV2)
 };

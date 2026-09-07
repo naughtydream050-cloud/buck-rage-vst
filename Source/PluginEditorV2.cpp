@@ -89,6 +89,8 @@ juce::Rectangle<int> cellBounds (int index)
 }
 
 enum CellState { normalState, selectedState, playingState, selectedPlayingState };
+enum XYButtonState { xyNormalState, xyPressedState, xyActiveState };
+enum XYButtonId { xyRecordButton, xyClearButton, xyResetButton, xyViewButton, xyNoButton = -1 };
 
 CellState resolveCellState (bool selected, bool playing) noexcept
 {
@@ -111,7 +113,8 @@ struct V2AssetCatalog final
     std::array<std::array<juce::Image, 4>, 64> barCells;
     std::array<std::array<juce::Image, 2>, 10> presets;
     std::array<std::array<juce::Image, 2>, 5> lengths;
-    bool barMapValid = true;
+    std::array<std::array<juce::Image, 3>, 4> xyButtons;
+    bool barMapValid = true, xyButtonAssetsValid = true;
 
     void load (juce::Image& destination, const juce::String& name, juce::Rectangle<int> bounds)
     {
@@ -125,6 +128,14 @@ struct V2AssetCatalog final
         const auto valid = hasNativeSize (destination, bounds);
         barMapValid = barMapValid && valid;
         return valid;
+    }
+
+    void loadXYButton (XYButtonId button, XYButtonState state, const juce::String& name,
+                       juce::Rectangle<int> bounds)
+    {
+        auto& image = xyButtons[(size_t) button][(size_t) state];
+        image = readAsset (name);
+        xyButtonAssetsValid = xyButtonAssetsValid && hasNativeSize (image, bounds);
     }
 
     void loadBarMapContract()
@@ -188,6 +199,16 @@ struct V2AssetCatalog final
         load (pointer,   "knob_pointer_60.png",          GeneratedLayout::speedKnobBounds());
         load (bypassOff, "bypass_off.png",               { 931, 14, 80, 31 });
         load (bypassOn,  "bypass_on.png",                { 931, 14, 80, 31 });
+        const std::array<juce::Rectangle<int>, 4> xyBounds {{ GeneratedLayout::xyRecBounds(),
+            GeneratedLayout::xyClearBounds(), GeneratedLayout::xyResetBounds(), GeneratedLayout::xyViewBounds() }};
+        const std::array<const char*, 4> xyNames {{ "rec", "clear", "reset", "view" }};
+        const std::array<const char*, 3> xyStates {{ "normal", "pressed", "active" }};
+        for (int button = 0; button < 4; ++button)
+            for (int state = 0; state < 3; ++state)
+                loadXYButton ((XYButtonId) button, (XYButtonState) state,
+                              "xy_" + juce::String (xyNames[(size_t) button]) + "_"
+                                  + juce::String (xyStates[(size_t) state]) + ".png",
+                              xyBounds[(size_t) button]);
     }
 };
 }
@@ -195,16 +216,24 @@ struct V2AssetCatalog final
 class ToyotomiHideyoshiAudioProcessorEditorV2::HitRegion final : public juce::Component
 {
 public:
-    explicit HitRegion (std::function<void()> callback) : fn (std::move (callback)) { setOpaque (false); }
-    void mouseDown (const juce::MouseEvent&) override { if (fn) fn(); }
-    bool activateAt (juce::Point<int> point)
+    HitRegion (std::function<void()> downCallback, std::function<void()> upCallback = {})
+        : down (std::move (downCallback)), up (std::move (upCallback)) { setOpaque (false); }
+    void mouseDown (const juce::MouseEvent&) override { if (down) down(); }
+    void mouseUp (const juce::MouseEvent&) override { if (up) up(); }
+    bool pressAt (juce::Point<int> point)
     {
         if (! getBounds().contains (point)) return false;
-        if (fn) fn();
+        if (down) down();
+        return true;
+    }
+    bool releaseAt (juce::Point<int> point)
+    {
+        if (! getBounds().contains (point)) return false;
+        if (up) up();
         return true;
     }
 private:
-    std::function<void()> fn;
+    std::function<void()> down, up;
 };
 
 class ToyotomiHideyoshiAudioProcessorEditorV2::KnobRegion final : public juce::Component
@@ -329,9 +358,10 @@ private:
 class ToyotomiHideyoshiAudioProcessorEditorV2::Surface final : public juce::Component
 {
 public:
-    Surface (ToyotomiHideyoshiAudioProcessor& source, const bool& recordingState, const bool& viewState)
-        : processor (source), xyRecording (recordingState), xyView (viewState) {}
-    bool barMapAssetsReady() const { return assets.barMapValid; }
+    Surface (ToyotomiHideyoshiAudioProcessor& source, const bool& recordingState, const bool& viewState,
+             const int& pressedButtonState)
+        : processor (source), xyRecording (recordingState), xyView (viewState), xyPressedButton (pressedButtonState) {}
+    bool barMapAssetsReady() const { return assets.barMapValid && assets.xyButtonAssetsValid; }
 
     void paint (juce::Graphics& g) override
     {
@@ -416,16 +446,17 @@ public:
             g.setColour (juce::Colour (0xffd6a446));
             g.fillEllipse (currentPoint.x - 2.0f, currentPoint.y - 2.0f, 4.0f, 4.0f);
             g.restoreState();
-            if (xyRecording)
-            {
-                g.setColour (juce::Colour (0xffd6a446));
-                g.drawRect (GeneratedLayout::xyRecBounds(), 1);
-            }
-            if (xyView)
-            {
-                g.setColour (juce::Colour (0xffd6a446));
-                g.drawRect (GeneratedLayout::xyViewBounds(), 1);
-            }
+        }
+
+        const std::array<juce::Rectangle<int>, 4> xyBounds {{ GeneratedLayout::xyRecBounds(),
+            GeneratedLayout::xyClearBounds(), GeneratedLayout::xyResetBounds(), GeneratedLayout::xyViewBounds() }};
+        for (int button = 0; button < 4; ++button)
+        {
+            const auto active = button == xyRecordButton ? xyRecording
+                              : button == xyViewButton ? xyView : false;
+            const auto state = xyPressedButton == button ? xyPressedState
+                             : active ? xyActiveState : xyNormalState;
+            drawNative (g, assets.xyButtons[(size_t) button][(size_t) state], xyBounds[(size_t) button]);
         }
     }
 
@@ -433,13 +464,14 @@ private:
     ToyotomiHideyoshiAudioProcessor& processor;
     const bool& xyRecording;
     const bool& xyView;
+    const int& xyPressedButton;
     V2AssetCatalog assets;
 };
 
 ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2 (ToyotomiHideyoshiAudioProcessor& source)
     : AudioProcessorEditor (&source), processor (source)
 {
-    surface = std::make_unique<Surface> (processor, xyRecording, xyView);
+    surface = std::make_unique<Surface> (processor, xyRecording, xyView, xyPressedButton);
     addAndMakeVisible (*surface);
     surface->setInterceptsMouseClicks (false, false);
     outputMeter = std::make_unique<OutputMeter> (processor);
@@ -455,10 +487,10 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
     for (int index = 0; index < 5; ++index)
         addImageHit (kLengths[(size_t) index], [this, index] { processor.getStateModel().setSelectedLength ((PluginStateModel::NoteLength) index); });
     addImageHit ({ 931, 14, 80, 31 }, [this] { auto& state = processor.getStateModel(); state.setBypass (! state.getUiState().bypass); });
-    addImageHit (GeneratedLayout::xyRecBounds(), [this] { toggleXYRecording(); });
-    addImageHit (GeneratedLayout::xyClearBounds(), [this] { processor.getStateModel().clearSelectedBarXYMotion(); });
-    addImageHit (GeneratedLayout::xyResetBounds(), [this] { processor.getStateModel().resetSelectedBarXYPosition(); });
-    addImageHit (GeneratedLayout::xyViewBounds(), [this] { if (PluginStateModel::hasSelectedBar (processor.getStateModel().getUiState().selectedBar)) xyView = ! xyView; });
+    addXYButtonImageHit (GeneratedLayout::xyRecBounds(), xyRecordButton, [this] { toggleXYRecording(); });
+    addXYButtonImageHit (GeneratedLayout::xyClearBounds(), xyClearButton, [this] { processor.getStateModel().clearSelectedBarXYMotion(); });
+    addXYButtonImageHit (GeneratedLayout::xyResetBounds(), xyResetButton, [this] { processor.getStateModel().resetSelectedBarXYPosition(); });
+    addXYButtonImageHit (GeneratedLayout::xyViewBounds(), xyViewButton, [this] { if (PluginStateModel::hasSelectedBar (processor.getStateModel().getUiState().selectedBar)) xyView = ! xyView; });
 
     for (int index = 0; index < 3; ++index)
     {
@@ -543,7 +575,17 @@ void ToyotomiHideyoshiAudioProcessorEditorV2::updateXYFromPad (juce::Point<float
 bool ToyotomiHideyoshiAudioProcessorEditorV2::debugClickAt (juce::Point<int> point)
 {
     if (auto* hit = dynamic_cast<HitRegion*> (getComponentAt (point)))
-        return hit->activateAt (point);
+        return hit->pressAt (point) && hit->releaseAt (point);
+    return false;
+}
+bool ToyotomiHideyoshiAudioProcessorEditorV2::debugMouseDownAt (juce::Point<int> point)
+{
+    if (auto* hit = dynamic_cast<HitRegion*> (getComponentAt (point))) return hit->pressAt (point);
+    return false;
+}
+bool ToyotomiHideyoshiAudioProcessorEditorV2::debugMouseUpAt (juce::Point<int> point)
+{
+    if (auto* hit = dynamic_cast<HitRegion*> (getComponentAt (point))) return hit->releaseAt (point);
     return false;
 }
 void ToyotomiHideyoshiAudioProcessorEditorV2::paint (juce::Graphics& g) { juce::ignoreUnused (g); }
@@ -562,6 +604,22 @@ void ToyotomiHideyoshiAudioProcessorEditorV2::timerCallback()
 void ToyotomiHideyoshiAudioProcessorEditorV2::addImageHit (juce::Rectangle<int> bounds, std::function<void()> fn)
 {
     auto* hit = new HitRegion (std::move (fn));
+    hit->setBounds (bounds);
+    addAndMakeVisible (hit);
+    hitRegions.add (hit);
+}
+
+void ToyotomiHideyoshiAudioProcessorEditorV2::addXYButtonImageHit (juce::Rectangle<int> bounds, int button,
+                                                                     std::function<void()> fn)
+{
+    auto* hit = new HitRegion (
+        [this, button, fn = std::move (fn)] () mutable
+        {
+            xyPressedButton = button;
+            if (fn) fn();
+            surface->repaint();
+        },
+        [this] { xyPressedButton = xyNoButton; surface->repaint(); });
     hit->setBounds (bounds);
     addAndMakeVisible (hit);
     hitRegions.add (hit);
