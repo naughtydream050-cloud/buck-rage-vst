@@ -975,6 +975,7 @@ int main()
     pass &= check (cropsDiffer (clearNormal, clearPressed, GeneratedLayout::xyClearBounds())
                 && ! cropsDiffer (clearNormal, clearReleased, GeneratedLayout::xyClearBounds()),
                    "v2-xy-clear-uses-native-pressed-and-normal-sprites");
+    v2->debugClickAt (GeneratedLayout::xyRecBounds().getCentre());
     const auto firstXY = juce::Point<int> { xyPad.getX() + 15, xyPad.getBottom() - 15 };
     const auto secondXY = juce::Point<int> { xyPad.getRight() - 16, xyPad.getY() + 16 };
     pass &= check (v2->debugXYAt (firstXY, 0.0) && v2->debugXYAt (secondXY, 0.5),
@@ -982,17 +983,10 @@ int main()
     pass &= check (png (render (*editor), "v2-xy-recording-buttons.png"), "v2-xy-recording-buttons-proof");
     v2->debugClickAt (juce::Point<int> { 465, 261 }); // BAR 12; stops REC
     v2->debugXYAt (xyPad.getCentre(), 1.0);
-    const auto& recordedBar11 = state.getSlot (10);
-    const auto& switchedBar12 = state.getSlot (11);
-    std::cout << "XY_SMOKE_SWITCH selected=" << state.getUiState().selectedBar
-              << " bar11_points=" << recordedBar11.xyMotion.size()
-              << " bar11_exists=" << recordedBar11.xyMotionExists
-              << " bar12_points=" << switchedBar12.xyMotion.size()
-              << " bar12_exists=" << switchedBar12.xyMotionExists << '\n';
-    pass &= check (recordedBar11.xyMotionExists && recordedBar11.xyMotion.size() == 2
-                && recordedBar11.currentX > .9f && recordedBar11.currentY > .85f
-                && recordedBar11.xyMotion[1].timeSeconds == .5
-                && ! switchedBar12.xyMotionExists,
+    pass &= check (state.getSlot (10).xyMotionExists && state.getSlot (10).xyMotion.size() == 2
+                && state.getSlot (10).currentX > .9f && state.getSlot (10).currentY > .85f
+                && state.getSlot (10).xyMotion[1].timeSeconds == .5
+                && ! state.getSlot (11).xyMotionExists,
                    "v2-xy-rec-stops-on-absolute-bar-change");
     v2->debugClickAt (juce::Point<int> { 406, 261 }); // return BAR 11
     const auto traceOn = render (*editor);
