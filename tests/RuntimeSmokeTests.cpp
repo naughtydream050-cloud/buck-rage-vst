@@ -720,7 +720,7 @@ int main()
     const auto runtimeManifest = jsonResource ("runtimemanifest_json");
     juce::Array<juce::var> barPixelTrace;
     pass &= check (visualManifest.getDynamicObject() != nullptr && visualRegions.getArray() != nullptr
-                && visualInteractive != nullptr && visualInteractive->size() == 39
+                && visualInteractive != nullptr && visualInteractive->size() == 40
                 && visualReference.isValid() && visualReference.getWidth() == 1024 && visualReference.getHeight() == 683,
                    "v2-visual-acceptance-reference-and-manifest");
     bool faceplateClean = staticFaceplate.isValid();
@@ -876,8 +876,8 @@ int main()
     pass &= check (cropMatchesResource (defaultImage, { 750, 100, 84, 64 }, "preset_off_selected_png")
                 && cropMatchesResource (defaultImage, { 924, 100, 84, 64 }, "preset_backspin_normal_png"),
                    "v2-default-off-selected-backspin-neutral");
-    pass &= check (hasNoDynamicGoldTrace (defaultImage, { 56, 450, 157, 120 }),
-                   "v2-xy-static-panel-owned-by-faceplate");
+    pass &= check (hasNoDynamicGoldTrace (freshImage, { 56, 450, 157, 120 }),
+                   "v2-xy-fresh-neutral-has-no-trace-or-point");
 
     const auto initialBar=state.getUiState().selectedBar; const auto initialSlot=state.getSlot(initialBar);
     const std::array<int, 8> cellX { 259, 317, 378, 437, 494, 553, 611, 670 };
@@ -943,6 +943,61 @@ int main()
     for(int l=0;l<5;++l){state.setSelectedLength((PluginStateModel::NoteLength)l);auto image=render(*editor);pass &=check(png(image,"v2-length-"+juce::String(l)+".png") && png(image,"v2-full-length-"+juce::String(l)+".png"),"v2-length-render");}
     const auto bypassBefore=state.getUiState().bypass; state.setSelectedPreset(PluginStateModel::ScratchPreset::custom);state.setBypass(!bypassBefore);auto bypassImage=render(*editor);pass &=check(png(bypassImage,"v2-full-bypass-on.png") && state.getSlot(0).preset==PluginStateModel::ScratchPreset::custom,"v2-bypass-preset-isolation");
     state.setSlotSpeed(0,PluginStateModel::kMinSpeed);state.setSlotPitch(0,PluginStateModel::kMinPitch);state.setSlotDepth(0,0.f);auto min=render(*editor);state.setSlotSpeed(0,PluginStateModel::kMaxSpeed);state.setSlotPitch(0,PluginStateModel::kMaxPitch);state.setSlotDepth(0,1.f);auto max=render(*editor);pass &=check(different(min,max) && png(min,"v2-knobs-min.png") && png(max,"v2-knobs-max.png"),"v2-knob-min-max-render");
+
+    // XY PAD: exercise the real V2 hit/input path. The test uses absolute
+    // BARs and offscreen render output, rather than state-only assertions.
+    const auto xyPad = GeneratedLayout::xyPadBounds();
+    const auto xyCrop = juce::Rectangle<int> { 14, 416, 232, 200 };
+    state.selectTab (0); state.selectBar (PluginStateModel::kNoSelectedBar);
+    const auto freshXY = render (*editor);
+    pass &= check (! v2->debugXYAt (xyPad.getCentre(), 0.0)
+                && ! state.getSlot (0).xyMotionExists
+                && hasNoDynamicGoldTrace (freshXY, { 56, 450, 157, 120 }),
+                   "v2-xy-fresh-interaction-disabled");
+    v2->debugClickAt (GeneratedLayout::xyRecBounds().getCentre());
+    pass &= check (! state.getSlot (0).xyMotionExists, "v2-xy-fresh-rec-disabled");
+    v2->debugClickAt (juce::Point<int> { 406, 261 }); // BAR 11
+    v2->debugClickAt (GeneratedLayout::xyRecBounds().getCentre());
+    const auto firstXY = juce::Point<int> { xyPad.getX() + 15, xyPad.getBottom() - 15 };
+    const auto secondXY = juce::Point<int> { xyPad.getRight() - 16, xyPad.getY() + 16 };
+    pass &= check (v2->debugXYAt (firstXY, 0.0) && v2->debugXYAt (secondXY, 0.5),
+                   "v2-xy-record-drag-input");
+    v2->debugClickAt (juce::Point<int> { 465, 261 }); // BAR 12; stops REC
+    v2->debugXYAt (xyPad.getCentre(), 1.0);
+    pass &= check (state.getSlot (10).xyMotionExists && state.getSlot (10).xyMotion.size() == 2
+                && state.getSlot (10).currentX > .9f && state.getSlot (10).currentY > .85f
+                && state.getSlot (10).xyMotion[1].timeSeconds == .5
+                && ! state.getSlot (11).xyMotionExists,
+                   "v2-xy-rec-stops-on-absolute-bar-change");
+    v2->debugClickAt (juce::Point<int> { 406, 261 }); // return BAR 11
+    const auto traceOn = render (*editor);
+    v2->debugClickAt (GeneratedLayout::xyViewBounds().getCentre());
+    const auto traceOff = render (*editor);
+    pass &= check (cropsDiffer (traceOn, traceOff, xyCrop) && state.getSlot (10).xyMotionExists,
+                   "v2-xy-view-off-hides-trace-keeps-data");
+    v2->debugClickAt (GeneratedLayout::xyViewBounds().getCentre());
+    const auto traceRestored = render (*editor);
+    const auto motionBeforeReset = state.getSlot (10).xyMotion;
+    v2->debugClickAt (GeneratedLayout::xyResetBounds().getCentre());
+    pass &= check (cropsDiffer (traceOff, traceRestored, xyCrop)
+                && state.getSlot (10).currentX == .5f && state.getSlot (10).currentY == .5f
+                && state.getSlot (10).xyMotion == motionBeforeReset,
+                   "v2-xy-view-on-and-reset-keeps-motion");
+    v2->debugClickAt (GeneratedLayout::xyClearBounds().getCentre());
+    const auto clearedXY = render (*editor);
+    pass &= check (! state.getSlot (10).xyMotionExists
+                && state.getSlot (10).currentX == .5f && state.getSlot (10).currentY == .5f
+                && cropsDiffer (traceOn, clearedXY, xyCrop),
+                   "v2-xy-clear-removes-only-current-trace");
+    for (const auto bar : { 10, 26, 42, 58 })
+    {
+        state.beginSlotXYMotion (bar, (float) bar / 64.0f, .2f);
+        state.appendSlotXYMotion (bar, .8f, (float) bar / 64.0f, .5);
+    }
+    bool isolatedXY = true;
+    for (const auto bar : { 10, 26, 42, 58 })
+        isolatedXY &= state.getSlot (bar).xyMotionExists && state.getSlot (bar).xyMotion[0].x == (float) bar / 64.0f;
+    pass &= check (isolatedXY && ! state.getSlot (9).xyMotionExists, "v2-xy-bars-11-27-43-59-no-contamination");
 
     // DYNAMIC_STATE_VISUAL_GATE: each check is made against the real V2
     // offscreen renderer and its single selected state PNG, never a cache or

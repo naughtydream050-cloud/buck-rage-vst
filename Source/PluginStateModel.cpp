@@ -5,7 +5,7 @@ namespace
 {
 constexpr int kStateVersion = 2;
 const juce::Identifier rootId { "ToyotomiHideyoshiState" }, globalId { "Global" }, barsId { "Bars" },
-                       barId { "Bar" }, slotId { "Slot" }, countId { "Count" }, pointId { "Point" };
+                       barId { "Bar" }, slotId { "Slot" }, countId { "Count" }, pointId { "Point" }, xyPointId { "XYPoint" };
 
 void writeSlot (juce::ValueTree& node, const PluginStateModel::TimelineSlot& slot)
 {
@@ -15,11 +15,23 @@ void writeSlot (juce::ValueTree& node, const PluginStateModel::TimelineSlot& slo
     node.setProperty ("pitch", slot.pitch, nullptr);
     node.setProperty ("depth", slot.depth, nullptr);
     node.setProperty ("customMotion", slot.customMotion, nullptr);
+    node.setProperty ("currentX", slot.currentX, nullptr);
+    node.setProperty ("currentY", slot.currentY, nullptr);
+    node.setProperty ("xyMotionExists", slot.xyMotionExists, nullptr);
+    node.setProperty ("xyMotionDurationSeconds", slot.xyMotionDurationSeconds, nullptr);
     for (const auto point : slot.motion)
     {
         juce::ValueTree child (pointId);
         child.setProperty ("x", point.x, nullptr);
         child.setProperty ("y", point.y, nullptr);
+        node.addChild (child, -1, nullptr);
+    }
+    for (const auto point : slot.xyMotion)
+    {
+        juce::ValueTree child (xyPointId);
+        child.setProperty ("x", point.x, nullptr);
+        child.setProperty ("y", point.y, nullptr);
+        child.setProperty ("t", point.timeSeconds, nullptr);
         node.addChild (child, -1, nullptr);
     }
 }
@@ -38,7 +50,23 @@ std::vector<PluginStateModel::MotionPoint> PluginStateModel::sanitiseMotion (con
     for (const auto point : input)
     {
         if (! std::isfinite (point.x) || ! std::isfinite (point.y)) continue;
-        const MotionPoint clamped { juce::jlimit (0.0f, 1.0f, point.x), juce::jlimit (0.0f, 1.0f, point.y) };
+        const MotionPoint clamped { juce::jlimit (0.0f, 1.0f, point.x), juce::jlimit (0.0f, 1.0f, point.y), 0.0 };
+        if (output.empty() || std::hypot (clamped.x - output.back().x, clamped.y - output.back().y) >= 0.004f)
+            output.push_back (clamped);
+        if (static_cast<int> (output.size()) == kMaxMotionPoints) break;
+    }
+    return output;
+}
+std::vector<PluginStateModel::MotionPoint> PluginStateModel::sanitiseXYMotion (const std::vector<MotionPoint>& input)
+{
+    std::vector<MotionPoint> output;
+    output.reserve (juce::jmin (static_cast<int> (input.size()), kMaxMotionPoints));
+    for (const auto point : input)
+    {
+        if (! std::isfinite (point.x) || ! std::isfinite (point.y) || ! std::isfinite (point.timeSeconds)) continue;
+        MotionPoint clamped { juce::jlimit (0.0f, 1.0f, point.x), juce::jlimit (0.0f, 1.0f, point.y),
+                               juce::jlimit (0.0, 86400.0, point.timeSeconds) };
+        if (! output.empty()) clamped.timeSeconds = juce::jmax (clamped.timeSeconds, output.back().timeSeconds);
         if (output.empty() || std::hypot (clamped.x - output.back().x, clamped.y - output.back().y) >= 0.004f)
             output.push_back (clamped);
         if (static_cast<int> (output.size()) == kMaxMotionPoints) break;
@@ -74,6 +102,35 @@ void PluginStateModel::setSelectedDepth (float value) { if (hasSelectedBar (ui.s
 void PluginStateModel::setSelectedMotion (const std::vector<MotionPoint>& motion) { if (hasSelectedBar (ui.selectedBar)) setSlotMotion (ui.selectedBar, motion); }
 void PluginStateModel::clearSelectedMotion() { if (hasSelectedBar (ui.selectedBar)) clearSlotMotion (ui.selectedBar); }
 void PluginStateModel::resetSelectedSlot() { if (hasSelectedBar (ui.selectedBar)) resetSlot (ui.selectedBar); }
+void PluginStateModel::setSlotXYPosition (int bar, float x, float y)
+{
+    auto& slot = mutableSlot (bar);
+    slot.currentX = finiteClamp (x, 0.0f, 1.0f, 0.5f);
+    slot.currentY = finiteClamp (y, 0.0f, 1.0f, 0.5f);
+}
+void PluginStateModel::beginSlotXYMotion (int bar, float x, float y)
+{
+    auto& slot = mutableSlot (bar);
+    slot.xyMotion.clear(); slot.xyMotionExists = false; slot.xyMotionDurationSeconds = 0.0;
+    appendSlotXYMotion (bar, x, y, 0.0);
+}
+void PluginStateModel::appendSlotXYMotion (int bar, float x, float y, double elapsedSeconds)
+{
+    auto& slot = mutableSlot (bar);
+    setSlotXYPosition (bar, x, y);
+    if (slot.xyMotion.size() < static_cast<size_t> (kMaxMotionPoints))
+        slot.xyMotion.push_back ({ slot.currentX, slot.currentY, elapsedSeconds });
+    slot.xyMotion = sanitiseXYMotion (slot.xyMotion);
+    slot.xyMotionExists = ! slot.xyMotion.empty();
+    slot.xyMotionDurationSeconds = slot.xyMotionExists ? slot.xyMotion.back().timeSeconds : 0.0;
+}
+void PluginStateModel::clearSlotXYMotion (int bar) { auto& slot = mutableSlot (bar); slot.xyMotion.clear(); slot.xyMotionExists = false; slot.xyMotionDurationSeconds = 0.0; }
+void PluginStateModel::resetSlotXYPosition (int bar) { setSlotXYPosition (bar, 0.5f, 0.5f); }
+void PluginStateModel::setSelectedXYPosition (float x, float y) { if (hasSelectedBar (ui.selectedBar)) setSlotXYPosition (ui.selectedBar, x, y); }
+void PluginStateModel::beginSelectedXYMotion (float x, float y) { if (hasSelectedBar (ui.selectedBar)) beginSlotXYMotion (ui.selectedBar, x, y); }
+void PluginStateModel::appendSelectedXYMotion (float x, float y, double elapsedSeconds) { if (hasSelectedBar (ui.selectedBar)) appendSlotXYMotion (ui.selectedBar, x, y, elapsedSeconds); }
+void PluginStateModel::clearSelectedBarXYMotion() { if (hasSelectedBar (ui.selectedBar)) clearSlotXYMotion (ui.selectedBar); }
+void PluginStateModel::resetSelectedBarXYPosition() { if (hasSelectedBar (ui.selectedBar)) resetSlotXYPosition (ui.selectedBar); }
 
 juce::ValueTree PluginStateModel::toValueTree() const
 {
@@ -106,7 +163,7 @@ bool PluginStateModel::fromValueTree (const juce::ValueTree& root)
     if (global.isValid())
     {
         parsed.ui.selectedTab = juce::jlimit (0, 3, static_cast<int> (global.getProperty ("selectedTab", 0)));
-        const auto restoredBar = static_cast<int> (global.getProperty ("selectedBar", 0));
+        const auto restoredBar = static_cast<int> (global.getProperty ("selectedBar", kNoSelectedBar));
         parsed.ui.selectedBar = restoredBar == kNoSelectedBar ? kNoSelectedBar : barIndex (restoredBar);
         parsed.ui.bypass = static_cast<bool> (global.getProperty ("bypass", false));
     }
@@ -128,6 +185,8 @@ bool PluginStateModel::fromValueTree (const juce::ValueTree& root)
         slot.pitch = finiteClamp (static_cast<float> (source.getProperty ("pitch", 0.0)), kMinPitch, kMaxPitch, 0.0f);
         slot.depth = finiteClamp (static_cast<float> (source.getProperty ("depth", 0.5)), 0.0f, 1.0f, 0.5f);
         slot.customMotion = static_cast<bool> (source.getProperty ("customMotion", false));
+        slot.currentX = finiteClamp (static_cast<float> (source.getProperty ("currentX", 0.5)), 0.0f, 1.0f, 0.5f);
+        slot.currentY = finiteClamp (static_cast<float> (source.getProperty ("currentY", 0.5)), 0.0f, 1.0f, 0.5f);
         std::vector<MotionPoint> motion;
         for (int p = 0; p < source.getNumChildren(); ++p)
         {
@@ -135,6 +194,15 @@ bool PluginStateModel::fromValueTree (const juce::ValueTree& root)
             if (point.hasType (pointId)) motion.push_back ({ static_cast<float> (point.getProperty ("x", NAN)), static_cast<float> (point.getProperty ("y", NAN)) });
         }
         slot.motion = sanitiseMotion (motion);
+        std::vector<MotionPoint> xyMotion;
+        for (int p = 0; p < source.getNumChildren(); ++p)
+        {
+            const auto point = source.getChild (p);
+            if (point.hasType (xyPointId)) xyMotion.push_back ({ static_cast<float> (point.getProperty ("x", NAN)), static_cast<float> (point.getProperty ("y", NAN)), static_cast<double> (point.getProperty ("t", NAN)) });
+        }
+        slot.xyMotion = sanitiseXYMotion (xyMotion);
+        slot.xyMotionExists = static_cast<bool> (source.getProperty ("xyMotionExists", false)) && ! slot.xyMotion.empty();
+        slot.xyMotionDurationSeconds = slot.xyMotionExists ? slot.xyMotion.back().timeSeconds : 0.0;
         if (slot.customMotion) slot.preset = ScratchPreset::custom;
     }
     *this = std::move (parsed);

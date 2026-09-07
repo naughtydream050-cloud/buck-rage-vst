@@ -1,0 +1,333 @@
+{
+  "results": [
+    {
+      "id": 1,
+      "status": "PASS",
+      "errors": {
+        "width": 0,
+        "contrast": 0,
+        "colour": 0.0
+      },
+      "measured": {
+        "contrast": [
+          20.0,
+          35.833333333333336
+        ],
+        "width": [
+          1.125,
+          1.75
+        ],
+        "colour_min": [
+          39.0,
+          40.0,
+          39.0
+        ],
+        "colour_max": [
+          53.0,
+          54.0,
+          56.0
+        ],
+        "edge": [
+          12.333333333333334,
+          20.833333333333336
+        ],
+        "center_luminance": [
+          39.666666666666664,
+          54.333333333333336
+        ]
+      },
+      "reference": {
+        "contrast": [
+          18.666666666666668,
+          41.5
+        ],
+        "width": [
+          1.125,
+          2.0
+        ],
+        "colour_min": [
+          38.0,
+          39.0,
+          37.0
+        ],
+        "colour_max": [
+          58.0,
+          56.0,
+          57.0
+        ]
+      },
+      "choice": {
+        "mode": "rotate",
+        "start": -1.7453292519943295,
+        "length": 0.0,
+        "sampling": 2
+      },
+      "attempts": 122,
+      "line_width_error_px": 0,
+      "center_luminance_error": 0.0,
+      "edge_luminance_error": 0.0,
+      "healthy_pixel_reference": {
+        "contrast": [
+          16.500000000000004,
+          73.33333333333333
+        ],
+        "width": [
+          1.0,
+          2.0
+        ],
+        "colour_min": [
+          31.0,
+          34.0,
+          33.0
+        ],
+        "colour_max": [
+          86.0,
+          90.0,
+          91.0
+        ],
+        "edge": [
+          9.666666666666668,
+          25.166666666666664
+        ],
+        "center_luminance": [
+          33.333333333333336,
+          89.0
+        ]
+      },
+      "continuity_breaks": 0,
+      "extended_pass": true
+    },
+    {
+      "id": 3,
+      "status": "PASS",
+      "errors": {
+        "width": 0,
+        "contrast": 0,
+        "colour": 0.0
+      },
+      "measured": {
+        "contrast": [
+          31.166666666666664,
+          53.5
+        ],
+        "width": [
+          1.125,
+          1.5
+        ],
+        "colour_min": [
+          56.0,
+          55.0,
+          50.0
+        ],
+        "colour_max": [
+          79.0,
+          78.0,
+          74.0
+        ],
+        "edge": [
+          8.5,
+          15.833333333333332
+        ],
+        "center_luminance": [
+          53.666666666666664,
+          77.0
+        ]
+      },
+      "reference": {
+        "contrast": [
+          30.499999999999996,
+          68.66666666666667
+        ],
+        "width": [
+          1.125,
+          1.875
+        ],
+        "colour_min": [
+          44.0,
+          45.0,
+          42.0
+        ],
+        "colour_max": [
+          83.0,
+          83.0,
+          74.0
+        ]
+      },
+      "choice": {
+        "mode": "rotate",
+        "start": -1.7453292519943295,
+        "length": 0.0,
+        "sampling": 2
+      },
+      "attempts": 101,
+      "line_width_error_px": 0,
+      "center_luminance_error": 0.0,
+      "edge_luminance_error": 0.0,
+      "healthy_pixel_reference": {
+        "contrast": [
+          30.666666666666664,
+          69.83333333333333
+        ],
+        "width": [
+          1.125,
+          1.875
+        ],
+        "colour_min": [
+          43.0,
+          44.0,
+          42.0
+        ],
+        "colour_max": [
+          85.0,
+          85.0,
+          76.0
+        ],
+        "edge": [
+          7.5,
+          26.166666666666664
+        ],
+        "center_luminance": [
+          43.0,
+          82.0
+        ]
+      },
+      "continuity_breaks": 0,
+      "extended_pass": true
+    },
+    {
+      "id": 6,
+      "status": "PASS",
+      "errors": {
+        "width": 0,
+        "contrast": 0,
+        "colour": 0.0
+      },
+      "measured": {
+        "contrast": [
+          30.833333333333336,
+          61.5
+        ],
+        "width": [
+          1.125,
+          1.875
+        ],
+        "colour_min": [
+          46.0,
+          47.0,
+          45.0
+        ],
+        "colour_max": [
+          82.0,
+          79.0,
+          72.0
+        ],
+        "edge": [
+          10.666666666666668,
+          23.5
+        ],
+        "center_luminance": [
+          46.0,
+          77.66666666666667
+        ]
+      },
+      "reference": {
+        "contrast": [
+          30.499999999999996,
+          70.5
+        ],
+        "width": [
+          1.125,
+          1.875
+        ],
+        "colour_min": [
+          44.0,
+          45.0,
+          42.0
+        ],
+        "colour_max": [
+          85.0,
+          85.0,
+          76.0
+        ]
+      },
+      "choice": {
+        "mode": "extend",
+        "start": -2.9321531433504737,
+        "length": 0.12,
+        "sampling": 0
+      },
+      "attempts": 55,
+      "line_width_error_px": 0,
+      "center_luminance_error": 0.0,
+      "edge_luminance_error": 0.0,
+      "healthy_pixel_reference": {
+        "contrast": [
+          30.666666666666664,
+          69.83333333333333
+        ],
+        "width": [
+          1.125,
+          1.875
+        ],
+        "colour_min": [
+          43.0,
+          44.0,
+          42.0
+        ],
+        "colour_max": [
+          85.0,
+          85.0,
+          76.0
+        ],
+        "edge": [
+          7.5,
+          26.166666666666664
+        ],
+        "center_luminance": [
+          43.0,
+          82.0
+        ]
+      },
+      "continuity_breaks": 0,
+      "extended_pass": true
+    }
+  ],
+  "locked_pixel_diff": 0,
+  "outside_diff": 0,
+  "nonintersection_grid_diff": 0,
+  "source_sha256": "998eb5bc2f44cc5069e25741f1d9dc304a77ce2cdb83b52bb73c9533d7722093",
+  "neutral_confirmed": true,
+  "trace_check": "PASS",
+  "light_check": "PASS",
+  "token_baseline": "unknown",
+  "token_savings_percent": null,
+  "all_grid_checks_pass": true,
+  "residual_checks": {
+    "path_samples": 69,
+    "original_max_contrast": 51.5,
+    "remaining_max_contrast": 5.0,
+    "intact_background_noise_envelope": 5.2929351806640526,
+    "trace_residual_samples": 0,
+    "gold_glow_residual_pixels": 0,
+    "noise_chroma": 3.0,
+    "detections": []
+  },
+  "asset": "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\projects\\ToyotomiHideyoshi\\reports\\latest\\xy-neutral\\xy-pad-neutral-confirmed.png",
+  "asset_bounds": [
+    42,
+    430,
+    190,
+    160
+  ],
+  "asset_sha256": "54af6d77baf4ae67f7927a4a0fa376d1a7c5b6620f13036d05ca7eb12ba888be",
+  "full_preview_sha256": "7df3a40557e4ca75749f4f988908a5ffaf6997e499392bc5cfbdade29b9f2fe1",
+  "texture": {
+    "repaired_std": 1.2032872923597384,
+    "adjacent_std": 1.3738833194326492
+  },
+  "visual_review": "PASS at native size and 4x",
+  "outside_pixel_diff": 0,
+  "production_faceplate_modified": false,
+  "build_executed": false,
+  "candidate_modified": false
+}

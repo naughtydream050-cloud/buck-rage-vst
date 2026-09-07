@@ -234,19 +234,11 @@ private:
 class ToyotomiHideyoshiAudioProcessorEditorV2::XYRegion final : public juce::Component
 {
 public:
-    explicit XYRegion (ToyotomiHideyoshiAudioProcessor& source) : processor (source) {}
-    void mouseDown (const juce::MouseEvent& event) override { points.clear(); add (event.position); }
-    void mouseDrag (const juce::MouseEvent& event) override { add (event.position); }
-    void mouseUp (const juce::MouseEvent&) override { processor.getStateModel().setSelectedMotion (points); }
+    explicit XYRegion (std::function<void(juce::Point<float>)> callback) : update (std::move (callback)) {}
+    void mouseDown (const juce::MouseEvent& event) override { if (update) update (event.position); }
+    void mouseDrag (const juce::MouseEvent& event) override { if (update) update (event.position); }
 private:
-    void add (juce::Point<float> point)
-    {
-        if (points.size() < PluginStateModel::kMaxMotionPoints)
-            points.push_back ({ juce::jlimit (0.0f, 1.0f, point.x / (float) getWidth()),
-                                juce::jlimit (0.0f, 1.0f, point.y / (float) getHeight()) });
-    }
-    ToyotomiHideyoshiAudioProcessor& processor;
-    std::vector<PluginStateModel::MotionPoint> points;
+    std::function<void(juce::Point<float>)> update;
 };
 
 // Same ownership pattern as Buck Raw Shit's StereoMeter: one child owns the
@@ -337,7 +329,8 @@ private:
 class ToyotomiHideyoshiAudioProcessorEditorV2::Surface final : public juce::Component
 {
 public:
-    explicit Surface (ToyotomiHideyoshiAudioProcessor& source) : processor (source) {}
+    Surface (ToyotomiHideyoshiAudioProcessor& source, const bool& recordingState, const bool& viewState)
+        : processor (source), xyRecording (recordingState), xyView (viewState) {}
     bool barMapAssetsReady() const { return assets.barMapValid; }
 
     void paint (juce::Graphics& g) override
@@ -372,8 +365,7 @@ public:
             drawNative (g, assets.lengths[(size_t) index][hasSelection && index == (int) slot.length ? 1 : 0], kLengths[(size_t) index]);
 
         drawNative (g, ui.bypass ? assets.bypassOn : assets.bypassOff, { 931, 14, 80, 31 });
-        // The static faceplate owns the neutral XY panel and its fixed button
-        // visuals. Only the trace is dynamic in V2.
+        // The static faceplate owns the neutral XY panel and fixed labels.
 
         const std::array<float, 3> normalized {{ (slot.speed - .25f) / 3.75f, (slot.pitch + 12.0f) / 24.0f, slot.depth }};
         const std::array<juce::String, 3> text {{ juce::String (slot.speed, 2) + "x", juce::String (slot.pitch, 1) + " st", juce::String (juce::roundToInt (slot.depth * 100.0f)) + " %" }};
@@ -398,32 +390,56 @@ public:
             g.drawText (text[(size_t) index], readoutBounds, juce::Justification::centred);
         }
 
-        if (! slot.motion.empty())
+        if (hasSelection)
         {
-            juce::Path trace;
-            for (size_t index = 0; index < slot.motion.size(); ++index)
+            const auto pad = GeneratedLayout::xyPadBounds();
+            const auto toPoint = [&pad] (const PluginStateModel::MotionPoint& point)
             {
-                const auto point = slot.motion[index];
-                const auto location = juce::Point<float> (38.0f + point.x * 195.0f, 438.0f + point.y * 141.0f);
-                if (index == 0) trace.startNewSubPath (location); else trace.lineTo (location);
-            }
+                return juce::Point<float> (pad.getX() + point.x * (float) (pad.getWidth() - 1),
+                                            pad.getBottom() - 1 - point.y * (float) (pad.getHeight() - 1));
+            };
             g.saveState();
-            g.reduceClipRegion ({ 38, 438, 195, 141 });
+            g.reduceClipRegion (pad);
+            if ((xyView || xyRecording) && slot.xyMotionExists && ! slot.xyMotion.empty())
+            {
+                juce::Path trace;
+                for (size_t index = 0; index < slot.xyMotion.size(); ++index)
+                {
+                    const auto location = toPoint (slot.xyMotion[index]);
+                    if (index == 0) trace.startNewSubPath (location); else trace.lineTo (location);
+                }
+                g.setColour (juce::Colour (0xffd6a446));
+                g.strokePath (trace, juce::PathStrokeType (1.25f));
+            }
+            const PluginStateModel::MotionPoint current { slot.currentX, slot.currentY };
+            const auto currentPoint = toPoint (current);
             g.setColour (juce::Colour (0xffd6a446));
-            g.strokePath (trace, juce::PathStrokeType (1.5f));
+            g.fillEllipse (currentPoint.x - 2.0f, currentPoint.y - 2.0f, 4.0f, 4.0f);
             g.restoreState();
+            if (xyRecording)
+            {
+                g.setColour (juce::Colour (0xffd6a446));
+                g.drawRect (GeneratedLayout::xyRecBounds(), 1);
+            }
+            if (xyView)
+            {
+                g.setColour (juce::Colour (0xffd6a446));
+                g.drawRect (GeneratedLayout::xyViewBounds(), 1);
+            }
         }
     }
 
 private:
     ToyotomiHideyoshiAudioProcessor& processor;
+    const bool& xyRecording;
+    const bool& xyView;
     V2AssetCatalog assets;
 };
 
 ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2 (ToyotomiHideyoshiAudioProcessor& source)
     : AudioProcessorEditor (&source), processor (source)
 {
-    surface = std::make_unique<Surface> (processor);
+    surface = std::make_unique<Surface> (processor, xyRecording, xyView);
     addAndMakeVisible (*surface);
     surface->setInterceptsMouseClicks (false, false);
     outputMeter = std::make_unique<OutputMeter> (processor);
@@ -433,15 +449,16 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
     for (int index = 0; index < 4; ++index)
         addImageHit (kTabs[(size_t) index], [this, index] { processor.getStateModel().selectTab (index); });
     for (int index = 0; index < 16; ++index)
-        addImageHit (cellBounds (index), [this, index] { const auto page = processor.getStateModel().getUiState().selectedTab; processor.getStateModel().selectBar (page * 16 + index); });
+        addImageHit (cellBounds (index), [this, index] { stopXYRecording(); const auto page = processor.getStateModel().getUiState().selectedTab; processor.getStateModel().selectBar (page * 16 + index); });
     for (int index = 0; index < 10; ++index)
         addImageHit (kPresets[(size_t) index], [this, index] { processor.getStateModel().setSelectedPreset ((PluginStateModel::ScratchPreset) index); });
     for (int index = 0; index < 5; ++index)
         addImageHit (kLengths[(size_t) index], [this, index] { processor.getStateModel().setSelectedLength ((PluginStateModel::NoteLength) index); });
     addImageHit ({ 931, 14, 80, 31 }, [this] { auto& state = processor.getStateModel(); state.setBypass (! state.getUiState().bypass); });
-    addImageHit ({ 27, 591, 59, 23 }, [] {});
-    addImageHit ({ 95, 591, 59, 23 }, [this] { processor.getStateModel().clearSelectedMotion(); });
-    addImageHit ({ 159, 591, 82, 23 }, [this] { processor.getStateModel().resetSelectedSlot(); });
+    addImageHit (GeneratedLayout::xyRecBounds(), [this] { toggleXYRecording(); });
+    addImageHit (GeneratedLayout::xyClearBounds(), [this] { processor.getStateModel().clearSelectedBarXYMotion(); });
+    addImageHit (GeneratedLayout::xyResetBounds(), [this] { processor.getStateModel().resetSelectedBarXYPosition(); });
+    addImageHit (GeneratedLayout::xyViewBounds(), [this] { if (PluginStateModel::hasSelectedBar (processor.getStateModel().getUiState().selectedBar)) xyView = ! xyView; });
 
     for (int index = 0; index < 3; ++index)
     {
@@ -451,14 +468,16 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
                                       : index == 1 ? GeneratedLayout::pitchKnobBounds()
                                                    : GeneratedLayout::depthKnobBounds());
     }
-    xyInput = std::make_unique<XYRegion> (processor);
+    xyInput = std::make_unique<XYRegion> ([this] (juce::Point<float> point) { updateXYFromPad (point); });
     addAndMakeVisible (*xyInput);
-    xyInput->setBounds ({ 38, 438, 195, 141 });
+    xyInput->setBounds (GeneratedLayout::xyPadBounds());
 
     setResizable (false, false);
     setSize (kW, kH);
     startTimerHz (30);
 }
+
+ToyotomiHideyoshiAudioProcessorEditorV2::~ToyotomiHideyoshiAudioProcessorEditorV2() { stopXYRecording(); }
 
 bool ToyotomiHideyoshiAudioProcessorEditorV2::hasValidBarMapAssets() const { return surface != nullptr && surface->barMapAssetsReady(); }
 void ToyotomiHideyoshiAudioProcessorEditorV2::debugSetOutputMeterDb (float left, float right) { outputMeter->setLevelsForVisualTest (left, right); }
@@ -470,16 +489,55 @@ bool ToyotomiHideyoshiAudioProcessorEditorV2::validateInteractiveBounds() const
     expected.insert (expected.end(), kPresets.begin(), kPresets.end());
     expected.insert (expected.end(), kLengths.begin(), kLengths.end());
     expected.push_back ({ 931, 14, 80, 31 });
-    expected.push_back ({ 27, 591, 59, 23 });
-    expected.push_back ({ 95, 591, 59, 23 });
-    expected.push_back ({ 159, 591, 82, 23 });
+    expected.push_back (GeneratedLayout::xyRecBounds());
+    expected.push_back (GeneratedLayout::xyClearBounds());
+    expected.push_back (GeneratedLayout::xyResetBounds());
+    expected.push_back (GeneratedLayout::xyViewBounds());
     if ((int) hitRegions.size() != (int) expected.size()) return false;
     for (int index = 0; index < (int) expected.size(); ++index)
         if (hitRegions[index]->getBounds() != expected[(size_t) index]) return false;
     return knobs[0]->getBounds() == GeneratedLayout::speedKnobBounds()
         && knobs[1]->getBounds() == GeneratedLayout::pitchKnobBounds()
         && knobs[2]->getBounds() == GeneratedLayout::depthKnobBounds()
-        && xyInput->getBounds() == juce::Rectangle<int> { 38, 438, 195, 141 };
+        && xyInput->getBounds() == GeneratedLayout::xyPadBounds();
+}
+bool ToyotomiHideyoshiAudioProcessorEditorV2::debugXYAt (juce::Point<int> point, double elapsedSeconds)
+{
+    const auto bounds = GeneratedLayout::xyPadBounds();
+    if (! bounds.contains (point)) return false;
+    updateXYFromPad ((point - bounds.getPosition()).toFloat(), elapsedSeconds);
+    return true;
+}
+void ToyotomiHideyoshiAudioProcessorEditorV2::toggleXYRecording()
+{
+    const auto selectedBar = processor.getStateModel().getUiState().selectedBar;
+    if (! PluginStateModel::hasSelectedBar (selectedBar)) return;
+    if (xyRecording) { stopXYRecording(); return; }
+    xyRecording = true; xyRecordingHasPoint = false;
+    xyRecordingBar = selectedBar;
+    xyRecordingStartMilliseconds = juce::Time::getMillisecondCounterHiRes();
+}
+void ToyotomiHideyoshiAudioProcessorEditorV2::stopXYRecording()
+{
+    xyRecording = false; xyRecordingHasPoint = false;
+    xyRecordingBar = PluginStateModel::kNoSelectedBar;
+    xyRecordingStartMilliseconds = 0.0;
+}
+void ToyotomiHideyoshiAudioProcessorEditorV2::updateXYFromPad (juce::Point<float> point, double elapsedSeconds)
+{
+    auto& state = processor.getStateModel();
+    const auto selectedBar = state.getUiState().selectedBar;
+    if (! PluginStateModel::hasSelectedBar (selectedBar)) return;
+    if (xyRecording && selectedBar != xyRecordingBar) stopXYRecording();
+    const auto bounds = GeneratedLayout::xyPadBounds();
+    const auto x = juce::jlimit (0.0f, 1.0f, point.x / (float) (bounds.getWidth() - 1));
+    const auto y = juce::jlimit (0.0f, 1.0f, 1.0f - point.y / (float) (bounds.getHeight() - 1));
+    state.setSelectedXYPosition (x, y);
+    if (! xyRecording) return;
+    const auto elapsed = elapsedSeconds >= 0.0 ? elapsedSeconds
+                       : (juce::Time::getMillisecondCounterHiRes() - xyRecordingStartMilliseconds) / 1000.0;
+    if (! xyRecordingHasPoint) { state.beginSelectedXYMotion (x, y); xyRecordingHasPoint = true; }
+    else state.appendSelectedXYMotion (x, y, elapsed);
 }
 bool ToyotomiHideyoshiAudioProcessorEditorV2::debugClickAt (juce::Point<int> point)
 {
@@ -495,6 +553,8 @@ void ToyotomiHideyoshiAudioProcessorEditorV2::resized()
 }
 void ToyotomiHideyoshiAudioProcessorEditorV2::timerCallback()
 {
+    if (xyRecording && processor.getStateModel().getUiState().selectedBar != xyRecordingBar)
+        stopXYRecording();
     surface->repaint();
 }
 

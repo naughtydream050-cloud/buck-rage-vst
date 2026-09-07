@@ -20,4 +20,10 @@ inline juce::Rectangle<int> outputLBounds()         { return { 940, 419, 16, 174
 inline juce::Rectangle<int> outputRBounds()         { return { 974, 419, 15, 174 }; }
 inline juce::Rectangle<int> outputLReadoutBounds()  { return { 923, 601, 39, 21 }; }
 inline juce::Rectangle<int> outputRReadoutBounds()  { return { 963, 601, 39, 21 }; }
+// XY uses this one native coordinate contract for paint, input and tests.
+inline juce::Rectangle<int> xyPadBounds()            { return { 38, 438, 195, 141 }; }
+inline juce::Rectangle<int> xyRecBounds()            { return { 27, 591, 59, 23 }; }
+inline juce::Rectangle<int> xyClearBounds()          { return { 95, 591, 59, 23 }; }
+inline juce::Rectangle<int> xyResetBounds()          { return { 159, 591, 41, 23 }; }
+inline juce::Rectangle<int> xyViewBounds()           { return { 200, 591, 41, 23 }; }
 }

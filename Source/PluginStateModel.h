@@ -13,7 +13,14 @@ public:
     enum class ScratchPreset { off, forwardCut, backspin, chirp, baby, transform, drag, zigzag, tapeBrake, custom };
     enum class NoteLength { sixteenth, eighth, quarter, half, oneBar };
 
-    struct MotionPoint { float x = 0.0f, y = 0.0f; };
+    struct MotionPoint
+    {
+        float x = 0.0f, y = 0.0f; double timeSeconds = 0.0;
+        bool operator== (const MotionPoint& other) const noexcept
+        {
+            return x == other.x && y == other.y && timeSeconds == other.timeSeconds;
+        }
+    };
     struct TimelineSlot
     {
         ScratchPreset preset = ScratchPreset::off;
@@ -21,6 +28,11 @@ public:
         float speed = 1.0f, pitch = 0.0f, depth = 0.5f;
         bool customMotion = false;
         std::vector<MotionPoint> motion;
+        // XY PAD data is independent from the existing preset/custom motion.
+        float currentX = 0.5f, currentY = 0.5f;
+        bool xyMotionExists = false;
+        double xyMotionDurationSeconds = 0.0;
+        std::vector<MotionPoint> xyMotion;
     };
     struct UiState { int selectedTab = 0, selectedBar = kNoSelectedBar; bool bypass = false; };
 
@@ -50,6 +62,17 @@ public:
     void clearSelectedMotion();
     void resetSelectedSlot();
 
+    void setSlotXYPosition (int, float x, float y);
+    void beginSlotXYMotion (int, float x, float y);
+    void appendSlotXYMotion (int, float x, float y, double elapsedSeconds);
+    void clearSlotXYMotion (int);
+    void resetSlotXYPosition (int);
+    void setSelectedXYPosition (float x, float y);
+    void beginSelectedXYMotion (float x, float y);
+    void appendSelectedXYMotion (float x, float y, double elapsedSeconds);
+    void clearSelectedBarXYMotion();
+    void resetSelectedBarXYPosition();
+
     juce::ValueTree toValueTree() const;
     bool fromValueTree (const juce::ValueTree&);
     void reset();
@@ -60,6 +83,7 @@ private:
     static int barIndex (int) noexcept;
     static float finiteClamp (float, float, float, float) noexcept;
     static std::vector<MotionPoint> sanitiseMotion (const std::vector<MotionPoint>&);
+    static std::vector<MotionPoint> sanitiseXYMotion (const std::vector<MotionPoint>&);
     static std::vector<MotionPoint> presetMotion (ScratchPreset);
     TimelineSlot& mutableSlot (int) noexcept;
 

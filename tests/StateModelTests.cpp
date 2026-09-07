@@ -70,6 +70,45 @@ int main()
            && noSelectionRestored.getUiState().selectedBar == PluginStateModel::kNoSelectedBar,
            "none-selection-round-trips");
 
+    // XY recording is intentionally separate from existing preset/custom
+    // motion, and always uses absolute BAR indices.
+    check (! model.getSlot (0).xyMotionExists, "fresh-default-has-no-xy-motion");
+    model.selectBar (10); // BAR 11
+    model.beginSelectedXYMotion (.10f, .20f);
+    model.appendSelectedXYMotion (.45f, .60f, .25);
+    model.appendSelectedXYMotion (.80f, .90f, .75);
+    const auto bar11Motion = model.getSlot (10).xyMotion;
+    model.selectBar (11); // BAR 12
+    check (! model.getSlot (11).xyMotionExists && model.getSlot (10).xyMotion == bar11Motion,
+           "xy-bar-11-and-12-are-independent");
+    model.beginSelectedXYMotion (.30f, .40f);
+    model.appendSelectedXYMotion (.60f, .30f, .50);
+    model.selectBar (10);
+    check (model.getSlot (10).xyMotionExists && model.getSlot (10).xyMotion == bar11Motion,
+           "xy-bar-switch-restores-absolute-bar-11");
+    model.resetSelectedBarXYPosition();
+    check (model.getSlot (10).currentX == .5f && model.getSlot (10).currentY == .5f
+           && model.getSlot (10).xyMotion == bar11Motion, "xy-reset-keeps-recorded-motion");
+    model.clearSelectedBarXYMotion();
+    check (! model.getSlot (10).xyMotionExists && model.getSlot (11).xyMotionExists,
+           "xy-clear-is-local-and-keeps-current-position");
+    for (const auto bar : { 10, 26, 42, 58 })
+    {
+        model.beginSlotXYMotion (bar, (float) bar / 64.0f, .25f);
+        model.appendSlotXYMotion (bar, .75f, (float) bar / 64.0f, .5);
+    }
+    const auto xyState = model.toValueTree();
+    PluginStateModel xyRestored;
+    check (xyRestored.fromValueTree (xyState), "xy-save-restore-succeeds");
+    bool separateXY = true;
+    for (const auto bar : { 10, 26, 42, 58 })
+        separateXY &= xyRestored.getSlot (bar).xyMotionExists
+                   && xyRestored.getSlot (bar).xyMotion.size() == 2
+                   && xyRestored.getSlot (bar).xyMotion[0].x == (float) bar / 64.0f
+                   && xyRestored.getSlot (bar).xyMotion[1].timeSeconds == .5;
+    check (separateXY && ! xyRestored.getSlot (9).xyMotionExists,
+           "xy-bars-11-27-43-59-have-zero-cross-bar-contamination");
+
     // v1 migration deliberately takes each legacy BAR's Count 0 as its new
     // timeline slot: the former 1024-slot hierarchy no longer exists in UI.
     juce::ValueTree legacy ("ToyotomiHideyoshiState");
