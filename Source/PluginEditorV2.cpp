@@ -542,8 +542,8 @@ void ToyotomiHideyoshiAudioProcessorEditorV2::updateXYFromPad (juce::Point<float
 }
 bool ToyotomiHideyoshiAudioProcessorEditorV2::debugClickAt (juce::Point<int> point)
 {
-    for (auto* hit : hitRegions)
-        if (hit->activateAt (point)) return true;
+    if (auto* hit = dynamic_cast<HitRegion*> (getComponentAt (point)))
+        return hit->activateAt (point);
     return false;
 }
 void ToyotomiHideyoshiAudioProcessorEditorV2::paint (juce::Graphics& g) { juce::ignoreUnused (g); }

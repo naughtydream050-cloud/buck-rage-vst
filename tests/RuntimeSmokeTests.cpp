@@ -948,6 +948,28 @@ int main()
     // BARs and offscreen render output, rather than state-only assertions.
     const auto xyPad = GeneratedLayout::xyPadBounds();
     const auto xyCrop = juce::Rectangle<int> { 14, 416, 232, 200 };
+    // Independently locate the printed faceplate edges, not a second copy of
+    // GeneratedLayout. This detects a shared draw/hit offset regression.
+    const auto strongestButtonRow = [&] (int first, int last)
+    {
+        int bestRow = first;
+        float best = -1.0f;
+        for (int y = first; y <= last; ++y)
+        {
+            float brightness = 0.0f;
+            for (int x = 30; x < 240; ++x)
+                brightness += staticFaceplate.getPixelAt (x, y).getBrightness();
+            if (brightness > best) { best = brightness; bestRow = y; }
+        }
+        return bestRow;
+    };
+    const auto printedTop = strongestButtonRow (599, 604);
+    const auto printedBottom = strongestButtonRow (622, 628);
+    bool buttonsOnPrintedFrames = true;
+    for (const auto bounds : { GeneratedLayout::xyRecBounds(), GeneratedLayout::xyClearBounds(),
+                               GeneratedLayout::xyResetBounds(), GeneratedLayout::xyViewBounds() })
+        buttonsOnPrintedFrames &= bounds.getY() == printedTop && bounds.getBottom() - 1 == printedBottom;
+    pass &= check (buttonsOnPrintedFrames, "v2-xy-buttons-match-faceplate-pixel-edges");
     state.selectTab (0); state.selectBar (PluginStateModel::kNoSelectedBar);
     pass &= check (! v2->debugXYAt (xyPad.getCentre(), 0.0)
                 && ! state.getSlot (0).xyMotionExists,
@@ -960,6 +982,7 @@ int main()
     const auto secondXY = juce::Point<int> { xyPad.getRight() - 16, xyPad.getY() + 16 };
     pass &= check (v2->debugXYAt (firstXY, 0.0) && v2->debugXYAt (secondXY, 0.5),
                    "v2-xy-record-drag-input");
+    pass &= check (png (render (*editor), "v2-xy-recording-buttons.png"), "v2-xy-recording-buttons-proof");
     v2->debugClickAt (juce::Point<int> { 465, 261 }); // BAR 12; stops REC
     v2->debugXYAt (xyPad.getCentre(), 1.0);
     pass &= check (state.getSlot (10).xyMotionExists && state.getSlot (10).xyMotion.size() == 2
@@ -971,6 +994,8 @@ int main()
     const auto traceOn = render (*editor);
     v2->debugClickAt (GeneratedLayout::xyViewBounds().getCentre());
     const auto traceOff = render (*editor);
+    pass &= check (png (traceOn, "v2-xy-view-on.png") && png (traceOff, "v2-xy-view-off.png"),
+                   "v2-xy-view-buttons-proof");
     pass &= check (cropsDiffer (traceOn, traceOff, xyCrop) && state.getSlot (10).xyMotionExists,
                    "v2-xy-view-off-hides-trace-keeps-data");
     v2->debugClickAt (GeneratedLayout::xyViewBounds().getCentre());
