@@ -574,18 +574,20 @@ void ToyotomiHideyoshiAudioProcessorEditorV2::updateXYFromPad (juce::Point<float
 }
 bool ToyotomiHideyoshiAudioProcessorEditorV2::debugClickAt (juce::Point<int> point)
 {
-    if (auto* hit = dynamic_cast<HitRegion*> (getComponentAt (point)))
-        return hit->pressAt (point) && hit->releaseAt (point);
+    for (auto* hit : hitRegions)
+        if (hit->pressAt (point)) return hit->releaseAt (point);
     return false;
 }
 bool ToyotomiHideyoshiAudioProcessorEditorV2::debugMouseDownAt (juce::Point<int> point)
 {
-    if (auto* hit = dynamic_cast<HitRegion*> (getComponentAt (point))) return hit->pressAt (point);
+    for (auto* hit : hitRegions)
+        if (hit->pressAt (point)) return true;
     return false;
 }
 bool ToyotomiHideyoshiAudioProcessorEditorV2::debugMouseUpAt (juce::Point<int> point)
 {
-    if (auto* hit = dynamic_cast<HitRegion*> (getComponentAt (point))) return hit->releaseAt (point);
+    for (auto* hit : hitRegions)
+        if (hit->releaseAt (point)) return true;
     return false;
 }
 void ToyotomiHideyoshiAudioProcessorEditorV2::paint (juce::Graphics& g) { juce::ignoreUnused (g); }
