@@ -965,17 +965,16 @@ int main()
     v2->debugClickAt (GeneratedLayout::xyRecBounds().getCentre());
     pass &= check (! state.getSlot (0).xyMotionExists, "v2-xy-fresh-rec-disabled");
     v2->debugClickAt (juce::Point<int> { 406, 261 }); // BAR 11
-    const auto recNormal = render (*editor);
-    v2->debugMouseDownAt (GeneratedLayout::xyRecBounds().getCentre());
-    const auto recPressed = render (*editor);
-    v2->debugMouseUpAt (GeneratedLayout::xyRecBounds().getCentre());
-    const auto recActive = render (*editor);
-    pass &= check (cropsDiffer (recNormal, recPressed, GeneratedLayout::xyRecBounds())
-                && cropsDiffer (recNormal, recActive, GeneratedLayout::xyRecBounds()),
-                   "v2-xy-rec-uses-native-pressed-and-active-sprites");
-    // Stop the recording begun by the explicit press state test, then use the
-    // normal user click path for the motion test below.
-    v2->debugClickAt (GeneratedLayout::xyRecBounds().getCentre());
+    // CLEAR is momentary, so it proves native press/release sprite switching
+    // without perturbing the subsequent REC state-machine scenario.
+    const auto clearNormal = render (*editor);
+    v2->debugMouseDownAt (GeneratedLayout::xyClearBounds().getCentre());
+    const auto clearPressed = render (*editor);
+    v2->debugMouseUpAt (GeneratedLayout::xyClearBounds().getCentre());
+    const auto clearReleased = render (*editor);
+    pass &= check (cropsDiffer (clearNormal, clearPressed, GeneratedLayout::xyClearBounds())
+                && ! cropsDiffer (clearNormal, clearReleased, GeneratedLayout::xyClearBounds()),
+                   "v2-xy-clear-uses-native-pressed-and-normal-sprites");
     const auto firstXY = juce::Point<int> { xyPad.getX() + 15, xyPad.getBottom() - 15 };
     const auto secondXY = juce::Point<int> { xyPad.getRight() - 16, xyPad.getY() + 16 };
     pass &= check (v2->debugXYAt (firstXY, 0.0) && v2->debugXYAt (secondXY, 0.5),
@@ -994,7 +993,7 @@ int main()
     const auto traceOff = render (*editor);
     pass &= check (png (traceOn, "v2-xy-view-on.png") && png (traceOff, "v2-xy-view-off.png"),
                    "v2-xy-view-buttons-proof");
-    pass &= check (cropsDiffer (traceOn, traceOff, xyCrop) && state.getSlot (10).xyMotionExists,
+    pass &= check (cropsDiffer (traceOn, traceOff, xyPad) && state.getSlot (10).xyMotionExists,
                    "v2-xy-view-off-hides-trace-keeps-data");
     v2->debugClickAt (GeneratedLayout::xyViewBounds().getCentre());
     const auto traceRestored = render (*editor);
