@@ -3,7 +3,7 @@
 #include <cmath>
 ToyotomiHideyoshiAudioProcessor::ToyotomiHideyoshiAudioProcessor():AudioProcessor(BusesProperties().withInput("Input",juce::AudioChannelSet::stereo(),true).withOutput("Output",juce::AudioChannelSet::stereo(),true)){}
 void ToyotomiHideyoshiAudioProcessor::prepareToPlay(double,int){} void ToyotomiHideyoshiAudioProcessor::releaseResources(){}
-void ToyotomiHideyoshiAudioProcessor::getStateInformation(juce::MemoryBlock& d){if(auto x=stateModel.toValueTree().createXml())copyXmlToBinary(*x,d);} void ToyotomiHideyoshiAudioProcessor::setStateInformation(const void*d,int s){if(auto x=getXmlFromBinary(d,s))stateModel.fromValueTree(juce::ValueTree::fromXml(*x));}
+void ToyotomiHideyoshiAudioProcessor::getStateInformation(juce::MemoryBlock& d){if(auto x=stateModel.toValueTree().createXml())copyXmlToBinary(*x,d);} void ToyotomiHideyoshiAudioProcessor::setStateInformation(const void*d,int s){if(auto x=getXmlFromBinary(d,s))if(stateModel.fromValueTree(juce::ValueTree::fromXml(*x)))hostSyncEnabled.store(stateModel.getUiState().hostSync,std::memory_order_relaxed);}
 bool ToyotomiHideyoshiAudioProcessor::isBusesLayoutSupported(const BusesLayout& l)const{auto o=l.getMainOutputChannelSet();return(o==juce::AudioChannelSet::mono()||o==juce::AudioChannelSet::stereo())&&o==l.getMainInputChannelSet();}
 void ToyotomiHideyoshiAudioProcessor::publishPeak(std::atomic<float>&d,float v)noexcept{auto c=d.load();while(v>c&&!d.compare_exchange_weak(c,v)){}}
 void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
@@ -27,7 +27,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
                 timeSignatureNumerator.store (time->numerator, std::memory_order_relaxed);
                 timeSignatureDenominator.store (time->denominator, std::memory_order_relaxed);
             }
-            if (playing)
+            if (playing && hostSyncEnabled.load (std::memory_order_relaxed))
                 if (auto ppq = position->getPpqPosition())
                 {
                     const auto sixteenth = static_cast<int> (std::floor (*ppq * 4.0));
@@ -37,6 +37,23 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
     hostPlaying.store (playing, std::memory_order_relaxed);
     currentTimelineSlot.store (timelineSlot, std::memory_order_relaxed);
     hostSyncAvailable.store (readPosition, std::memory_order_relaxed);
+}
+double ToyotomiHideyoshiAudioProcessor::getEffectiveBpm() const noexcept
+{
+    return isHostSyncEnabled() ? getHostBpm() : stateModel.getUiState().internalBpm;
+}
+int ToyotomiHideyoshiAudioProcessor::getEffectiveTimeSignatureNumerator() const noexcept
+{
+    return isHostSyncEnabled() ? getTimeSignatureNumerator() : stateModel.getUiState().internalTimeSigNumerator;
+}
+int ToyotomiHideyoshiAudioProcessor::getEffectiveTimeSignatureDenominator() const noexcept
+{
+    return isHostSyncEnabled() ? getTimeSignatureDenominator() : stateModel.getUiState().internalTimeSigDenominator;
+}
+void ToyotomiHideyoshiAudioProcessor::setHostSyncEnabled (bool enabled) noexcept
+{
+    stateModel.setHostSync (enabled);
+    hostSyncEnabled.store (enabled, std::memory_order_relaxed);
 }
 float ToyotomiHideyoshiAudioProcessor::consumeOutputPeak(int c)noexcept{return(c==0?outputPeakLeft:outputPeakRight).exchange(0.0f);}
 juce::AudioProcessorEditor* ToyotomiHideyoshiAudioProcessor::createEditor(){return new ToyotomiHideyoshiAudioProcessorEditorV2(*this);} juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter(){return new ToyotomiHideyoshiAudioProcessor();}

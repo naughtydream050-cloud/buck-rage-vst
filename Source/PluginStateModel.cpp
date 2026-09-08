@@ -3,7 +3,7 @@
 
 namespace
 {
-constexpr int kStateVersion = 2;
+constexpr int kStateVersion = 3;
 const juce::Identifier rootId { "ToyotomiHideyoshiState" }, globalId { "Global" }, barsId { "Bars" },
                        barId { "Bar" }, slotId { "Slot" }, countId { "Count" }, pointId { "Point" }, xyPointId { "XYPoint" };
 
@@ -86,6 +86,20 @@ PluginStateModel::TimelineSlot& PluginStateModel::mutableSlot (int bar) noexcept
 void PluginStateModel::selectTab (int tab) { ui.selectedTab = juce::jlimit (0, 3, tab); }
 void PluginStateModel::selectBar (int bar) { ui.selectedBar = bar == kNoSelectedBar ? kNoSelectedBar : barIndex (bar); }
 void PluginStateModel::setBypass (bool enabled) { ui.bypass = enabled; }
+void PluginStateModel::setHostSync (bool enabled) { ui.hostSync = enabled; }
+void PluginStateModel::setInternalBpm (double value)
+{
+    ui.internalBpm = std::isfinite (value) ? juce::jlimit (kMinInternalBpm, kMaxInternalBpm, value) : 120.0;
+}
+void PluginStateModel::setInternalTimeSignature (int numerator, int denominator)
+{
+    ui.internalTimeSigNumerator = juce::jlimit (1, 32, numerator);
+    static constexpr int validDenominators[] { 1, 2, 4, 8, 16, 32 };
+    ui.internalTimeSigDenominator = 4;
+    for (const auto value : validDenominators)
+        if (denominator == value) { ui.internalTimeSigDenominator = value; break; }
+}
+void PluginStateModel::setProjectPresetId (int id) { ui.projectPresetId = juce::jlimit (0, 0, id); }
 void PluginStateModel::setSlotPreset (int bar, ScratchPreset preset) { auto& slot = mutableSlot (bar); slot.preset = preset; slot.customMotion = false; slot.motion = presetMotion (preset); }
 void PluginStateModel::setSlotLength (int bar, NoteLength value) { mutableSlot (bar).length = static_cast<NoteLength> (juce::jlimit (0, 4, static_cast<int> (value))); }
 void PluginStateModel::setSlotSpeed (int bar, float value) { mutableSlot (bar).speed = finiteClamp (value, kMinSpeed, kMaxSpeed, 1.0f); }
@@ -140,6 +154,11 @@ juce::ValueTree PluginStateModel::toValueTree() const
     global.setProperty ("selectedTab", ui.selectedTab, nullptr);
     global.setProperty ("selectedBar", ui.selectedBar, nullptr);
     global.setProperty ("bypass", ui.bypass, nullptr);
+    global.setProperty ("hostSync", ui.hostSync, nullptr);
+    global.setProperty ("internalBpm", ui.internalBpm, nullptr);
+    global.setProperty ("internalTimeSigNumerator", ui.internalTimeSigNumerator, nullptr);
+    global.setProperty ("internalTimeSigDenominator", ui.internalTimeSigDenominator, nullptr);
+    global.setProperty ("projectPresetId", ui.projectPresetId, nullptr);
     root.addChild (global, -1, nullptr);
     juce::ValueTree timeline (barsId);
     for (int bar = 0; bar < kNumBars; ++bar)
@@ -166,6 +185,11 @@ bool PluginStateModel::fromValueTree (const juce::ValueTree& root)
         const auto restoredBar = static_cast<int> (global.getProperty ("selectedBar", kNoSelectedBar));
         parsed.ui.selectedBar = restoredBar == kNoSelectedBar ? kNoSelectedBar : barIndex (restoredBar);
         parsed.ui.bypass = static_cast<bool> (global.getProperty ("bypass", false));
+        parsed.setHostSync (static_cast<bool> (global.getProperty ("hostSync", true)));
+        parsed.setInternalBpm (static_cast<double> (global.getProperty ("internalBpm", 120.0)));
+        parsed.setInternalTimeSignature (static_cast<int> (global.getProperty ("internalTimeSigNumerator", 4)),
+                                        static_cast<int> (global.getProperty ("internalTimeSigDenominator", 4)));
+        parsed.setProjectPresetId (static_cast<int> (global.getProperty ("projectPresetId", 0)));
     }
     const auto timeline = root.getChildWithName (barsId);
     for (int i = 0; i < timeline.getNumChildren(); ++i)

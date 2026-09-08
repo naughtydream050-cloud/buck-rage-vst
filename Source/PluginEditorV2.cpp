@@ -260,6 +260,25 @@ private:
     float previousY = 0.0f;
 };
 
+class ToyotomiHideyoshiAudioProcessorEditorV2::BpmRegion final : public juce::Component
+{
+public:
+    BpmRegion (std::function<void (double)> dragCallback, std::function<void()> editCallback)
+        : drag (std::move (dragCallback)), edit (std::move (editCallback)) {}
+    void mouseDown (const juce::MouseEvent& event) override { previousY = event.position.y; }
+    void mouseDrag (const juce::MouseEvent& event) override
+    {
+        const auto delta = previousY - event.position.y;
+        previousY = event.position.y;
+        if (drag) drag (delta * 0.25);
+    }
+    void mouseDoubleClick (const juce::MouseEvent&) override { if (edit) edit(); }
+private:
+    std::function<void (double)> drag;
+    std::function<void()> edit;
+    float previousY = 0.0f;
+};
+
 class ToyotomiHideyoshiAudioProcessorEditorV2::XYRegion final : public juce::Component
 {
 public:
@@ -395,6 +414,29 @@ public:
             drawNative (g, assets.lengths[(size_t) index][hasSelection && index == (int) slot.length ? 1 : 0], kLengths[(size_t) index]);
 
         drawNative (g, ui.bypass ? assets.bypassOn : assets.bypassOff, { 931, 14, 80, 31 });
+        const auto drawTopValue = [&g] (juce::Rectangle<int> bounds, const juce::String& value, bool enabled)
+        {
+            auto textBounds = bounds.withTrimmedTop (13).reduced (3, 1);
+            g.setColour (juce::Colour (0xff090b0c));
+            g.fillRect (textBounds);
+            g.setColour (enabled ? juce::Colour (0xffe3d7c5) : juce::Colour (0xff78746b));
+            g.setFont (14.0f);
+            g.drawText (value, textBounds, juce::Justification::centred);
+        };
+        const auto hostSync = processor.isHostSyncEnabled();
+        drawTopValue (GeneratedLayout::bpmBounds(), juce::String (processor.getEffectiveBpm(), 2), ! hostSync);
+        drawTopValue (GeneratedLayout::timeSigBounds(), juce::String (processor.getEffectiveTimeSignatureNumerator())
+                                                     + "/" + juce::String (processor.getEffectiveTimeSignatureDenominator()), ! hostSync);
+        auto presetTextBounds = GeneratedLayout::presetSelectorBounds().withTrimmedLeft (8).withTrimmedRight (24).withTrimmedTop (7).withTrimmedBottom (6);
+        g.setColour (juce::Colour (0xff090b0c));
+        g.fillRect (presetTextBounds);
+        g.setColour (juce::Colour (0xffe3d7c5));
+        g.setFont (13.0f);
+        g.drawText (ui.projectPresetId == 0 ? "Init" : "Init", presetTextBounds, juce::Justification::centredLeft);
+        const auto hostBounds = GeneratedLayout::hostSyncBounds();
+        const auto syncIndicator = juce::Point<float> ((float) (hostBounds.getRight() - 17), (float) hostBounds.getCentreY());
+        g.setColour (hostSync ? juce::Colour (0xffb83229) : juce::Colour (0xff555049));
+        g.fillEllipse (syncIndicator.x - 4.0f, syncIndicator.y - 4.0f, 8.0f, 8.0f);
         // The static faceplate owns the neutral XY panel and fixed labels.
 
         const std::array<float, 3> normalized {{ (slot.speed - .25f) / 3.75f, (slot.pitch + 12.0f) / 24.0f, slot.depth }};
@@ -410,9 +452,9 @@ public:
             drawNative (g, assets.ring, knobBounds);
             g.saveState();
             const auto centre = knobBounds.getCentre().toFloat();
-            const auto angle = juce::MathConstants<float>::pi * 1.25f
+            const auto angle = -juce::MathConstants<float>::pi * 0.75f
                              + juce::MathConstants<float>::pi * 1.5f * juce::jlimit (0.0f, 1.0f, normalized[(size_t) index]);
-            g.addTransform (juce::AffineTransform::rotation (angle + juce::MathConstants<float>::halfPi, centre.x, centre.y));
+            g.addTransform (juce::AffineTransform::rotation (angle, centre.x, centre.y));
             drawNative (g, assets.pointer, knobBounds);
             g.restoreState();
             g.setColour (juce::Colour (0xffe3d7c5));
@@ -485,6 +527,10 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
     for (int index = 0; index < 5; ++index)
         addImageHit (kLengths[(size_t) index], [this, index] { processor.getStateModel().setSelectedLength ((PluginStateModel::NoteLength) index); });
     addImageHit ({ 931, 14, 80, 31 }, [this] { auto& state = processor.getStateModel(); state.setBypass (! state.getUiState().bypass); });
+    addImageHit (GeneratedLayout::hostSyncBounds(), [this] { processor.setHostSyncEnabled (! processor.isHostSyncEnabled()); });
+    addImageHit (GeneratedLayout::presetSelectorBounds(), [this] { showProjectPresetMenu(); });
+    addImageHit (GeneratedLayout::presetPrevBounds(), [this] { stepProjectPreset (-1); });
+    addImageHit (GeneratedLayout::presetNextBounds(), [this] { stepProjectPreset (1); });
     addXYButtonImageHit (GeneratedLayout::xyRecBounds(), xyRecordButton, [this] { toggleXYRecording(); });
     addXYButtonImageHit (GeneratedLayout::xyClearBounds(), xyClearButton, [this] { processor.getStateModel().clearSelectedBarXYMotion(); });
     addXYButtonImageHit (GeneratedLayout::xyResetViewBounds(), xyResetViewButton,
@@ -498,6 +544,11 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
                                       : index == 1 ? GeneratedLayout::pitchKnobBounds()
                                                    : GeneratedLayout::depthKnobBounds());
     }
+    bpmInput = std::make_unique<BpmRegion> (
+        [this] (double delta) { adjustInternalBpm (delta); },
+        [this] { beginBpmTextEdit(); });
+    addAndMakeVisible (*bpmInput);
+    bpmInput->setBounds (GeneratedLayout::bpmBounds());
     xyInput = std::make_unique<XYRegion> ([this] (juce::Point<float> point) { updateXYFromPad (point); });
     addAndMakeVisible (*xyInput);
     xyInput->setBounds (GeneratedLayout::xyPadBounds());
@@ -519,6 +570,10 @@ bool ToyotomiHideyoshiAudioProcessorEditorV2::validateInteractiveBounds() const
     expected.insert (expected.end(), kPresets.begin(), kPresets.end());
     expected.insert (expected.end(), kLengths.begin(), kLengths.end());
     expected.push_back ({ 931, 14, 80, 31 });
+    expected.push_back (GeneratedLayout::hostSyncBounds());
+    expected.push_back (GeneratedLayout::presetSelectorBounds());
+    expected.push_back (GeneratedLayout::presetPrevBounds());
+    expected.push_back (GeneratedLayout::presetNextBounds());
     expected.push_back (GeneratedLayout::xyRecBounds());
     expected.push_back (GeneratedLayout::xyClearBounds());
     expected.push_back (GeneratedLayout::xyResetViewBounds());
@@ -528,6 +583,7 @@ bool ToyotomiHideyoshiAudioProcessorEditorV2::validateInteractiveBounds() const
     return knobs[0]->getBounds() == GeneratedLayout::speedKnobBounds()
         && knobs[1]->getBounds() == GeneratedLayout::pitchKnobBounds()
         && knobs[2]->getBounds() == GeneratedLayout::depthKnobBounds()
+        && bpmInput != nullptr && bpmInput->getBounds() == GeneratedLayout::bpmBounds()
         && xyInput->getBounds() == GeneratedLayout::xyPadBounds();
 }
 bool ToyotomiHideyoshiAudioProcessorEditorV2::debugXYAt (juce::Point<int> point, double elapsedSeconds)
@@ -597,6 +653,62 @@ void ToyotomiHideyoshiAudioProcessorEditorV2::timerCallback()
 {
     if (xyRecording && processor.getStateModel().getUiState().selectedBar != xyRecordingBar)
         stopXYRecording();
+    surface->repaint();
+}
+
+void ToyotomiHideyoshiAudioProcessorEditorV2::adjustInternalBpm (double delta)
+{
+    if (processor.isHostSyncEnabled()) return;
+    auto& state = processor.getStateModel();
+    state.setInternalBpm (state.getUiState().internalBpm + delta);
+    surface->repaint();
+}
+
+void ToyotomiHideyoshiAudioProcessorEditorV2::beginBpmTextEdit()
+{
+    if (processor.isHostSyncEnabled() || bpmEditor != nullptr) return;
+    bpmEditor = std::make_unique<juce::TextEditor> ("Internal BPM");
+    bpmEditor->setText (juce::String (processor.getStateModel().getUiState().internalBpm, 2), false);
+    bpmEditor->setSelectAllWhenFocused (true);
+    bpmEditor->setInputRestrictions (7, "0123456789.");
+    bpmEditor->setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff090b0c));
+    bpmEditor->setColour (juce::TextEditor::textColourId, juce::Colour (0xffe3d7c5));
+    bpmEditor->setColour (juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+    bpmEditor->onReturnKey = [this] { commitBpmTextEdit(); };
+    bpmEditor->onEscapeKey = [this] { bpmEditor.reset(); surface->repaint(); };
+    bpmEditor->onFocusLost = [this] { commitBpmTextEdit(); };
+    bpmEditor->setBounds (GeneratedLayout::bpmBounds().reduced (2, 7));
+    addAndMakeVisible (*bpmEditor);
+    bpmEditor->grabKeyboardFocus();
+}
+
+void ToyotomiHideyoshiAudioProcessorEditorV2::commitBpmTextEdit()
+{
+    if (bpmEditor == nullptr) return;
+    const auto value = bpmEditor->getText().getDoubleValue();
+    if (! processor.isHostSyncEnabled()) processor.getStateModel().setInternalBpm (value);
+    bpmEditor.reset();
+    surface->repaint();
+}
+
+void ToyotomiHideyoshiAudioProcessorEditorV2::showProjectPresetMenu()
+{
+    juce::PopupMenu menu;
+    const auto selected = processor.getStateModel().getUiState().projectPresetId == 0;
+    menu.addItem (1, "Init", true, selected);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this),
+                        [this] (int result)
+                        {
+                            if (result == 1) processor.getStateModel().setProjectPresetId (0);
+                            surface->repaint();
+                        });
+}
+
+void ToyotomiHideyoshiAudioProcessorEditorV2::stepProjectPreset (int direction)
+{
+    juce::ignoreUnused (direction);
+    // Init is deliberately the only item until factory preset contents exist.
+    processor.getStateModel().setProjectPresetId (0);
     surface->repaint();
 }
 

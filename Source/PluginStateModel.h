@@ -34,7 +34,14 @@ public:
         double xyMotionDurationSeconds = 0.0;
         std::vector<MotionPoint> xyMotion;
     };
-    struct UiState { int selectedTab = 0, selectedBar = kNoSelectedBar; bool bypass = false; };
+    struct UiState
+    {
+        int selectedTab = 0, selectedBar = kNoSelectedBar;
+        bool bypass = false, hostSync = true;
+        double internalBpm = 120.0;
+        int internalTimeSigNumerator = 4, internalTimeSigDenominator = 4;
+        int projectPresetId = 0;
+    };
 
     PluginStateModel();
     const TimelineSlot& getSlot (int bar) const noexcept;
@@ -44,6 +51,10 @@ public:
     void selectTab (int); // view page only
     void selectBar (int);
     void setBypass (bool);
+    void setHostSync (bool);
+    void setInternalBpm (double);
+    void setInternalTimeSignature (int numerator, int denominator);
+    void setProjectPresetId (int);
     void setSlotPreset (int, ScratchPreset);
     void setSlotLength (int, NoteLength);
     void setSlotSpeed (int, float);
@@ -78,6 +89,7 @@ public:
     void reset();
 
     static constexpr float kMinSpeed = 0.25f, kMaxSpeed = 4.0f, kMinPitch = -12.0f, kMaxPitch = 12.0f;
+    static constexpr double kMinInternalBpm = 20.0, kMaxInternalBpm = 300.0;
 
 private:
     static int barIndex (int) noexcept;

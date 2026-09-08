@@ -13,7 +13,7 @@
     "length_1_4": "gold is an example selected length, not the default selected length"
   },
   "regions": [
-    { "name": "HEADER",      "bounds": [0, 0, 1024, 72],   "dynamic_region": false, "accepted_variance": "none" },
+    { "name": "HEADER",      "bounds": [0, 0, 1024, 72],   "dynamic_region": true, "accepted_variance": "HOST SYNC, BPM, TIME SIG and preset text are runtime state" },
     { "name": "BAR_TABS",    "bounds": [247, 70, 442, 35], "dynamic_region": true,  "accepted_variance": "tab state shell, including the master example's exterior gold border" },
     { "name": "BAR_MAP",     "bounds": [259, 137, 467, 164], "dynamic_region": true, "accepted_variance": "cell shell, label, mini preview and playhead" },
     { "name": "PRESET",      "bounds": [750, 100, 258, 260], "dynamic_region": true, "accepted_variance": "one selected preset image" },
@@ -34,6 +34,6 @@
     { "id":"bar_09", "bounds":[259,221,56,80] }, { "id":"bar_10", "bounds":[317,221,56,80] }, { "id":"bar_11", "bounds":[378,221,56,80] }, { "id":"bar_12", "bounds":[437,221,56,80] }, { "id":"bar_13", "bounds":[494,221,56,80] }, { "id":"bar_14", "bounds":[553,221,56,80] }, { "id":"bar_15", "bounds":[611,221,56,80] }, { "id":"bar_16", "bounds":[670,221,56,80] },
     { "id":"preset_off", "bounds":[750,100,84,64] }, { "id":"preset_forward_cut", "bounds":[836,100,84,64] }, { "id":"preset_backspin", "bounds":[924,100,84,64] }, { "id":"preset_chirp", "bounds":[750,166,84,64] }, { "id":"preset_baby", "bounds":[836,166,84,64] }, { "id":"preset_transform", "bounds":[924,166,84,64] }, { "id":"preset_drag", "bounds":[750,232,84,64] }, { "id":"preset_zigzag", "bounds":[836,232,84,64] }, { "id":"preset_tape_brake", "bounds":[924,232,84,64] }, { "id":"preset_custom", "bounds":[750,296,84,64] },
     { "id":"length_1_16", "bounds":[742,425,32,26] }, { "id":"length_1_8", "bounds":[773,425,32,26] }, { "id":"length_1_4", "bounds":[803,425,32,26] }, { "id":"length_1_2", "bounds":[834,425,32,26] }, { "id":"length_1_bar", "bounds":[864,425,32,26] },
-    { "id":"bypass", "bounds":[931,14,80,31] }, { "id":"rec", "bounds":[26,596,60,30] }, { "id":"clear", "bounds":[94,596,60,30] }, { "id":"reset_view", "bounds":[158,596,81,30] }
+    { "id":"bypass", "bounds":[931,14,80,31] }, { "id":"host_sync", "bounds":[375,14,88,31] }, { "id":"bpm", "bounds":[469,14,62,31] }, { "id":"preset_selector", "bounds":[697,14,155,31] }, { "id":"preset_prev", "bounds":[862,14,29,31] }, { "id":"preset_next", "bounds":[894,14,29,31] }, { "id":"rec", "bounds":[26,596,60,30] }, { "id":"clear", "bounds":[94,596,60,30] }, { "id":"reset_view", "bounds":[158,596,81,30] }
   ]
 }

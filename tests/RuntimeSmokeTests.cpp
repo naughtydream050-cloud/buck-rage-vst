@@ -174,11 +174,13 @@ bool cropsDiffer (const juce::Image& a, const juce::Image& b, juce::Rectangle<in
 class TestPlayHead final : public juce::AudioPlayHead
 {
 public:
-    void set (bool isPlaying, double ppq)
+    void set (bool isPlaying, double ppq, double bpm = 120.0, int numerator = 4, int denominator = 4)
     {
         position = {};
         position.setIsPlaying (isPlaying);
         position.setPpqPosition (ppq);
+        position.setBpm (bpm);
+        position.setTimeSignature ({ numerator, denominator });
     }
 
     juce::Optional<juce::AudioPlayHead::PositionInfo> getPosition() const override { return position; }
@@ -722,7 +724,7 @@ int main()
     const auto runtimeManifest = jsonResource ("runtimemanifest_json");
     juce::Array<juce::var> barPixelTrace;
     pass &= check (visualManifest.getDynamicObject() != nullptr && visualRegions.getArray() != nullptr
-                && visualInteractive != nullptr && visualInteractive->size() == 39
+                && visualInteractive != nullptr && visualInteractive->size() == 44
                 && visualReference.isValid() && visualReference.getWidth() == 1024 && visualReference.getHeight() == 683,
                    "v2-visual-acceptance-reference-and-manifest");
     bool faceplateClean = staticFaceplate.isValid();
@@ -763,6 +765,25 @@ int main()
                    "v2-output-meter-old-hole-restored");
     pass &= check (v2 != nullptr && v2->validateInteractiveBounds(), "v2-visual-hit-bounds-match-manifest");
     auto& state=processor.getStateModel();
+    TestPlayHead topControlsPlayHead;
+    processor.setPlayHead (&topControlsPlayHead);
+    juce::AudioBuffer<float> topControlsAudio (2, 32);
+    juce::MidiBuffer topControlsMidi;
+    topControlsPlayHead.set (true, 0.0, 147.0, 6, 8);
+    processor.setHostSyncEnabled (true);
+    processor.processBlock (topControlsAudio, topControlsMidi);
+    pass &= check (processor.isHostSyncEnabled() && processor.getEffectiveBpm() == 147.0
+                   && processor.getEffectiveTimeSignatureNumerator() == 6
+                   && processor.getEffectiveTimeSignatureDenominator() == 8,
+                   "v2-host-sync-displays-host-tempo-and-time-signature");
+    processor.setHostSyncEnabled (false);
+    state.setInternalBpm (133.0); state.setInternalTimeSignature (3, 4);
+    pass &= check (! processor.isHostSyncEnabled() && processor.getEffectiveBpm() == 133.0
+                   && processor.getEffectiveTimeSignatureNumerator() == 3
+                   && processor.getEffectiveTimeSignatureDenominator() == 4,
+                   "v2-internal-tempo-and-time-signature-are-independent");
+    processor.setHostSyncEnabled (true);
+    processor.setPlayHead (nullptr);
     // A fresh instance owns no selected timeline slot. Defaults remain valid
     // values, but no BAR/PRESET/LENGTH state image may be gold.
     state.selectTab (0); state.setBypass (false);

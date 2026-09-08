@@ -56,6 +56,10 @@ int main()
     model.setBypass (true);
     check (model.getSlot (5).preset == PluginStateModel::ScratchPreset::custom && model.getUiState().bypass,
            "bypass-does-not-alter-timeline-slot");
+    model.setHostSync (false);
+    model.setInternalBpm (133.25);
+    model.setInternalTimeSignature (6, 8);
+    model.setProjectPresetId (0);
 
     const auto state = model.toValueTree();
     PluginStateModel restored;
@@ -64,6 +68,11 @@ int main()
            && restored.getSlot (4).length == PluginStateModel::NoteLength::quarter
            && restored.getSlot (4).speed == 1.75f && restored.getSlot (4).pitch == -3.0f,
            "timeline-slot-parameters-round-trip");
+    check (! restored.getUiState().hostSync && restored.getUiState().internalBpm == 133.25
+           && restored.getUiState().internalTimeSigNumerator == 6
+           && restored.getUiState().internalTimeSigDenominator == 8
+           && restored.getUiState().projectPresetId == 0,
+           "top-controls-round-trip");
     PluginStateModel noSelectionRestored;
     PluginStateModel freshState;
     check (noSelectionRestored.fromValueTree (freshState.toValueTree())
@@ -121,6 +130,10 @@ int main()
     PluginStateModel migrated;
     check (migrated.fromValueTree (legacy) && migrated.getSlot (3).preset == PluginStateModel::ScratchPreset::drag,
            "v1-first-count-migrates-to-timeline-slot");
+    check (migrated.getUiState().hostSync && migrated.getUiState().internalBpm == 120.0
+           && migrated.getUiState().internalTimeSigNumerator == 4
+           && migrated.getUiState().internalTimeSigDenominator == 4,
+           "legacy-top-controls-defaults-preserved");
 
     PluginStateModel preserved = restored;
     juce::ValueTree future ("ToyotomiHideyoshiState"); future.setProperty ("stateVersion", 99, nullptr);

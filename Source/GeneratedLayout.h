@@ -7,6 +7,12 @@
 // GeneratedLayout.h pattern.
 namespace GeneratedLayout
 {
+inline juce::Rectangle<int> hostSyncBounds()        { return { 375, 14, 88, 31 }; }
+inline juce::Rectangle<int> bpmBounds()             { return { 469, 14, 62, 31 }; }
+inline juce::Rectangle<int> timeSigBounds()         { return { 541, 14, 70, 31 }; }
+inline juce::Rectangle<int> presetSelectorBounds()  { return { 697, 14, 155, 31 }; }
+inline juce::Rectangle<int> presetPrevBounds()      { return { 862, 14, 29, 31 }; }
+inline juce::Rectangle<int> presetNextBounds()      { return { 894, 14, 29, 31 }; }
 inline juce::Rectangle<int> speedKnobBounds()       { return { 744, 513, 48, 48 }; }
 inline juce::Rectangle<int> pitchKnobBounds()       { return { 793, 513, 48, 48 }; }
 inline juce::Rectangle<int> depthKnobBounds()       { return { 848, 513, 48, 48 }; }

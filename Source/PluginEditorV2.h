@@ -28,6 +28,7 @@ private:
     class OutputMeter;
     class HitRegion;
     class KnobRegion;
+    class BpmRegion;
     class XYRegion;
     ToyotomiHideyoshiAudioProcessor& processor;
     // Editor-local controls: recording must never be restored from a project.
@@ -39,10 +40,17 @@ private:
     std::unique_ptr<OutputMeter> outputMeter;
     juce::OwnedArray<HitRegion> hitRegions;
     std::array<std::unique_ptr<KnobRegion>, 3> knobs;
+    std::unique_ptr<BpmRegion> bpmInput;
+    std::unique_ptr<juce::TextEditor> bpmEditor;
     std::unique_ptr<XYRegion> xyInput;
     void toggleXYRecording();
     void stopXYRecording();
     void updateXYFromPad (juce::Point<float>, double elapsedSeconds = -1.0);
+    void adjustInternalBpm (double delta);
+    void beginBpmTextEdit();
+    void commitBpmTextEdit();
+    void showProjectPresetMenu();
+    void stepProjectPreset (int direction);
     void timerCallback() override;
     void addImageHit (juce::Rectangle<int>, std::function<void()>);
     void addXYButtonImageHit (juce::Rectangle<int>, int, std::function<void()>);
