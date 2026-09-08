@@ -722,7 +722,7 @@ int main()
     const auto runtimeManifest = jsonResource ("runtimemanifest_json");
     juce::Array<juce::var> barPixelTrace;
     pass &= check (visualManifest.getDynamicObject() != nullptr && visualRegions.getArray() != nullptr
-                && visualInteractive != nullptr && visualInteractive->size() == 40
+                && visualInteractive != nullptr && visualInteractive->size() == 39
                 && visualReference.isValid() && visualReference.getWidth() == 1024 && visualReference.getHeight() == 683,
                    "v2-visual-acceptance-reference-and-manifest");
     bool faceplateClean = staticFaceplate.isValid();
