@@ -724,7 +724,7 @@ int main()
     const auto runtimeManifest = jsonResource ("runtimemanifest_json");
     juce::Array<juce::var> barPixelTrace;
     pass &= check (visualManifest.getDynamicObject() != nullptr && visualRegions.getArray() != nullptr
-                && visualInteractive != nullptr && visualInteractive->size() == 44
+                && visualInteractive != nullptr && visualInteractive->size() == 39
                 && visualReference.isValid() && visualReference.getWidth() == 1024 && visualReference.getHeight() == 683,
                    "v2-visual-acceptance-reference-and-manifest");
     bool faceplateClean = staticFaceplate.isValid();
@@ -782,6 +782,15 @@ int main()
                    && processor.getEffectiveTimeSignatureNumerator() == 3
                    && processor.getEffectiveTimeSignatureDenominator() == 4,
                    "v2-internal-tempo-and-time-signature-are-independent");
+    pass &= check (v2 != nullptr
+                   && v2->debugClickAt (GeneratedLayout::hostSyncBounds().getCentre())
+                   && processor.isHostSyncEnabled()
+                   && v2->debugClickAt (GeneratedLayout::presetPrevBounds().getCentre())
+                   && v2->debugClickAt (GeneratedLayout::presetNextBounds().getCentre())
+                   && state.getUiState().projectPresetId == 0,
+                   "v2-top-control-hit-routing-and-init-preset-bounds");
+    topControlsPlayHead.set (false, 0.0);
+    processor.processBlock (topControlsAudio, topControlsMidi);
     processor.setHostSyncEnabled (true);
     processor.setPlayHead (nullptr);
     // A fresh instance owns no selected timeline slot. Defaults remain valid
