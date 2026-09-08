@@ -31,7 +31,7 @@ private:
     class XYRegion;
     ToyotomiHideyoshiAudioProcessor& processor;
     // Editor-local controls: recording must never be restored from a project.
-    bool xyRecording = false, xyView = true, xyRecordingHasPoint = false;
+    bool xyRecording = false, xyRecordingHasPoint = false;
     int xyPressedButton = -1;
     int xyRecordingBar = PluginStateModel::kNoSelectedBar;
     double xyRecordingStartMilliseconds = 0.0;

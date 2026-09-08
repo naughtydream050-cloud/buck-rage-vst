@@ -22,11 +22,9 @@ inline juce::Rectangle<int> outputLReadoutBounds()  { return { 923, 601, 39, 21 
 inline juce::Rectangle<int> outputRReadoutBounds()  { return { 963, 601, 39, 21 }; }
 // XY uses this one native coordinate contract for paint, input and tests.
 inline juce::Rectangle<int> xyPadBounds()            { return { 38, 438, 195, 141 }; }
-// Exact native crops from the approved 1024 reference.  These are the single
-// source for both the state sprites and transparent input regions.
-// RESET and VIEW are adjacent halves of one printed 81 x 30 plate.
+// Exact native crops from the approved 1024 reference. These are the single
+// source for both state sprites and transparent input regions.
 inline juce::Rectangle<int> xyRecBounds()            { return { 26, 596, 60, 30 }; }
 inline juce::Rectangle<int> xyClearBounds()          { return { 94, 596, 60, 30 }; }
-inline juce::Rectangle<int> xyResetBounds()          { return { 158, 596, 46, 30 }; }
-inline juce::Rectangle<int> xyViewBounds()           { return { 204, 596, 35, 30 }; }
+inline juce::Rectangle<int> xyResetViewBounds()      { return { 158, 596, 81, 30 }; }
 }

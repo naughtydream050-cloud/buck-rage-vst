@@ -955,8 +955,7 @@ int main()
     // not the former y=601 measurement of a partial frame edge.
     pass &= check (GeneratedLayout::xyRecBounds() == juce::Rectangle<int> (26, 596, 60, 30)
                 && GeneratedLayout::xyClearBounds() == juce::Rectangle<int> (94, 596, 60, 30)
-                && GeneratedLayout::xyResetBounds() == juce::Rectangle<int> (158, 596, 46, 30)
-                && GeneratedLayout::xyViewBounds() == juce::Rectangle<int> (204, 596, 35, 30),
+                && GeneratedLayout::xyResetViewBounds() == juce::Rectangle<int> (158, 596, 81, 30),
                    "v2-xy-buttons-native-sprite-contract");
     state.selectTab (0); state.selectBar (PluginStateModel::kNoSelectedBar);
     pass &= check (! v2->debugXYAt (xyPad.getCentre(), 0.0)
@@ -965,6 +964,7 @@ int main()
     v2->debugClickAt (GeneratedLayout::xyRecBounds().getCentre());
     pass &= check (! state.getSlot (0).xyMotionExists, "v2-xy-fresh-rec-disabled");
     v2->debugClickAt (juce::Point<int> { 406, 261 }); // BAR 11
+    const auto recIdle = render (*editor);
     // CLEAR is momentary, so it proves native press/release sprite switching
     // without perturbing the subsequent REC state-machine scenario.
     const auto clearNormal = render (*editor);
@@ -975,7 +975,18 @@ int main()
     pass &= check (cropsDiffer (clearNormal, clearPressed, GeneratedLayout::xyClearBounds())
                 && ! cropsDiffer (clearNormal, clearReleased, GeneratedLayout::xyClearBounds()),
                    "v2-xy-clear-uses-native-pressed-and-normal-sprites");
+    const auto resetViewNormal = render (*editor);
+    v2->debugMouseDownAt (GeneratedLayout::xyResetViewBounds().getCentre());
+    const auto resetViewPressed = render (*editor);
+    v2->debugMouseUpAt (GeneratedLayout::xyResetViewBounds().getCentre());
+    const auto resetViewReleased = render (*editor);
+    pass &= check (cropsDiffer (resetViewNormal, resetViewPressed, GeneratedLayout::xyResetViewBounds())
+                && ! cropsDiffer (resetViewNormal, resetViewReleased, GeneratedLayout::xyResetViewBounds()),
+                   "v2-xy-reset-view-is-one-native-momentary-button");
     v2->debugClickAt (GeneratedLayout::xyRecBounds().getCentre());
+    const auto recActive = render (*editor);
+    pass &= check (cropsDiffer (recIdle, recActive, GeneratedLayout::xyRecBounds()),
+                   "v2-xy-rec-active-is-a-distinct-native-sprite");
     const auto firstXY = juce::Point<int> { xyPad.getX() + 15, xyPad.getBottom() - 15 };
     const auto secondXY = juce::Point<int> { xyPad.getRight() - 16, xyPad.getY() + 16 };
     pass &= check (v2->debugXYAt (firstXY, 0.0) && v2->debugXYAt (secondXY, 0.5),
@@ -990,20 +1001,14 @@ int main()
                    "v2-xy-rec-stops-on-absolute-bar-change");
     v2->debugClickAt (juce::Point<int> { 406, 261 }); // return BAR 11
     const auto traceOn = render (*editor);
-    v2->debugClickAt (GeneratedLayout::xyViewBounds().getCentre());
-    const auto traceOff = render (*editor);
-    pass &= check (png (traceOn, "v2-xy-view-on.png") && png (traceOff, "v2-xy-view-off.png"),
-                   "v2-xy-view-buttons-proof");
-    pass &= check (cropsDiffer (traceOn, traceOff, xyPad) && state.getSlot (10).xyMotionExists,
-                   "v2-xy-view-off-hides-trace-keeps-data");
-    v2->debugClickAt (GeneratedLayout::xyViewBounds().getCentre());
-    const auto traceRestored = render (*editor);
     const auto motionBeforeReset = state.getSlot (10).xyMotion;
-    v2->debugClickAt (GeneratedLayout::xyResetBounds().getCentre());
-    pass &= check (cropsDiffer (traceOff, traceRestored, xyCrop)
-                && state.getSlot (10).currentX == .5f && state.getSlot (10).currentY == .5f
+    v2->debugXYAt (juce::Point<int> { xyPad.getX() + 4, xyPad.getY() + 4 }, 1.0);
+    pass &= check (state.getSlot (10).xyMotion == motionBeforeReset,
+                   "v2-xy-rec-off-updates-current-point-without-recording");
+    v2->debugClickAt (GeneratedLayout::xyResetViewBounds().getCentre());
+    pass &= check (state.getSlot (10).currentX == .5f && state.getSlot (10).currentY == .5f
                 && state.getSlot (10).xyMotion == motionBeforeReset,
-                   "v2-xy-view-on-and-reset-keeps-motion");
+                   "v2-xy-reset-view-keeps-recorded-motion");
     v2->debugClickAt (GeneratedLayout::xyClearBounds().getCentre());
     const auto clearedXY = render (*editor);
     pass &= check (! state.getSlot (10).xyMotionExists

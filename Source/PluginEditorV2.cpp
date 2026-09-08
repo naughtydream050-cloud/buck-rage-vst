@@ -90,7 +90,7 @@ juce::Rectangle<int> cellBounds (int index)
 
 enum CellState { normalState, selectedState, playingState, selectedPlayingState };
 enum XYButtonState { xyNormalState, xyPressedState, xyActiveState };
-enum XYButtonId { xyRecordButton, xyClearButton, xyResetButton, xyViewButton, xyNoButton = -1 };
+enum XYButtonId { xyRecordButton, xyClearButton, xyResetViewButton, xyNoButton = -1 };
 
 CellState resolveCellState (bool selected, bool playing) noexcept
 {
@@ -113,7 +113,7 @@ struct V2AssetCatalog final
     std::array<std::array<juce::Image, 4>, 64> barCells;
     std::array<std::array<juce::Image, 2>, 10> presets;
     std::array<std::array<juce::Image, 2>, 5> lengths;
-    std::array<std::array<juce::Image, 3>, 4> xyButtons;
+    std::array<std::array<juce::Image, 3>, 3> xyButtons;
     bool barMapValid = true, xyButtonAssetsValid = true;
 
     void load (juce::Image& destination, const juce::String& name, juce::Rectangle<int> bounds)
@@ -199,11 +199,11 @@ struct V2AssetCatalog final
         load (pointer,   "knob_pointer_60.png",          GeneratedLayout::speedKnobBounds());
         load (bypassOff, "bypass_off.png",               { 931, 14, 80, 31 });
         load (bypassOn,  "bypass_on.png",                { 931, 14, 80, 31 });
-        const std::array<juce::Rectangle<int>, 4> xyBounds {{ GeneratedLayout::xyRecBounds(),
-            GeneratedLayout::xyClearBounds(), GeneratedLayout::xyResetBounds(), GeneratedLayout::xyViewBounds() }};
-        const std::array<const char*, 4> xyNames {{ "rec", "clear", "reset", "view" }};
+        const std::array<juce::Rectangle<int>, 3> xyBounds {{ GeneratedLayout::xyRecBounds(),
+            GeneratedLayout::xyClearBounds(), GeneratedLayout::xyResetViewBounds() }};
+        const std::array<const char*, 3> xyNames {{ "rec", "clear", "reset_view" }};
         const std::array<const char*, 3> xyStates {{ "normal", "pressed", "active" }};
-        for (int button = 0; button < 4; ++button)
+        for (int button = 0; button < 3; ++button)
             for (int state = 0; state < 3; ++state)
                 loadXYButton ((XYButtonId) button, (XYButtonState) state,
                               "xy_" + juce::String (xyNames[(size_t) button]) + "_"
@@ -358,9 +358,9 @@ private:
 class ToyotomiHideyoshiAudioProcessorEditorV2::Surface final : public juce::Component
 {
 public:
-    Surface (ToyotomiHideyoshiAudioProcessor& source, const bool& recordingState, const bool& viewState,
+    Surface (ToyotomiHideyoshiAudioProcessor& source, const bool& recordingState,
              const int& pressedButtonState)
-        : processor (source), xyRecording (recordingState), xyView (viewState), xyPressedButton (pressedButtonState) {}
+        : processor (source), xyRecording (recordingState), xyPressedButton (pressedButtonState) {}
     bool barMapAssetsReady() const { return assets.barMapValid && assets.xyButtonAssetsValid; }
 
     void paint (juce::Graphics& g) override
@@ -430,7 +430,7 @@ public:
             };
             g.saveState();
             g.reduceClipRegion (pad);
-            if ((xyView || xyRecording) && slot.xyMotionExists && ! slot.xyMotion.empty())
+            if (slot.xyMotionExists && ! slot.xyMotion.empty())
             {
                 juce::Path trace;
                 for (size_t index = 0; index < slot.xyMotion.size(); ++index)
@@ -448,12 +448,11 @@ public:
             g.restoreState();
         }
 
-        const std::array<juce::Rectangle<int>, 4> xyBounds {{ GeneratedLayout::xyRecBounds(),
-            GeneratedLayout::xyClearBounds(), GeneratedLayout::xyResetBounds(), GeneratedLayout::xyViewBounds() }};
-        for (int button = 0; button < 4; ++button)
+        const std::array<juce::Rectangle<int>, 3> xyBounds {{ GeneratedLayout::xyRecBounds(),
+            GeneratedLayout::xyClearBounds(), GeneratedLayout::xyResetViewBounds() }};
+        for (int button = 0; button < 3; ++button)
         {
-            const auto active = button == xyRecordButton ? xyRecording
-                              : button == xyViewButton ? xyView : false;
+            const auto active = button == xyRecordButton && xyRecording;
             const auto state = xyPressedButton == button ? xyPressedState
                              : active ? xyActiveState : xyNormalState;
             drawNative (g, assets.xyButtons[(size_t) button][(size_t) state], xyBounds[(size_t) button]);
@@ -463,7 +462,6 @@ public:
 private:
     ToyotomiHideyoshiAudioProcessor& processor;
     const bool& xyRecording;
-    const bool& xyView;
     const int& xyPressedButton;
     V2AssetCatalog assets;
 };
@@ -471,7 +469,7 @@ private:
 ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2 (ToyotomiHideyoshiAudioProcessor& source)
     : AudioProcessorEditor (&source), processor (source)
 {
-    surface = std::make_unique<Surface> (processor, xyRecording, xyView, xyPressedButton);
+    surface = std::make_unique<Surface> (processor, xyRecording, xyPressedButton);
     addAndMakeVisible (*surface);
     surface->setInterceptsMouseClicks (false, false);
     outputMeter = std::make_unique<OutputMeter> (processor);
@@ -489,8 +487,8 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
     addImageHit ({ 931, 14, 80, 31 }, [this] { auto& state = processor.getStateModel(); state.setBypass (! state.getUiState().bypass); });
     addXYButtonImageHit (GeneratedLayout::xyRecBounds(), xyRecordButton, [this] { toggleXYRecording(); });
     addXYButtonImageHit (GeneratedLayout::xyClearBounds(), xyClearButton, [this] { processor.getStateModel().clearSelectedBarXYMotion(); });
-    addXYButtonImageHit (GeneratedLayout::xyResetBounds(), xyResetButton, [this] { processor.getStateModel().resetSelectedBarXYPosition(); });
-    addXYButtonImageHit (GeneratedLayout::xyViewBounds(), xyViewButton, [this] { if (PluginStateModel::hasSelectedBar (processor.getStateModel().getUiState().selectedBar)) xyView = ! xyView; });
+    addXYButtonImageHit (GeneratedLayout::xyResetViewBounds(), xyResetViewButton,
+                         [this] { processor.getStateModel().resetSelectedBarXYPosition(); });
 
     for (int index = 0; index < 3; ++index)
     {
@@ -523,8 +521,7 @@ bool ToyotomiHideyoshiAudioProcessorEditorV2::validateInteractiveBounds() const
     expected.push_back ({ 931, 14, 80, 31 });
     expected.push_back (GeneratedLayout::xyRecBounds());
     expected.push_back (GeneratedLayout::xyClearBounds());
-    expected.push_back (GeneratedLayout::xyResetBounds());
-    expected.push_back (GeneratedLayout::xyViewBounds());
+    expected.push_back (GeneratedLayout::xyResetViewBounds());
     if ((int) hitRegions.size() != (int) expected.size()) return false;
     for (int index = 0; index < (int) expected.size(); ++index)
         if (hitRegions[index]->getBounds() != expected[(size_t) index]) return false;
