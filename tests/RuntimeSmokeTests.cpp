@@ -180,7 +180,7 @@ public:
         position.setIsPlaying (isPlaying);
         position.setPpqPosition (ppq);
         position.setBpm (bpm);
-        position.setTimeSignature ({ numerator, denominator });
+        position.setTimeSignature (juce::AudioPlayHead::TimeSignature { numerator, denominator });
     }
 
     juce::Optional<juce::AudioPlayHead::PositionInfo> getPosition() const override { return position; }
