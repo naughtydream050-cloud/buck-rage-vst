@@ -414,29 +414,25 @@ public:
             drawNative (g, assets.lengths[(size_t) index][hasSelection && index == (int) slot.length ? 1 : 0], kLengths[(size_t) index]);
 
         drawNative (g, ui.bypass ? assets.bypassOn : assets.bypassOff, { 931, 14, 80, 31 });
-        const auto drawTopValue = [&g] (juce::Rectangle<int> bounds, const juce::String& value, bool enabled)
+        const auto drawTopValue = [&g] (juce::Rectangle<int> bounds, const juce::String& value, bool enabled,
+                                        juce::Justification justification)
         {
-            auto textBounds = bounds.withTrimmedTop (13).reduced (3, 1);
             g.setColour (juce::Colour (0xff090b0c));
-            g.fillRect (textBounds);
+            g.fillRect (bounds);
             g.setColour (enabled ? juce::Colour (0xffe3d7c5) : juce::Colour (0xff78746b));
             g.setFont (14.0f);
-            g.drawText (value, textBounds, juce::Justification::centred);
+            g.drawText (value, bounds, justification);
         };
         const auto hostSync = processor.isHostSyncEnabled();
-        drawTopValue (GeneratedLayout::bpmBounds(), juce::String (processor.getEffectiveBpm(), 2), ! hostSync);
-        drawTopValue (GeneratedLayout::timeSigBounds(), juce::String (processor.getEffectiveTimeSignatureNumerator())
-                                                     + "/" + juce::String (processor.getEffectiveTimeSignatureDenominator()), ! hostSync);
-        auto presetTextBounds = GeneratedLayout::presetSelectorBounds().withTrimmedLeft (8).withTrimmedRight (24).withTrimmedTop (7).withTrimmedBottom (6);
-        g.setColour (juce::Colour (0xff090b0c));
-        g.fillRect (presetTextBounds);
-        g.setColour (juce::Colour (0xffe3d7c5));
-        g.setFont (13.0f);
-        g.drawText (ui.projectPresetId == 0 ? "Init" : "Init", presetTextBounds, juce::Justification::centredLeft);
-        const auto hostBounds = GeneratedLayout::hostSyncBounds();
-        const auto syncIndicator = juce::Point<float> ((float) (hostBounds.getRight() - 17), (float) hostBounds.getCentreY());
+        drawTopValue (GeneratedLayout::bpmValueBounds(), juce::String (processor.getEffectiveBpm(), 2), ! hostSync,
+                      juce::Justification::centred);
+        drawTopValue (GeneratedLayout::timeSigValueBounds(), juce::String (processor.getEffectiveTimeSignatureNumerator())
+                                                          + "/" + juce::String (processor.getEffectiveTimeSignatureDenominator()), ! hostSync,
+                      juce::Justification::centred);
+        drawTopValue (GeneratedLayout::presetValueBounds(), ui.projectPresetId == 0 ? "Init" : "Init", true,
+                      juce::Justification::centredLeft);
         g.setColour (hostSync ? juce::Colour (0xffb83229) : juce::Colour (0xff555049));
-        g.fillEllipse (syncIndicator.x - 4.0f, syncIndicator.y - 4.0f, 8.0f, 8.0f);
+        g.fillEllipse (GeneratedLayout::hostSyncLampBounds().toFloat());
         // The static faceplate owns the neutral XY panel and fixed labels.
 
         const std::array<float, 3> normalized {{ (slot.speed - .25f) / 3.75f, (slot.pitch + 12.0f) / 24.0f, slot.depth }};

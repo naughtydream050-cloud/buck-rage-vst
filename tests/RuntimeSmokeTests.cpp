@@ -741,6 +741,16 @@ int main()
         GeneratedLayout::outputLReadoutBounds(), GeneratedLayout::outputRReadoutBounds()
     }})
         faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
+    for (const auto& bounds : std::array<juce::Rectangle<int>, 4> {{
+        GeneratedLayout::hostSyncLampBounds(), GeneratedLayout::bpmValueBounds(),
+        GeneratedLayout::timeSigValueBounds(), GeneratedLayout::presetValueBounds()
+    }})
+        faceplateClean = faceplateClean && fullyTransparent (staticFaceplate, bounds);
+    pass &= check (GeneratedLayout::hostSyncLampBounds().getCentre() == juce::Point<int> { 438, 36 }
+                && GeneratedLayout::bpmValueBounds().getCentre().getY() == 41
+                && GeneratedLayout::timeSigValueBounds().getCentre().getY() == 41
+                && GeneratedLayout::presetValueBounds().getCentre().getY() == 36,
+                   "v2-top-dynamic-geometry-is-ssot-derived");
     const auto nativeRing = resourceImage("knob_ring_60_png");
     for (const auto b : {GeneratedLayout::speedKnobBounds(),GeneratedLayout::pitchKnobBounds(),GeneratedLayout::depthKnobBounds()})
     {

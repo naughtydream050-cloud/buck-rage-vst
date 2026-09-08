@@ -13,6 +13,13 @@ inline juce::Rectangle<int> timeSigBounds()         { return { 541, 14, 70, 31 }
 inline juce::Rectangle<int> presetSelectorBounds()  { return { 697, 14, 155, 31 }; }
 inline juce::Rectangle<int> presetPrevBounds()      { return { 862, 14, 29, 31 }; }
 inline juce::Rectangle<int> presetNextBounds()      { return { 894, 14, 29, 31 }; }
+// These are the mutable pixels measured from the 1024x683 SSOT.  They are
+// deliberately separate from their input/frame bounds: the faceplate owns
+// labels and frames; runtime owns only these values and the existing lamp.
+inline juce::Rectangle<int> hostSyncLampBounds()     { return { 433, 30, 11, 12 }; }
+inline juce::Rectangle<int> bpmValueBounds()         { return { 472, 31, 48, 21 }; }
+inline juce::Rectangle<int> timeSigValueBounds()     { return { 543, 31, 43, 21 }; }
+inline juce::Rectangle<int> presetValueBounds()      { return { 701, 26, 128, 20 }; }
 inline juce::Rectangle<int> speedKnobBounds()       { return { 744, 513, 48, 48 }; }
 inline juce::Rectangle<int> pitchKnobBounds()       { return { 793, 513, 48, 48 }; }
 inline juce::Rectangle<int> depthKnobBounds()       { return { 848, 513, 48, 48 }; }
