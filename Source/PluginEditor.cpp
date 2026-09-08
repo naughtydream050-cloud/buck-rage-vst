@@ -1,35 +1,20 @@
 #include "PluginEditor.h"
 #include "GeneratedLayout.h"
 
-#if __has_include(<BinaryData.h>)
- #include <BinaryData.h>
- #define RUDE_HYPE_HAS_BINARY_DATA 1
-#else
- #define RUDE_HYPE_HAS_BINARY_DATA 0
-#endif
+#include <BinaryData.h>
 
 namespace
 {
-constexpr auto kExternalReferenceImagePath = "C:/Users/razor/Downloads/S__45752322.jpg";
-
-juce::Image loadBinaryImage(const char* name)
+juce::Image loadBinaryImage(const void* data, int size)
 {
-#if RUDE_HYPE_HAS_BINARY_DATA
-    int size = 0;
-    if (auto* data = BinaryData::getNamedResource(name, size))
-        return juce::ImageCache::getFromMemory(data, size);
-#else
-    juce::ignoreUnused(name);
-#endif
-    return {};
+    return data != nullptr && size > 0 ? juce::ImageCache::getFromMemory(data, size) : juce::Image {};
 }
 
 juce::Image loadReferenceFaceplate()
 {
-    if (auto image = loadBinaryImage("faceplate_rude_hype_png"); image.isValid())
+    if (auto image = loadBinaryImage(BinaryData::faceplate_rude_hype_png, BinaryData::faceplate_rude_hype_pngSize); image.isValid())
         return image;
-
-    return juce::ImageFileFormat::loadFrom(juce::File(kExternalReferenceImagePath));
+    return {};
 }
 
 juce::Image cropKnobFromFaceplate(const juce::Image& faceplate, juce::Rectangle<float> bounds)
@@ -75,11 +60,11 @@ RudeHypeEditor::RudeHypeEditor(RudeHypeProcessor& p)
 
     faceplateImage = loadReferenceFaceplate();
 
-    auto shoutImage = loadBinaryImage("knob_shout_png");
+    auto shoutImage = loadBinaryImage(BinaryData::knob_shout_png, BinaryData::knob_shout_pngSize);
     if (!shoutImage.isValid())
         shoutImage = cropKnobFromFaceplate(faceplateImage, RudeHypeGeneratedLayout::shoutBounds());
 
-    auto burnImage = loadBinaryImage("knob_burn_png");
+    auto burnImage = loadBinaryImage(BinaryData::knob_burn_png, BinaryData::knob_burn_pngSize);
     if (!burnImage.isValid())
         burnImage = cropKnobFromFaceplate(faceplateImage, RudeHypeGeneratedLayout::burnBounds());
 
