@@ -14,8 +14,8 @@ int main()
     PluginStateModel model;
     check (model.getUiState().selectedBar == PluginStateModel::kNoSelectedBar,
            "fresh-default-has-no-selected-bar");
-    check (model.getUiState().selectedTab == 0 && model.getUiState().tabHighlight == -1,
-           "fresh-default-has-no-selected-tab-highlight");
+    check (model.getUiState().selectedTab == 0,
+           "fresh-default-has-neutral-tab-page");
     model.setSelectedPreset (PluginStateModel::ScratchPreset::backspin);
     model.setSelectedLength (PluginStateModel::NoteLength::quarter);
     check (model.getSlot (0).preset == PluginStateModel::ScratchPreset::off
@@ -38,7 +38,6 @@ int main()
     for (const int tab : { 1, 2, 3, 0 }) model.selectTab (tab);
     const auto ui = model.getUiState();
     check (ui.selectedTab == 0 && ui.selectedBar == 5
-           && ui.tabHighlight == 0
            && model.getSlot (4).preset == beforeTab.preset
            && model.getSlot (4).motion.size() == beforeTab.motion.size(),
            "tab-switch-is-view-only");
@@ -79,8 +78,7 @@ int main()
     PluginStateModel noSelectionRestored;
     PluginStateModel freshState;
     check (noSelectionRestored.fromValueTree (freshState.toValueTree())
-           && noSelectionRestored.getUiState().selectedBar == PluginStateModel::kNoSelectedBar
-           && noSelectionRestored.getUiState().tabHighlight == -1,
+           && noSelectionRestored.getUiState().selectedBar == PluginStateModel::kNoSelectedBar,
            "none-selection-round-trips");
 
     // XY recording is intentionally separate from existing preset/custom
@@ -143,8 +141,7 @@ int main()
     legacyTabState.addChild (legacyGlobal, -1, nullptr);
     PluginStateModel legacyTabRestored;
     check (legacyTabRestored.fromValueTree (legacyTabState)
-           && legacyTabRestored.getUiState().selectedTab == 2
-           && legacyTabRestored.getUiState().tabHighlight == -1,
+           && legacyTabRestored.getUiState().selectedTab == 2,
            "legacy-tab-page-restores-without-gold-highlight");
 
     PluginStateModel preserved = restored;

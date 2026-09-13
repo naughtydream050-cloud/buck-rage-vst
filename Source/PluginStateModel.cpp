@@ -86,7 +86,6 @@ PluginStateModel::TimelineSlot& PluginStateModel::mutableSlot (int bar) noexcept
 void PluginStateModel::selectTab (int tab)
 {
     ui.selectedTab = juce::jlimit (0, 3, tab);
-    ui.tabHighlight = ui.selectedTab;
 }
 void PluginStateModel::selectBar (int bar) { ui.selectedBar = bar == kNoSelectedBar ? kNoSelectedBar : barIndex (bar); }
 void PluginStateModel::setBypass (bool enabled) { ui.bypass = enabled; }
@@ -156,8 +155,6 @@ juce::ValueTree PluginStateModel::toValueTree() const
     root.setProperty ("stateVersion", kStateVersion, nullptr);
     juce::ValueTree global (globalId);
     global.setProperty ("selectedTab", ui.selectedTab, nullptr);
-    if (ui.tabHighlight >= 0)
-        global.setProperty ("tabHighlight", ui.tabHighlight, nullptr);
     global.setProperty ("selectedBar", ui.selectedBar, nullptr);
     global.setProperty ("bypass", ui.bypass, nullptr);
     global.setProperty ("hostSync", ui.hostSync, nullptr);
@@ -188,12 +185,8 @@ bool PluginStateModel::fromValueTree (const juce::ValueTree& root)
     if (global.isValid())
     {
         parsed.ui.selectedTab = juce::jlimit (0, 3, static_cast<int> (global.getProperty ("selectedTab", 0)));
-        // v1-v3 did not distinguish the visible page from a user-selected
-        // TAB.  Missing data therefore restores to no highlight, never to
-        // the legacy permanent gold rim.
-        parsed.ui.tabHighlight = version >= 4
-            ? juce::jlimit (-1, 3, static_cast<int> (global.getProperty ("tabHighlight", -1)))
-            : -1;
+        // A short-lived v4 build persisted a visual TAB highlight.  Deliberately
+        // ignore that obsolete property: restored projects open neutral.
         const auto restoredBar = static_cast<int> (global.getProperty ("selectedBar", kNoSelectedBar));
         parsed.ui.selectedBar = restoredBar == kNoSelectedBar ? kNoSelectedBar : barIndex (restoredBar);
         parsed.ui.bypass = static_cast<bool> (global.getProperty ("bypass", false));

@@ -477,6 +477,12 @@ public:
              const int& pressedButtonState)
         : processor (source), xyRecording (recordingState), xyPressedButton (pressedButtonState) {}
     bool barMapAssetsReady() const { return assets.barMapValid && assets.xyButtonAssetsValid; }
+    void selectTab (int index)
+    {
+        tabHighlight = juce::jlimit (0, 3, index);
+        processor.getStateModel().selectTab (index);
+        repaint();
+    }
 
     void paint (juce::Graphics& g) override
     {
@@ -488,7 +494,7 @@ public:
         const bool hasSelection = PluginStateModel::hasSelectedBar (selected);
 
         for (int index = 0; index < 4; ++index)
-            drawNative (g, assets.tabs[(size_t) index][ui.tabHighlight == index ? 1 : 0], kTabs[(size_t) index]);
+            drawNative (g, assets.tabs[(size_t) index][tabHighlight == index ? 1 : 0], kTabs[(size_t) index]);
 
         for (int index = 0; index < 16; ++index)
         {
@@ -595,6 +601,7 @@ private:
     ToyotomiHideyoshiAudioProcessor& processor;
     const bool& xyRecording;
     const int& xyPressedButton;
+    int tabHighlight = -1;
     V2AssetCatalog assets;
 };
 
@@ -609,7 +616,7 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
     outputMeter->setBounds (GeneratedLayout::outputPanelBounds());
 
     for (int index = 0; index < 4; ++index)
-        addImageHit (kTabs[(size_t) index], [this, index] { processor.getStateModel().selectTab (index); });
+        addImageHit (kTabs[(size_t) index], [this, index] { surface->selectTab (index); });
     for (int index = 0; index < 16; ++index)
         addImageHit (cellBounds (index), [this, index] { stopXYRecording(); const auto page = processor.getStateModel().getUiState().selectedTab; processor.getStateModel().selectBar (page * 16 + index); });
     for (int index = 0; index < 10; ++index)

@@ -203,6 +203,32 @@ bool noPlayingRed (const juce::Image& image)
     return true;
 }
 
+bool hasPlayingInteriorRedDot (const juce::Image& image, juce::Rectangle<int> cell)
+{
+    // The playing perimeter is intentionally red.  Only the former centre
+    // playhead dot is forbidden.
+    for (int y = cell.getY() + 60; y < cell.getY() + 76; ++y)
+        for (int x = cell.getX() + 18; x < cell.getX() + 38; ++x)
+        {
+            const auto c = image.getPixelAt (x, y);
+            if (c.getRed() > 70 && c.getRed() > c.getGreen() * 1.35f && c.getRed() > c.getBlue() * 1.35f)
+                return true;
+        }
+    return false;
+}
+
+bool hasRedActiveLamp (const juce::Image& image)
+{
+    for (int y = 0; y < image.getHeight(); ++y)
+        for (int x = 0; x < image.getWidth(); ++x)
+        {
+            const auto c = image.getPixelAt (x, y);
+            if (c.getRed() > 120 && c.getGreen() < 100 && c.getBlue() < 100)
+                return true;
+        }
+    return false;
+}
+
 bool hasSelectedGoldContamination (const juce::Image& image)
 {
     for (int y = 0; y < image.getHeight(); ++y)
@@ -671,6 +697,9 @@ int main()
     }};
     for (const auto* resource : nativeDisplayResources)
         pass &= check (resourceImage (resource).isValid(), "v2-native-display-sprite-present");
+    pass &= check (hasRedActiveLamp (resourceImage ("toy_display_host_sync_lamp_on_png"))
+                && ! hasRedActiveLamp (resourceImage ("toy_display_host_sync_lamp_off_png")),
+                   "v2-host-sync-approved-red-sprite-only");
     for (int digit = 0; digit < 10; ++digit)
         pass &= check (resourceImage (("toy_display_digit_" + juce::String (digit) + "_png").toRawUTF8()).isValid(),
                        "v2-native-display-digit-present");
@@ -879,13 +908,14 @@ int main()
             ("length_" + juce::String (kGateLengthNames[(size_t) index]) + "_selected_png").toRawUTF8()) ? 1 : 0;
     pass &= check (state.getUiState().selectedBar == PluginStateModel::kNoSelectedBar && freshGoldBars == 0,
                    "fresh-default-no-selected-bar");
-    pass &= check (state.getUiState().tabHighlight == -1 && freshGoldTabs == 0,
-                   "fresh-default-no-selected-tab");
+    pass &= check (freshGoldTabs == 0,
+                   "fresh-default-tab-gold-count-0");
     pass &= check (freshGoldPresets == 0, "fresh-default-no-selected-preset");
     pass &= check (freshGoldLengths == 0, "fresh-default-no-selected-length");
-    state.selectTab (2);
+    pass &= check (v2->debugClickAt (freshTabBounds[2].getCentre()),
+                   "tab-click-routes-to-editor-local-highlight");
     const auto clickedTabImage = render (*editor);
-    pass &= check (state.getUiState().tabHighlight == 2
+    pass &= check (state.getUiState().selectedTab == 2
                 && cropMatchesResource (clickedTabImage, freshTabBounds[2], "tab_33_48_selected_png"),
                    "explicit-tab-click-owns-one-gold-highlight");
     state.reset(); state.selectBar (0); state.setSlotPreset (0, PluginStateModel::ScratchPreset::off);
@@ -984,7 +1014,8 @@ int main()
     pass &= check(processor.getCurrentTimelineSlot() == 5
                && cropsDiffer (defaultImage, playing, {553,137,56,80})
                && cropHasVisibleCellContent (playing, {259,137,56,80})
-               && cropHasVisibleCellContent (playing, {553,137,56,80}), "v2-playing-red-and-selected-gold-separated");
+               && cropHasVisibleCellContent (playing, {553,137,56,80})
+               && ! hasPlayingInteriorRedDot (playing, {553,137,56,80}), "v2-playing-red-border-without-dot");
     playHead.set (true, 40.0); // PPQ 40 -> BAR 11 (zero-based slot 10) at 4/4
     processor.processBlock (audio, midi);
     state.selectBar (10);
@@ -992,7 +1023,8 @@ int main()
     pass &= check (png (selectedPlaying, "v2-bar-selected-playing.png") && png (selectedPlaying, "v2-full-bar-selected-playing.png"), "v2-selected-playing-render");
     pass &= check(processor.getCurrentTimelineSlot() == 10
                && cropHasVisibleCellContent (selectedPlaying,{378,221,56,80})
-               && cropsDiffer (playing, selectedPlaying, {378,221,56,80}), "v2-selected-playing-single-state-image");
+               && cropsDiffer (playing, selectedPlaying, {378,221,56,80})
+               && ! hasPlayingInteriorRedDot (selectedPlaying, {378,221,56,80}), "v2-selected-playing-border-without-dot");
     playHead.set (false, 0.0);
     processor.processBlock (audio, midi);
     state.selectBar (0);
