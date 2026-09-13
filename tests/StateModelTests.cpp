@@ -14,6 +14,8 @@ int main()
     PluginStateModel model;
     check (model.getUiState().selectedBar == PluginStateModel::kNoSelectedBar,
            "fresh-default-has-no-selected-bar");
+    check (model.getUiState().selectedTab == 0 && model.getUiState().tabHighlight == -1,
+           "fresh-default-has-no-selected-tab-highlight");
     model.setSelectedPreset (PluginStateModel::ScratchPreset::backspin);
     model.setSelectedLength (PluginStateModel::NoteLength::quarter);
     check (model.getSlot (0).preset == PluginStateModel::ScratchPreset::off
@@ -36,6 +38,7 @@ int main()
     for (const int tab : { 1, 2, 3, 0 }) model.selectTab (tab);
     const auto ui = model.getUiState();
     check (ui.selectedTab == 0 && ui.selectedBar == 5
+           && ui.tabHighlight == 0
            && model.getSlot (4).preset == beforeTab.preset
            && model.getSlot (4).motion.size() == beforeTab.motion.size(),
            "tab-switch-is-view-only");
@@ -76,7 +79,8 @@ int main()
     PluginStateModel noSelectionRestored;
     PluginStateModel freshState;
     check (noSelectionRestored.fromValueTree (freshState.toValueTree())
-           && noSelectionRestored.getUiState().selectedBar == PluginStateModel::kNoSelectedBar,
+           && noSelectionRestored.getUiState().selectedBar == PluginStateModel::kNoSelectedBar
+           && noSelectionRestored.getUiState().tabHighlight == -1,
            "none-selection-round-trips");
 
     // XY recording is intentionally separate from existing preset/custom
@@ -134,6 +138,14 @@ int main()
            && migrated.getUiState().internalTimeSigNumerator == 4
            && migrated.getUiState().internalTimeSigDenominator == 4,
            "legacy-top-controls-defaults-preserved");
+    juce::ValueTree legacyTabState ("ToyotomiHideyoshiState"); legacyTabState.setProperty ("stateVersion", 3, nullptr);
+    juce::ValueTree legacyGlobal ("Global"); legacyGlobal.setProperty ("selectedTab", 2, nullptr);
+    legacyTabState.addChild (legacyGlobal, -1, nullptr);
+    PluginStateModel legacyTabRestored;
+    check (legacyTabRestored.fromValueTree (legacyTabState)
+           && legacyTabRestored.getUiState().selectedTab == 2
+           && legacyTabRestored.getUiState().tabHighlight == -1,
+           "legacy-tab-page-restores-without-gold-highlight");
 
     PluginStateModel preserved = restored;
     juce::ValueTree future ("ToyotomiHideyoshiState"); future.setProperty ("stateVersion", 99, nullptr);

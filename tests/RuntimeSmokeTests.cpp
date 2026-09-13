@@ -659,6 +659,21 @@ int main()
     pass &= check(resourceIs("knob_ring_60_png",48,48) && resourceIs("knob_pointer_60_png",48,48),"v2-knob-assets-native");
     pass &= check(resourceIs("bypass_off_png",80,31) && resourceIs("bypass_on_png",80,31),"v2-bypass-native");
     pass &= check(resourceIs("meter_led_strip_png",12,204),"v2-output-meter-led-native");
+    const std::array<const char*, 18> nativeDisplayResources {{
+        "toy_display_header_bpm_backing_png", "toy_display_header_timesig_backing_png",
+        "toy_display_header_preset_backing_png", "toy_display_host_sync_lamp_on_png",
+        "toy_display_host_sync_lamp_off_png", "toy_display_speed_readout_backing_png",
+        "toy_display_pitch_readout_backing_png", "toy_display_depth_readout_backing_png",
+        "toy_display_output_l_readout_backing_png", "toy_display_output_r_readout_backing_png",
+        "toy_display_dot_png", "toy_display_minus_png", "toy_display_slash_png",
+        "toy_display_s_png", "toy_display_t_png", "toy_display_percent_png",
+        "toy_display_init_png", "toy_display_minus_inf_png"
+    }};
+    for (const auto* resource : nativeDisplayResources)
+        pass &= check (resourceImage (resource).isValid(), "v2-native-display-sprite-present");
+    for (int digit = 0; digit < 10; ++digit)
+        pass &= check (resourceImage (("toy_display_digit_" + juce::String (digit) + "_png").toRawUTF8()).isValid(),
+                       "v2-native-display-digit-present");
     const std::array<const char*, 4> shellResources {{ "bar_cell_shell_normal_56x80_png", "bar_cell_shell_selected_56x80_png", "bar_cell_shell_playing_56x80_png", "bar_cell_shell_selected_playing_56x80_png" }};
     for (const auto* resource : shellResources)
         pass &= check (resourceIs (resource, 56, 80), "v2-bar-shell-native");
@@ -802,7 +817,7 @@ int main()
     processor.setPlayHead (nullptr);
     // A fresh instance owns no selected timeline slot. Defaults remain valid
     // values, but no BAR/PRESET/LENGTH state image may be gold.
-    state.selectTab (0); state.setBypass (false);
+    state.reset(); state.setBypass (false);
     const auto freshImage = render (*editor);
     // Measure the independent reference's bottom lit segments. Do not compare
     // implementation coordinates against constants from the same header.
@@ -843,7 +858,11 @@ int main()
         pass &= check(png(actual,"v2-output-layout-"+juce::String((int)levels[0])+"-"+juce::String((int)levels[1])+".png"),"v2-output-layout-proof");
     }
     v2->debugSetOutputMeterDb(-60,-60);
-    int freshGoldBars = 0, freshGoldPresets = 0, freshGoldLengths = 0;
+    int freshGoldTabs = 0, freshGoldBars = 0, freshGoldPresets = 0, freshGoldLengths = 0;
+    const std::array<juce::Rectangle<int>, 4> freshTabBounds {{{251,74,105,27},{360,74,105,27},{470,74,106,27},{580,74,105,27}}};
+    for (int index = 0; index < 4; ++index)
+        freshGoldTabs += cropMatchesResource (freshImage, freshTabBounds[(size_t) index],
+            ("tab_" + juce::String (std::array<const char*, 4> {{"1_16","17_32","33_48","49_64"}}[(size_t) index]) + "_selected_png").toRawUTF8()) ? 1 : 0;
     for (int index = 0; index < 16; ++index)
     {
         const auto bounds = juce::Rectangle<int> { std::array<int, 8> { 259, 317, 378, 437, 494, 553, 611, 670 }[(size_t) (index % 8)], index < 8 ? 137 : 221, 56, 80 };
@@ -860,9 +879,16 @@ int main()
             ("length_" + juce::String (kGateLengthNames[(size_t) index]) + "_selected_png").toRawUTF8()) ? 1 : 0;
     pass &= check (state.getUiState().selectedBar == PluginStateModel::kNoSelectedBar && freshGoldBars == 0,
                    "fresh-default-no-selected-bar");
+    pass &= check (state.getUiState().tabHighlight == -1 && freshGoldTabs == 0,
+                   "fresh-default-no-selected-tab");
     pass &= check (freshGoldPresets == 0, "fresh-default-no-selected-preset");
     pass &= check (freshGoldLengths == 0, "fresh-default-no-selected-length");
-    state.selectTab (0); state.selectBar (0); state.setSlotPreset (0, PluginStateModel::ScratchPreset::off);
+    state.selectTab (2);
+    const auto clickedTabImage = render (*editor);
+    pass &= check (state.getUiState().tabHighlight == 2
+                && cropMatchesResource (clickedTabImage, freshTabBounds[2], "tab_33_48_selected_png"),
+                   "explicit-tab-click-owns-one-gold-highlight");
+    state.reset(); state.selectBar (0); state.setSlotPreset (0, PluginStateModel::ScratchPreset::off);
     state.setSelectedLength ((PluginStateModel::NoteLength) 0); state.setBypass (false); state.clearSelectedMotion();
     state.setSlotSpeed (0, 1.0f); state.setSlotPitch (0, 0.0f); state.setSlotDepth (0, 0.5f);
     auto defaultImage=render(*editor); pass &= check(png(defaultImage,"v2-default-stop.png") && png(defaultImage,"v2-full-default-actual.png"),"v2-default-render");
@@ -904,7 +930,7 @@ int main()
     juce::File::getCurrentWorkingDirectory().getChildFile ("v2-bar-pixel-trace.json")
         .replaceWithText (juce::JSON::toString (juce::var (barPixelTrace), true));
     pass &= check(noPlayingRed(defaultImage), "v2-stop-red-cell-count-zero");
-    pass &= check(cropMatchesResource(defaultImage,{251,74,105,27},"tab_1_16_selected_png")
+    pass &= check(cropMatchesResource(defaultImage,{251,74,105,27},"tab_1_16_normal_png")
                && cropMatchesResource(defaultImage,{360,74,105,27},"tab_17_32_normal_png"), "v2-tab-images-painted");
     // The master is an example-state illustration.  Its gold BACKSPIN is not
     // the default: default is OFF selected and BACKSPIN must be neutral.

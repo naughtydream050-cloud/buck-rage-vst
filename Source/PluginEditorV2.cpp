@@ -100,12 +100,89 @@ CellState resolveCellState (bool selected, bool playing) noexcept
     return normalState;
 }
 
+// Every dynamic value is assembled from source-derived sprites. There is no
+// JUCE font fallback: a missing native glyph must fail validation visibly,
+// never silently replace the approved visual language.
+struct NativeDisplayAssets final
+{
+    std::array<juce::Image, 10> digits;
+    juce::Image dot, minus, slash, s, t, percent, init, minusInf;
+
+    void load()
+    {
+        for (int digit = 0; digit < 10; ++digit)
+            digits[(size_t) digit] = readAsset ("toy_display_digit_" + juce::String (digit) + ".png");
+        dot = readAsset ("toy_display_dot.png"); minus = readAsset ("toy_display_minus.png");
+        slash = readAsset ("toy_display_slash.png"); s = readAsset ("toy_display_s.png");
+        t = readAsset ("toy_display_t.png"); percent = readAsset ("toy_display_percent.png");
+        init = readAsset ("toy_display_init.png"); minusInf = readAsset ("toy_display_minus_inf.png");
+    }
+
+    const juce::Image* imageFor (juce_wchar character) const
+    {
+        if (character >= '0' && character <= '9') return &digits[(size_t) (character - '0')];
+        if (character == '.') return &dot; if (character == '-') return &minus;
+        if (character == '/') return &slash; if (character == 's') return &s;
+        if (character == 't') return &t; if (character == '%') return &percent;
+        return nullptr;
+    }
+};
+
+bool drawNativeValue (juce::Graphics& g, const NativeDisplayAssets& assets, const juce::String& value,
+                      juce::Rectangle<int> bounds, const float targetHeight,
+                      juce::Justification justification = juce::Justification::centred)
+{
+    const auto drawWhole = [&g, bounds, targetHeight, justification] (const juce::Image& image)
+    {
+        if (! image.isValid()) return false;
+        const auto scale = juce::jmin (1.0f, targetHeight / (float) image.getHeight());
+        const auto target = justification.appliedToRectangle ({ 0, 0, juce::roundToInt (image.getWidth() * scale),
+            juce::roundToInt (image.getHeight() * scale) }, bounds);
+        g.drawImage (image, target.getX(), target.getY(), target.getWidth(), target.getHeight(),
+                     0, 0, image.getWidth(), image.getHeight(), false);
+        return true;
+    };
+    if (value == "Init") return drawWhole (assets.init);
+    if (value == "-Inf") return drawWhole (assets.minusInf);
+
+    struct Glyph { const juce::Image* image = nullptr; bool space = false; };
+    juce::Array<Glyph> glyphs; float maximumHeight = 0.0f;
+    for (auto characters = value.getCharPointer(); ! characters.isEmpty();)
+    {
+        const auto character = characters.getAndAdvance();
+        if (character == ' ') { glyphs.add ({ nullptr, true }); continue; }
+        const auto* image = assets.imageFor (character);
+        if (image == nullptr || ! image->isValid()) return false;
+        glyphs.add ({ image, false }); maximumHeight = juce::jmax (maximumHeight, (float) image->getHeight());
+    }
+    if (glyphs.isEmpty() || maximumHeight <= 0.0f) return false;
+    const auto scale = juce::jmin (1.0f, targetHeight / maximumHeight);
+    float width = 0.0f;
+    for (const auto& glyph : glyphs) width += glyph.space ? targetHeight * 0.28f : glyph.image->getWidth() * scale;
+    const auto target = justification.appliedToRectangle ({ 0, 0, juce::roundToInt (width),
+        juce::roundToInt (maximumHeight * scale) }, bounds);
+    float x = (float) target.getX();
+    for (const auto& glyph : glyphs)
+    {
+        if (glyph.space) { x += targetHeight * 0.28f; continue; }
+        const auto glyphWidth = glyph.image->getWidth() * scale;
+        g.drawImage (*glyph.image, juce::roundToInt (x), target.getY(), juce::roundToInt (glyphWidth),
+                     juce::roundToInt (glyph.image->getHeight() * scale), 0, 0,
+                     glyph.image->getWidth(), glyph.image->getHeight(), false);
+        x += glyphWidth;
+    }
+    return true;
+}
+
 // Every state image is loaded once, validated against its draw rectangle, and
 // then used directly. This is deliberately not a per-paint resource lookup:
 // a failed resource can no longer silently expose the black hole behind it.
 struct V2AssetCatalog final
 {
     juce::Image background, ring, pointer, bypassOff, bypassOn;
+    juce::Image headerBpmBacking, headerTimeSigBacking, headerPresetBacking, hostSyncLampOn, hostSyncLampOff;
+    std::array<juce::Image, 3> parameterReadoutBackings;
+    NativeDisplayAssets nativeDisplay;
     std::array<std::array<juce::Image, 2>, 4> tabs;
     // Retain the proven native 56 x 80 completed BAR cells.  The later
     // shell/label split introduced a same-basename BinaryData collision and
@@ -206,6 +283,15 @@ struct V2AssetCatalog final
         load (pointer,   "knob_pointer_60.png",          GeneratedLayout::speedKnobBounds());
         load (bypassOff, "bypass_off.png",               { 931, 14, 80, 31 });
         load (bypassOn,  "bypass_on.png",                { 931, 14, 80, 31 });
+        load (headerBpmBacking, "toy_display_header_bpm_backing.png", GeneratedLayout::bpmValueBounds());
+        load (headerTimeSigBacking, "toy_display_header_timesig_backing.png", GeneratedLayout::timeSigValueBounds());
+        load (headerPresetBacking, "toy_display_header_preset_backing.png", GeneratedLayout::presetValueBounds());
+        load (hostSyncLampOn, "toy_display_host_sync_lamp_on.png", GeneratedLayout::hostSyncLampBounds());
+        load (hostSyncLampOff, "toy_display_host_sync_lamp_off.png", GeneratedLayout::hostSyncLampBounds());
+        load (parameterReadoutBackings[0], "toy_display_speed_readout_backing.png", GeneratedLayout::speedReadoutBounds());
+        load (parameterReadoutBackings[1], "toy_display_pitch_readout_backing.png", GeneratedLayout::pitchReadoutBounds());
+        load (parameterReadoutBackings[2], "toy_display_depth_readout_backing.png", GeneratedLayout::depthReadoutBounds());
+        nativeDisplay.load();
         const std::array<juce::Rectangle<int>, 3> xyBounds {{ GeneratedLayout::xyRecBounds(),
             GeneratedLayout::xyClearBounds(), GeneratedLayout::xyResetViewBounds() }};
         const std::array<const char*, 3> xyNames {{ "rec", "clear", "reset_view" }};
@@ -303,8 +389,10 @@ class ToyotomiHideyoshiAudioProcessorEditorV2::OutputMeter final : public juce::
 {
 public:
     explicit OutputMeter (ToyotomiHideyoshiAudioProcessor& source)
-        : processor (source), meterLeds {{ readAsset ("output_meter_left.png"), readAsset ("output_meter_right.png") }}
+        : processor (source), meterLeds {{ readAsset ("output_meter_left.png"), readAsset ("output_meter_right.png") }},
+          readoutBackings {{ readAsset ("toy_display_output_l_readout_backing.png"), readAsset ("toy_display_output_r_readout_backing.png") }}
     {
+        nativeDisplay.load();
         setOpaque (false);
         startTimerHz (30);
     }
@@ -350,10 +438,9 @@ public:
                 drawNative (g, meterLed, stripBounds);
                 g.restoreState();
             }
-            g.setColour (juce::Colour (0xffe3d7c5));
-            g.setFont (9.0f);
-            g.drawText (outputDb[channel] <= -59.5f ? "-Inf" : juce::String (outputDb[channel], 1),
-                        readouts[channel], juce::Justification::centred);
+            drawNative (g, readoutBackings[channel], readouts[channel]);
+            drawNativeValue (g, nativeDisplay, outputDb[channel] <= -59.5f ? "-Inf" : juce::String (outputDb[channel], 1),
+                             readouts[channel], 8.0f);
         }
     }
 
@@ -377,6 +464,8 @@ private:
 
     ToyotomiHideyoshiAudioProcessor& processor;
     std::array<juce::Image, 2> meterLeds;
+    std::array<juce::Image, 2> readoutBackings;
+    NativeDisplayAssets nativeDisplay;
     std::array<float, 2> outputDb {{ -60.0f, -60.0f }};
     std::array<float, 2> outputPeakDb {{ -60.0f, -60.0f }};
 };
@@ -399,7 +488,7 @@ public:
         const bool hasSelection = PluginStateModel::hasSelectedBar (selected);
 
         for (int index = 0; index < 4; ++index)
-            drawNative (g, assets.tabs[(size_t) index][index == tab ? 1 : 0], kTabs[(size_t) index]);
+            drawNative (g, assets.tabs[(size_t) index][ui.tabHighlight == index ? 1 : 0], kTabs[(size_t) index]);
 
         for (int index = 0; index < 16; ++index)
         {
@@ -427,29 +516,22 @@ public:
             drawNative (g, assets.lengths[(size_t) index][hasSelection && index == (int) slot.length ? 1 : 0], kLengths[(size_t) index]);
 
         drawNative (g, ui.bypass ? assets.bypassOn : assets.bypassOff, { 931, 14, 80, 31 });
-        const auto drawTopValue = [&g] (juce::Rectangle<int> bounds, const juce::String& value, bool enabled,
-                                        juce::Justification justification)
-        {
-            g.setColour (juce::Colour (0xff090b0c));
-            g.fillRect (bounds);
-            g.setColour (enabled ? juce::Colour (0xffe3d7c5) : juce::Colour (0xff78746b));
-            g.setFont (14.0f);
-            g.drawText (value, bounds, justification);
-        };
         const auto hostSync = processor.isHostSyncEnabled();
-        drawTopValue (GeneratedLayout::bpmValueBounds(), juce::String (processor.getEffectiveBpm(), 2), ! hostSync,
-                      juce::Justification::centred);
-        drawTopValue (GeneratedLayout::timeSigValueBounds(), juce::String (processor.getEffectiveTimeSignatureNumerator())
-                                                          + "/" + juce::String (processor.getEffectiveTimeSignatureDenominator()), ! hostSync,
-                      juce::Justification::centred);
-        drawTopValue (GeneratedLayout::presetValueBounds(), ui.projectPresetId == 0 ? "Init" : "Init", true,
-                      juce::Justification::centredLeft);
-        g.setColour (hostSync ? juce::Colour (0xffb83229) : juce::Colour (0xff555049));
-        g.fillEllipse (GeneratedLayout::hostSyncLampBounds().toFloat());
+        drawNative (g, assets.headerBpmBacking, GeneratedLayout::bpmValueBounds());
+        drawNativeValue (g, assets.nativeDisplay, juce::String (processor.getEffectiveBpm(), 2),
+                         GeneratedLayout::bpmValueBounds(), 12.0f);
+        drawNative (g, assets.headerTimeSigBacking, GeneratedLayout::timeSigValueBounds());
+        drawNativeValue (g, assets.nativeDisplay, juce::String (processor.getEffectiveTimeSignatureNumerator())
+                                                          + "/" + juce::String (processor.getEffectiveTimeSignatureDenominator()),
+                         GeneratedLayout::timeSigValueBounds(), 12.0f);
+        drawNative (g, assets.headerPresetBacking, GeneratedLayout::presetValueBounds());
+        drawNativeValue (g, assets.nativeDisplay, ui.projectPresetId == 0 ? "Init" : "Init",
+                         GeneratedLayout::presetValueBounds(), 10.0f, juce::Justification::centredLeft);
+        drawNative (g, hostSync ? assets.hostSyncLampOn : assets.hostSyncLampOff, GeneratedLayout::hostSyncLampBounds());
         // The static faceplate owns the neutral XY panel and fixed labels.
 
         const std::array<float, 3> normalized {{ (slot.speed - .25f) / 3.75f, (slot.pitch + 12.0f) / 24.0f, slot.depth }};
-        const std::array<juce::String, 3> text {{ juce::String (slot.speed, 2) + "x", juce::String (slot.pitch, 1) + " st", juce::String (juce::roundToInt (slot.depth * 100.0f)) + " %" }};
+        const std::array<juce::String, 3> text {{ juce::String (slot.speed, 2), juce::String (slot.pitch, 2) + " st", juce::String (juce::roundToInt (slot.depth * 100.0f)) + " %" }};
         for (int index = 0; index < 3; ++index)
         {
             const auto knobBounds = index == 0 ? GeneratedLayout::speedKnobBounds()
@@ -466,9 +548,8 @@ public:
             g.addTransform (juce::AffineTransform::rotation (angle, centre.x, centre.y));
             drawNative (g, assets.pointer, knobBounds);
             g.restoreState();
-            g.setColour (juce::Colour (0xffe3d7c5));
-            g.setFont (10.0f);
-            g.drawText (text[(size_t) index], readoutBounds, juce::Justification::centred);
+            drawNative (g, assets.parameterReadoutBackings[(size_t) index], readoutBounds);
+            drawNativeValue (g, assets.nativeDisplay, text[(size_t) index], readoutBounds, 8.0f);
         }
 
         if (hasSelection)

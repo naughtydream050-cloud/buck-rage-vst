@@ -36,7 +36,10 @@ public:
     };
     struct UiState
     {
-        int selectedTab = 0, selectedBar = kNoSelectedBar;
+        // selectedTab is the visible 16-BAR page.  It is deliberately not a
+        // visual selection: a fresh instance must show page 1-16 without a
+        // gold TAB rim.  tabHighlight is set only by an explicit TAB click.
+        int selectedTab = 0, tabHighlight = -1, selectedBar = kNoSelectedBar;
         bool bypass = false, hostSync = true;
         double internalBpm = 120.0;
         int internalTimeSigNumerator = 4, internalTimeSigDenominator = 4;
