@@ -30,8 +30,14 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
             if (playing && hostSyncEnabled.load (std::memory_order_relaxed))
                 if (auto ppq = position->getPpqPosition())
                 {
-                    const auto sixteenth = static_cast<int> (std::floor (*ppq * 4.0));
-                    timelineSlot = ((sixteenth % PluginStateModel::kNumBars) + PluginStateModel::kNumBars) % PluginStateModel::kNumBars;
+                    // PPQ is expressed in quarter notes.  A COUNT BAR is one
+                    // host bar, not one sixteenth note: at 4/4, PPQ 0..3.999
+                    // is BAR 1 and PPQ 4 starts BAR 2.
+                    const auto numerator = timeSignatureNumerator.load (std::memory_order_relaxed);
+                    const auto denominator = timeSignatureDenominator.load (std::memory_order_relaxed);
+                    const auto quartersPerBar = juce::jmax (0.25, (double) numerator * 4.0 / (double) denominator);
+                    const auto hostBar = static_cast<int> (std::floor (*ppq / quartersPerBar));
+                    timelineSlot = ((hostBar % PluginStateModel::kNumBars) + PluginStateModel::kNumBars) % PluginStateModel::kNumBars;
                 }
         }
     hostPlaying.store (playing, std::memory_order_relaxed);
