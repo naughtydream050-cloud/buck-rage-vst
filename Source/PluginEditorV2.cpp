@@ -112,7 +112,6 @@ struct V2AssetCatalog final
     // produced the unreadable labels seen in the editor.
     std::array<std::array<juce::Image, 4>, 64> barCells;
     std::array<juce::Image, 4> barShells;
-    std::array<juce::Image, 64> barLabels;
     std::array<juce::Image, 10> barMinis;
     std::array<std::array<juce::Image, 2>, 10> presets;
     std::array<std::array<juce::Image, 2>, 5> lengths;
@@ -189,8 +188,6 @@ struct V2AssetCatalog final
         const std::array<const char*, 4> shellNames {{ "normal", "selected", "playing", "selected_playing" }};
         for (int state = 0; state < 4; ++state)
             loadBarMap (barShells[(size_t) state], "bar_cell_shell_" + juce::String (shellNames[(size_t) state]) + "_56x80.png", { 0, 0, 56, 80 });
-        for (int bar = 0; bar < 64; ++bar)
-            loadBarMap (barLabels[(size_t) bar], "bar_label_" + juce::String (bar + 1).paddedLeft ('0', 2) + ".png", { 0, 0, 56, 12 });
         for (int preset = 0; preset < 10; ++preset)
             loadBarMap (barMinis[(size_t) preset], "bar_mini_" + juce::String (kPresetNames[(size_t) preset]) + ".png", { 0, 0, 40, 20 });
         for (int index = 0; index < 10; ++index)
@@ -409,11 +406,14 @@ public:
             const auto bar = tab * 16 + index;
             const auto state = resolveCellState (bar == selected, bar == playing);
             const auto bounds = cellBounds (index);
-            // The shell owns selection/playhead colour; label and mini are
-            // state data.  This makes a preset click change that BAR's map
-            // preview instead of leaving the old waveform baked in place.
+            // Keep the proven completed cell: standalone label assets are
+            // ambiguous in BinaryData and corrupt the BAR text. Replace only
+            // the mini's backing pixels, then draw the selected preset mini.
+            drawNative (g, assets.barCells[(size_t) bar][(size_t) state], bounds);
+            g.saveState();
+            g.reduceClipRegion ({ bounds.getX() + 8, bounds.getY() + 36, 40, 20 });
             drawNative (g, assets.barShells[(size_t) state], bounds);
-            drawNative (g, assets.barLabels[(size_t) bar], { bounds.getX(), bounds.getY() + 5, 56, 12 });
+            g.restoreState();
             drawNative (g, assets.barMinis[(size_t) static_cast<int> (processor.getStateModel().getSlot (bar).preset)],
                         { bounds.getX() + 8, bounds.getY() + 36, 40, 20 });
         }
