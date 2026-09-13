@@ -75,10 +75,26 @@ void TimelineScratchEngine::beginBar (int bar, const Slot& slot, double quarters
     // Clamp requested duration to the explicit 10-second history ceiling.
     activeDurationQuarters = juce::jmin (activeDurationQuarters,
         maxHistorySeconds / juce::jmax (0.000001, secondsPerQuarter));
-    const auto durationSamples = juce::jmin ((double) historySamples - 4.0,
+    activeDurationSamples = juce::jmin ((double) historySamples - 4.0,
         activeDurationQuarters * secondsPerQuarter * sampleRateHz);
-    anchorSerial = (double) writeSerial - juce::jmax (2.0, durationSamples);
+    // Every wet read starts measurably behind the write head.  The old curve
+    // started BACKSPIN at writeSerial-2, making its first 90% sound Dry.
+    const auto initialHistoryOffset = juce::jmin (sampleRateHz * 0.08,
+        juce::jmax (2.0, activeDurationSamples * 0.15));
+    anchorSerial = (double) writeSerial - initialHistoryOffset;
+    reverseTravelSamples = juce::jmin (activeDurationSamples * 0.70,
+        juce::jmax (2.0, (double) historySamples - initialHistoryOffset - 4.0));
     tapeReadSerial = anchorSerial;
+}
+
+double TimelineScratchEngine::tapeBrakePlaybackRate (double effectPhase, float speed) noexcept
+{
+    const auto safePhase = juce::jlimit (0.0, 1.0, effectPhase);
+    const auto safeSpeed = juce::jlimit (0.25f, 4.0f, speed);
+    // Even 0.25x SPEED begins below unity; SPEED changes both the initial
+    // braking amount and the curve without altering the parameter range.
+    const auto startRate = juce::jlimit (0.40, 0.88, 0.72 / std::sqrt ((double) safeSpeed));
+    return startRate * std::pow (1.0 - safePhase, 1.0 + 0.25 * (double) safeSpeed);
 }
 
 float TimelineScratchEngine::wetSample (int channel, double barPhase, double quartersPerBar) noexcept
@@ -92,15 +108,13 @@ float TimelineScratchEngine::wetSample (int channel, double barPhase, double qua
     const auto speed = juce::jlimit (0.25f, 4.0f, activeSlot.speed);
     if (activeSlot.preset == Preset::backspin)
     {
-        const auto travel = effectPhase * speed * juce::jmax (2.0, (double) historySamples * 0.45);
-        return read (history[(size_t) channel], (double) writeSerial - 2.0 - travel);
+        const auto travel = juce::jmin (effectPhase * (double) speed * reverseTravelSamples,
+                                        juce::jmax (2.0, (double) historySamples - 4.0));
+        return read (history[(size_t) channel], anchorSerial - travel);
     }
     if (activeSlot.preset == Preset::tapeBrake)
     {
-        const auto curve = juce::jlimit (0.0, 1.0, effectPhase * speed);
-        const auto rate = (1.0 - curve) * (1.0 - curve);
-        const auto sample = read (history[(size_t) channel], tapeReadSerial);
-        return sample;
+        return read (history[(size_t) channel], tapeReadSerial);
     }
     return 0.0f;
 }
@@ -146,9 +160,7 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
         if (activeSlot.preset == Preset::tapeBrake && effectActive)
         {
             const auto elapsed = phase * transport.quartersPerBar;
-            const auto curve = juce::jlimit (0.0, 1.0, (elapsed / activeDurationQuarters) * activeSlot.speed);
-            const auto rate = (1.0 - curve) * (1.0 - curve);
-            tapeReadSerial += rate;
+            tapeReadSerial += tapeBrakePlaybackRate (elapsed / activeDurationQuarters, activeSlot.speed);
         }
         ++writeSerial;
     }

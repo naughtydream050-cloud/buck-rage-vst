@@ -1,4 +1,5 @@
 #include "TimelineScratchEngine.h"
+#include <array>
 #include <cmath>
 #include <iostream>
 
@@ -20,7 +21,7 @@ std::array<TimelineScratchEngine::Slot, 64> slots (TimelineScratchEngine::Preset
     return result;
 }
 
-TimelineScratchEngine::Transport transport (int bar = 0, double phase = 0.0)
+TimelineScratchEngine::Transport transport (int bar, double phase)
 {
     TimelineScratchEngine::Transport result;
     result.playing = true; result.startBar = bar; result.startBarPhase = phase;
@@ -35,53 +36,130 @@ void fill (juce::AudioBuffer<float>& buffer, float value)
         for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
             buffer.setSample (channel, sample, value);
 }
+
+void fillHistory (TimelineScratchEngine& engine, juce::AudioBuffer<float>& buffer)
+{
+    const auto dry = slots (TimelineScratchEngine::Preset::off, TimelineScratchEngine::Length::oneBar);
+    for (int block = 0; block < 1000; ++block)
+    {
+        for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+        {
+            const auto phase = (float) (block * buffer.getNumSamples() + sample) * 0.0137f;
+            buffer.setSample (0, sample, std::sin (phase));
+            buffer.setSample (1, sample, std::cos (phase));
+        }
+        engine.process (buffer, transport (0, 0.0), dry);
+    }
+}
+
+float tailEnergy (const juce::AudioBuffer<float>& buffer)
+{
+    float result = 0.0f;
+    for (int sample = buffer.getNumSamples() / 2; sample < buffer.getNumSamples(); ++sample)
+        result += std::abs (buffer.getSample (0, sample));
+    return result;
+}
+
+bool boundedFinite (const juce::AudioBuffer<float>& buffer)
+{
+    for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
+        for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+            if (! std::isfinite (buffer.getSample (channel, sample)) || std::abs (buffer.getSample (channel, sample)) > 1.01f)
+                return false;
+    return true;
+}
+
+bool noHardJump (const juce::AudioBuffer<float>& buffer, float previous = 0.0f)
+{
+    auto last = previous;
+    for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+    {
+        const auto current = buffer.getSample (0, sample);
+        if (std::abs (current - last) > 0.15f) return false;
+        last = current;
+    }
+    return true;
+}
 }
 
 int main()
 {
+    constexpr std::array<double, 5> phases { .05, .25, .50, .75, .95 };
     TimelineScratchEngine engine;
     engine.prepare (48000.0, 512, 2);
     check (engine.getAllocatedHistorySamples() == 480000, "history-is-exactly-ten-seconds");
 
     juce::AudioBuffer<float> audio (2, 512);
-    auto dry = slots (TimelineScratchEngine::Preset::off, TimelineScratchEngine::Length::oneBar);
+    const auto dry = slots (TimelineScratchEngine::Preset::off, TimelineScratchEngine::Length::oneBar);
     fill (audio, 0.375f);
-    engine.process (audio, transport(), dry);
+    engine.process (audio, transport (0, 0.0), dry);
     check (audio.getSample (0, 0) == 0.375f && audio.getSample (1, 511) == 0.375f,
            "off-is-bit-exact-dry");
 
-    // Fill history while playing dry, then start a BACKSPIN on the next BAR.
-    for (int block = 0; block < 96; ++block)
+    fillHistory (engine, audio);
+    const auto backspin = slots (TimelineScratchEngine::Preset::backspin, TimelineScratchEngine::Length::oneBar);
+    bool backspinAllPhases = true, backspinPopFree = true;
+    for (const auto phase : phases)
     {
-        for (int i = 0; i < audio.getNumSamples(); ++i)
-            audio.setSample (0, i, std::sin ((float) (block * 512 + i) * 0.01f)),
-            audio.setSample (1, i, std::cos ((float) (block * 512 + i) * 0.01f));
-        engine.process (audio, transport(), dry);
+        fill (audio, 0.0f);
+        engine.process (audio, transport (1, phase), backspin);
+        const auto detected = tailEnergy (audio) > 0.01f;
+        check (detected, ("backspin-one-bar-effect-at-phase-" + juce::String (phase, 2)).toRawUTF8());
+        backspinAllPhases &= detected;
+        backspinPopFree &= boundedFinite (audio);
     }
-    auto backspin = slots (TimelineScratchEngine::Preset::backspin, TimelineScratchEngine::Length::sixteenth, 1.0f, 1.0f);
-    fill (audio, 0.0f);
-    engine.process (audio, transport (1), backspin);
-    float energy = 0.0f;
-    for (int i = 0; i < audio.getNumSamples(); ++i) energy += std::abs (audio.getSample (0, i));
-    check (energy > 0.01f, "backspin-reads-stereo-history");
+    check (backspinAllPhases, "backspin-one-bar-entire-duration-is-wet");
 
-    // After a 1/16 duration (0.25 quarters), output returns fully dry inside
-    // the same bar.  The input is zero, so any tail here would be a failure.
+    TimelineScratchEngine tapeEngine;
+    tapeEngine.prepare (48000.0, 512, 2);
+    fillHistory (tapeEngine, audio);
+    const auto tapeBrake = slots (TimelineScratchEngine::Preset::tapeBrake, TimelineScratchEngine::Length::oneBar);
+    bool tapeAllPhases = true, ratesAreBraking = true, tapePopFree = true;
+    auto previousRate = 1.0;
+    for (const auto phase : phases)
+    {
+        const auto rate = TimelineScratchEngine::tapeBrakePlaybackRate (phase, 1.0f);
+        fill (audio, 0.0f);
+        tapeEngine.process (audio, transport (1, phase), tapeBrake);
+        const auto detected = tailEnergy (audio) > 0.01f;
+        check (detected, ("tape-brake-one-bar-effect-at-phase-" + juce::String (phase, 2)).toRawUTF8());
+        tapeAllPhases &= detected;
+        ratesAreBraking &= rate < 1.0 && rate < previousRate;
+        previousRate = rate;
+        tapePopFree &= boundedFinite (audio);
+    }
+    check (tapeAllPhases, "tape-brake-one-bar-entire-duration-is-wet");
+    check (ratesAreBraking, "tape-brake-rate-is-below-unity-and-continuously-decreases");
+    // A real BAR transition is contiguous. Do not mistake sparse phase probes
+    // for audio-adjacent blocks when asserting the click/pop guard.
+    TimelineScratchEngine transitionEngine;
+    transitionEngine.prepare (48000.0, 512, 2);
+    fillHistory (transitionEngine, audio);
     fill (audio, 0.0f);
-    auto afterLength = transport (1, 0.10); // 0.4 quarters, after 1/16 duration
-    engine.process (audio, afterLength, backspin);
-    engine.process (audio, afterLength, backspin); // complete the click-protection fade
-    float tail = 0.0f;
-    for (int i = 0; i < audio.getNumSamples(); ++i) tail += std::abs (audio.getSample (0, i));
-    check (tail == 0.0f, "length-expiry-is-dry-within-bar");
-
-    engine.resetTransport();
+    transitionEngine.process (audio, transport (1, .995), tapeBrake);
+    const auto priorWetSample = audio.getSample (0, audio.getNumSamples() - 1);
     fill (audio, 0.0f);
-    engine.process (audio, transport (2), backspin);
-    float resetEnergy = 0.0f;
-    for (int i = 0; i < audio.getNumSamples(); ++i) resetEnergy += std::abs (audio.getSample (0, i));
-    check (resetEnergy == 0.0f, "transport-reset-never-reads-stale-history");
+    transitionEngine.process (audio, transport (2, 0.0), dry);
+    tapePopFree &= noHardJump (audio, priorWetSample);
+    check (backspinPopFree && tapePopFree, "wet-transition-is-finite-and-bounded");
 
-    engine.release();
+    TimelineScratchEngine shortLengthEngine;
+    shortLengthEngine.prepare (48000.0, 512, 2);
+    fillHistory (shortLengthEngine, audio);
+    const auto quarterBackspin = slots (TimelineScratchEngine::Preset::backspin, TimelineScratchEngine::Length::quarter);
+    fill (audio, 0.0f); shortLengthEngine.process (audio, transport (1, .05), quarterBackspin);
+    const auto beforeExpiry = tailEnergy (audio);
+    fill (audio, 0.0f); shortLengthEngine.process (audio, transport (1, .40), quarterBackspin);
+    shortLengthEngine.process (audio, transport (1, .40), quarterBackspin);
+    check (beforeExpiry > 0.01f && tailEnergy (audio) == 0.0f, "length-remains-duration-not-curve-strength");
+
+    TimelineScratchEngine depthEngine;
+    depthEngine.prepare (48000.0, 512, 2);
+    fillHistory (depthEngine, audio);
+    auto depthZero = slots (TimelineScratchEngine::Preset::backspin, TimelineScratchEngine::Length::oneBar, 1.0f, 0.0f);
+    fill (audio, .25f); depthEngine.process (audio, transport (1, .05), depthZero);
+    check (audio.getSample (0, 511) == .25f && audio.getSample (1, 511) == .25f, "depth-zero-is-bit-exact-dry");
+
+    engine.release(); tapeEngine.release(); transitionEngine.release(); shortLengthEngine.release(); depthEngine.release();
     return passed ? 0 : 1;
 }

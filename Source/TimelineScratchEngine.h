@@ -34,6 +34,7 @@ public:
     void resetTransport() noexcept;
     void process (juce::AudioBuffer<float>&, const Transport&, const std::array<Slot, 64>&) noexcept;
     int getAllocatedHistorySamples() const noexcept { return historySamples; }
+    static double tapeBrakePlaybackRate (double effectPhase, float speed) noexcept;
 
 private:
     static double lengthInQuarters (Length, double quartersPerBar) noexcept;
@@ -49,7 +50,8 @@ private:
     uint64_t writeSerial = 0, minimumReadableSerial = 0;
     int activeBar = -1;
     Slot activeSlot {};
-    double activeDurationQuarters = 0.25, anchorSerial = 0.0, tapeReadSerial = 0.0;
+    double activeDurationQuarters = 0.25, activeDurationSamples = 0.0,
+           anchorSerial = 0.0, tapeReadSerial = 0.0, reverseTravelSamples = 0.0;
     float wetRamp = 0.0f;
     bool waitingForDry = false;
 };
