@@ -52,6 +52,7 @@ juce_add_binary_data(ToyotomiHideyoshiAssets
 
 target_sources(ToyotomiHideyoshi PRIVATE
     Source/PluginProcessor.cpp
+    Source/TimelineScratchEngine.cpp
     Source/PluginEditorV2.cpp
     Source/PluginStateModel.cpp
 )
@@ -68,6 +69,7 @@ if (TOYOTOMI_BUILD_STATE_TESTS)
     juce_generate_juce_header(ToyotomiHideyoshiRuntimeSmoke)
     target_sources(ToyotomiHideyoshiRuntimeSmoke PRIVATE
         Source/PluginProcessor.cpp
+        Source/TimelineScratchEngine.cpp
         Source/PluginEditorV2.cpp
         Source/PluginStateModel.cpp
         tests/RuntimeSmokeTests.cpp)
@@ -78,6 +80,14 @@ if (TOYOTOMI_BUILD_STATE_TESTS)
         ToyotomiHideyoshiAssets
         juce::juce_audio_utils
         juce::juce_graphics)
+
+    juce_add_console_app(ToyotomiHideyoshiScratchEngineTests PRODUCT_NAME "Toyotomi Hideyoshi Scratch Engine Tests")
+    juce_generate_juce_header(ToyotomiHideyoshiScratchEngineTests)
+    target_sources(ToyotomiHideyoshiScratchEngineTests PRIVATE
+        Source/TimelineScratchEngine.cpp
+        tests/TimelineScratchEngineTests.cpp)
+    target_include_directories(ToyotomiHideyoshiScratchEngineTests PRIVATE Source)
+    target_link_libraries(ToyotomiHideyoshiScratchEngineTests PRIVATE juce::juce_audio_basics)
 endif()
 
 target_compile_definitions(ToyotomiHideyoshi PUBLIC

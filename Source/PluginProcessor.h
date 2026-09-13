@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include <atomic>
 #include "PluginStateModel.h"
+#include "TimelineScratchEngine.h"
 
 class ToyotomiHideyoshiAudioProcessor final : public juce::AudioProcessor
 {
@@ -50,6 +51,9 @@ public:
 
 private:
     static void publishPeak (std::atomic<float>& destination, float value) noexcept;
+    static uint64_t packDspSlot (const PluginStateModel::TimelineSlot&) noexcept;
+    static TimelineScratchEngine::Slot unpackDspSlot (uint64_t) noexcept;
+    void publishDspSlot (int, const PluginStateModel::TimelineSlot&) noexcept;
 
     std::atomic<float> outputPeakLeft { 0.0f };
     std::atomic<float> outputPeakRight { 0.0f };
@@ -59,7 +63,13 @@ private:
     std::atomic<bool> hostSyncAvailable { false };
     std::atomic<bool> hostPlaying { false };
     std::atomic<bool> hostSyncEnabled { true };
+    std::atomic<double> internalBpmForDsp { 120.0 };
+    std::atomic<int> internalTimeSigNumeratorForDsp { 4 }, internalTimeSigDenominatorForDsp { 4 };
     std::atomic<int> currentTimelineSlot { -1 };
+    std::array<std::atomic<uint64_t>, PluginStateModel::kNumBars> dspSlots;
+    TimelineScratchEngine scratchEngine;
+    double preparedSampleRate = 44100.0, internalQuarterPosition = 0.0, lastHostPpqEnd = 0.0;
+    bool internalWasPlaying = false, haveLastHostPpq = false;
     PluginStateModel stateModel;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ToyotomiHideyoshiAudioProcessor)

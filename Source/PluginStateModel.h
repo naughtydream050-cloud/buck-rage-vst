@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include <array>
+#include <functional>
 #include <vector>
 
 // Phase 1 timeline state. One BAR MAP cell is one independent timeline slot.
@@ -49,6 +50,11 @@ public:
     const TimelineSlot& getSlot (int bar) const noexcept;
     UiState getUiState() const noexcept { return ui; }
     static bool hasSelectedBar (int bar) noexcept { return bar >= 0 && bar < kNumBars; }
+    // Called only by non-realtime state mutation/restore paths. The processor
+    // converts this into an atomic fixed DSP snapshot; processBlock never
+    // traverses TimelineSlot or its vectors.
+    void setDspSlotChangedCallback (std::function<void (int, const TimelineSlot&)>);
+    void setDspTimingChangedCallback (std::function<void (const UiState&)>);
 
     void selectTab (int); // view page only
     void selectBar (int);
@@ -99,9 +105,14 @@ private:
     static std::vector<MotionPoint> sanitiseMotion (const std::vector<MotionPoint>&);
     static std::vector<MotionPoint> sanitiseXYMotion (const std::vector<MotionPoint>&);
     static std::vector<MotionPoint> presetMotion (ScratchPreset);
+    void notifyDspSlotChanged (int);
+    void notifyAllDspSlotsChanged();
+    void notifyDspTimingChanged();
     TimelineSlot& mutableSlot (int) noexcept;
 
     std::array<TimelineSlot, kNumBars> slots {};
     UiState ui {};
     TimelineSlot fallback {};
+    std::function<void (int, const TimelineSlot&)> dspSlotChanged;
+    std::function<void (const UiState&)> dspTimingChanged;
 };
