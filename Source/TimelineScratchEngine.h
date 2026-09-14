@@ -29,11 +29,22 @@ public:
                secondsPerQuarter = 0.5;
     };
 
+    struct BackspinReadState final
+    {
+        bool active = false, crossfading = false;
+        double windowSamples = 0.0, launchOffsetSamples = 0.0,
+               primaryOffsetSamples = 0.0, secondaryOffsetSamples = 0.0,
+               reverseReadRate = 0.0;
+        float wetRamp = 0.0f;
+        uint32_t completedWraps = 0;
+    };
+
     void prepare (double sampleRate, int maxBlockSize, int channels);
     void release();
     void resetTransport() noexcept;
     void process (juce::AudioBuffer<float>&, const Transport&, const std::array<Slot, 64>&) noexcept;
     int getAllocatedHistorySamples() const noexcept { return historySamples; }
+    BackspinReadState getBackspinReadState() const noexcept;
     static double tapeBrakePlaybackRate (double effectPhase, float speed) noexcept;
 
 private:
@@ -43,6 +54,7 @@ private:
     void write (int channel, float sample) noexcept;
     void beginBar (int bar, const Slot&, double quartersPerBar, double secondsPerQuarter) noexcept;
     float wetSample (int channel, double barPhase, double quartersPerBar) noexcept;
+    void advanceBackspinReadHeads() noexcept;
 
     double sampleRateHz = 0.0;
     int historySamples = 0, channelCount = 0;
@@ -51,7 +63,11 @@ private:
     int activeBar = -1;
     Slot activeSlot {};
     double activeDurationQuarters = 0.25, activeDurationSamples = 0.0,
-           anchorSerial = 0.0, tapeReadSerial = 0.0, reverseTravelSamples = 0.0;
+           anchorSerial = 0.0, tapeReadSerial = 0.0,
+           backspinWindowSamples = 0.0, backspinLaunchOffsetSamples = 0.0,
+           backspinPrimaryOffsetSamples = 0.0, backspinSecondaryOffsetSamples = 0.0;
+    int backspinWrapSamples = 1, backspinWrapProgress = 1;
+    uint32_t backspinCompletedWraps = 0;
     float wetRamp = 0.0f;
     bool waitingForDry = false;
 };

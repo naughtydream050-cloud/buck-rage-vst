@@ -25,8 +25,8 @@ TimelineScratchEngine::Transport transport (int bar, double phase)
 {
     TimelineScratchEngine::Transport result;
     result.playing = true; result.startBar = bar; result.startBarPhase = phase;
-    result.barPhasePerSample = 1.0 / (4.0 * 48000.0);
-    result.quartersPerBar = 4.0; result.secondsPerQuarter = 0.5;
+    result.barPhasePerSample = 140.0 / (60.0 * 48000.0 * 4.0);
+    result.quartersPerBar = 4.0; result.secondsPerQuarter = 60.0 / 140.0;
     return result;
 }
 
@@ -37,17 +37,22 @@ void fill (juce::AudioBuffer<float>& buffer, float value)
             buffer.setSample (channel, sample, value);
 }
 
+void fillTone (juce::AudioBuffer<float>& buffer, int64_t firstSample)
+{
+    for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+    {
+        const auto phase = (float) (firstSample + sample) * 0.0137f;
+        buffer.setSample (0, sample, std::sin (phase));
+        buffer.setSample (1, sample, std::cos (phase));
+    }
+}
+
 void fillHistory (TimelineScratchEngine& engine, juce::AudioBuffer<float>& buffer)
 {
     const auto dry = slots (TimelineScratchEngine::Preset::off, TimelineScratchEngine::Length::oneBar);
     for (int block = 0; block < 1000; ++block)
     {
-        for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
-        {
-            const auto phase = (float) (block * buffer.getNumSamples() + sample) * 0.0137f;
-            buffer.setSample (0, sample, std::sin (phase));
-            buffer.setSample (1, sample, std::cos (phase));
-        }
+        fillTone (buffer, (int64_t) block * buffer.getNumSamples());
         engine.process (buffer, transport (0, 0.0), dry);
     }
 }
@@ -84,7 +89,7 @@ bool noHardJump (const juce::AudioBuffer<float>& buffer, float previous = 0.0f)
 
 int main()
 {
-    constexpr std::array<double, 5> phases { .05, .25, .50, .75, .95 };
+    constexpr std::array<double, 7> phases { .05, .10, .25, .50, .75, .90, .95 };
     TimelineScratchEngine engine;
     engine.prepare (48000.0, 512, 2);
     check (engine.getAllocatedHistorySamples() == 480000, "history-is-exactly-ten-seconds");
@@ -96,19 +101,42 @@ int main()
     check (audio.getSample (0, 0) == 0.375f && audio.getSample (1, 511) == 0.375f,
            "off-is-bit-exact-dry");
 
-    fillHistory (engine, audio);
     const auto backspin = slots (TimelineScratchEngine::Preset::backspin, TimelineScratchEngine::Length::oneBar);
-    bool backspinAllPhases = true, backspinPopFree = true;
-    for (const auto phase : phases)
+    TimelineScratchEngine backspinWrapEngine;
+    backspinWrapEngine.prepare (48000.0, 512, 2);
+    fillHistory (backspinWrapEngine, audio);
+    double backspinPhase = 0.0;
+    int64_t backspinSample = 512000;
+    float previousBackspinSample = std::sin ((float) (backspinSample - 1) * 0.0137f);
+    bool backspinPopFree = true, continuousBackspinIsBounded = true;
+    size_t phaseIndex = 0;
+    while (backspinPhase < 0.96)
     {
-        fill (audio, 0.0f);
-        engine.process (audio, transport (1, phase), backspin);
-        const auto detected = tailEnergy (audio) > 0.01f;
-        check (detected, ("backspin-one-bar-effect-at-phase-" + juce::String (phase, 2)).toRawUTF8());
-        backspinAllPhases &= detected;
-        backspinPopFree &= boundedFinite (audio);
+        fillTone (audio, backspinSample);
+        backspinWrapEngine.process (audio, transport (1, backspinPhase), backspin);
+        const auto state = backspinWrapEngine.getBackspinReadState();
+        const auto stateIsBoundedWetReverse = state.active && state.reverseReadRate == -1.0
+                                           && state.wetRamp > 0.99f
+                                           && state.primaryOffsetSamples >= state.launchOffsetSamples
+                                           && state.primaryOffsetSamples <= state.windowSamples
+                                           && state.secondaryOffsetSamples >= state.launchOffsetSamples
+                                           && state.secondaryOffsetSamples <= state.windowSamples;
+        continuousBackspinIsBounded &= stateIsBoundedWetReverse;
+        backspinPopFree &= noHardJump (audio, previousBackspinSample) && boundedFinite (audio);
+        previousBackspinSample = audio.getSample (0, audio.getNumSamples() - 1);
+        const auto nextBackspinPhase = backspinPhase + transport (1, 0.0).barPhasePerSample * audio.getNumSamples();
+        while (phaseIndex < phases.size() && nextBackspinPhase >= phases[phaseIndex])
+        {
+            check (stateIsBoundedWetReverse,
+                   ("backspin-one-bar-bounded-effect-at-phase-" + juce::String (phases[phaseIndex], 2)).toRawUTF8());
+            ++phaseIndex;
+        }
+        backspinPhase = nextBackspinPhase;
+        backspinSample += audio.getNumSamples();
     }
-    check (backspinAllPhases, "backspin-one-bar-entire-duration-is-wet");
+    const auto finalBackspinState = backspinWrapEngine.getBackspinReadState();
+    check (phaseIndex == phases.size() && continuousBackspinIsBounded && finalBackspinState.completedWraps > 0,
+           "backspin-window-stays-bounded-through-one-bar");
 
     TimelineScratchEngine tapeEngine;
     tapeEngine.prepare (48000.0, 512, 2);
@@ -160,6 +188,6 @@ int main()
     fill (audio, .25f); depthEngine.process (audio, transport (1, .05), depthZero);
     check (audio.getSample (0, 511) == .25f && audio.getSample (1, 511) == .25f, "depth-zero-is-bit-exact-dry");
 
-    engine.release(); tapeEngine.release(); transitionEngine.release(); shortLengthEngine.release(); depthEngine.release();
+    engine.release(); backspinWrapEngine.release(); tapeEngine.release(); transitionEngine.release(); shortLengthEngine.release(); depthEngine.release();
     return passed ? 0 : 1;
 }

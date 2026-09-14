@@ -5,6 +5,8 @@ namespace
 {
 constexpr float kRampSeconds = 0.008f;
 constexpr double kMinimumReadableDistance = 2.0;
+constexpr double kBackspinWindowSeconds = 0.35;
+constexpr double kBackspinLaunchSeconds = 0.04;
 }
 
 void TimelineScratchEngine::prepare (double rate, int, int channels)
@@ -15,6 +17,10 @@ void TimelineScratchEngine::prepare (double rate, int, int channels)
     for (auto& channel : history) channel.assign ((size_t) historySamples, 0.0f);
     writeSerial = minimumReadableSerial = 0;
     activeBar = -1; wetRamp = 0.0f; waitingForDry = false;
+    backspinWindowSamples = backspinLaunchOffsetSamples = 0.0;
+    backspinPrimaryOffsetSamples = backspinSecondaryOffsetSamples = 0.0;
+    backspinWrapSamples = backspinWrapProgress = 1;
+    backspinCompletedWraps = 0;
 }
 
 void TimelineScratchEngine::release()
@@ -22,6 +28,10 @@ void TimelineScratchEngine::release()
     for (auto& channel : history) { channel.clear(); channel.shrink_to_fit(); }
     historySamples = channelCount = 0; sampleRateHz = 0.0;
     writeSerial = minimumReadableSerial = 0; activeBar = -1; wetRamp = 0.0f;
+    backspinWindowSamples = backspinLaunchOffsetSamples = 0.0;
+    backspinPrimaryOffsetSamples = backspinSecondaryOffsetSamples = 0.0;
+    backspinWrapSamples = backspinWrapProgress = 1;
+    backspinCompletedWraps = 0;
 }
 
 void TimelineScratchEngine::resetTransport() noexcept
@@ -77,14 +87,41 @@ void TimelineScratchEngine::beginBar (int bar, const Slot& slot, double quarters
         maxHistorySeconds / juce::jmax (0.000001, secondsPerQuarter));
     activeDurationSamples = juce::jmin ((double) historySamples - 4.0,
         activeDurationQuarters * secondsPerQuarter * sampleRateHz);
-    // Every wet read starts measurably behind the write head.  The old curve
-    // started BACKSPIN at writeSerial-2, making its first 90% sound Dry.
+    // TAPE BRAKE retains its existing initial source position.
     const auto initialHistoryOffset = juce::jmin (sampleRateHz * 0.08,
         juce::jmax (2.0, activeDurationSamples * 0.15));
     anchorSerial = (double) writeSerial - initialHistoryOffset;
-    reverseTravelSamples = juce::jmin (activeDurationSamples * 0.70,
-        juce::jmax (2.0, (double) historySamples - initialHistoryOffset - 4.0));
     tapeReadSerial = anchorSerial;
+
+    // BACKSPIN loops a moving, recent-history window.  It must not use BAR
+    // duration as a read distance: LENGTH controls only how long it is active.
+    backspinWindowSamples = juce::jmin (sampleRateHz * kBackspinWindowSeconds,
+        juce::jmax (8.0, (double) historySamples - 4.0));
+    backspinLaunchOffsetSamples = juce::jmin (backspinWindowSamples * 0.25,
+        juce::jmax (kMinimumReadableDistance, sampleRateHz * kBackspinLaunchSeconds));
+    const auto maximumOffsetAdvance = 1.0 + 4.0;
+    backspinWrapSamples = juce::jmax (1, juce::jmin (
+        juce::roundToInt (sampleRateHz * kRampSeconds),
+        juce::jmax (1, static_cast<int> (std::floor ((backspinWindowSamples - backspinLaunchOffsetSamples)
+                                                      / maximumOffsetAdvance)))));
+    backspinWrapProgress = backspinWrapSamples;
+    backspinPrimaryOffsetSamples = backspinLaunchOffsetSamples;
+    backspinSecondaryOffsetSamples = backspinLaunchOffsetSamples;
+    backspinCompletedWraps = 0;
+}
+
+TimelineScratchEngine::BackspinReadState TimelineScratchEngine::getBackspinReadState() const noexcept
+{
+    const auto speed = juce::jlimit (0.25f, 4.0f, activeSlot.speed);
+    return { activeSlot.preset == Preset::backspin,
+             backspinWrapProgress < backspinWrapSamples,
+             backspinWindowSamples,
+             backspinLaunchOffsetSamples,
+             backspinPrimaryOffsetSamples,
+             backspinSecondaryOffsetSamples,
+             -(double) speed,
+             wetRamp,
+             backspinCompletedWraps };
 }
 
 double TimelineScratchEngine::tapeBrakePlaybackRate (double effectPhase, float speed) noexcept
@@ -104,19 +141,52 @@ float TimelineScratchEngine::wetSample (int channel, double barPhase, double qua
     const auto elapsedQuarters = barPhase * quartersPerBar;
     if (elapsedQuarters >= activeDurationQuarters || activeDurationQuarters <= 0.0)
         return 0.0f;
-    const auto effectPhase = juce::jlimit (0.0, 1.0, elapsedQuarters / activeDurationQuarters);
-    const auto speed = juce::jlimit (0.25f, 4.0f, activeSlot.speed);
     if (activeSlot.preset == Preset::backspin)
     {
-        const auto travel = juce::jmin (effectPhase * (double) speed * reverseTravelSamples,
-                                        juce::jmax (2.0, (double) historySamples - 4.0));
-        return read (history[(size_t) channel], anchorSerial - travel);
+        const auto primary = read (history[(size_t) channel],
+                                   (double) writeSerial - backspinPrimaryOffsetSamples);
+        if (backspinWrapProgress >= backspinWrapSamples)
+            return primary;
+
+        const auto secondary = read (history[(size_t) channel],
+                                     (double) writeSerial - backspinSecondaryOffsetSamples);
+        const auto blend = (float) backspinWrapProgress / (float) backspinWrapSamples;
+        return primary * (1.0f - blend) + secondary * blend;
     }
     if (activeSlot.preset == Preset::tapeBrake)
     {
         return read (history[(size_t) channel], tapeReadSerial);
     }
     return 0.0f;
+}
+
+void TimelineScratchEngine::advanceBackspinReadHeads() noexcept
+{
+    const auto speed = juce::jlimit (0.25f, 4.0f, activeSlot.speed);
+    const auto offsetAdvance = 1.0 + (double) speed;
+
+    if (backspinWrapProgress >= backspinWrapSamples
+        && backspinPrimaryOffsetSamples + offsetAdvance * (double) backspinWrapSamples >= backspinWindowSamples)
+    {
+        backspinSecondaryOffsetSamples = backspinLaunchOffsetSamples;
+        backspinWrapProgress = 0;
+    }
+
+    if (backspinWrapProgress < backspinWrapSamples)
+    {
+        backspinPrimaryOffsetSamples = juce::jmin (backspinWindowSamples,
+                                                    backspinPrimaryOffsetSamples + offsetAdvance);
+        backspinSecondaryOffsetSamples += offsetAdvance;
+        if (++backspinWrapProgress >= backspinWrapSamples)
+        {
+            backspinPrimaryOffsetSamples = backspinSecondaryOffsetSamples;
+            ++backspinCompletedWraps;
+        }
+        return;
+    }
+
+    backspinPrimaryOffsetSamples = juce::jmin (backspinWindowSamples,
+                                                backspinPrimaryOffsetSamples + offsetAdvance);
 }
 
 void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Transport& transport,
@@ -162,6 +232,8 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
             const auto elapsed = phase * transport.quartersPerBar;
             tapeReadSerial += tapeBrakePlaybackRate (elapsed / activeDurationQuarters, activeSlot.speed);
         }
+        if (activeSlot.preset == Preset::backspin && effectActive && ! waitingForDry)
+            advanceBackspinReadHeads();
         ++writeSerial;
     }
 }
