@@ -7,6 +7,7 @@ constexpr float kRampSeconds = 0.008f;
 constexpr double kMinimumReadableDistance = 2.0;
 constexpr double kBackspinWindowSeconds = 0.35;
 constexpr double kBackspinLaunchSeconds = 0.04;
+constexpr double kBackspinSegmentSeconds = 0.15;
 }
 
 void TimelineScratchEngine::prepare (double rate, int, int channels)
@@ -19,6 +20,8 @@ void TimelineScratchEngine::prepare (double rate, int, int channels)
     activeBar = -1; wetRamp = 0.0f; waitingForDry = false;
     backspinWindowSamples = backspinLaunchOffsetSamples = 0.0;
     backspinPrimaryOffsetSamples = backspinSecondaryOffsetSamples = 0.0;
+    backspinPrimaryCaptureSerial = backspinSecondaryCaptureSerial = 0.0;
+    backspinCycleEndOffsetSamples = 0.0;
     backspinWrapSamples = backspinWrapProgress = 1;
     backspinCompletedWraps = 0;
 }
@@ -30,6 +33,8 @@ void TimelineScratchEngine::release()
     writeSerial = minimumReadableSerial = 0; activeBar = -1; wetRamp = 0.0f;
     backspinWindowSamples = backspinLaunchOffsetSamples = 0.0;
     backspinPrimaryOffsetSamples = backspinSecondaryOffsetSamples = 0.0;
+    backspinPrimaryCaptureSerial = backspinSecondaryCaptureSerial = 0.0;
+    backspinCycleEndOffsetSamples = 0.0;
     backspinWrapSamples = backspinWrapProgress = 1;
     backspinCompletedWraps = 0;
 }
@@ -93,13 +98,15 @@ void TimelineScratchEngine::beginBar (int bar, const Slot& slot, double quarters
     anchorSerial = (double) writeSerial - initialHistoryOffset;
     tapeReadSerial = anchorSerial;
 
-    // BACKSPIN loops a moving, recent-history window.  It must not use BAR
-    // duration as a read distance: LENGTH controls only how long it is active.
+    // BACKSPIN reverses a captured, recent-history segment.  Capturing a
+    // segment (rather than subtracting offsets from the live write head each
+    // sample) keeps the source genuinely reversed.  LENGTH controls only how
+    // long these bounded segments run.
     backspinWindowSamples = juce::jmin (sampleRateHz * kBackspinWindowSeconds,
         juce::jmax (8.0, (double) historySamples - 4.0));
     backspinLaunchOffsetSamples = juce::jmin (backspinWindowSamples * 0.25,
         juce::jmax (kMinimumReadableDistance, sampleRateHz * kBackspinLaunchSeconds));
-    const auto maximumOffsetAdvance = 1.0 + 4.0;
+    const auto maximumOffsetAdvance = 4.0;
     backspinWrapSamples = juce::jmax (1, juce::jmin (
         juce::roundToInt (sampleRateHz * kRampSeconds),
         juce::jmax (1, static_cast<int> (std::floor ((backspinWindowSamples - backspinLaunchOffsetSamples)
@@ -107,6 +114,11 @@ void TimelineScratchEngine::beginBar (int bar, const Slot& slot, double quarters
     backspinWrapProgress = backspinWrapSamples;
     backspinPrimaryOffsetSamples = backspinLaunchOffsetSamples;
     backspinSecondaryOffsetSamples = backspinLaunchOffsetSamples;
+    backspinPrimaryCaptureSerial = (double) writeSerial - kMinimumReadableDistance;
+    backspinSecondaryCaptureSerial = backspinPrimaryCaptureSerial;
+    const auto speed = juce::jlimit (0.25f, 4.0f, slot.speed);
+    backspinCycleEndOffsetSamples = juce::jmin (backspinWindowSamples,
+        backspinLaunchOffsetSamples + (double) speed * sampleRateHz * kBackspinSegmentSeconds);
     backspinCompletedWraps = 0;
 }
 
@@ -119,6 +131,8 @@ TimelineScratchEngine::BackspinReadState TimelineScratchEngine::getBackspinReadS
              backspinLaunchOffsetSamples,
              backspinPrimaryOffsetSamples,
              backspinSecondaryOffsetSamples,
+             (double) writeSerial - (backspinPrimaryCaptureSerial - backspinPrimaryOffsetSamples),
+             (double) writeSerial - (backspinSecondaryCaptureSerial - backspinSecondaryOffsetSamples),
              -(double) speed,
              wetRamp,
              backspinCompletedWraps };
@@ -144,12 +158,12 @@ float TimelineScratchEngine::wetSample (int channel, double barPhase, double qua
     if (activeSlot.preset == Preset::backspin)
     {
         const auto primary = read (history[(size_t) channel],
-                                   (double) writeSerial - backspinPrimaryOffsetSamples);
+                                   backspinPrimaryCaptureSerial - backspinPrimaryOffsetSamples);
         if (backspinWrapProgress >= backspinWrapSamples)
             return primary;
 
         const auto secondary = read (history[(size_t) channel],
-                                     (double) writeSerial - backspinSecondaryOffsetSamples);
+                                     backspinSecondaryCaptureSerial - backspinSecondaryOffsetSamples);
         const auto blend = (float) backspinWrapProgress / (float) backspinWrapSamples;
         return primary * (1.0f - blend) + secondary * blend;
     }
@@ -163,11 +177,16 @@ float TimelineScratchEngine::wetSample (int channel, double barPhase, double qua
 void TimelineScratchEngine::advanceBackspinReadHeads() noexcept
 {
     const auto speed = juce::jlimit (0.25f, 4.0f, activeSlot.speed);
-    const auto offsetAdvance = 1.0 + (double) speed;
+    // Capture serials are fixed inside a segment, so the offset itself moves
+    // at SPEED.  Adding one here would make a 1x setting read at -2x.
+    const auto offsetAdvance = (double) speed;
 
     if (backspinWrapProgress >= backspinWrapSamples
-        && backspinPrimaryOffsetSamples + offsetAdvance * (double) backspinWrapSamples >= backspinWindowSamples)
+        && backspinPrimaryOffsetSamples + offsetAdvance * (double) backspinWrapSamples >= backspinCycleEndOffsetSamples)
     {
+        // Start the next bounded segment at the current safe write position;
+        // its read head remains fixed to that capture during the crossfade.
+        backspinSecondaryCaptureSerial = (double) writeSerial - kMinimumReadableDistance;
         backspinSecondaryOffsetSamples = backspinLaunchOffsetSamples;
         backspinWrapProgress = 0;
     }
@@ -180,6 +199,7 @@ void TimelineScratchEngine::advanceBackspinReadHeads() noexcept
         if (++backspinWrapProgress >= backspinWrapSamples)
         {
             backspinPrimaryOffsetSamples = backspinSecondaryOffsetSamples;
+            backspinPrimaryCaptureSerial = backspinSecondaryCaptureSerial;
             ++backspinCompletedWraps;
         }
         return;

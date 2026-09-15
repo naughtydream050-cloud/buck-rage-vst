@@ -85,6 +85,17 @@ bool noHardJump (const juce::AudioBuffer<float>& buffer, float previous = 0.0f)
     }
     return true;
 }
+
+float maximumDifferenceFromTone (const juce::AudioBuffer<float>& buffer, int64_t firstSample)
+{
+    auto maximum = 0.0f;
+    for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+    {
+        const auto dry = std::sin ((float) (firstSample + sample) * 0.0137f);
+        maximum = juce::jmax (maximum, std::abs (buffer.getSample (0, sample) - dry));
+    }
+    return maximum;
+}
 }
 
 int main()
@@ -108,7 +119,7 @@ int main()
     double backspinPhase = 0.0;
     int64_t backspinSample = 512000;
     float previousBackspinSample = std::sin ((float) (backspinSample - 1) * 0.0137f);
-    bool backspinPopFree = true, continuousBackspinIsBounded = true;
+    bool backspinPopFree = true, continuousBackspinIsBounded = true, backspinIsAudiblyWet = true;
     size_t phaseIndex = 0;
     while (backspinPhase < 0.96)
     {
@@ -120,14 +131,18 @@ int main()
                                            && state.primaryOffsetSamples >= state.launchOffsetSamples
                                            && state.primaryOffsetSamples <= state.windowSamples
                                            && state.secondaryOffsetSamples >= state.launchOffsetSamples
-                                           && state.secondaryOffsetSamples <= state.windowSamples;
+                                           && state.secondaryOffsetSamples <= state.windowSamples
+                                           && state.primaryReadAgeSamples <= state.windowSamples * 1.25
+                                           && state.secondaryReadAgeSamples <= state.windowSamples * 1.25;
         continuousBackspinIsBounded &= stateIsBoundedWetReverse;
+        const auto differsFromDry = maximumDifferenceFromTone (audio, backspinSample) > 0.02f;
+        backspinIsAudiblyWet &= differsFromDry;
         backspinPopFree &= noHardJump (audio, previousBackspinSample) && boundedFinite (audio);
         previousBackspinSample = audio.getSample (0, audio.getNumSamples() - 1);
         const auto nextBackspinPhase = backspinPhase + transport (1, 0.0).barPhasePerSample * audio.getNumSamples();
         while (phaseIndex < phases.size() && nextBackspinPhase >= phases[phaseIndex])
         {
-            check (stateIsBoundedWetReverse,
+            check (stateIsBoundedWetReverse && differsFromDry,
                    ("backspin-one-bar-bounded-effect-at-phase-" + juce::String (phases[phaseIndex], 2)).toRawUTF8());
             ++phaseIndex;
         }
@@ -135,7 +150,8 @@ int main()
         backspinSample += audio.getNumSamples();
     }
     const auto finalBackspinState = backspinWrapEngine.getBackspinReadState();
-    check (phaseIndex == phases.size() && continuousBackspinIsBounded && finalBackspinState.completedWraps > 0,
+    check (phaseIndex == phases.size() && continuousBackspinIsBounded && backspinIsAudiblyWet
+           && finalBackspinState.completedWraps > 0,
            "backspin-window-stays-bounded-through-one-bar");
 
     TimelineScratchEngine tapeEngine;

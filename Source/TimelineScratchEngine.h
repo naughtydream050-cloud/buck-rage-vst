@@ -34,6 +34,7 @@ public:
         bool active = false, crossfading = false;
         double windowSamples = 0.0, launchOffsetSamples = 0.0,
                primaryOffsetSamples = 0.0, secondaryOffsetSamples = 0.0,
+               primaryReadAgeSamples = 0.0, secondaryReadAgeSamples = 0.0,
                reverseReadRate = 0.0;
         float wetRamp = 0.0f;
         uint32_t completedWraps = 0;
@@ -65,7 +66,9 @@ private:
     double activeDurationQuarters = 0.25, activeDurationSamples = 0.0,
            anchorSerial = 0.0, tapeReadSerial = 0.0,
            backspinWindowSamples = 0.0, backspinLaunchOffsetSamples = 0.0,
-           backspinPrimaryOffsetSamples = 0.0, backspinSecondaryOffsetSamples = 0.0;
+           backspinPrimaryOffsetSamples = 0.0, backspinSecondaryOffsetSamples = 0.0,
+           backspinPrimaryCaptureSerial = 0.0, backspinSecondaryCaptureSerial = 0.0,
+           backspinCycleEndOffsetSamples = 0.0;
     int backspinWrapSamples = 1, backspinWrapProgress = 1;
     uint32_t backspinCompletedWraps = 0;
     float wetRamp = 0.0f;
