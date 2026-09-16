@@ -1046,11 +1046,12 @@ int main()
                    "v2-host-nonzero-ppq-12-rebases-bars-1-through-64-without-boundary-reset");
 
     ToyotomiHideyoshiAudioProcessor fractionalStartProcessor;
-    fractionalStartProcessor.prepareToPlay (48000, 32);
+    juce::AudioBuffer<float> fractionalStartAudio (2, 1);
+    fractionalStartProcessor.prepareToPlay (48000, fractionalStartAudio.getNumSamples());
     TestPlayHead fractionalStartPlayHead;
     fractionalStartProcessor.setPlayHead (&fractionalStartPlayHead);
     fractionalStartPlayHead.set (true, 100.5, 120.0, 4, 4, 0);
-    fractionalStartProcessor.processBlock (audio, midi);
+    fractionalStartProcessor.processBlock (fractionalStartAudio, midi);
     pass &= check (fractionalStartProcessor.getCurrentTimelineSlot() == 0
                    && fractionalStartProcessor.getScratchDiagnostics().effectPhase < 0.001,
                    "v2-host-nonzero-fractional-ppq-start-rebases-bar-one-phase-zero");
