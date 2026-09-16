@@ -13,6 +13,7 @@ public:
     static constexpr double maxHistorySeconds = 10.0;
     enum class Preset : uint8_t { off, forwardCut, backspin, chirp, baby, transform, drag, zigzag, tapeBrake, custom };
     enum class Length : uint8_t { sixteenth, eighth, quarter, half, oneBar };
+    enum class DiscontinuityReason : uint8_t { none, stopped, start, samplePositionJump, ppqJump };
 
     struct Slot final
     {
@@ -24,6 +25,7 @@ public:
     struct Transport final
     {
         bool playing = false, discontinuity = false;
+        DiscontinuityReason discontinuityReason = DiscontinuityReason::none;
         int startBar = -1;
         double startBarPhase = 0.0, barPhasePerSample = 0.0, quartersPerBar = 4.0,
                secondsPerQuarter = 0.5;
@@ -32,12 +34,23 @@ public:
     struct BackspinReadState final
     {
         bool active = false, crossfading = false;
-        double windowSamples = 0.0, launchOffsetSamples = 0.0,
-               primaryOffsetSamples = 0.0, secondaryOffsetSamples = 0.0,
-               primaryReadAgeSamples = 0.0, secondaryReadAgeSamples = 0.0,
+        double windowSamples = 0.0, windowStartSerial = 0.0, windowEndSerial = 0.0,
+               primaryReadSerial = 0.0, secondaryReadSerial = 0.0,
+               historyValidSamples = 0.0,
                reverseReadRate = 0.0;
         float wetRamp = 0.0f;
         uint32_t completedWraps = 0;
+    };
+
+    struct Diagnostics final
+    {
+        int playingBar = -1;
+        Preset preset = Preset::off;
+        double effectPhase = 0.0, historyValidSamples = 0.0,
+               captureWindowSamples = 0.0, readPosition = 0.0, readRate = 0.0;
+        uint32_t wrapCount = 0, transportResetCount = 0;
+        float effectiveWet = 0.0f;
+        DiscontinuityReason discontinuityReason = DiscontinuityReason::none;
     };
 
     void prepare (double sampleRate, int maxBlockSize, int channels);
@@ -46,6 +59,7 @@ public:
     void process (juce::AudioBuffer<float>&, const Transport&, const std::array<Slot, 64>&) noexcept;
     int getAllocatedHistorySamples() const noexcept { return historySamples; }
     BackspinReadState getBackspinReadState() const noexcept;
+    Diagnostics getDiagnostics() const noexcept;
     static double tapeBrakePlaybackRate (double effectPhase, float speed) noexcept;
 
 private:
@@ -54,8 +68,12 @@ private:
     float read (const std::vector<float>&, double serial) const noexcept;
     void write (int channel, float sample) noexcept;
     void beginBar (int bar, const Slot&, double quartersPerBar, double secondsPerQuarter) noexcept;
+    bool beginBackspinCapture() noexcept;
+    bool beginTapeBrakeCapture() noexcept;
     float wetSample (int channel, double barPhase, double quartersPerBar) noexcept;
     void advanceBackspinReadHeads() noexcept;
+    double historyValidSamples() const noexcept;
+    bool isWetReady() const noexcept;
 
     double sampleRateHz = 0.0;
     int historySamples = 0, channelCount = 0;
@@ -64,13 +82,16 @@ private:
     int activeBar = -1;
     Slot activeSlot {};
     double activeDurationQuarters = 0.25, activeDurationSamples = 0.0,
-           anchorSerial = 0.0, tapeReadSerial = 0.0,
-           backspinWindowSamples = 0.0, backspinLaunchOffsetSamples = 0.0,
-           backspinPrimaryOffsetSamples = 0.0, backspinSecondaryOffsetSamples = 0.0,
-           backspinPrimaryCaptureSerial = 0.0, backspinSecondaryCaptureSerial = 0.0,
-           backspinCycleEndOffsetSamples = 0.0;
+           tapeReadSerial = 0.0, tapeWindowStartSerial = 0.0, tapeWindowEndSerial = 0.0,
+           backspinWindowSamples = 0.0, backspinWindowStartSerial = 0.0,
+           backspinWindowEndSerial = 0.0, backspinPrimaryReadSerial = 0.0,
+           backspinSecondaryReadSerial = 0.0;
     int backspinWrapSamples = 1, backspinWrapProgress = 1;
     uint32_t backspinCompletedWraps = 0;
     float wetRamp = 0.0f;
-    bool waitingForDry = false;
+    bool waitingForDry = false, backspinCaptured = false, tapeBrakeCaptured = false;
+    double diagnosticEffectPhase = 0.0, diagnosticReadPosition = 0.0, diagnosticReadRate = 0.0;
+    float diagnosticEffectiveWet = 0.0f;
+    uint32_t transportResetCount = 0;
+    DiscontinuityReason lastDiscontinuityReason = DiscontinuityReason::none;
 };

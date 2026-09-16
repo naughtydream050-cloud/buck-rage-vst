@@ -46,6 +46,7 @@ public:
     int getEffectiveTimeSignatureDenominator() const noexcept;
     void setHostSyncEnabled (bool enabled) noexcept;
     int getCurrentTimelineSlot() const noexcept { return currentTimelineSlot.load (std::memory_order_relaxed); }
+    TimelineScratchEngine::Diagnostics getScratchDiagnostics() const noexcept { return scratchEngine.getDiagnostics(); }
     PluginStateModel& getStateModel() noexcept { return stateModel; }
     const PluginStateModel& getStateModel() const noexcept { return stateModel; }
 
@@ -68,8 +69,12 @@ private:
     std::atomic<int> currentTimelineSlot { -1 };
     std::array<std::atomic<uint64_t>, PluginStateModel::kNumBars> dspSlots;
     TimelineScratchEngine scratchEngine;
-    double preparedSampleRate = 44100.0, internalQuarterPosition = 0.0, lastHostPpqEnd = 0.0;
-    bool internalWasPlaying = false, haveLastHostPpq = false;
+    double preparedSampleRate = 44100.0, internalQuarterPosition = 0.0,
+           lastHostPpq = 0.0, lastHostBpmForContinuity = 120.0;
+    int64_t lastHostSamplePosition = 0;
+    int lastHostBlockSize = 0;
+    bool internalWasPlaying = false, haveLastHostPpq = false,
+         haveLastHostSamplePosition = false;
     PluginStateModel stateModel;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ToyotomiHideyoshiAudioProcessor)

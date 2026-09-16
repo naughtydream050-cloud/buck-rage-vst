@@ -174,13 +174,15 @@ bool cropsDiffer (const juce::Image& a, const juce::Image& b, juce::Rectangle<in
 class TestPlayHead final : public juce::AudioPlayHead
 {
 public:
-    void set (bool isPlaying, double ppq, double bpm = 120.0, int numerator = 4, int denominator = 4)
+    void set (bool isPlaying, double ppq, double bpm = 120.0, int numerator = 4, int denominator = 4,
+              int64_t timeInSamples = -1)
     {
         position = {};
         position.setIsPlaying (isPlaying);
         position.setPpqPosition (ppq);
         position.setBpm (bpm);
         position.setTimeSignature (juce::AudioPlayHead::TimeSignature { numerator, denominator });
+        if (timeInSamples >= 0) position.setTimeInSamples (timeInSamples);
     }
 
     juce::Optional<juce::AudioPlayHead::PositionInfo> getPosition() const override { return position; }
@@ -995,10 +997,25 @@ int main()
                     && (selectedBar == 0 || cropsDiffer (defaultImage, image, bounds)), "v2-only-selected-bar-uses-gold-state");
     }
 
-    TestPlayHead playHead;
-    processor.setPlayHead (&playHead);
     juce::AudioBuffer<float> audio (2, 32);
     juce::MidiBuffer midi;
+    TestPlayHead continuityPlayHead;
+    processor.setPlayHead (&continuityPlayHead);
+    const auto ppqPerBlock = 32.0 / 48000.0 * 120.0 / 60.0;
+    continuityPlayHead.set (true, 0.0, 120.0, 4, 4, 0);
+    processor.processBlock (audio, midi);
+    const auto resetsAfterStart = processor.getScratchDiagnostics().transportResetCount;
+    continuityPlayHead.set (true, ppqPerBlock, 120.0, 4, 4, 32);
+    processor.processBlock (audio, midi);
+    continuityPlayHead.set (true, ppqPerBlock * 2.0, 120.0, 4, 4, 64);
+    processor.processBlock (audio, midi);
+    pass &= check (processor.getScratchDiagnostics().transportResetCount == resetsAfterStart
+                   && processor.getCurrentTimelineSlot() == 0,
+                   "v2-host-sample-position-keeps-continuous-blocks-without-reset");
+    processor.setPlayHead (nullptr);
+
+    TestPlayHead playHead;
+    processor.setPlayHead (&playHead);
     playHead.set (true, 16.0); // FL BAR 5 is zero-based COUNT BAR 5.
     processor.processBlock (audio, midi);
     pass &= check (processor.getCurrentTimelineSlot() == 4, "v2-host-4-4-advances-one-count-per-host-bar");

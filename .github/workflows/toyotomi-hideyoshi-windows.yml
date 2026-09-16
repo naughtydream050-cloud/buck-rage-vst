@@ -208,6 +208,7 @@ jobs:
             toyotomi-state-tests.log
             toyotomi-runtime-smoke.log
             toyotomi-scratch-engine-tests.log
+            phase1-render-*.wav
             bar-map-render-*.png
             toyotomi-editor-*.png
             toyotomi-timeline-editor-full.png

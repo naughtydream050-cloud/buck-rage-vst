@@ -30,7 +30,10 @@ void ToyotomiHideyoshiAudioProcessor::prepareToPlay(double sampleRate, int maxim
 {
     preparedSampleRate = juce::jmax (1.0, sampleRate);
     scratchEngine.prepare (preparedSampleRate, maximumExpectedSamplesPerBlock, getTotalNumInputChannels());
-    internalQuarterPosition = lastHostPpqEnd = 0.0; haveLastHostPpq = internalWasPlaying = false;
+    internalQuarterPosition = lastHostPpq = 0.0;
+    lastHostBpmForContinuity = 120.0;
+    lastHostSamplePosition = 0; lastHostBlockSize = 0;
+    haveLastHostPpq = haveLastHostSamplePosition = internalWasPlaying = false;
 }
 void ToyotomiHideyoshiAudioProcessor::releaseResources(){ scratchEngine.release(); }
 void ToyotomiHideyoshiAudioProcessor::getStateInformation(juce::MemoryBlock& d){if(auto x=stateModel.toValueTree().createXml())copyXmlToBinary(*x,d);} void ToyotomiHideyoshiAudioProcessor::setStateInformation(const void*d,int s){if(auto x=getXmlFromBinary(d,s))if(stateModel.fromValueTree(juce::ValueTree::fromXml(*x)))hostSyncEnabled.store(stateModel.getUiState().hostSync,std::memory_order_relaxed);}
@@ -65,7 +68,9 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         buffer.clear (channel, 0, buffer.getNumSamples());
     bool readPosition = false, playing = false;
     int timelineSlot = -1; double hostPpq = 0.0;
-    bool hasHostPpq = false, discontinuity = false;
+    int64_t hostSamplePosition = 0;
+    bool hasHostPpq = false, hasHostSamplePosition = false, discontinuity = false;
+    auto discontinuityReason = TimelineScratchEngine::DiscontinuityReason::none;
     if (auto* playHead = getPlayHead())
         if (auto position = playHead->getPosition())
         {
@@ -76,6 +81,11 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
             {
                 timeSignatureNumerator.store (time->numerator, std::memory_order_relaxed);
                 timeSignatureDenominator.store (time->denominator, std::memory_order_relaxed);
+            }
+            if (auto timeInSamples = position->getTimeInSamples())
+            {
+                hostSamplePosition = *timeInSamples;
+                hasHostSamplePosition = true;
             }
             if (playing && hostSyncEnabled.load (std::memory_order_relaxed))
                 if (auto ppq = position->getPpqPosition())
@@ -106,26 +116,67 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         const auto hostBar = (int) std::floor (barPosition);
         transport.startBar = ((hostBar % PluginStateModel::kNumBars) + PluginStateModel::kNumBars) % PluginStateModel::kNumBars;
         transport.startBarPhase = barPosition - std::floor (barPosition);
-        if (haveLastHostPpq)
+        // A host sample position is the authoritative continuity source. PPQ
+        // is only used when the host cannot provide one; normal block advance,
+        // tempo edits and small PPQ rounding must never clear history.
+        if (! internalWasPlaying)
         {
-            const auto expected = lastHostPpqEnd;
-            discontinuity = std::abs (hostPpq - expected) > juce::jmax (0.01, effectiveBpm * 2.0 / (60.0 * preparedSampleRate));
+            discontinuity = true;
+            discontinuityReason = TimelineScratchEngine::DiscontinuityReason::start;
         }
-        lastHostPpqEnd = hostPpq + effectiveBpm * (double) buffer.getNumSamples() / (60.0 * preparedSampleRate);
+        if (hasHostSamplePosition)
+        {
+            if (haveLastHostSamplePosition)
+            {
+                const auto expected = lastHostSamplePosition + (int64_t) lastHostBlockSize;
+                const auto error = hostSamplePosition - expected;
+                if (std::abs (error) > 2)
+                {
+                    discontinuity = true;
+                    discontinuityReason = TimelineScratchEngine::DiscontinuityReason::samplePositionJump;
+                }
+            }
+            lastHostSamplePosition = hostSamplePosition;
+            lastHostBlockSize = buffer.getNumSamples();
+            haveLastHostSamplePosition = true;
+        }
+        else if (haveLastHostPpq)
+        {
+            const auto expectedDelta = (double) lastHostBlockSize / preparedSampleRate
+                * 0.5 * (lastHostBpmForContinuity + effectiveBpm) / 60.0;
+            const auto actualDelta = hostPpq - lastHostPpq;
+            const auto tolerance = juce::jmax (1.0e-6, effectiveBpm * 4.0 / (60.0 * preparedSampleRate));
+            const auto error = actualDelta - expectedDelta;
+            if (actualDelta < -tolerance
+                || std::abs (error) > juce::jmax (tolerance, 4.0 * std::abs (expectedDelta)))
+            {
+                discontinuity = true;
+                discontinuityReason = TimelineScratchEngine::DiscontinuityReason::ppqJump;
+            }
+        }
+        lastHostPpq = hostPpq;
+        lastHostBpmForContinuity = effectiveBpm;
+        lastHostBlockSize = buffer.getNumSamples();
         haveLastHostPpq = true;
     }
     else
     {
-        if (playing && ! internalWasPlaying) { internalQuarterPosition = 0.0; discontinuity = true; }
+        if (playing && ! internalWasPlaying)
+        {
+            internalQuarterPosition = 0.0;
+            discontinuity = true;
+            discontinuityReason = TimelineScratchEngine::DiscontinuityReason::start;
+        }
         const auto barPosition = internalQuarterPosition / quartersPerBar;
         const auto internalBar = (int) std::floor (barPosition);
         transport.startBar = playing ? ((internalBar % PluginStateModel::kNumBars) + PluginStateModel::kNumBars) % PluginStateModel::kNumBars : -1;
         transport.startBarPhase = barPosition - std::floor (barPosition);
         if (playing) internalQuarterPosition += effectiveBpm * (double) buffer.getNumSamples() / (60.0 * preparedSampleRate);
         timelineSlot = transport.startBar;
-        haveLastHostPpq = false;
+        haveLastHostPpq = haveLastHostSamplePosition = false;
     }
     transport.discontinuity = discontinuity;
+    transport.discontinuityReason = discontinuityReason;
     internalWasPlaying = playing;
     std::array<TimelineScratchEngine::Slot, PluginStateModel::kNumBars> snapshot;
     for (int bar = 0; bar < PluginStateModel::kNumBars; ++bar)
