@@ -1025,6 +1025,32 @@ int main()
                    "v2-host-sample-position-keeps-continuous-blocks-without-reset");
     processor.setPlayHead (nullptr);
 
+    // Some FL transport callbacks expose a stale time-in-samples value even
+    // while PPQ progresses normally. That must not reset capture history on
+    // every block or leave BACKSPIN permanently Dry.
+    ToyotomiHideyoshiAudioProcessor staleSampleProcessor;
+    juce::AudioBuffer<float> staleSampleAudio (2, 256);
+    staleSampleProcessor.prepareToPlay (48000, staleSampleAudio.getNumSamples());
+    staleSampleProcessor.getStateModel().setSlotPreset (0, PluginStateModel::ScratchPreset::backspin);
+    staleSampleProcessor.getStateModel().setSlotLength (0, PluginStateModel::NoteLength::oneBar);
+    staleSampleProcessor.getStateModel().setSlotDepth (0, 1.0f);
+    TestPlayHead staleSamplePlayHead;
+    staleSampleProcessor.setPlayHead (&staleSamplePlayHead);
+    bool staleSampleWetObserved = false;
+    const auto stalePpqPerBlock = 256.0 / 48000.0 * 120.0 / 60.0;
+    for (int block = 0; block < 80; ++block)
+    {
+        staleSamplePlayHead.set (true, 12.0 + stalePpqPerBlock * (double) block, 120.0, 4, 4, 0);
+        staleSampleAudio.clear();
+        staleSampleProcessor.processBlock (staleSampleAudio, midi);
+        staleSampleWetObserved |= staleSampleProcessor.getScratchDiagnostics().effectiveWet > 0.1f;
+    }
+    pass &= check (staleSampleProcessor.getScratchDiagnostics().transportResetCount == 1
+                   && staleSampleWetObserved
+                   && staleSampleProcessor.getCurrentTimelineSlot() == 0,
+                   "v2-host-stale-sample-position-preserves-history-and-backspin-wet");
+    staleSampleProcessor.setPlayHead (nullptr);
+
     // A host's PPQ origin is not necessarily zero: FL may start or loop at an
     // arbitrary playlist position.  Every such start must be Toyotomi BAR 1.
     juce::AudioBuffer<float> rebaseAudio (2, 96000);

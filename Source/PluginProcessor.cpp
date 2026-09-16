@@ -104,31 +104,31 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
     transport.barPhasePerSample = effectiveBpm / (60.0 * preparedSampleRate * quartersPerBar);
     if (hostSyncEnabled.load (std::memory_order_relaxed) && hasHostPpq)
     {
-        // A host sample position is the authoritative continuity source. PPQ
-        // is only used when the host cannot provide one; normal block advance,
-        // tempo edits and small PPQ rounding must never clear history.
+        // Prefer sample positions when they are trustworthy, but some hosts
+        // expose a stale value while their PPQ stream remains continuous. A
+        // stale sample position alone must not repeatedly clear history and
+        // starve a buffer-based effect of its capture material.
         if (! internalWasPlaying)
         {
             discontinuity = true;
             discontinuityReason = TimelineScratchEngine::DiscontinuityReason::start;
         }
+        bool samplePositionJump = false;
         if (hasHostSamplePosition)
         {
             if (haveLastHostSamplePosition)
             {
                 const auto expected = lastHostSamplePosition + (int64_t) lastHostBlockSize;
                 const auto error = hostSamplePosition - expected;
-                if (std::abs (error) > 2)
-                {
-                    discontinuity = true;
-                    discontinuityReason = TimelineScratchEngine::DiscontinuityReason::samplePositionJump;
-                }
+                samplePositionJump = std::abs (error) > 2;
             }
             lastHostSamplePosition = hostSamplePosition;
             lastHostBlockSize = buffer.getNumSamples();
             haveLastHostSamplePosition = true;
         }
-        else if (haveLastHostPpq)
+
+        bool ppqJump = false;
+        if (haveLastHostPpq)
         {
             const auto expectedDelta = (double) lastHostBlockSize / preparedSampleRate
                 * 0.5 * (lastHostBpmForContinuity + effectiveBpm) / 60.0;
@@ -137,10 +137,15 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
             const auto error = actualDelta - expectedDelta;
             if (actualDelta < -tolerance
                 || std::abs (error) > juce::jmax (tolerance, 4.0 * std::abs (expectedDelta)))
-            {
-                discontinuity = true;
-                discontinuityReason = TimelineScratchEngine::DiscontinuityReason::ppqJump;
-            }
+                ppqJump = true;
+        }
+
+        if (ppqJump)
+        {
+            discontinuity = true;
+            discontinuityReason = samplePositionJump
+                ? TimelineScratchEngine::DiscontinuityReason::samplePositionJump
+                : TimelineScratchEngine::DiscontinuityReason::ppqJump;
         }
 
         // Toyotomi BAR 1 starts at the host's actual play/seek/loop position,
