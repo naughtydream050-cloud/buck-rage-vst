@@ -30,10 +30,10 @@ void ToyotomiHideyoshiAudioProcessor::prepareToPlay(double sampleRate, int maxim
 {
     preparedSampleRate = juce::jmax (1.0, sampleRate);
     scratchEngine.prepare (preparedSampleRate, maximumExpectedSamplesPerBlock, getTotalNumInputChannels());
-    internalQuarterPosition = lastHostPpq = 0.0;
+    internalQuarterPosition = lastHostPpq = hostPpqOrigin = 0.0;
     lastHostBpmForContinuity = 120.0;
     lastHostSamplePosition = 0; lastHostBlockSize = 0;
-    haveLastHostPpq = haveLastHostSamplePosition = internalWasPlaying = false;
+    haveLastHostPpq = haveLastHostSamplePosition = internalWasPlaying = haveHostPpqOrigin = false;
 }
 void ToyotomiHideyoshiAudioProcessor::releaseResources(){ scratchEngine.release(); }
 void ToyotomiHideyoshiAudioProcessor::getStateInformation(juce::MemoryBlock& d){if(auto x=stateModel.toValueTree().createXml())copyXmlToBinary(*x,d);} void ToyotomiHideyoshiAudioProcessor::setStateInformation(const void*d,int s){if(auto x=getXmlFromBinary(d,s))if(stateModel.fromValueTree(juce::ValueTree::fromXml(*x)))hostSyncEnabled.store(stateModel.getUiState().hostSync,std::memory_order_relaxed);}
@@ -90,14 +90,6 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
             if (playing && hostSyncEnabled.load (std::memory_order_relaxed))
                 if (auto ppq = position->getPpqPosition())
                 {
-                    // PPQ is expressed in quarter notes.  A COUNT BAR is one
-                    // host bar, not one sixteenth note: at 4/4, PPQ 0..3.999
-                    // is BAR 1 and PPQ 4 starts BAR 2.
-                    const auto numerator = timeSignatureNumerator.load (std::memory_order_relaxed);
-                    const auto denominator = timeSignatureDenominator.load (std::memory_order_relaxed);
-                    const auto quartersPerBar = juce::jmax (0.25, (double) numerator * 4.0 / (double) denominator);
-                    const auto hostBar = static_cast<int> (std::floor (*ppq / quartersPerBar));
-                    timelineSlot = ((hostBar % PluginStateModel::kNumBars) + PluginStateModel::kNumBars) % PluginStateModel::kNumBars;
                     hostPpq = *ppq; hasHostPpq = true;
                 }
         }
@@ -112,10 +104,6 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
     transport.barPhasePerSample = effectiveBpm / (60.0 * preparedSampleRate * quartersPerBar);
     if (hostSyncEnabled.load (std::memory_order_relaxed) && hasHostPpq)
     {
-        const auto barPosition = hostPpq / quartersPerBar;
-        const auto hostBar = (int) std::floor (barPosition);
-        transport.startBar = ((hostBar % PluginStateModel::kNumBars) + PluginStateModel::kNumBars) % PluginStateModel::kNumBars;
-        transport.startBarPhase = barPosition - std::floor (barPosition);
         // A host sample position is the authoritative continuity source. PPQ
         // is only used when the host cannot provide one; normal block advance,
         // tempo edits and small PPQ rounding must never clear history.
@@ -154,6 +142,22 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
                 discontinuityReason = TimelineScratchEngine::DiscontinuityReason::ppqJump;
             }
         }
+
+        // Toyotomi BAR 1 starts at the host's actual play/seek/loop position,
+        // never at the DAW's absolute PPQ zero.  The origin remains fixed over
+        // ordinary blocks, tempo edits and BAR boundaries.
+        if (! haveHostPpqOrigin || discontinuity)
+        {
+            hostPpqOrigin = hostPpq;
+            haveHostPpqOrigin = true;
+        }
+        const auto relativePpq = hostPpq - hostPpqOrigin;
+        const auto barPosition = relativePpq / quartersPerBar;
+        const auto hostBar = (int) std::floor (barPosition);
+        transport.startBar = ((hostBar % PluginStateModel::kNumBars) + PluginStateModel::kNumBars) % PluginStateModel::kNumBars;
+        transport.startBarPhase = barPosition - std::floor (barPosition);
+        timelineSlot = transport.startBar;
+
         lastHostPpq = hostPpq;
         lastHostBpmForContinuity = effectiveBpm;
         lastHostBlockSize = buffer.getNumSamples();
@@ -161,6 +165,8 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
     }
     else
     {
+        if (hostSyncEnabled.load (std::memory_order_relaxed) && ! playing)
+            haveHostPpqOrigin = false;
         if (playing && ! internalWasPlaying)
         {
             internalQuarterPosition = 0.0;

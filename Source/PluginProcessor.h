@@ -70,11 +70,12 @@ private:
     std::array<std::atomic<uint64_t>, PluginStateModel::kNumBars> dspSlots;
     TimelineScratchEngine scratchEngine;
     double preparedSampleRate = 44100.0, internalQuarterPosition = 0.0,
-           lastHostPpq = 0.0, lastHostBpmForContinuity = 120.0;
+           lastHostPpq = 0.0, lastHostBpmForContinuity = 120.0,
+           hostPpqOrigin = 0.0;
     int64_t lastHostSamplePosition = 0;
     int lastHostBlockSize = 0;
     bool internalWasPlaying = false, haveLastHostPpq = false,
-         haveLastHostSamplePosition = false;
+         haveLastHostSamplePosition = false, haveHostPpqOrigin = false;
     PluginStateModel stateModel;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ToyotomiHideyoshiAudioProcessor)

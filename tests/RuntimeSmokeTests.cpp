@@ -999,6 +999,17 @@ int main()
 
     juce::AudioBuffer<float> audio (2, 32);
     juce::MidiBuffer midi;
+    juce::AudioBuffer<float> hostBarAudio (2, 96000);
+    auto playHostBar = [&] (ToyotomiHideyoshiAudioProcessor& target, TestPlayHead& head, int finalBar)
+    {
+        for (int bar = 0; bar <= finalBar; ++bar)
+        {
+            head.set (true, 4.0 * (double) bar, 120.0, 4, 4,
+                      (int64_t) hostBarAudio.getNumSamples() * bar);
+            hostBarAudio.clear();
+            target.processBlock (hostBarAudio, midi);
+        }
+    };
     TestPlayHead continuityPlayHead;
     processor.setPlayHead (&continuityPlayHead);
     const auto ppqPerBlock = 32.0 / 48000.0 * 120.0 / 60.0;
@@ -1014,16 +1025,86 @@ int main()
                    "v2-host-sample-position-keeps-continuous-blocks-without-reset");
     processor.setPlayHead (nullptr);
 
+    // A host's PPQ origin is not necessarily zero: FL may start or loop at an
+    // arbitrary playlist position.  Every such start must be Toyotomi BAR 1.
+    juce::AudioBuffer<float> rebaseAudio (2, 96000);
+    ToyotomiHideyoshiAudioProcessor rebaseProcessor;
+    rebaseProcessor.prepareToPlay (48000, rebaseAudio.getNumSamples());
+    TestPlayHead rebasePlayHead;
+    rebaseProcessor.setPlayHead (&rebasePlayHead);
+    bool allRebasedBarsAddressed = true;
+    for (int bar = 0; bar < 64; ++bar)
+    {
+        rebasePlayHead.set (true, 12.0 + 4.0 * (double) bar, 120.0, 4, 4,
+                            (int64_t) rebaseAudio.getNumSamples() * bar);
+        rebaseAudio.clear();
+        rebaseProcessor.processBlock (rebaseAudio, midi);
+        allRebasedBarsAddressed &= rebaseProcessor.getCurrentTimelineSlot() == bar;
+    }
+    const auto rebaseResetsAfter64Bars = rebaseProcessor.getScratchDiagnostics().transportResetCount;
+    pass &= check (allRebasedBarsAddressed && rebaseResetsAfter64Bars == 1,
+                   "v2-host-nonzero-ppq-12-rebases-bars-1-through-64-without-boundary-reset");
+
+    ToyotomiHideyoshiAudioProcessor fractionalStartProcessor;
+    fractionalStartProcessor.prepareToPlay (48000, 32);
+    TestPlayHead fractionalStartPlayHead;
+    fractionalStartProcessor.setPlayHead (&fractionalStartPlayHead);
+    fractionalStartPlayHead.set (true, 100.5, 120.0, 4, 4, 0);
+    fractionalStartProcessor.processBlock (audio, midi);
+    pass &= check (fractionalStartProcessor.getCurrentTimelineSlot() == 0
+                   && fractionalStartProcessor.getScratchDiagnostics().effectPhase < 0.001,
+                   "v2-host-nonzero-fractional-ppq-start-rebases-bar-one-phase-zero");
+
+    ToyotomiHideyoshiAudioProcessor loopRebaseProcessor;
+    loopRebaseProcessor.prepareToPlay (48000, rebaseAudio.getNumSamples());
+    TestPlayHead loopRebasePlayHead;
+    loopRebaseProcessor.setPlayHead (&loopRebasePlayHead);
+    for (int block = 0; block < 3; ++block)
+    {
+        loopRebasePlayHead.set (true, 12.0 + 4.0 * (double) block, 120.0, 4, 4,
+                                 (int64_t) rebaseAudio.getNumSamples() * block);
+        rebaseAudio.clear();
+        loopRebaseProcessor.processBlock (rebaseAudio, midi);
+    }
+    const auto resetsBeforeLoop = loopRebaseProcessor.getScratchDiagnostics().transportResetCount;
+    loopRebasePlayHead.set (true, 12.0, 120.0, 4, 4, 0);
+    rebaseAudio.clear();
+    loopRebaseProcessor.processBlock (rebaseAudio, midi);
+    pass &= check (loopRebaseProcessor.getCurrentTimelineSlot() == 0
+                   && loopRebaseProcessor.getScratchDiagnostics().transportResetCount == resetsBeforeLoop + 1,
+                   "v2-host-loop-backward-ppq-rebases-to-bar-one");
+    ToyotomiHideyoshiAudioProcessor internalTimelineProcessor;
+    internalTimelineProcessor.prepareToPlay (48000, 32);
+    internalTimelineProcessor.setHostSyncEnabled (false);
+    TestPlayHead internalTimelinePlayHead;
+    internalTimelineProcessor.setPlayHead (&internalTimelinePlayHead);
+    internalTimelinePlayHead.set (true, 100.5, 120.0, 4, 4, 0);
+    internalTimelineProcessor.processBlock (audio, midi);
+    pass &= check (internalTimelineProcessor.getCurrentTimelineSlot() == 0,
+                   "v2-host-sync-off-keeps-internal-timeline-origin");
+    rebaseProcessor.setPlayHead (nullptr);
+    fractionalStartProcessor.setPlayHead (nullptr);
+    loopRebaseProcessor.setPlayHead (nullptr);
+    internalTimelineProcessor.setPlayHead (nullptr);
+
+    processor.prepareToPlay (48000, hostBarAudio.getNumSamples());
     TestPlayHead playHead;
     processor.setPlayHead (&playHead);
-    playHead.set (true, 16.0); // FL BAR 5 is zero-based COUNT BAR 5.
-    processor.processBlock (audio, midi);
+    playHostBar (processor, playHead, 4);
     pass &= check (processor.getCurrentTimelineSlot() == 4, "v2-host-4-4-advances-one-count-per-host-bar");
-    playHead.set (true, 3.0, 120.0, 6, 8); // 6/8 contains three quarter notes.
-    processor.processBlock (audio, midi);
-    pass &= check (processor.getCurrentTimelineSlot() == 1, "v2-host-time-signature-controls-count-advance");
-    playHead.set (true, 20.0); // PPQ 20 -> BAR 6 (zero-based slot 5) at 4/4
-    processor.processBlock (audio, midi);
+    ToyotomiHideyoshiAudioProcessor sixEightProcessor;
+    juce::AudioBuffer<float> sixEightAudio (2, 72000);
+    sixEightProcessor.prepareToPlay (48000, sixEightAudio.getNumSamples());
+    TestPlayHead sixEightPlayHead;
+    sixEightProcessor.setPlayHead (&sixEightPlayHead);
+    sixEightPlayHead.set (true, 0.0, 120.0, 6, 8, 0);
+    sixEightProcessor.processBlock (sixEightAudio, midi);
+    sixEightPlayHead.set (true, 3.0, 120.0, 6, 8, 72000);
+    sixEightProcessor.processBlock (sixEightAudio, midi);
+    pass &= check (sixEightProcessor.getCurrentTimelineSlot() == 1, "v2-host-time-signature-controls-count-advance");
+    sixEightProcessor.setPlayHead (nullptr);
+    processor.prepareToPlay (48000, hostBarAudio.getNumSamples());
+    playHostBar (processor, playHead, 5);
     state.selectTab (0);
     state.selectBar (0);
     auto playing = render (*editor);
@@ -1033,8 +1114,8 @@ int main()
                && cropHasVisibleCellContent (playing, {259,137,56,80})
                && cropHasVisibleCellContent (playing, {553,137,56,80})
                && ! hasPlayingInteriorRedDot (playing, {553,137,56,80}), "v2-playing-red-border-without-dot");
-    playHead.set (true, 40.0); // PPQ 40 -> BAR 11 (zero-based slot 10) at 4/4
-    processor.processBlock (audio, midi);
+    processor.prepareToPlay (48000, hostBarAudio.getNumSamples());
+    playHostBar (processor, playHead, 10);
     state.selectBar (10);
     auto selectedPlaying = render (*editor);
     pass &= check (png (selectedPlaying, "v2-bar-selected-playing.png") && png (selectedPlaying, "v2-full-bar-selected-playing.png"), "v2-selected-playing-render");
@@ -1157,9 +1238,9 @@ int main()
     barCase ("bar-page-4-selected-49", 3, 48, "dynamic-bar-page-4.png");
 
     TestPlayHead dynamicPlayHead;
+    processor.prepareToPlay (48000, hostBarAudio.getNumSamples());
     processor.setPlayHead (&dynamicPlayHead);
-    dynamicPlayHead.set (true, 20.0); // BAR 6 at 4/4
-    processor.processBlock (audio, midi);
+    playHostBar (processor, dynamicPlayHead, 5);
     state.selectTab (0); state.selectBar (10);
     auto separated = render (*editor);
     dynamicReport.beginCase ("bar-selected-11-playing-6", "selected GOLD and playing RED use separate absolute BARs", gateStateSnapshot (0, 10, 5, (int) state.getSlot (10).preset, (int) state.getSlot (10).length, state.getUiState().bypass));
@@ -1170,8 +1251,8 @@ int main()
         dynamicReport.checkValue ("separate-selected-playing-cell", cropHasVisibleCellContent (separated, gateCellBounds (cell)), 0);
     }
     dynamicReport.endCase();
-    dynamicPlayHead.set (true, 40.0); // BAR 11 at 4/4
-    processor.processBlock (audio, midi);
+    processor.prepareToPlay (48000, hostBarAudio.getNumSamples());
+    playHostBar (processor, dynamicPlayHead, 10);
     auto combined = render (*editor);
     dynamicReport.beginCase ("bar-selected-playing-11", "selected+playing resolves to one completed PNG", gateStateSnapshot (0, 10, 10, (int) state.getSlot (10).preset, (int) state.getSlot (10).length, state.getUiState().bypass));
     dynamicReport.screenshot (combined, "dynamic-bar-selected-playing-11.png");
