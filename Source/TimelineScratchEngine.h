@@ -18,8 +18,8 @@ public:
     struct Slot final
     {
         Preset preset = Preset::off;
-        Length length = Length::sixteenth;
-        float speed = 1.0f, pitch = 0.0f, depth = 0.5f;
+        Length length = Length::oneBar;
+        float speed = 1.0f, pitch = 0.0f, depth = 1.0f;
     };
 
     struct Transport final

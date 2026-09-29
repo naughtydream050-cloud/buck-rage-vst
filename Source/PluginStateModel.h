@@ -25,8 +25,10 @@ public:
     struct TimelineSlot
     {
         ScratchPreset preset = ScratchPreset::off;
-        NoteLength length = NoteLength::sixteenth;
-        float speed = 1.0f, pitch = 0.0f, depth = 0.5f;
+        // A freshly assigned preset should be audible without first adjusting
+        // LENGTH or DEPTH. Restored projects retain their serialized values.
+        NoteLength length = NoteLength::oneBar;
+        float speed = 1.0f, pitch = 0.0f, depth = 1.0f;
         bool customMotion = false;
         std::vector<MotionPoint> motion;
         // XY PAD data is independent from the existing preset/custom motion.

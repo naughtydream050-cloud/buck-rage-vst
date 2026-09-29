@@ -2,6 +2,7 @@
 #include "PluginEditorV2.h"
 #include "GeneratedLayout.h"
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <memory>
@@ -1050,6 +1051,53 @@ int main()
                    && staleSampleProcessor.getCurrentTimelineSlot() == 0,
                    "v2-host-stale-sample-position-preserves-history-and-backspin-wet");
     staleSampleProcessor.setPlayHead (nullptr);
+
+    // Exercise the full state -> atomic slot -> processor -> scratch path with
+    // non-zero audio. A wet coefficient observed on a silent buffer does not
+    // prove that a configured BAR changes the sound.
+    for (const auto preset : { PluginStateModel::ScratchPreset::backspin,
+                               PluginStateModel::ScratchPreset::tapeBrake })
+    {
+        ToyotomiHideyoshiAudioProcessor audibleProcessor;
+        juce::AudioBuffer<float> audibleAudio (2, 256);
+        audibleProcessor.prepareToPlay (48000, audibleAudio.getNumSamples());
+        audibleProcessor.setHostSyncEnabled (false);
+        for (int bar = 0; bar < 4; ++bar)
+            audibleProcessor.getStateModel().setSlotPreset (bar, preset);
+        TestPlayHead audiblePlayHead;
+        audibleProcessor.setPlayHead (&audiblePlayHead);
+        std::array<bool, 4> audibleBars {};
+        bool audibleClockAdvanced = true;
+        constexpr int blocksPerBar = 375;
+        for (int block = 0; block < blocksPerBar * 4; ++block)
+        {
+            audiblePlayHead.set (true, 0.0, 120.0, 4, 4, (int64_t) block * 256);
+            for (int sample = 0; sample < audibleAudio.getNumSamples(); ++sample)
+            {
+                const auto index = (double) block * 256.0 + (double) sample;
+                const auto value = (float) (0.35 * std::sin (index * 0.0137)
+                                          + 0.16 * std::sin (index * 0.0471));
+                for (int channel = 0; channel < 2; ++channel)
+                    audibleAudio.setSample (channel, sample, value);
+            }
+            audibleProcessor.processBlock (audibleAudio, midi);
+            const auto bar = block / blocksPerBar;
+            if (block % blocksPerBar > 240 && block % blocksPerBar < 300)
+            {
+                audibleClockAdvanced &= audibleProcessor.getCurrentTimelineSlot() == bar;
+                const auto index = (double) block * 256.0 + 255.0;
+                const auto dry = (float) (0.35 * std::sin (index * 0.0137)
+                                        + 0.16 * std::sin (index * 0.0471));
+                audibleBars[(size_t) bar] |= std::abs (audibleAudio.getSample (0, 255) - dry) > 0.02f;
+            }
+        }
+        pass &= check (audibleClockAdvanced && std::all_of (audibleBars.begin(), audibleBars.end(),
+                           [] (bool wet) { return wet; }),
+                       preset == PluginStateModel::ScratchPreset::backspin
+                           ? "v2-default-backspin-changes-audio-on-bars-1-through-4"
+                           : "v2-default-tape-brake-changes-audio-on-bars-1-through-4");
+        audibleProcessor.setPlayHead (nullptr);
+    }
 
     // A host's PPQ origin is not necessarily zero: FL may start or loop at an
     // arbitrary playlist position.  Every such start must be Toyotomi BAR 1.

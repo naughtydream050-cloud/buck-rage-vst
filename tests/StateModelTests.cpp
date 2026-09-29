@@ -16,10 +16,15 @@ int main()
            "fresh-default-has-no-selected-bar");
     check (model.getUiState().selectedTab == 0,
            "fresh-default-has-neutral-tab-page");
+    check (model.getSlot (0).length == PluginStateModel::NoteLength::oneBar
+           && model.getSlot (0).speed == 1.0f
+           && model.getSlot (0).pitch == 0.0f
+           && model.getSlot (0).depth == 1.0f,
+           "fresh-slot-defaults-are-audible-when-preset-is-assigned");
     model.setSelectedPreset (PluginStateModel::ScratchPreset::backspin);
     model.setSelectedLength (PluginStateModel::NoteLength::quarter);
     check (model.getSlot (0).preset == PluginStateModel::ScratchPreset::off
-           && model.getSlot (0).length == PluginStateModel::NoteLength::sixteenth,
+           && model.getSlot (0).length == PluginStateModel::NoteLength::oneBar,
            "fresh-default-selection-actions-do-not-mutate-slot-zero");
     model.selectBar (4);
     model.setSelectedPreset (PluginStateModel::ScratchPreset::backspin);
@@ -31,7 +36,10 @@ int main()
     model.selectBar (5);
     model.setSelectedPreset (PluginStateModel::ScratchPreset::chirp);
     check (model.getSlot (4).preset == PluginStateModel::ScratchPreset::custom
-           && model.getSlot (5).preset == PluginStateModel::ScratchPreset::chirp,
+           && model.getSlot (5).preset == PluginStateModel::ScratchPreset::chirp
+           && model.getSlot (5).length == PluginStateModel::NoteLength::oneBar
+           && model.getSlot (5).speed == 1.0f && model.getSlot (5).pitch == 0.0f
+           && model.getSlot (5).depth == 1.0f,
            "64-timeline-slots-are-independent");
 
     const auto beforeTab = model.getSlot (4);
@@ -52,8 +60,10 @@ int main()
         check (model.getSlot (5).preset == static_cast<PluginStateModel::ScratchPreset> (preset)
                && std::count (selectedImages.begin(), selectedImages.end(), true) == 1
                && selectedImages[static_cast<size_t> (preset)]
+               && model.getSlot (5).length == PluginStateModel::NoteLength::oneBar
+               && model.getSlot (5).depth == 1.0f
                && model.getUiState().bypass == bypassBefore,
-               "preset-single-selection-and-bypass-isolation");
+               "preset-single-selection-keeps-audible-defaults-and-bypass-isolation");
     }
     model.setBypass (true);
     check (model.getSlot (5).preset == PluginStateModel::ScratchPreset::custom && model.getUiState().bypass,
@@ -80,6 +90,22 @@ int main()
     check (noSelectionRestored.fromValueTree (freshState.toValueTree())
            && noSelectionRestored.getUiState().selectedBar == PluginStateModel::kNoSelectedBar,
            "none-selection-round-trips");
+    PluginStateModel oldSavedValues;
+    oldSavedValues.setSlotLength (0, PluginStateModel::NoteLength::sixteenth);
+    oldSavedValues.setSlotDepth (0, 0.5f);
+    PluginStateModel oldValuesRestored;
+    check (oldValuesRestored.fromValueTree (oldSavedValues.toValueTree())
+           && oldValuesRestored.getSlot (0).length == PluginStateModel::NoteLength::sixteenth
+           && oldValuesRestored.getSlot (0).depth == 0.5f,
+           "saved-short-length-and-depth-are-preserved");
+    oldValuesRestored.setSlotPreset (0, PluginStateModel::ScratchPreset::backspin);
+    check (oldValuesRestored.getSlot (0).length == PluginStateModel::NoteLength::sixteenth
+           && oldValuesRestored.getSlot (0).depth == 0.5f,
+           "assigning-preset-does-not-overwrite-saved-parameters");
+    oldValuesRestored.resetSlot (0);
+    check (oldValuesRestored.getSlot (0).length == PluginStateModel::NoteLength::oneBar
+           && oldValuesRestored.getSlot (0).depth == 1.0f,
+           "reset-slot-uses-audible-defaults");
 
     // XY recording is intentionally separate from existing preset/custom
     // motion, and always uses absolute BAR indices.
