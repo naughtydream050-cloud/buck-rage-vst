@@ -70,8 +70,10 @@ private:
     void beginBar (int bar, const Slot&, double quartersPerBar, double secondsPerQuarter) noexcept;
     bool beginBackspinCapture() noexcept;
     bool beginTapeBrakeCapture() noexcept;
+    bool beginBabyCapture() noexcept;
     float wetSample (int channel, double barPhase, double quartersPerBar) noexcept;
     void advanceBackspinReadHeads() noexcept;
+    void advanceBabyReadHead() noexcept;
     double historyValidSamples() const noexcept;
     bool isWetReady() const noexcept;
 
@@ -86,10 +88,13 @@ private:
            backspinWindowSamples = 0.0, backspinWindowStartSerial = 0.0,
            backspinWindowEndSerial = 0.0, backspinPrimaryReadSerial = 0.0,
            backspinSecondaryReadSerial = 0.0;
+    double babyWindowSamples = 0.0, babyWindowStartSerial = 0.0,
+           babyWindowEndSerial = 0.0, babyReadSerial = 0.0, babyCycleSample = 0.0;
     int backspinWrapSamples = 1, backspinWrapProgress = 1;
     uint32_t backspinCompletedWraps = 0;
     float wetRamp = 0.0f;
-    bool waitingForDry = false, backspinCaptured = false, tapeBrakeCaptured = false;
+    bool waitingForDry = false, backspinCaptured = false, tapeBrakeCaptured = false,
+         babyCaptured = false;
     double diagnosticEffectPhase = 0.0, diagnosticReadPosition = 0.0, diagnosticReadRate = 0.0;
     float diagnosticEffectiveWet = 0.0f;
     uint32_t transportResetCount = 0;
