@@ -215,6 +215,22 @@ int main()
     check (babyBounded && babyMaxRead - babyMinRead <= 12000.0, "baby-fixed-bounded-capture");
     check (babyPopFree, "baby-no-click-or-nonfinite-output");
 
+    // Constant audio must remain constant while the BABY effect releases at
+    // LENGTH end. Returning a zero wet sample during the ramp causes a pop.
+    TimelineScratchEngine babyReleaseEngine;
+    babyReleaseEngine.prepare (48000.0, 512, 2);
+    for (int block = 0; block < 1000; ++block)
+    {
+        fill (audio, .7f);
+        babyReleaseEngine.process (audio, transport (0, 0.0), dry);
+    }
+    const auto shortBaby = slots (TimelineScratchEngine::Preset::baby,
+                                  TimelineScratchEngine::Length::quarter);
+    fill (audio, .7f); babyReleaseEngine.process (audio, transport (1, 0.0), shortBaby);
+    fill (audio, .7f); babyReleaseEngine.process (audio, transport (1, .249), shortBaby);
+    check (noHardJump (audio, .7f) && std::abs (audio.getSample (0, 511) - .7f) < .001f,
+           "baby-length-end-releases-without-silence-pop");
+
     const auto backspin = slots (TimelineScratchEngine::Preset::backspin, TimelineScratchEngine::Length::oneBar);
     TimelineScratchEngine backspinWrapEngine;
     backspinWrapEngine.prepare (48000.0, 512, 2);
