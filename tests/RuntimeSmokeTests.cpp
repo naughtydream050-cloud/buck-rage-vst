@@ -1052,6 +1052,35 @@ int main()
                    "v2-host-stale-sample-position-preserves-history-and-backspin-wet");
     staleSampleProcessor.setPlayHead (nullptr);
 
+    // FL can alternate audio block sizes. PPQ and sample positions are still
+    // continuous; comparing PPQ against the current block size would reset
+    // history every time a long block is followed by a short one.
+    ToyotomiHideyoshiAudioProcessor variableBlockProcessor;
+    juce::AudioBuffer<float> longBlockAudio (2, 1024), shortBlockAudio (2, 64);
+    variableBlockProcessor.prepareToPlay (48000, longBlockAudio.getNumSamples());
+    auto& variableBlockState = variableBlockProcessor.getStateModel();
+    variableBlockState.setSlotPreset (0, PluginStateModel::ScratchPreset::backspin);
+    variableBlockState.setSlotLength (0, PluginStateModel::NoteLength::oneBar);
+    variableBlockState.setSlotDepth (0, 1.0f);
+    TestPlayHead variableBlockPlayHead;
+    variableBlockProcessor.setPlayHead (&variableBlockPlayHead);
+    int64_t processedSamples = 0;
+    bool variableBlockWetObserved = false;
+    for (int block = 0; block < 80; ++block)
+    {
+        auto& blockAudio = block % 2 == 0 ? longBlockAudio : shortBlockAudio;
+        variableBlockPlayHead.set (true, 12.0 + (double) processedSamples * 120.0 / (60.0 * 48000.0),
+                                   120.0, 4, 4, processedSamples);
+        blockAudio.clear();
+        variableBlockProcessor.processBlock (blockAudio, midi);
+        variableBlockWetObserved |= variableBlockProcessor.getScratchDiagnostics().effectiveWet > 0.1f;
+        processedSamples += blockAudio.getNumSamples();
+    }
+    pass &= check (variableBlockProcessor.getScratchDiagnostics().transportResetCount == 1
+                   && variableBlockWetObserved && variableBlockProcessor.getCurrentTimelineSlot() == 0,
+                   "v2-host-sync-on-variable-blocks-keep-backspin-wet-and-history");
+    variableBlockProcessor.setPlayHead (nullptr);
+
     // Exercise the full state -> atomic slot -> processor -> scratch path with
     // non-zero audio. A wet coefficient observed on a silent buffer does not
     // prove that a configured BAR changes the sound.
