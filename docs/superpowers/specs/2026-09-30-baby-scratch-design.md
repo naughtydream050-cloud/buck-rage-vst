@@ -1,0 +1,5 @@
+# BABY scratch DSP design
+
+BABY uses the existing single `TimelineScratchEngine` and stereo history. At effect entry it fixes one recent, safe 250 ms capture window. During LENGTH it reads that window forward and backward repeatedly, with smooth zero-velocity turnarounds and no rhythmic gate. SPEED (0.25–4.0) controls motion rate; DEPTH controls the existing 8 ms dry/wet ramp and mix. A selected BAR never drives DSP; only the playing absolute BAR does. At a new BAR it captures anew; within one BAR it never recaptures. OFF, BACKSPIN, TAPE BRAKE, PITCH, UI, state schema, parameter IDs and host timing remain unchanged.
+
+If history is insufficient, BABY stays Dry until a safe window is available. Only valid history positions may be read. No allocation, locking, file I/O or logging occurs in the audio callback. Tests assert early/mid/late wet audio, alternating read direction, fixed bounded capture, speed ordering, LENGTH end to Dry, OFF bit-exact and existing preset regressions. Numerical checks do not replace rendered-audio and user FL listening acceptance.

@@ -171,6 +171,50 @@ int main()
     check (audio.getSample (0, 0) == 0.375f && audio.getSample (1, 511) == 0.375f,
            "off-is-bit-exact-dry");
 
+    // BABY should move one fixed recent window forward and backward for the
+    // full requested LENGTH, without using a crossfader/gate.
+    TimelineScratchEngine babyEngine;
+    babyEngine.prepare (48000.0, 512, 2);
+    fillHistory (babyEngine, audio);
+    const auto baby = slots (TimelineScratchEngine::Preset::baby, TimelineScratchEngine::Length::oneBar);
+    double babyPhase = 0.0;
+    int64_t babySample = 512000;
+    bool babyWetThroughout = true, babyBounded = true, babyPopFree = true;
+    bool babyForward = false, babyReverse = false;
+    double babyMinRead = 1.0e18, babyMaxRead = -1.0e18;
+    float previousBabySample = std::sin ((float) (babySample - 1) * 0.0137f);
+    size_t babyPhaseIndex = 0;
+    while (babyPhase < 0.96)
+    {
+        fillTone (audio, babySample);
+        babyEngine.process (audio, transport (1, babyPhase), baby);
+        const auto diagnostics = babyEngine.getDiagnostics();
+        const auto differsFromDry = maximumDifferenceFromTone (audio, babySample) > 0.02f;
+        const auto active = diagnostics.preset == TimelineScratchEngine::Preset::baby
+            && diagnostics.effectiveWet > 0.99f && differsFromDry;
+        babyWetThroughout &= active;
+        babyBounded &= diagnostics.captureWindowSamples == 12000.0
+            && diagnostics.readPosition > 0.0;
+        babyMinRead = juce::jmin (babyMinRead, diagnostics.readPosition);
+        babyMaxRead = juce::jmax (babyMaxRead, diagnostics.readPosition);
+        babyForward |= diagnostics.readRate > 0.1;
+        babyReverse |= diagnostics.readRate < -0.1;
+        babyPopFree &= boundedFinite (audio) && noHardJump (audio, previousBabySample);
+        previousBabySample = audio.getSample (0, audio.getNumSamples() - 1);
+        const auto nextPhase = babyPhase + transport (1, 0.0).barPhasePerSample * audio.getNumSamples();
+        while (babyPhaseIndex < phases.size() && nextPhase >= phases[babyPhaseIndex])
+        {
+            check (active, ("baby-one-bar-wet-at-phase-" + juce::String (phases[babyPhaseIndex], 2)).toRawUTF8());
+            ++babyPhaseIndex;
+        }
+        babyPhase = nextPhase;
+        babySample += audio.getNumSamples();
+    }
+    check (babyPhaseIndex == phases.size() && babyWetThroughout, "baby-wet-throughout-one-bar");
+    check (babyForward && babyReverse, "baby-read-motion-alternates-forward-and-reverse");
+    check (babyBounded && babyMaxRead - babyMinRead <= 12000.0, "baby-fixed-bounded-capture");
+    check (babyPopFree, "baby-no-click-or-nonfinite-output");
+
     const auto backspin = slots (TimelineScratchEngine::Preset::backspin, TimelineScratchEngine::Length::oneBar);
     TimelineScratchEngine backspinWrapEngine;
     backspinWrapEngine.prepare (48000.0, 512, 2);
