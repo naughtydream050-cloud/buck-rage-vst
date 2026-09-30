@@ -113,6 +113,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
             discontinuity = true;
             discontinuityReason = TimelineScratchEngine::DiscontinuityReason::start;
         }
+        const auto previousHostBlockSize = lastHostBlockSize;
         bool samplePositionJump = false;
         if (hasHostSamplePosition)
         {
@@ -130,7 +131,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         bool ppqJump = false;
         if (haveLastHostPpq)
         {
-            const auto expectedDelta = (double) lastHostBlockSize / preparedSampleRate
+            const auto expectedDelta = (double) previousHostBlockSize / preparedSampleRate
                 * 0.5 * (lastHostBpmForContinuity + effectiveBpm) / 60.0;
             const auto actualDelta = hostPpq - lastHostPpq;
             const auto tolerance = juce::jmax (1.0e-6, effectiveBpm * 4.0 / (60.0 * preparedSampleRate));
