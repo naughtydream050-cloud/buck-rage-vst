@@ -207,7 +207,11 @@ bool TimelineScratchEngine::isWetReady() const noexcept
 float TimelineScratchEngine::wetSample (int channel, double barPhase, double quartersPerBar) noexcept
 {
     const auto elapsedQuarters = barPhase * quartersPerBar;
-    if (elapsedQuarters >= activeDurationQuarters || activeDurationQuarters <= 0.0) return 0.0f;
+    // BABY keeps its last valid wet sample during the short release ramp.
+    // Returning zero here would cause a full-scale dip at LENGTH expiry.
+    if ((elapsedQuarters >= activeDurationQuarters || activeDurationQuarters <= 0.0)
+        && ! (activeSlot.preset == Preset::baby && babyCaptured && wetRamp > 0.0f))
+        return 0.0f;
 
     if (activeSlot.preset == Preset::backspin && backspinCaptured)
     {

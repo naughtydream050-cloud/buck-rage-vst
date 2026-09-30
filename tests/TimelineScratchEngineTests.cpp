@@ -112,7 +112,7 @@ void writeLittleEndian32 (std::ofstream& stream, uint32_t value)
     writeLittleEndian16 (stream, (uint16_t) ((value >> 16) & 0xffff));
 }
 
-bool renderPhaseOneWav (const char* presetName, TimelineScratchEngine::Preset preset,
+bool renderScratchWav (const char* presetName, TimelineScratchEngine::Preset preset,
                         TimelineScratchEngine::Length length, const char* lengthName,
                         float speed, const char* speedName)
 {
@@ -142,7 +142,8 @@ bool renderPhaseOneWav (const char* presetName, TimelineScratchEngine::Preset pr
                     block.getSample (channel, sample)) * 32767.0f));
         sourceSample += samples;
     }
-    const auto fileName = juce::String ("phase1-render-") + presetName + "-" + lengthName
+    const auto fileName = juce::String (preset == TimelineScratchEngine::Preset::baby
+        ? "phase2-render-" : "phase1-render-") + presetName + "-" + lengthName
         + "-speed-" + speedName + ".wav";
     std::ofstream file (fileName.toStdString(), std::ios::binary);
     if (! file.good()) return false;
@@ -230,6 +231,39 @@ int main()
     fill (audio, .7f); babyReleaseEngine.process (audio, transport (1, .249), shortBaby);
     check (noHardJump (audio, .7f) && std::abs (audio.getSample (0, 511) - .7f) < .001f,
            "baby-length-end-releases-without-silence-pop");
+
+    TimelineScratchEngine babyColdEngine;
+    babyColdEngine.prepare (48000.0, 512, 2);
+    fill (audio, .7f); babyColdEngine.process (audio, transport (1, 0.0), baby);
+    check (audio.getSample (0, 511) == .7f && babyColdEngine.getDiagnostics().effectiveWet == 0.0f,
+           "baby-waits-dry-for-enough-history");
+
+    std::array<int, 3> babyDirectionChanges {};
+    for (size_t speedIndex = 0; speedIndex < babyDirectionChanges.size(); ++speedIndex)
+    {
+        const auto speed = std::array<float, 3> { .25f, 1.0f, 4.0f }[speedIndex];
+        TimelineScratchEngine speedEngine;
+        speedEngine.prepare (48000.0, 512, 2);
+        fillHistory (speedEngine, audio);
+        const auto speedBaby = slots (TimelineScratchEngine::Preset::baby,
+                                      TimelineScratchEngine::Length::oneBar, speed);
+        double phase = 0.0;
+        int previousDirection = 0;
+        while (phase < .95)
+        {
+            fill (audio, .7f);
+            speedEngine.process (audio, transport (1, phase), speedBaby);
+            const auto rate = speedEngine.getDiagnostics().readRate;
+            const auto direction = rate > .05 ? 1 : rate < -.05 ? -1 : 0;
+            if (direction != 0 && previousDirection != 0 && direction != previousDirection)
+                ++babyDirectionChanges[speedIndex];
+            if (direction != 0) previousDirection = direction;
+            phase += transport (1, 0.0).barPhasePerSample * audio.getNumSamples();
+        }
+    }
+    check (babyDirectionChanges[0] < babyDirectionChanges[1]
+           && babyDirectionChanges[1] < babyDirectionChanges[2],
+           "baby-speed-controls-forward-reverse-gesture-rate");
 
     const auto backspin = slots (TimelineScratchEngine::Preset::backspin, TimelineScratchEngine::Length::oneBar);
     TimelineScratchEngine backspinWrapEngine;
@@ -376,19 +410,21 @@ int main()
     check (allBarsAddressed, "continuous-absolute-bars-1-through-64-do-not-reset");
 
     bool wavRenders = true;
-    for (const auto& preset : std::array<std::pair<const char*, TimelineScratchEngine::Preset>, 3> {{
+    for (const auto& preset : std::array<std::pair<const char*, TimelineScratchEngine::Preset>, 4> {{
              { "off", TimelineScratchEngine::Preset::off },
              { "backspin", TimelineScratchEngine::Preset::backspin },
-             { "tape-brake", TimelineScratchEngine::Preset::tapeBrake } }})
+             { "tape-brake", TimelineScratchEngine::Preset::tapeBrake },
+             { "baby", TimelineScratchEngine::Preset::baby } }})
         for (const auto& length : std::array<std::pair<const char*, TimelineScratchEngine::Length>, 2> {{
                  { "short", TimelineScratchEngine::Length::sixteenth },
                  { "one-bar", TimelineScratchEngine::Length::oneBar } }})
             for (const auto& speed : std::array<std::pair<const char*, float>, 3> {{
                      { "0_25", .25f }, { "1_0", 1.0f }, { "4_0", 4.0f } }})
-                wavRenders &= renderPhaseOneWav (preset.first, preset.second, length.second,
+                wavRenders &= renderScratchWav (preset.first, preset.second, length.second,
                     length.first, speed.second, speed.first);
-    check (wavRenders, "phase-one-offline-wav-renders-speed-0-25-1-0-4-0");
+    check (wavRenders, "scratch-offline-wav-renders-speed-0-25-1-0-4-0");
 
-    engine.release(); backspinWrapEngine.release(); tapeEngine.release(); transitionEngine.release(); shortLengthEngine.release(); depthEngine.release(); offTransitionEngine.release(); barEngine.release(); continuityEngine.release();
+    engine.release(); babyEngine.release(); babyReleaseEngine.release(); babyColdEngine.release();
+    backspinWrapEngine.release(); tapeEngine.release(); transitionEngine.release(); shortLengthEngine.release(); depthEngine.release(); offTransitionEngine.release(); barEngine.release(); continuityEngine.release();
     return passed ? 0 : 1;
 }
