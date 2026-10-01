@@ -7,6 +7,7 @@ constexpr float kWetRampSeconds = 0.008f;
 constexpr double kMinimumReadableDistance = 2.0;
 constexpr double kBackspinWrapSeconds = 0.008;
 constexpr double kTapeBrakeStartRate = 0.92;
+constexpr double kForwardCutWindowSeconds = 0.125;
 }
 
 void TimelineScratchEngine::prepare (double rate, int, int channels)
@@ -17,14 +18,17 @@ void TimelineScratchEngine::prepare (double rate, int, int channels)
     for (auto& channel : history) channel.assign ((size_t) historySamples, 0.0f);
     writeSerial = minimumReadableSerial = 0;
     activeBar = -1; wetRamp = 0.0f; waitingForDry = false;
-    backspinCaptured = tapeBrakeCaptured = babyCaptured = false;
+    backspinCaptured = tapeBrakeCaptured = babyCaptured = forwardCaptured = false;
     backspinWindowSamples = backspinWindowStartSerial = backspinWindowEndSerial = 0.0;
     backspinPrimaryReadSerial = backspinSecondaryReadSerial = 0.0;
     tapeReadSerial = tapeWindowStartSerial = tapeWindowEndSerial = 0.0;
     babyWindowSamples = babyWindowStartSerial = babyWindowEndSerial = 0.0;
     babyReadSerial = babyCycleSample = 0.0;
+    forwardWindowSamples = forwardWindowStartSerial = forwardWindowEndSerial = forwardReadSerial = 0.0;
+    forwardSecondaryReadSerial = 0.0;
     backspinWrapSamples = backspinWrapProgress = 1;
-    backspinCompletedWraps = 0;
+    forwardWrapSamples = forwardWrapProgress = 1;
+    backspinCompletedWraps = forwardCompletedWraps = 0;
 }
 
 void TimelineScratchEngine::release()
@@ -32,21 +36,24 @@ void TimelineScratchEngine::release()
     for (auto& channel : history) { channel.clear(); channel.shrink_to_fit(); }
     historySamples = channelCount = 0; sampleRateHz = 0.0;
     writeSerial = minimumReadableSerial = 0; activeBar = -1; wetRamp = 0.0f;
-    backspinCaptured = tapeBrakeCaptured = babyCaptured = false;
+    backspinCaptured = tapeBrakeCaptured = babyCaptured = forwardCaptured = false;
     backspinWindowSamples = backspinWindowStartSerial = backspinWindowEndSerial = 0.0;
     backspinPrimaryReadSerial = backspinSecondaryReadSerial = 0.0;
     tapeReadSerial = tapeWindowStartSerial = tapeWindowEndSerial = 0.0;
     babyWindowSamples = babyWindowStartSerial = babyWindowEndSerial = 0.0;
     babyReadSerial = babyCycleSample = 0.0;
+    forwardWindowSamples = forwardWindowStartSerial = forwardWindowEndSerial = forwardReadSerial = 0.0;
+    forwardSecondaryReadSerial = 0.0;
     backspinWrapSamples = backspinWrapProgress = 1;
-    backspinCompletedWraps = 0;
+    forwardWrapSamples = forwardWrapProgress = 1;
+    backspinCompletedWraps = forwardCompletedWraps = 0;
 }
 
 void TimelineScratchEngine::resetTransport() noexcept
 {
     minimumReadableSerial = writeSerial;
     activeBar = -1; wetRamp = 0.0f; waitingForDry = false;
-    backspinCaptured = tapeBrakeCaptured = babyCaptured = false;
+    backspinCaptured = tapeBrakeCaptured = babyCaptured = forwardCaptured = false;
 }
 
 double TimelineScratchEngine::lengthInQuarters (Length length, double quartersPerBar) noexcept
@@ -102,7 +109,7 @@ void TimelineScratchEngine::beginBar (int bar, const Slot& slot, double quarters
         maxHistorySeconds / juce::jmax (0.000001, secondsPerQuarter));
     activeDurationSamples = juce::jmin ((double) historySamples - 4.0,
         activeDurationQuarters * secondsPerQuarter * sampleRateHz);
-    backspinCaptured = tapeBrakeCaptured = babyCaptured = false;
+    backspinCaptured = tapeBrakeCaptured = babyCaptured = forwardCaptured = false;
     backspinCompletedWraps = 0;
     const auto speed = juce::jlimit (0.25f, 4.0f, slot.speed);
     backspinWindowSamples = juce::jlimit (sampleRateHz * 0.125, sampleRateHz * 0.500,
@@ -111,6 +118,10 @@ void TimelineScratchEngine::beginBar (int bar, const Slot& slot, double quarters
     backspinWrapProgress = backspinWrapSamples;
     babyWindowSamples = sampleRateHz * 0.250;
     babyCycleSample = 0.0;
+    forwardWindowSamples = sampleRateHz * kForwardCutWindowSeconds;
+    forwardWrapSamples = juce::jmax (1, juce::roundToInt (sampleRateHz * kBackspinWrapSeconds));
+    forwardWrapProgress = forwardWrapSamples;
+    forwardCompletedWraps = 0;
 }
 
 bool TimelineScratchEngine::beginBackspinCapture() noexcept
@@ -163,6 +174,23 @@ bool TimelineScratchEngine::beginBabyCapture() noexcept
     return true;
 }
 
+bool TimelineScratchEngine::beginForwardCutCapture() noexcept
+{
+    if (forwardCaptured || activeSlot.preset != Preset::forwardCut) return forwardCaptured;
+    const auto required = forwardWindowSamples + kMinimumReadableDistance + 2.0;
+    if (historyValidSamples() < required) return false;
+
+    forwardWindowEndSerial = (double) writeSerial - kMinimumReadableDistance;
+    forwardWindowStartSerial = forwardWindowEndSerial - forwardWindowSamples;
+    if (! canRead (forwardWindowStartSerial) || ! canRead (forwardWindowEndSerial - 1.0)) return false;
+
+    forwardReadSerial = forwardWindowStartSerial;
+    forwardSecondaryReadSerial = forwardWindowStartSerial;
+    forwardWrapProgress = forwardWrapSamples;
+    forwardCaptured = true;
+    return true;
+}
+
 TimelineScratchEngine::BackspinReadState TimelineScratchEngine::getBackspinReadState() const noexcept
 {
     const auto speed = juce::jlimit (0.25f, 4.0f, activeSlot.speed);
@@ -181,8 +209,10 @@ TimelineScratchEngine::BackspinReadState TimelineScratchEngine::getBackspinReadS
 
 TimelineScratchEngine::Diagnostics TimelineScratchEngine::getDiagnostics() const noexcept
 {
+    const auto captureWindow = activeSlot.preset == Preset::baby ? babyWindowSamples
+        : activeSlot.preset == Preset::forwardCut ? forwardWindowSamples : backspinWindowSamples;
     return { activeBar, activeSlot.preset, diagnosticEffectPhase, historyValidSamples(),
-             activeSlot.preset == Preset::baby ? babyWindowSamples : backspinWindowSamples,
+             captureWindow,
              diagnosticReadPosition, diagnosticReadRate,
              backspinCompletedWraps, transportResetCount, diagnosticEffectiveWet,
              lastDiscontinuityReason };
@@ -198,7 +228,8 @@ double TimelineScratchEngine::tapeBrakePlaybackRate (double effectPhase, float s
 
 bool TimelineScratchEngine::isWetReady() const noexcept
 {
-    return (activeSlot.preset == Preset::backspin && backspinCaptured)
+    return (activeSlot.preset == Preset::forwardCut && forwardCaptured)
+        || (activeSlot.preset == Preset::backspin && backspinCaptured)
         || (activeSlot.preset == Preset::tapeBrake && tapeBrakeCaptured)
         || (activeSlot.preset == Preset::baby && babyCaptured
             && canRead (babyWindowStartSerial) && canRead (babyWindowEndSerial));
@@ -224,6 +255,28 @@ float TimelineScratchEngine::wetSample (int channel, double barPhase, double qua
         const auto gainA = std::cos (t * juce::MathConstants<float>::halfPi);
         const auto gainB = std::sin (t * juce::MathConstants<float>::halfPi);
         return primary * gainA + secondary * gainB;
+    }
+
+    if (activeSlot.preset == Preset::forwardCut && forwardCaptured)
+    {
+        diagnosticReadPosition = forwardReadSerial;
+        diagnosticReadRate = (double) juce::jlimit (0.25f, 4.0f, activeSlot.speed);
+        if (forwardWrapProgress < forwardWrapSamples)
+        {
+            const auto primary = read (history[(size_t) channel], forwardWindowEndSerial - 1.0);
+            const auto secondary = read (history[(size_t) channel], forwardSecondaryReadSerial);
+            const auto t = (float) forwardWrapProgress / (float) forwardWrapSamples;
+            return primary * std::cos (t * juce::MathConstants<float>::halfPi)
+                 + secondary * std::sin (t * juce::MathConstants<float>::halfPi);
+        }
+        const auto cyclePosition = forwardReadSerial - forwardWindowStartSerial;
+        const auto cutStart = forwardWindowSamples * 0.80;
+        const auto cutFadeSamples = juce::jmax (1.0, sampleRateHz * kBackspinWrapSeconds);
+        const auto source = read (history[(size_t) channel], forwardReadSerial);
+        if (cyclePosition < cutStart) return source;
+        if (cyclePosition >= cutStart + cutFadeSamples) return 0.0f;
+        const auto fade = (float) ((cyclePosition - cutStart) / cutFadeSamples);
+        return source * std::cos (fade * juce::MathConstants<float>::halfPi);
     }
 
     if (activeSlot.preset == Preset::tapeBrake && tapeBrakeCaptured)
@@ -276,6 +329,30 @@ void TimelineScratchEngine::advanceBabyReadHead() noexcept
     babyReadSerial = babyWindowStartSerial + 0.5 * babyWindowSamples * (1.0 - std::cos (angle));
 }
 
+void TimelineScratchEngine::advanceForwardCutReadHead() noexcept
+{
+    const auto speed = (double) juce::jlimit (0.25f, 4.0f, activeSlot.speed);
+    if (forwardWrapProgress >= forwardWrapSamples
+        && forwardReadSerial + speed >= forwardWindowEndSerial - 1.0)
+    {
+        forwardSecondaryReadSerial = forwardWindowStartSerial;
+        forwardWrapProgress = 0;
+    }
+
+    if (forwardWrapProgress < forwardWrapSamples)
+    {
+        forwardSecondaryReadSerial = juce::jmin (forwardWindowEndSerial - 1.0,
+                                                 forwardSecondaryReadSerial + speed);
+        if (++forwardWrapProgress >= forwardWrapSamples)
+        {
+            forwardReadSerial = forwardSecondaryReadSerial;
+            ++forwardCompletedWraps;
+        }
+    }
+    else
+        forwardReadSerial = juce::jmin (forwardWindowEndSerial - 1.0, forwardReadSerial + speed);
+}
+
 void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Transport& transport,
                                      const std::array<Slot, 64>& slots) noexcept
 {
@@ -308,6 +385,7 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
             && elapsedQuarters < activeDurationQuarters;
         if (effectActive && ! waitingForDry)
         {
+            if (activeSlot.preset == Preset::forwardCut) beginForwardCutCapture();
             if (activeSlot.preset == Preset::backspin) beginBackspinCapture();
             if (activeSlot.preset == Preset::tapeBrake) beginTapeBrakeCapture();
             if (activeSlot.preset == Preset::baby) beginBabyCapture();
@@ -344,6 +422,8 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
             advanceBackspinReadHeads();
         if (activeSlot.preset == Preset::baby && effectActive && babyCaptured && ! waitingForDry)
             advanceBabyReadHead();
+        if (activeSlot.preset == Preset::forwardCut && effectActive && forwardCaptured && ! waitingForDry)
+            advanceForwardCutReadHead();
         ++writeSerial;
     }
 }

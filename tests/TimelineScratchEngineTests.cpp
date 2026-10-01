@@ -265,6 +265,49 @@ int main()
            && babyDirectionChanges[1] < babyDirectionChanges[2],
            "baby-speed-controls-forward-reverse-gesture-rate");
 
+    // FORWARD CUT uses one short forward snapshot, retriggered with a short
+    // cut at the end of each cycle.  It must be audible from the BAR start,
+    // stay inside the fixed capture, and remain click-safe at retriggers.
+    TimelineScratchEngine forwardEngine;
+    forwardEngine.prepare (48000.0, 512, 2);
+    fillHistory (forwardEngine, audio);
+    const auto forward = slots (TimelineScratchEngine::Preset::forwardCut,
+                                TimelineScratchEngine::Length::oneBar, 1.0f, 1.0f);
+    double forwardPhase = 0.0;
+    int64_t forwardSample = 512000;
+    bool forwardWetThroughout = true, forwardBounded = true, forwardPopFree = true;
+    bool forwardRetriggered = false;
+    float previousForwardSample = std::sin ((float) (forwardSample - 1) * 0.0137f);
+    size_t forwardPhaseIndex = 0;
+    while (forwardPhase < 0.96)
+    {
+        fillTone (audio, forwardSample);
+        forwardEngine.process (audio, transport (1, forwardPhase), forward);
+        const auto diagnostics = forwardEngine.getDiagnostics();
+        const auto differsFromDry = maximumDifferenceFromTone (audio, forwardSample) > 0.02f;
+        const auto active = diagnostics.preset == TimelineScratchEngine::Preset::forwardCut
+            && diagnostics.effectiveWet > 0.99f && differsFromDry;
+        forwardWetThroughout &= active;
+        forwardBounded &= diagnostics.captureWindowSamples == 6000.0
+            && diagnostics.readPosition > 0.0;
+        forwardRetriggered |= diagnostics.readRate > 0.1 && diagnostics.readPosition > 0.0;
+        forwardPopFree &= boundedFinite (audio) && noHardJump (audio, previousForwardSample);
+        previousForwardSample = audio.getSample (0, audio.getNumSamples() - 1);
+        const auto nextPhase = forwardPhase + transport (1, 0.0).barPhasePerSample * audio.getNumSamples();
+        while (forwardPhaseIndex < phases.size() && nextPhase >= phases[forwardPhaseIndex])
+        {
+            check (active, ("forward-cut-one-bar-effect-at-phase-"
+                           + juce::String (phases[forwardPhaseIndex], 2)).toRawUTF8());
+            ++forwardPhaseIndex;
+        }
+        forwardPhase = nextPhase;
+        forwardSample += audio.getNumSamples();
+    }
+    check (forwardPhaseIndex == phases.size() && forwardWetThroughout,
+           "forward-cut-wet-throughout-one-bar");
+    check (forwardBounded && forwardRetriggered, "forward-cut-fixed-forward-capture");
+    check (forwardPopFree, "forward-cut-no-click-or-nonfinite-output");
+
     const auto backspin = slots (TimelineScratchEngine::Preset::backspin, TimelineScratchEngine::Length::oneBar);
     TimelineScratchEngine backspinWrapEngine;
     backspinWrapEngine.prepare (48000.0, 512, 2);
@@ -410,8 +453,9 @@ int main()
     check (allBarsAddressed, "continuous-absolute-bars-1-through-64-do-not-reset");
 
     bool wavRenders = true;
-    for (const auto& preset : std::array<std::pair<const char*, TimelineScratchEngine::Preset>, 4> {{
+    for (const auto& preset : std::array<std::pair<const char*, TimelineScratchEngine::Preset>, 5> {{
              { "off", TimelineScratchEngine::Preset::off },
+             { "forward-cut", TimelineScratchEngine::Preset::forwardCut },
              { "backspin", TimelineScratchEngine::Preset::backspin },
              { "tape-brake", TimelineScratchEngine::Preset::tapeBrake },
              { "baby", TimelineScratchEngine::Preset::baby } }})
@@ -424,7 +468,7 @@ int main()
                     length.first, speed.second, speed.first);
     check (wavRenders, "scratch-offline-wav-renders-speed-0-25-1-0-4-0");
 
-    engine.release(); babyEngine.release(); babyReleaseEngine.release(); babyColdEngine.release();
+    engine.release(); babyEngine.release(); babyReleaseEngine.release(); babyColdEngine.release(); forwardEngine.release();
     backspinWrapEngine.release(); tapeEngine.release(); transitionEngine.release(); shortLengthEngine.release(); depthEngine.release(); offTransitionEngine.release(); barEngine.release(); continuityEngine.release();
     return passed ? 0 : 1;
 }
