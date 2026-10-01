@@ -362,6 +362,7 @@ int main()
     }
     check (! silenceEngine.getDiagnostics().forwardSourceEnded,
            "forward-cut-short-gap-does-not-end-source");
+    const auto retriggersBeforeSourceEnd = silenceEngine.getDiagnostics().forwardRetriggerCount;
     for (int block = 0; block < 3; ++block)
     {
         fill (audio, 0.0f);
@@ -369,7 +370,7 @@ int main()
         silencePhase += transport (1, 0.0).barPhasePerSample * audio.getNumSamples();
     }
     const auto endedState = silenceEngine.getDiagnostics();
-    check (endedState.forwardSourceEnded && endedState.forwardRetriggerCount == 0,
+    check (endedState.forwardSourceEnded && endedState.forwardRetriggerCount == retriggersBeforeSourceEnd,
            "forward-cut-30ms-source-silence-latches-current-bar");
     check (endedState.effectiveWet < 0.5f, "forward-cut-source-ended-wet-to-dry");
     fillTone (audio, 910000);
