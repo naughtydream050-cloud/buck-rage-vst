@@ -144,8 +144,9 @@ bool renderScratchWav (const char* presetName, TimelineScratchEngine::Preset pre
                     block.getSample (channel, sample)) * 32767.0f));
         sourceSample += samples;
     }
-    const auto fileName = juce::String (preset == TimelineScratchEngine::Preset::baby
-        ? "phase2-render-" : "phase1-render-") + presetName + "-" + lengthName
+    const auto fileName = juce::String ((preset == TimelineScratchEngine::Preset::baby
+        || preset == TimelineScratchEngine::Preset::drag) ? "phase2-render-" : "phase1-render-")
+        + presetName + "-" + lengthName
         + "-speed-" + speedName + ".wav";
     std::ofstream file (fileName.toStdString(), std::ios::binary);
     if (! file.good()) return false;
@@ -266,6 +267,89 @@ int main()
     check (babyDirectionChanges[0] < babyDirectionChanges[1]
            && babyDirectionChanges[1] < babyDirectionChanges[2],
            "baby-speed-controls-forward-reverse-gesture-rate");
+
+    // DRAG uses one fixed forward snapshot for the whole effect.  Its rate is
+    // deliberately below unity and is independent of any live writer head,
+    // so the snapshot cannot be recaptured or overtaken during a BAR.
+    for (size_t speedIndex = 0; speedIndex < 3; ++speedIndex)
+    {
+        const auto speed = std::array<float, 3> { .25f, 1.0f, 4.0f }[speedIndex];
+        TimelineScratchEngine dragEngine;
+        dragEngine.prepare (48000.0, 512, 2);
+        fillHistory (dragEngine, audio);
+        const auto drag = slots (TimelineScratchEngine::Preset::drag,
+                                 TimelineScratchEngine::Length::oneBar, speed, 1.0f);
+        double dragPhase = 0.0;
+        double firstRead = 0.0, lastRead = 0.0, fixedWindow = 0.0;
+        bool dragWet = false, dragForward = true, dragFinite = true;
+        for (int block = 0; block < 24; ++block)
+        {
+            fillTone (audio, 730000 + block * audio.getNumSamples());
+            dragEngine.process (audio, transport (1, dragPhase), drag);
+            const auto state = dragEngine.getDiagnostics();
+            if (block == 0) { firstRead = state.readPosition; fixedWindow = state.captureWindowSamples; }
+            lastRead = state.readPosition;
+            dragWet |= state.effectiveWet > 0.99f;
+            dragForward &= state.readRate > 0.0 && state.readRate < 1.0;
+            dragFinite &= boundedFinite (audio);
+            dragPhase += transport (1, 0.0).barPhasePerSample * audio.getNumSamples();
+        }
+        const auto expectedRate = std::array<double, 3> { .25, .45, .85 }[speedIndex];
+        check (dragEngine.getDiagnostics().readRate == expectedRate,
+               speedIndex == 0 ? "drag-read-rate-0-25" : speedIndex == 1
+               ? "drag-read-rate-1-0" : "drag-read-rate-4-0");
+        check (dragWet && dragForward && dragFinite,
+               speedIndex == 0 ? "drag-forward-fixed-snapshot-0-25" : speedIndex == 1
+               ? "drag-forward-fixed-snapshot-1-0" : "drag-forward-fixed-snapshot-4-0");
+        check (fixedWindow > 0.0 && lastRead >= firstRead
+                   && lastRead <= firstRead + fixedWindow + 1.0,
+               speedIndex == 0 ? "drag-bounded-window-0-25" : speedIndex == 1
+               ? "drag-bounded-window-1-0" : "drag-bounded-window-4-0");
+        dragEngine.release();
+    }
+
+    // Every LENGTH remains an effect-duration control, not a read-rate curve.
+    for (const auto length : { TimelineScratchEngine::Length::sixteenth,
+                               TimelineScratchEngine::Length::eighth,
+                               TimelineScratchEngine::Length::quarter,
+                               TimelineScratchEngine::Length::half,
+                               TimelineScratchEngine::Length::oneBar })
+    {
+        TimelineScratchEngine dragLengthEngine;
+        dragLengthEngine.prepare (48000.0, 512, 2);
+        fillHistory (dragLengthEngine, audio);
+        auto drag = slots (TimelineScratchEngine::Preset::off, length, 1.0f, 1.0f);
+        drag[0] = { TimelineScratchEngine::Preset::drag, length, 1.0f, 0.0f, 1.0f };
+        const auto expiryPhase = length == TimelineScratchEngine::Length::oneBar ? 0.999 : 0.95;
+        fillTone (audio, 740000); dragLengthEngine.process (audio, transport (1, 0.0), drag);
+        fillTone (audio, 740512); dragLengthEngine.process (audio, transport (1, expiryPhase), drag);
+        fillTone (audio, 741024); dragLengthEngine.process (audio, transport (1, expiryPhase), drag);
+        check (dragLengthEngine.getDiagnostics().effectiveWet == 0.0f,
+               "drag-length-ends-in-dry");
+        dragLengthEngine.release();
+    }
+
+    TimelineScratchEngine dragSafetyEngine;
+    dragSafetyEngine.prepare (48000.0, 512, 2);
+    fillHistory (dragSafetyEngine, audio);
+    auto dragDepthZero = slots (TimelineScratchEngine::Preset::drag,
+                                TimelineScratchEngine::Length::oneBar, 1.0f, 0.0f);
+    fill (audio, 0.375f);
+    dragSafetyEngine.process (audio, transport (1, 0.05), dragDepthZero);
+    check (audio.getSample (0, 511) == 0.375f && audio.getSample (1, 511) == 0.375f,
+           "drag-depth-zero-is-bit-exact-dry");
+    auto dragWet = slots (TimelineScratchEngine::Preset::drag,
+                          TimelineScratchEngine::Length::oneBar, 1.0f, 1.0f);
+    fillTone (audio, 750000);
+    dragSafetyEngine.process (audio, transport (1, 0.10), dragWet);
+    TimelineScratchEngine::Transport dragStopped;
+    dragStopped.playing = false; dragStopped.startBar = -1;
+    fill (audio, 0.125f);
+    dragSafetyEngine.process (audio, dragStopped, dragWet);
+    check (dragSafetyEngine.getDiagnostics().effectiveWet == 0.0f
+               && dragSafetyEngine.getDiagnostics().playingBar == -1,
+           "drag-stop-invalidates-snapshot-and-returns-dry");
+    dragSafetyEngine.release();
 
     // FORWARD CUT uses one short forward snapshot, retriggered with a short
     // cut at the end of each cycle.  It must be audible from the BAR start,
@@ -539,7 +623,8 @@ int main()
              { "forward-cut", TimelineScratchEngine::Preset::forwardCut },
              { "backspin", TimelineScratchEngine::Preset::backspin },
              { "tape-brake", TimelineScratchEngine::Preset::tapeBrake },
-             { "baby", TimelineScratchEngine::Preset::baby } }})
+             { "baby", TimelineScratchEngine::Preset::baby },
+             { "drag", TimelineScratchEngine::Preset::drag } }})
         for (const auto& length : std::array<std::pair<const char*, TimelineScratchEngine::Length>, 5> {{
                  { "1-16", TimelineScratchEngine::Length::sixteenth },
                  { "1-8", TimelineScratchEngine::Length::eighth },

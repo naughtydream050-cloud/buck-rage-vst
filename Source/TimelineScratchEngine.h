@@ -76,6 +76,7 @@ private:
     bool beginTapeBrakeCapture() noexcept;
     bool beginBabyCapture() noexcept;
     bool beginForwardCutCapture() noexcept;
+    bool beginDragCapture() noexcept;
     float wetSample (int channel, double barPhase, double quartersPerBar) noexcept;
     void advanceBackspinReadHeads() noexcept;
     void advanceBabyReadHead() noexcept;
@@ -96,6 +97,8 @@ private:
            backspinSecondaryReadSerial = 0.0;
     double babyWindowSamples = 0.0, babyWindowStartSerial = 0.0,
            babyWindowEndSerial = 0.0, babyReadSerial = 0.0, babyCycleSample = 0.0;
+    double dragWindowSamples = 0.0, dragWindowStartSerial = 0.0,
+           dragWindowEndSerial = 0.0, dragReadSerial = 0.0;
     double forwardWindowSamples = 0.0, forwardWindowStartSerial = 0.0,
            forwardWindowEndSerial = 0.0, forwardReadSerial = 0.0,
            forwardSecondaryReadSerial = 0.0;
@@ -108,7 +111,7 @@ private:
     float wetRamp = 0.0f;
     bool waitingForDry = false, backspinCaptured = false, tapeBrakeCaptured = false,
          babyCaptured = false, forwardCaptured = false, forwardSourceEnded = false,
-         forwardSourceHasSignal = false;
+         forwardSourceHasSignal = false, dragCaptured = false;
     double diagnosticEffectPhase = 0.0, diagnosticReadPosition = 0.0, diagnosticReadRate = 0.0;
     float diagnosticEffectiveWet = 0.0f;
     uint32_t transportResetCount = 0;

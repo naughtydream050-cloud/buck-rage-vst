@@ -1085,7 +1085,8 @@ int main()
     // non-zero audio. A wet coefficient observed on a silent buffer does not
     // prove that a configured BAR changes the sound.
     for (const auto preset : { PluginStateModel::ScratchPreset::backspin,
-                               PluginStateModel::ScratchPreset::tapeBrake })
+                               PluginStateModel::ScratchPreset::tapeBrake,
+                               PluginStateModel::ScratchPreset::drag })
     {
         ToyotomiHideyoshiAudioProcessor audibleProcessor;
         juce::AudioBuffer<float> audibleAudio (2, 256);
@@ -1124,7 +1125,9 @@ int main()
                            [] (bool wet) { return wet; }),
                        preset == PluginStateModel::ScratchPreset::backspin
                            ? "v2-default-backspin-changes-audio-on-bars-1-through-4"
-                           : "v2-default-tape-brake-changes-audio-on-bars-1-through-4");
+                           : preset == PluginStateModel::ScratchPreset::tapeBrake
+                           ? "v2-default-tape-brake-changes-audio-on-bars-1-through-4"
+                           : "v2-default-drag-changes-audio-on-bars-1-through-4");
         audibleProcessor.setPlayHead (nullptr);
     }
 
