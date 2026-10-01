@@ -323,7 +323,11 @@ int main()
         const auto expiryPhase = length == TimelineScratchEngine::Length::oneBar ? 0.999 : 0.95;
         fillTone (audio, 740000); dragLengthEngine.process (audio, transport (1, 0.0), drag);
         fillTone (audio, 740512); dragLengthEngine.process (audio, transport (1, expiryPhase), drag);
-        fillTone (audio, 741024); dragLengthEngine.process (audio, transport (1, expiryPhase), drag);
+        fillTone (audio, 741024);
+        if (length == TimelineScratchEngine::Length::oneBar)
+            dragLengthEngine.process (audio, transport (2, 0.0), drag);
+        else
+            dragLengthEngine.process (audio, transport (1, expiryPhase), drag);
         check (dragLengthEngine.getDiagnostics().effectiveWet == 0.0f,
                "drag-length-ends-in-dry");
         dragLengthEngine.release();
