@@ -263,11 +263,12 @@ float TimelineScratchEngine::wetSample (int channel, double barPhase, double qua
         diagnosticReadRate = (double) juce::jlimit (0.25f, 4.0f, activeSlot.speed);
         if (forwardWrapProgress < forwardWrapSamples)
         {
-            const auto primary = read (history[(size_t) channel], forwardWindowEndSerial - 1.0);
             const auto secondary = read (history[(size_t) channel], forwardSecondaryReadSerial);
             const auto t = (float) forwardWrapProgress / (float) forwardWrapSamples;
-            return primary * std::cos (t * juce::MathConstants<float>::halfPi)
-                 + secondary * std::sin (t * juce::MathConstants<float>::halfPi);
+            // The cut phase has already faded to silence.  Crossfade from
+            // that silence into the next fixed-window trigger, avoiding a
+            // stale end-sample jump at the retrigger boundary.
+            return secondary * std::sin (t * juce::MathConstants<float>::halfPi);
         }
         const auto cyclePosition = forwardReadSerial - forwardWindowStartSerial;
         const auto cutStart = forwardWindowSamples * 0.80;
