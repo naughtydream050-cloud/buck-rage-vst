@@ -119,7 +119,9 @@ bool renderScratchWav (const char* presetName, TimelineScratchEngine::Preset pre
     constexpr int sampleRate = 48000, blockSize = 512, channels = 2;
     constexpr double bpm = 140.0, quartersPerBar = 4.0;
     const auto lengthQuarters = length == TimelineScratchEngine::Length::sixteenth ? .25
-        : length == TimelineScratchEngine::Length::oneBar ? 4.0 : 1.0;
+        : length == TimelineScratchEngine::Length::eighth ? .5
+        : length == TimelineScratchEngine::Length::quarter ? 1.0
+        : length == TimelineScratchEngine::Length::half ? 2.0 : 4.0;
     const auto totalSamples = juce::roundToInt ((lengthQuarters * 60.0 / bpm + .03) * sampleRate);
     TimelineScratchEngine engine;
     engine.prepare (sampleRate, blockSize, channels);
@@ -308,6 +310,84 @@ int main()
     check (forwardBounded && forwardRetriggered, "forward-cut-fixed-forward-capture");
     check (forwardPopFree, "forward-cut-no-click-or-nonfinite-output");
 
+    // FORWARD CUT's speed controls only the cycle clock.  The read head is
+    // always native forward rate, and every cycle contains a real wet-silence
+    // interval before a new head-trigger.
+    std::array<uint32_t, 3> forwardRetriggers {};
+    for (size_t speedIndex = 0; speedIndex < 3; ++speedIndex)
+    {
+        const auto speed = std::array<float, 3> { .25f, 1.0f, 4.0f }[speedIndex];
+        TimelineScratchEngine speedEngine;
+        speedEngine.prepare (48000.0, 512, 2);
+        fillHistory (speedEngine, audio);
+        const auto speedSlots = slots (TimelineScratchEngine::Preset::forwardCut,
+                                       TimelineScratchEngine::Length::oneBar, speed, 1.0f);
+        double speedPhase = 0.0;
+        while (speedPhase < 0.50)
+        {
+            fillTone (audio, 800000 + (int64_t) (speedPhase * 100000.0));
+            speedEngine.process (audio, transport (1, speedPhase), speedSlots);
+            const auto state = speedEngine.getDiagnostics();
+            check (state.readRate == 1.0, speedIndex == 0 ? "forward-cut-read-rate-0-25"
+                : speedIndex == 1 ? "forward-cut-read-rate-1-0" : "forward-cut-read-rate-4-0");
+            check (state.forwardCycleSamples > 0.0 && state.forwardReadSamples < state.forwardCycleSamples,
+                   speedIndex == 0 ? "forward-cut-cycle-0-25" : speedIndex == 1 ? "forward-cut-cycle-1-0" : "forward-cut-cycle-4-0");
+            speedPhase += transport (1, 0.0).barPhasePerSample * audio.getNumSamples();
+        }
+        forwardRetriggers[speedIndex] = speedEngine.getDiagnostics().forwardRetriggerCount;
+        speedEngine.release();
+    }
+    check (forwardRetriggers[0] < forwardRetriggers[1] && forwardRetriggers[1] < forwardRetriggers[2],
+           "forward-cut-speed-increases-retrigger-density");
+
+    // Source silence is measured on the pre-effect input, sample by sample.
+    // A short gap is tolerated; a 30 ms hold latches the current BAR dry.
+    TimelineScratchEngine silenceEngine;
+    silenceEngine.prepare (48000.0, 512, 2);
+    fillHistory (silenceEngine, audio);
+    const auto silenceSlots = slots (TimelineScratchEngine::Preset::forwardCut,
+                                     TimelineScratchEngine::Length::oneBar, 1.0f, 1.0f);
+    double silencePhase = 0.0;
+    for (int block = 0; block < 12; ++block)
+    {
+        fillTone (audio, 900000 + block * audio.getNumSamples());
+        silenceEngine.process (audio, transport (1, silencePhase), silenceSlots);
+        silencePhase += transport (1, 0.0).barPhasePerSample * audio.getNumSamples();
+    }
+    for (int block = 0; block < 1; ++block)
+    {
+        fill (audio, 0.0f);
+        silenceEngine.process (audio, transport (1, silencePhase), silenceSlots);
+        silencePhase += transport (1, 0.0).barPhasePerSample * audio.getNumSamples();
+    }
+    check (! silenceEngine.getDiagnostics().forwardSourceEnded,
+           "forward-cut-short-gap-does-not-end-source");
+    for (int block = 0; block < 3; ++block)
+    {
+        fill (audio, 0.0f);
+        silenceEngine.process (audio, transport (1, silencePhase), silenceSlots);
+        silencePhase += transport (1, 0.0).barPhasePerSample * audio.getNumSamples();
+    }
+    const auto endedState = silenceEngine.getDiagnostics();
+    check (endedState.forwardSourceEnded && endedState.forwardRetriggerCount == 0,
+           "forward-cut-30ms-source-silence-latches-current-bar");
+    check (endedState.effectiveWet < 0.5f, "forward-cut-source-ended-wet-to-dry");
+    fillTone (audio, 910000);
+    silenceEngine.process (audio, transport (1, silencePhase), silenceSlots);
+    check (silenceEngine.getDiagnostics().forwardSourceEnded,
+           "forward-cut-source-latch-ignores-input-restart");
+
+    // Transport STOP is independent from source silence and invalidates state.
+    fillTone (audio, 920000);
+    silenceEngine.process (audio, transport (1, silencePhase), silenceSlots);
+    TimelineScratchEngine::Transport stopped;
+    stopped.playing = false; stopped.startBar = -1;
+    silenceEngine.process (audio, stopped, silenceSlots);
+    check (silenceEngine.getDiagnostics().effectiveWet == 0.0f
+               && silenceEngine.getDiagnostics().playingBar == -1,
+           "forward-cut-transport-stop-returns-dry");
+    silenceEngine.release();
+
     const auto backspin = slots (TimelineScratchEngine::Preset::backspin, TimelineScratchEngine::Length::oneBar);
     TimelineScratchEngine backspinWrapEngine;
     backspinWrapEngine.prepare (48000.0, 512, 2);
@@ -459,14 +539,18 @@ int main()
              { "backspin", TimelineScratchEngine::Preset::backspin },
              { "tape-brake", TimelineScratchEngine::Preset::tapeBrake },
              { "baby", TimelineScratchEngine::Preset::baby } }})
-        for (const auto& length : std::array<std::pair<const char*, TimelineScratchEngine::Length>, 2> {{
-                 { "short", TimelineScratchEngine::Length::sixteenth },
-                 { "one-bar", TimelineScratchEngine::Length::oneBar } }})
+        for (const auto& length : std::array<std::pair<const char*, TimelineScratchEngine::Length>, 5> {{
+                 { "1-16", TimelineScratchEngine::Length::sixteenth },
+                 { "1-8", TimelineScratchEngine::Length::eighth },
+                 { "1-4", TimelineScratchEngine::Length::quarter },
+                 { "1-2", TimelineScratchEngine::Length::half },
+                 { "1-bar", TimelineScratchEngine::Length::oneBar } }})
             for (const auto& speed : std::array<std::pair<const char*, float>, 3> {{
                      { "0_25", .25f }, { "1_0", 1.0f }, { "4_0", 4.0f } }})
                 wavRenders &= renderScratchWav (preset.first, preset.second, length.second,
                     length.first, speed.second, speed.first);
     check (wavRenders, "scratch-offline-wav-renders-speed-0-25-1-0-4-0");
+    check (wavRenders, "forward-cut-all-lengths");
 
     engine.release(); babyEngine.release(); babyReleaseEngine.release(); babyColdEngine.release(); forwardEngine.release();
     backspinWrapEngine.release(); tapeEngine.release(); transitionEngine.release(); shortLengthEngine.release(); depthEngine.release(); offTransitionEngine.release(); barEngine.release(); continuityEngine.release();

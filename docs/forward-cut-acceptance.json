@@ -1,0 +1,27 @@
+{
+  "approvedBy": "Sol",
+  "status": "APPROVED",
+  "approvedPlanSha256": "443D292270F7049A79CD64A46E397C03464912C381CC018AAF3A1E73C767F03D",
+  "criteria": [
+    {"id":"AC-01","requirement":"FORWARD CUT readRate == +1.0","check":["pwsh","-NoProfile","-File","tests/forward-cut-ac-check.ps1","-Ac","AC-01"]},
+    {"id":"AC-02","requirement":"SPEED does not change readRate","check":["pwsh","-NoProfile","-File","tests/forward-cut-ac-check.ps1","-Ac","AC-02"]},
+    {"id":"AC-03","requirement":"cycle period is 125ms / SPEED","check":["pwsh","-NoProfile","-File","tests/forward-cut-ac-check.ps1","-Ac","AC-03"]},
+    {"id":"AC-04","requirement":"SPEED increases retrigger density over equal observation time","check":["pwsh","-NoProfile","-File","tests/forward-cut-ac-check.ps1","-Ac","AC-04"]},
+    {"id":"AC-05","requirement":"capture remains fixed during one effect","check":["pwsh","-NoProfile","-File","tests/forward-cut-ac-check.ps1","-Ac","AC-05"]},
+    {"id":"AC-06","requirement":"forward, fade-out, Wet silence, fade-in retrigger with no reverse read","check":["pwsh","-NoProfile","-File","tests/forward-cut-ac-check.ps1","-Ac","AC-06"]},
+    {"id":"AC-07","requirement":"transport STOP disables capture/retrigger and returns Dry","check":["pwsh","-NoProfile","-File","tests/forward-cut-ac-check.ps1","-Ac","AC-07"]},
+    {"id":"AC-08","requirement":"LENGTH end has no retrigger and returns Dry","check":["pwsh","-NoProfile","-File","tests/forward-cut-ac-check.ps1","-Ac","AC-08"]},
+    {"id":"AC-09","requirement":"DEPTH is only Dry/Wet and Wet silence stays silent","check":["pwsh","-NoProfile","-File","tests/forward-cut-ac-check.ps1","-Ac","AC-09"]},
+    {"id":"AC-10","requirement":"BABY, BACKSPIN, TAPE BRAKE and OFF behavior regresses zero","check":["pwsh","-NoProfile","-File","tests/forward-cut-ac-check.ps1","-Ac","AC-10"]},
+    {"id":"AC-11","requirement":"30ms source silence latches current BAR; short gap does not","check":["pwsh","-NoProfile","-File","tests/forward-cut-ac-check.ps1","-Ac","AC-11"]},
+    {"id":"AC-12","requirement":"Host Sync ON and OFF pass","check":["pwsh","-NoProfile","-File","tests/forward-cut-ac-check.ps1","-Ac","AC-12","-TestLog","toyotomi-runtime-smoke.log"]},
+    {"id":"AC-13","requirement":"all five LENGTH values pass","check":["pwsh","-NoProfile","-File","tests/forward-cut-ac-check.ps1","-Ac","AC-13"]},
+    {"id":"AC-14","requirement":"64 BAR continuous playback passes","check":["pwsh","-NoProfile","-File","tests/forward-cut-ac-check.ps1","-Ac","AC-14"]},
+    {"id":"AC-15","requirement":"retrigger boundaries are click-free, finite and realtime safe","check":["pwsh","-NoProfile","-File","tests/forward-cut-ac-check.ps1","-Ac","AC-15"]}
+  ],
+  "deterministicTests": [
+    {"id":"TimelineScratchEngineTests","command":["pwsh","-NoProfile","-Command","if (Test-Path toyotomi-scratch-engine-tests.log) { exit 0 } else { exit 1 }"]},
+    {"id":"RuntimeSmokeTests","command":["pwsh","-NoProfile","-Command","if (Test-Path toyotomi-runtime-smoke.log) { exit 0 } else { exit 1 }"]},
+    {"id":"StateModelTests","command":["pwsh","-NoProfile","-Command","if (Test-Path toyotomi-state-tests.log) { exit 0 } else { exit 1 }"]}
+  ]
+}
