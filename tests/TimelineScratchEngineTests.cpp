@@ -622,7 +622,7 @@ int main()
     check (allBarsAddressed, "continuous-absolute-bars-1-through-64-do-not-reset");
 
     bool wavRenders = true;
-    for (const auto& preset : std::array<std::pair<const char*, TimelineScratchEngine::Preset>, 5> {{
+    for (const auto& preset : std::array<std::pair<const char*, TimelineScratchEngine::Preset>, 6> {{
              { "off", TimelineScratchEngine::Preset::off },
              { "forward-cut", TimelineScratchEngine::Preset::forwardCut },
              { "backspin", TimelineScratchEngine::Preset::backspin },
