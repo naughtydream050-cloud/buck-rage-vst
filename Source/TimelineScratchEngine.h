@@ -13,7 +13,7 @@ public:
     static constexpr double maxHistorySeconds = 10.0;
     enum class Preset : uint8_t { off, forwardCut, backspin, chirp, baby, transform, drag, zigzag, tapeBrake, custom };
     enum class Length : uint8_t { sixteenth, eighth, quarter, half, oneBar };
-    enum class DiscontinuityReason : uint8_t { none, stopped, start, samplePositionJump, ppqJump };
+    enum class DiscontinuityReason : uint8_t { none, stopped, start, samplePositionJump, ppqJump, loopWrap };
 
     struct Slot final
     {
@@ -29,6 +29,8 @@ public:
         int startBar = -1;
         double startBarPhase = 0.0, barPhasePerSample = 0.0, quartersPerBar = 4.0,
                secondsPerQuarter = 0.5;
+        int loopBoundarySample = -1, loopStartBar = 0;
+        double loopStartPhase = 0.0;
     };
 
     struct BackspinReadState final
@@ -59,7 +61,7 @@ public:
 
     void prepare (double sampleRate, int maxBlockSize, int channels);
     void release();
-    void resetTransport() noexcept;
+    void resetTransport (bool preserveHistory = false) noexcept;
     void process (juce::AudioBuffer<float>&, const Transport&, const std::array<Slot, 64>&) noexcept;
     int getAllocatedHistorySamples() const noexcept { return historySamples; }
     BackspinReadState getBackspinReadState() const noexcept;

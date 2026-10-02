@@ -63,9 +63,10 @@ void TimelineScratchEngine::release()
     backspinCompletedWraps = forwardCompletedWraps = 0;
 }
 
-void TimelineScratchEngine::resetTransport() noexcept
+void TimelineScratchEngine::resetTransport (bool preserveHistory) noexcept
 {
-    minimumReadableSerial = writeSerial;
+    if (! preserveHistory)
+        minimumReadableSerial = writeSerial;
     activeBar = -1; wetRamp = 0.0f; waitingForDry = false;
     backspinCaptured = tapeBrakeCaptured = babyCaptured = forwardCaptured = dragCaptured = false;
     forwardSourceEnded = false;
@@ -233,12 +234,14 @@ bool TimelineScratchEngine::beginForwardCutCapture() noexcept
 bool TimelineScratchEngine::beginDragCapture() noexcept
 {
     if (dragCaptured || activeSlot.preset != Preset::drag) return dragCaptured;
-    const auto required = dragWindowSamples + kMinimumReadableDistance + 2.0;
-    if (dragWindowSamples <= 0.0 || historyValidSamples() < required) return false;
+    if (dragWindowSamples <= 0.0) return false;
 
-    dragWindowEndSerial = (double) writeSerial - kMinimumReadableDistance;
-    dragWindowStartSerial = dragWindowEndSerial - dragWindowSamples;
-    if (! canRead (dragWindowStartSerial) || ! canRead (dragWindowEndSerial - 1.0)) return false;
+    // DRAG is anchored at the effect entry, not at a long retrospective
+    // snapshot.  This prevents a BAR loop from replaying the previous BAR's
+    // entire history while keeping the two-sample realtime safety margin.
+    dragWindowStartSerial = (double) writeSerial - kMinimumReadableDistance;
+    dragWindowEndSerial = dragWindowStartSerial + dragWindowSamples;
+    if (! canRead (dragWindowStartSerial)) return false;
 
     dragReadSerial = dragWindowStartSerial;
     dragCaptured = true;
@@ -290,7 +293,7 @@ bool TimelineScratchEngine::isWetReady() const noexcept
         || (activeSlot.preset == Preset::baby && babyCaptured
             && canRead (babyWindowStartSerial) && canRead (babyWindowEndSerial))
         || (activeSlot.preset == Preset::drag && dragCaptured
-            && canRead (dragWindowStartSerial) && canRead (dragWindowEndSerial - 1.0));
+            && canRead (dragReadSerial));
 }
 
 float TimelineScratchEngine::wetSample (int channel, double barPhase, double quartersPerBar) noexcept
@@ -420,13 +423,20 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
         ++transportResetCount;
         lastDiscontinuityReason = transport.discontinuity ? transport.discontinuityReason
             : DiscontinuityReason::stopped;
-        resetTransport();
+        resetTransport (transport.discontinuityReason == DiscontinuityReason::loopWrap);
     }
 
     const auto rampStep = 1.0f / juce::jmax (1.0f, (float) sampleRateHz * kWetRampSeconds);
     const auto channels = juce::jmin (channelCount, buffer.getNumChannels());
+    bool loopBoundaryApplied = false;
     for (int sampleIndex = 0; sampleIndex < buffer.getNumSamples(); ++sampleIndex)
     {
+        if (! loopBoundaryApplied && transport.loopBoundarySample >= 0
+            && sampleIndex >= transport.loopBoundarySample)
+        {
+            resetTransport (true);
+            loopBoundaryApplied = true;
+        }
         const auto dryLeft = channels > 0 ? buffer.getSample (0, sampleIndex) : 0.0f;
         const auto dryRight = channels > 1 ? buffer.getSample (1, sampleIndex) : dryLeft;
         if (activeSlot.preset == Preset::forwardCut && ! forwardSourceEnded && ! waitingForDry)
@@ -443,10 +453,16 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
             if (forwardSourceSilenceSamples >= sampleRateHz * kForwardCutSilenceHoldSeconds)
                 forwardSourceEnded = true;
         }
-        const auto progressed = transport.startBarPhase + transport.barPhasePerSample * (double) sampleIndex;
+        const auto localSample = loopBoundaryApplied
+            ? sampleIndex - transport.loopBoundarySample : sampleIndex;
+        const auto progressed = (loopBoundaryApplied ? transport.loopStartPhase
+                                                      : transport.startBarPhase)
+            + transport.barPhasePerSample * (double) localSample;
         const auto wholeBars = (int) std::floor (progressed);
         const auto phase = progressed - std::floor (progressed);
-        const auto bar = transport.playing ? (transport.startBar + wholeBars + 64) % 64 : -1;
+        const auto bar = transport.playing
+            ? ((loopBoundaryApplied ? transport.loopStartBar : transport.startBar) + wholeBars + 64) % 64
+            : -1;
         if (bar != activeBar && bar >= 0)
         {
             if (wetRamp > 0.001f) waitingForDry = true;

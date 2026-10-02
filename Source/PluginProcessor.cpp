@@ -66,7 +66,8 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
     juce::ScopedNoDenormals noDenormals;
     for (int channel = getTotalNumInputChannels(); channel < getTotalNumOutputChannels(); ++channel)
         buffer.clear (channel, 0, buffer.getNumSamples());
-    bool readPosition = false, playing = false;
+    bool readPosition = false, playing = false, hostIsLooping = false;
+    juce::Optional<juce::AudioPlayHead::LoopPoints> hostLoopPoints;
     int timelineSlot = -1; double hostPpq = 0.0;
     int64_t hostSamplePosition = 0;
     bool hasHostPpq = false, hasHostSamplePosition = false, discontinuity = false;
@@ -76,6 +77,8 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         {
             readPosition = true;
             playing = position->getIsPlaying();
+            if (auto looping = position->getIsLooping()) hostIsLooping = *looping;
+            hostLoopPoints = position->getLoopPoints();
             if (auto bpm = position->getBpm()) hostBpm.store (*bpm, std::memory_order_relaxed);
             if (auto time = position->getTimeSignature())
             {
@@ -147,6 +150,13 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
             discontinuityReason = samplePositionJump
                 ? TimelineScratchEngine::DiscontinuityReason::samplePositionJump
                 : TimelineScratchEngine::DiscontinuityReason::ppqJump;
+            if (hostIsLooping && hostLoopPoints.hasValue())
+            {
+                const auto ppqPerSample = effectiveBpm / (60.0 * preparedSampleRate);
+                const auto tolerance = ppqPerSample * (double) juce::jmax (4, buffer.getNumSamples());
+                if (hostPpq <= hostLoopPoints->ppqStart + tolerance)
+                    discontinuityReason = TimelineScratchEngine::DiscontinuityReason::loopWrap;
+            }
         }
 
         // Toyotomi BAR 1 starts at the host's actual play/seek/loop position,
@@ -168,6 +178,20 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         lastHostBpmForContinuity = effectiveBpm;
         lastHostBlockSize = buffer.getNumSamples();
         haveLastHostPpq = true;
+
+        if (hostIsLooping && hostLoopPoints.hasValue())
+        {
+            const auto ppqPerSample = effectiveBpm / (60.0 * preparedSampleRate);
+            const auto blockPpqEnd = hostPpq + ppqPerSample * (double) buffer.getNumSamples();
+            if (hostPpq < hostLoopPoints->ppqEnd && blockPpqEnd > hostLoopPoints->ppqEnd)
+            {
+                const auto offset = juce::jlimit (0, buffer.getNumSamples() - 1,
+                    (int) std::ceil ((hostLoopPoints->ppqEnd - hostPpq) / ppqPerSample));
+                transport.loopBoundarySample = offset;
+                transport.loopStartBar = 0;
+                transport.loopStartPhase = 0.0;
+            }
+        }
     }
     else
     {

@@ -355,6 +355,34 @@ int main()
            "drag-stop-invalidates-snapshot-and-returns-dry");
     dragSafetyEngine.release();
 
+    // A loop can fall in the middle of an audio block.  The old BAR must stop
+    // at that exact sample; DRAG then anchors to the new BAR's live writer
+    // with only the realtime safety margin, not the old BAR's long snapshot.
+    TimelineScratchEngine dragLoopEngine;
+    dragLoopEngine.prepare (48000.0, 512, 2);
+    fillHistory (dragLoopEngine, audio);
+    auto dragLoopSlots = slots (TimelineScratchEngine::Preset::drag,
+                                TimelineScratchEngine::Length::oneBar, 1.0f, 1.0f);
+    fill (audio, 0.85f);
+    auto dragLoopTransport = transport (3, 0.99);
+    dragLoopTransport.loopBoundarySample = 256;
+    dragLoopTransport.loopStartBar = 0;
+    dragLoopTransport.loopStartPhase = 0.0;
+    for (int sample = 256; sample < audio.getNumSamples(); ++sample)
+    {
+        audio.setSample (0, sample, 0.125f);
+        audio.setSample (1, sample, 0.125f);
+    }
+    dragLoopEngine.process (audio, dragLoopTransport, dragLoopSlots);
+    float postLoopError = 0.0f;
+    for (int sample = 384; sample < audio.getNumSamples(); ++sample)
+        postLoopError += std::abs (audio.getSample (0, sample) - 0.125f);
+    check (dragLoopEngine.getDiagnostics().playingBar == 0
+               && postLoopError < 20.0f
+               && boundedFinite (audio),
+           "drag-mid-block-loop-stops-old-bar-and-restarts-at-bar-one");
+    dragLoopEngine.release();
+
     // FORWARD CUT uses one short forward snapshot, retriggered with a short
     // cut at the end of each cycle.  It must be audible from the BAR start,
     // stay inside the fixed capture, and remain click-safe at retriggers.
