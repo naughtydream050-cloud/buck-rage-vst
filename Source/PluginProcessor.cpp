@@ -77,7 +77,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         {
             readPosition = true;
             playing = position->getIsPlaying();
-            if (auto looping = position->getIsLooping()) hostIsLooping = *looping;
+            hostIsLooping = position->getIsLooping();
             hostLoopPoints = position->getLoopPoints();
             if (auto bpm = position->getBpm()) hostBpm.store (*bpm, std::memory_order_relaxed);
             if (auto time = position->getTimeSignature())
