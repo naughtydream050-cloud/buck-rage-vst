@@ -12,6 +12,8 @@ constexpr double kForwardCutFadeSeconds = 0.005;
 constexpr double kForwardCutSilenceHoldSeconds = 0.030;
 constexpr float kForwardCutSilenceThreshold = 1.0e-4f;
 constexpr double kDragMinimumWindowSeconds = 0.125;
+constexpr double kMotionCaptureWindowSeconds = 0.125;
+constexpr double kMotionGateFadeSeconds = 0.003;
 }
 
 void TimelineScratchEngine::prepare (double rate, int, int channels)
@@ -33,6 +35,9 @@ void TimelineScratchEngine::prepare (double rate, int, int channels)
     forwardSecondaryReadSerial = 0.0;
     forwardCycleSamples = forwardReadSamples = forwardFadeSamples = forwardCyclePosition = 0.0;
     forwardSourceSilenceSamples = 0.0;
+    motionWindowSamples = motionWindowStartSerial = motionWindowEndSerial = 0.0;
+    motionPhase = motionCycleSamples = motionSourceSilenceSamples = 0.0;
+    motionCaptured = motionSourceEnded = motionSourceHasSignal = false;
     forwardSourceEnded = false;
     forwardSourceHasSignal = false;
     backspinWrapSamples = backspinWrapProgress = 1;
@@ -56,6 +61,9 @@ void TimelineScratchEngine::release()
     forwardSecondaryReadSerial = 0.0;
     forwardCycleSamples = forwardReadSamples = forwardFadeSamples = forwardCyclePosition = 0.0;
     forwardSourceSilenceSamples = 0.0;
+    motionWindowSamples = motionWindowStartSerial = motionWindowEndSerial = 0.0;
+    motionPhase = motionCycleSamples = motionSourceSilenceSamples = 0.0;
+    motionCaptured = motionSourceEnded = motionSourceHasSignal = false;
     forwardSourceEnded = false;
     forwardSourceHasSignal = false;
     backspinWrapSamples = backspinWrapProgress = 1;
@@ -72,6 +80,8 @@ void TimelineScratchEngine::resetTransport (bool preserveHistory) noexcept
     forwardSourceEnded = false;
     forwardSourceHasSignal = false;
     forwardSourceSilenceSamples = 0.0;
+    motionSourceSilenceSamples = 0.0;
+    motionSourceEnded = motionSourceHasSignal = motionCaptured = false;
 }
 
 double TimelineScratchEngine::lengthInQuarters (Length length, double quartersPerBar) noexcept
@@ -161,6 +171,13 @@ void TimelineScratchEngine::beginBar (int bar, const Slot& slot, double quarters
     forwardWrapSamples = juce::jmax (1, juce::roundToInt (sampleRateHz * kBackspinWrapSeconds));
     forwardWrapProgress = forwardWrapSamples;
     forwardCompletedWraps = 0;
+    motionWindowSamples = sampleRateHz * kMotionCaptureWindowSeconds;
+    motionWindowStartSerial = motionWindowEndSerial = 0.0;
+    motionPhase = 0.0;
+    motionCycleSamples = juce::jmax (1.0,
+        secondsPerQuarter * 0.5 * sampleRateHz / (double) speed);
+    motionSourceSilenceSamples = 0.0;
+    motionCaptured = motionSourceEnded = motionSourceHasSignal = false;
 }
 
 bool TimelineScratchEngine::beginBackspinCapture() noexcept
@@ -248,6 +265,25 @@ bool TimelineScratchEngine::beginDragCapture() noexcept
     return true;
 }
 
+bool TimelineScratchEngine::beginMotionCapture() noexcept
+{
+    const auto presetId = static_cast<int> (activeSlot.preset);
+    if (motionCaptured || presetId < static_cast<int> (Preset::chirp)
+        || presetId > static_cast<int> (Preset::zigzag))
+        return motionCaptured;
+    const auto required = motionWindowSamples + kMinimumReadableDistance + 2.0;
+    if (! motionSourceHasSignal || historyValidSamples() < required) return false;
+
+    motionWindowEndSerial = (double) writeSerial - kMinimumReadableDistance;
+    motionWindowStartSerial = motionWindowEndSerial - motionWindowSamples;
+    if (! canRead (motionWindowStartSerial) || ! canRead (motionWindowEndSerial - 1.0))
+        return false;
+
+    motionPhase = 0.0;
+    motionCaptured = true;
+    return true;
+}
+
 TimelineScratchEngine::BackspinReadState TimelineScratchEngine::getBackspinReadState() const noexcept
 {
     const auto speed = juce::jlimit (0.25f, 4.0f, activeSlot.speed);
@@ -268,13 +304,17 @@ TimelineScratchEngine::Diagnostics TimelineScratchEngine::getDiagnostics() const
 {
     const auto captureWindow = activeSlot.preset == Preset::baby ? babyWindowSamples
         : activeSlot.preset == Preset::forwardCut ? forwardWindowSamples
-        : activeSlot.preset == Preset::drag ? dragWindowSamples : backspinWindowSamples;
+        : activeSlot.preset == Preset::drag ? dragWindowSamples
+        : (static_cast<int> (activeSlot.preset) >= static_cast<int> (Preset::chirp)
+            && static_cast<int> (activeSlot.preset) <= static_cast<int> (Preset::zigzag))
+            ? motionWindowSamples : backspinWindowSamples;
     return { activeBar, activeSlot.preset, diagnosticEffectPhase, historyValidSamples(),
              captureWindow,
              diagnosticReadPosition, diagnosticReadRate,
              backspinCompletedWraps, transportResetCount, diagnosticEffectiveWet,
              lastDiscontinuityReason, forwardCycleSamples, forwardReadSamples,
-             forwardCyclePosition, forwardCompletedWraps, forwardSourceEnded };
+             forwardCyclePosition, forwardCompletedWraps, forwardSourceEnded,
+             motionSourceEnded };
 }
 
 double TimelineScratchEngine::tapeBrakePlaybackRate (double effectPhase, float speed) noexcept
@@ -293,7 +333,10 @@ bool TimelineScratchEngine::isWetReady() const noexcept
         || (activeSlot.preset == Preset::baby && babyCaptured
             && canRead (babyWindowStartSerial) && canRead (babyWindowEndSerial))
         || (activeSlot.preset == Preset::drag && dragCaptured
-            && canRead (dragReadSerial));
+            && canRead (dragReadSerial))
+        || ((static_cast<int> (activeSlot.preset) >= static_cast<int> (Preset::chirp)
+             && static_cast<int> (activeSlot.preset) <= static_cast<int> (Preset::zigzag))
+            && motionCaptured && canRead (motionWindowStartSerial));
 }
 
 float TimelineScratchEngine::wetSample (int channel, double barPhase, double quartersPerBar) noexcept
@@ -362,6 +405,56 @@ float TimelineScratchEngine::wetSample (int channel, double barPhase, double qua
         diagnosticReadPosition = dragReadSerial;
         diagnosticReadRate = juce::jlimit (0.25, 0.85, 0.45 * std::sqrt (speed));
         return read (history[(size_t) channel], dragReadSerial);
+    }
+    const auto motionPreset = static_cast<int> (activeSlot.preset) >= static_cast<int> (Preset::chirp)
+        && static_cast<int> (activeSlot.preset) <= static_cast<int> (Preset::zigzag);
+    if (motionPreset && motionCaptured)
+    {
+        const auto u = juce::jlimit (0.0, 1.0,
+                                     motionCycleSamples > 0.0
+                                         ? motionPhase / motionCycleSamples : 0.0);
+        double position = 0.0;
+        double positionRate = 0.0;
+        float gate = 1.0f;
+
+        if (activeSlot.preset == Preset::zigzag)
+        {
+            const auto segment = juce::jmin (3, (int) std::floor (u * 4.0));
+            const auto t = u * 4.0 - (double) segment;
+            constexpr double points[] { 0.0, 1.0, 0.25, 0.75, 0.0 };
+            const auto eased = 0.5 * (1.0 - std::cos (juce::MathConstants<double>::pi * t));
+            position = points[segment] + (points[segment + 1] - points[segment]) * eased;
+            positionRate = (points[segment + 1] - points[segment])
+                * 2.0 * juce::MathConstants<double>::pi * std::sin (juce::MathConstants<double>::pi * t)
+                * juce::jmax (0.0, motionWindowSamples - 1.0)
+                / juce::jmax (1.0, motionCycleSamples);
+        }
+        else
+        {
+            position = 0.5 * (1.0 - std::cos (2.0 * juce::MathConstants<double>::pi * u));
+            positionRate = juce::MathConstants<double>::pi
+                * std::sin (2.0 * juce::MathConstants<double>::pi * u)
+                * juce::jmax (0.0, motionWindowSamples - 1.0)
+                / juce::jmax (1.0, motionCycleSamples);
+            const auto gateUnits = activeSlot.preset == Preset::chirp ? 2.0 : 8.0;
+            const auto local = std::fmod (u * gateUnits, 1.0);
+            const auto openLimit = activeSlot.preset == Preset::chirp ? 0.8 : 0.5;
+            const auto segmentSamples = motionCycleSamples / gateUnits;
+            const auto fadeSamples = juce::jmin (sampleRateHz * kMotionGateFadeSeconds,
+                                                  segmentSamples * 0.25);
+            if (local >= openLimit)
+                gate = 0.0f;
+            else if (fadeSamples > 1.0 && local * segmentSamples < fadeSamples)
+                gate = (float) (local * segmentSamples / fadeSamples);
+            else if (fadeSamples > 1.0 && (openLimit - local) * segmentSamples < fadeSamples)
+                gate = (float) ((openLimit - local) * segmentSamples / fadeSamples);
+        }
+
+        const auto serial = motionWindowStartSerial
+            + position * juce::jmax (0.0, motionWindowSamples - 1.0);
+        diagnosticReadPosition = serial;
+        diagnosticReadRate = positionRate;
+        return read (history[(size_t) channel], serial) * gate;
     }
     return 0.0f;
 }
@@ -469,6 +562,23 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
             else beginBar (bar, slots[(size_t) bar], transport.quartersPerBar, transport.secondsPerQuarter);
         }
 
+        const auto motionPreset = static_cast<int> (activeSlot.preset) >= static_cast<int> (Preset::chirp)
+            && static_cast<int> (activeSlot.preset) <= static_cast<int> (Preset::zigzag);
+        if (motionPreset && ! motionSourceEnded && ! waitingForDry)
+        {
+            if (std::abs (dryLeft) < kForwardCutSilenceThreshold
+                && std::abs (dryRight) < kForwardCutSilenceThreshold)
+                motionSourceSilenceSamples += 1.0;
+            else
+            {
+                motionSourceHasSignal = true;
+                motionSourceSilenceSamples = 0.0;
+            }
+
+            if (motionSourceSilenceSamples >= sampleRateHz * kForwardCutSilenceHoldSeconds)
+                motionSourceEnded = true;
+        }
+
         const auto elapsedQuarters = phase * transport.quartersPerBar;
         diagnosticEffectPhase = activeDurationQuarters > 0.0 ? elapsedQuarters / activeDurationQuarters : 0.0;
         const auto effectActive = activeBar >= 0 && activeSlot.preset != Preset::off
@@ -480,8 +590,10 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
             if (activeSlot.preset == Preset::tapeBrake) beginTapeBrakeCapture();
             if (activeSlot.preset == Preset::baby) beginBabyCapture();
             if (activeSlot.preset == Preset::drag) beginDragCapture();
+            if (motionPreset) beginMotionCapture();
         }
-        const auto sourceEnded = activeSlot.preset == Preset::forwardCut && forwardSourceEnded;
+        const auto sourceEnded = (activeSlot.preset == Preset::forwardCut && forwardSourceEnded)
+            || (motionPreset && motionSourceEnded);
         const auto targetWet = effectActive && ! waitingForDry && ! sourceEnded && isWetReady() ? 1.0f : 0.0f;
         wetRamp += juce::jlimit (-rampStep, rampStep, targetWet - wetRamp);
 
@@ -524,6 +636,8 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
             dragReadSerial = juce::jmin (dragWindowEndSerial - 1.0,
                                          dragReadSerial + dragRate);
         }
+        if (motionPreset && effectActive && motionCaptured && ! waitingForDry && ! motionSourceEnded)
+            motionPhase = std::fmod (motionPhase + 1.0, juce::jmax (1.0, motionCycleSamples));
         ++writeSerial;
     }
 }

@@ -56,7 +56,7 @@ public:
         double forwardCycleSamples = 0.0, forwardReadSamples = 0.0,
                forwardCyclePosition = 0.0;
         uint32_t forwardRetriggerCount = 0;
-        bool forwardSourceEnded = false;
+        bool forwardSourceEnded = false, motionSourceEnded = false;
     };
 
     void prepare (double sampleRate, int maxBlockSize, int channels);
@@ -79,6 +79,7 @@ private:
     bool beginBabyCapture() noexcept;
     bool beginForwardCutCapture() noexcept;
     bool beginDragCapture() noexcept;
+    bool beginMotionCapture() noexcept;
     float wetSample (int channel, double barPhase, double quartersPerBar) noexcept;
     void advanceBackspinReadHeads() noexcept;
     void advanceBabyReadHead() noexcept;
@@ -107,13 +108,18 @@ private:
     double forwardCycleSamples = 0.0, forwardReadSamples = 0.0,
            forwardFadeSamples = 0.0, forwardCyclePosition = 0.0,
            forwardSourceSilenceSamples = 0.0;
+    double motionWindowSamples = 0.0, motionWindowStartSerial = 0.0,
+           motionWindowEndSerial = 0.0, motionPhase = 0.0,
+           motionCycleSamples = 0.0, motionSourceSilenceSamples = 0.0;
     int backspinWrapSamples = 1, backspinWrapProgress = 1;
     int forwardWrapSamples = 1, forwardWrapProgress = 1;
     uint32_t backspinCompletedWraps = 0, forwardCompletedWraps = 0;
     float wetRamp = 0.0f;
     bool waitingForDry = false, backspinCaptured = false, tapeBrakeCaptured = false,
          babyCaptured = false, forwardCaptured = false, forwardSourceEnded = false,
-         forwardSourceHasSignal = false, dragCaptured = false;
+         forwardSourceHasSignal = false, dragCaptured = false,
+         motionCaptured = false, motionSourceEnded = false,
+         motionSourceHasSignal = false;
     double diagnosticEffectPhase = 0.0, diagnosticReadPosition = 0.0, diagnosticReadRate = 0.0;
     float diagnosticEffectiveWet = 0.0f;
     uint32_t transportResetCount = 0;

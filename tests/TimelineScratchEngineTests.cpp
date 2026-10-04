@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -637,6 +638,87 @@ int main()
     const auto barFiveDry = maximumDifferenceFromTone (audio, 881536) == 0.0f;
     check (barThreeDry && barFourWet && barFiveDry, "absolute-bar-slot-selection-is-isolated");
 
+    // CHIRP, TRANSFORM and ZIGZAG share one fixed capture window but expose
+    // distinct motion/gate behavior.  Constant history makes gate silence
+    // deterministic instead of depending on an input zero crossing.
+    for (const auto& preset : std::array<std::pair<const char*, TimelineScratchEngine::Preset>, 3> {{
+             { "chirp", TimelineScratchEngine::Preset::chirp },
+             { "transform", TimelineScratchEngine::Preset::transform },
+             { "zigzag", TimelineScratchEngine::Preset::zigzag } }})
+    {
+        TimelineScratchEngine motionEngine;
+        motionEngine.prepare (48000.0, 512, 2);
+        for (int block = 0; block < 1000; ++block)
+        {
+            fill (audio, .7f);
+            motionEngine.process (audio, transport (0, 0.0), dry);
+        }
+        const auto motionSlots = slots (preset.second, TimelineScratchEngine::Length::oneBar, 1.0f, 1.0f);
+        bool wetSeen = false, finite = true, fixedCapture = true, silenceSeen = false;
+        bool positiveRate = false, negativeRate = false;
+        double firstWindow = 0.0;
+        double phase = 0.0;
+        for (int block = 0; block < 90; ++block)
+        {
+            fill (audio, .7f);
+            motionEngine.process (audio, transport (1, phase), motionSlots);
+            const auto state = motionEngine.getDiagnostics();
+            if (block == 0) firstWindow = state.captureWindowSamples;
+            fixedCapture &= state.captureWindowSamples == firstWindow;
+            wetSeen |= state.effectiveWet > 0.99f;
+            finite &= boundedFinite (audio);
+            auto energy = 0.0f;
+            for (int sample = 0; sample < audio.getNumSamples(); ++sample)
+                energy += std::abs (audio.getSample (0, sample));
+            silenceSeen |= energy < 1.0f;
+            positiveRate |= state.readRate > 0.001;
+            negativeRate |= state.readRate < -0.001;
+            phase += transport (1, 0.0).barPhasePerSample * audio.getNumSamples();
+        }
+        check (wetSeen && finite && fixedCapture && firstWindow == 6000.0,
+               (std::string (preset.first) + "-fixed-capture-and-wet").c_str());
+        if (preset.second == TimelineScratchEngine::Preset::zigzag)
+            check (positiveRate && negativeRate && ! silenceSeen,
+                   "zigzag-forward-reverse-no-gate-silence");
+        else
+            check (positiveRate && negativeRate && silenceSeen,
+                   preset.second == TimelineScratchEngine::Preset::chirp
+                       ? "chirp-forward-reverse-gate-silence"
+                       : "transform-forward-reverse-gate-silence");
+        motionEngine.release();
+    }
+
+    TimelineScratchEngine motionSilenceEngine;
+    motionSilenceEngine.prepare (48000.0, 512, 2);
+    for (int block = 0; block < 1000; ++block)
+    {
+        fill (audio, .7f);
+        motionSilenceEngine.process (audio, transport (0, 0.0), dry);
+    }
+    const auto chirpSlots = slots (TimelineScratchEngine::Preset::chirp,
+                                   TimelineScratchEngine::Length::oneBar, 1.0f, 1.0f);
+    double motionSilencePhase = 0.0;
+    for (int block = 0; block < 8; ++block)
+    {
+        fill (audio, .7f);
+        motionSilenceEngine.process (audio, transport (1, motionSilencePhase), chirpSlots);
+        motionSilencePhase += transport (1, 0.0).barPhasePerSample * audio.getNumSamples();
+    }
+    for (int block = 0; block < 3; ++block)
+    {
+        fill (audio, 0.0f);
+        motionSilenceEngine.process (audio, transport (1, motionSilencePhase), chirpSlots);
+        motionSilencePhase += transport (1, 0.0).barPhasePerSample * audio.getNumSamples();
+    }
+    const auto motionEnded = motionSilenceEngine.getDiagnostics();
+    check (motionEnded.motionSourceEnded && motionEnded.effectiveWet < 0.5f,
+           "chirp-30ms-source-silence-latches-current-bar");
+    fill (audio, .7f);
+    motionSilenceEngine.process (audio, transport (1, motionSilencePhase), chirpSlots);
+    check (motionSilenceEngine.getDiagnostics().motionSourceEnded,
+           "chirp-source-latch-ignores-input-restart");
+    motionSilenceEngine.release();
+
     TimelineScratchEngine continuityEngine;
     continuityEngine.prepare (48000.0, 512, 2);
     bool allBarsAddressed = true;
@@ -650,13 +732,16 @@ int main()
     check (allBarsAddressed, "continuous-absolute-bars-1-through-64-do-not-reset");
 
     bool wavRenders = true;
-    for (const auto& preset : std::array<std::pair<const char*, TimelineScratchEngine::Preset>, 6> {{
+    for (const auto& preset : std::array<std::pair<const char*, TimelineScratchEngine::Preset>, 9> {{
              { "off", TimelineScratchEngine::Preset::off },
              { "forward-cut", TimelineScratchEngine::Preset::forwardCut },
              { "backspin", TimelineScratchEngine::Preset::backspin },
              { "tape-brake", TimelineScratchEngine::Preset::tapeBrake },
              { "baby", TimelineScratchEngine::Preset::baby },
-             { "drag", TimelineScratchEngine::Preset::drag } }})
+             { "drag", TimelineScratchEngine::Preset::drag },
+             { "chirp", TimelineScratchEngine::Preset::chirp },
+             { "transform", TimelineScratchEngine::Preset::transform },
+             { "zigzag", TimelineScratchEngine::Preset::zigzag } }})
         for (const auto& length : std::array<std::pair<const char*, TimelineScratchEngine::Length>, 5> {{
                  { "1-16", TimelineScratchEngine::Length::sixteenth },
                  { "1-8", TimelineScratchEngine::Length::eighth },
