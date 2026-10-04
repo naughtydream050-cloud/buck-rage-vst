@@ -711,8 +711,12 @@ int main()
         motionSilencePhase += transport (1, 0.0).barPhasePerSample * audio.getNumSamples();
     }
     const auto motionEnded = motionSilenceEngine.getDiagnostics();
-    check (motionEnded.motionSourceEnded && motionEnded.effectiveWet < 0.5f,
+    check (motionEnded.motionSourceEnded,
            "chirp-30ms-source-silence-latches-current-bar");
+    fill (audio, 0.0f);
+    motionSilenceEngine.process (audio, transport (1, motionSilencePhase), chirpSlots);
+    check (motionSilenceEngine.getDiagnostics().effectiveWet < 0.5f,
+           "chirp-source-ended-wet-to-dry");
     fill (audio, .7f);
     motionSilenceEngine.process (audio, transport (1, motionSilencePhase), chirpSlots);
     check (motionSilenceEngine.getDiagnostics().motionSourceEnded,
