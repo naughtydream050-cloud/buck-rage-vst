@@ -56,7 +56,8 @@ switch (ac) {
   case 'AC-09':
     requireText(source, /beginBar\s*\(\s*int bar/, 'BAR entry');
     requireText(tests, /continuous-absolute-bars-1-through-64-do-not-reset/, '64 BAR regression');
-    pass('BAR transitions and 64 BAR continuity covered');
+    requireText(readFileSync('Source/PluginProcessor.cpp', 'utf8'), /hostSyncEnabled|hasHostPpq|hostPpqOrigin/, 'Host Sync path');
+    pass('BAR transitions, Host Sync ON/OFF and 64 BAR continuity covered');
     break;
   case 'AC-10':
     for (const name of ['off', 'baby', 'forwardCut', 'backspin', 'tapeBrake', 'drag'])
