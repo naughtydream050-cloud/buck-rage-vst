@@ -758,7 +758,8 @@ int main()
 
     // Eight consecutive BAR entries, including BAR1 and BAR5, must expose
     // an active effect. DRAG is included to guard against false coupling to
-    // the motion source-silence detector.
+    // the motion source-silence detector. AC-08 keeps the existing OFF,
+    // FORWARD CUT, BACKSPIN, TAPE BRAKE and BABY regression checks intact.
     for (const auto preset : { TimelineScratchEngine::Preset::chirp,
                                TimelineScratchEngine::Preset::drag,
                                TimelineScratchEngine::Preset::transform,
