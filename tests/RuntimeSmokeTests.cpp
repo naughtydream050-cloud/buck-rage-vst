@@ -176,13 +176,14 @@ class TestPlayHead final : public juce::AudioPlayHead
 {
 public:
     void set (bool isPlaying, double ppq, double bpm = 120.0, int numerator = 4, int denominator = 4,
-              int64_t timeInSamples = -1)
+              int64_t timeInSamples = -1, bool isLooping = false)
     {
         position = {};
         position.setIsPlaying (isPlaying);
         position.setPpqPosition (ppq);
         position.setBpm (bpm);
         position.setTimeSignature (juce::AudioPlayHead::TimeSignature { numerator, denominator });
+        position.setIsLooping (isLooping);
         if (timeInSamples >= 0) position.setTimeInSamples (timeInSamples);
     }
 
@@ -1180,6 +1181,41 @@ int main()
     pass &= check (loopRebaseProcessor.getCurrentTimelineSlot() == 0
                    && loopRebaseProcessor.getScratchDiagnostics().transportResetCount == resetsBeforeLoop + 1,
                    "v2-host-loop-backward-ppq-rebases-to-bar-one");
+
+    // FL may report isLooping while leaving LoopPoints unavailable.  A
+    // backwards PPQ/sample jump must still preserve history for the new BAR1
+    // capture; treating it as an ordinary seek starves every preset again.
+    ToyotomiHideyoshiAudioProcessor loopNoPointsProcessor;
+    juce::AudioBuffer<float> loopNoPointsAudio (2, 256);
+    loopNoPointsProcessor.prepareToPlay (48000, loopNoPointsAudio.getNumSamples());
+    loopNoPointsProcessor.getStateModel().setSlotPreset (0, PluginStateModel::ScratchPreset::backspin);
+    loopNoPointsProcessor.getStateModel().setSlotLength (0, PluginStateModel::NoteLength::oneBar);
+    loopNoPointsProcessor.getStateModel().setSlotDepth (0, 1.0f);
+    TestPlayHead loopNoPointsPlayHead;
+    loopNoPointsProcessor.setPlayHead (&loopNoPointsPlayHead);
+    const auto loopNoPointsPpqPerBlock = 256.0 / 48000.0 * 120.0 / 60.0;
+    for (int block = 0; block < 120; ++block)
+    {
+        loopNoPointsPlayHead.set (true, 12.0 + loopNoPointsPpqPerBlock * block, 120.0, 4, 4,
+                                  (int64_t) block * 256, true);
+        for (int sample = 0; sample < loopNoPointsAudio.getNumSamples(); ++sample)
+        {
+            const auto n = (double) block * 256.0 + sample;
+            const auto value = (float) (0.35 * std::sin (n * 0.019));
+            loopNoPointsAudio.setSample (0, sample, value);
+            loopNoPointsAudio.setSample (1, sample, value);
+        }
+        loopNoPointsProcessor.processBlock (loopNoPointsAudio, midi);
+    }
+    const auto loopNoPointsResets = loopNoPointsProcessor.getScratchDiagnostics().transportResetCount;
+    loopNoPointsPlayHead.set (true, 12.0, 120.0, 4, 4, 0, true);
+    loopNoPointsAudio.clear();
+    loopNoPointsProcessor.processBlock (loopNoPointsAudio, midi);
+    pass &= check (loopNoPointsProcessor.getScratchDiagnostics().lastDiscontinuityReason
+                       == TimelineScratchEngine::DiscontinuityReason::loopWrap
+                   && loopNoPointsProcessor.getScratchDiagnostics().transportResetCount == loopNoPointsResets + 1,
+                   "v2-host-loop-without-loop-points-preserves-history");
+    loopNoPointsProcessor.setPlayHead (nullptr);
 
     // A four-BAR host loop must restart the configured BAR1..BAR4 effects on
     // every pass.  This is intentionally a continuous sample-level run: the
