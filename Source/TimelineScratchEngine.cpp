@@ -641,7 +641,11 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
             dragReadSerial = juce::jmin (dragWindowEndSerial - 1.0,
                                          dragReadSerial + dragRate);
         }
-        if (motionPreset && effectActive && ! waitingForDry && ! motionSourceEnded)
+        // Keep the motion clock aligned to BAR entry even while a delayed
+        // history capture is waiting for a safe window.  The wet path remains
+        // dry until capture succeeds, but the eventual capture must inherit
+        // the elapsed BAR phase rather than restarting at zero.
+        if (motionPreset && effectActive && ! motionSourceEnded)
             motionPhase = std::fmod (motionPhase + 1.0, juce::jmax (1.0, motionCycleSamples));
         ++writeSerial;
     }
