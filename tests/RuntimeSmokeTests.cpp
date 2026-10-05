@@ -1211,7 +1211,7 @@ int main()
     loopNoPointsPlayHead.set (true, 12.0, 120.0, 4, 4, 0, true);
     loopNoPointsAudio.clear();
     loopNoPointsProcessor.processBlock (loopNoPointsAudio, midi);
-    pass &= check (loopNoPointsProcessor.getScratchDiagnostics().lastDiscontinuityReason
+    pass &= check (loopNoPointsProcessor.getScratchDiagnostics().discontinuityReason
                        == TimelineScratchEngine::DiscontinuityReason::loopWrap
                    && loopNoPointsProcessor.getScratchDiagnostics().transportResetCount == loopNoPointsResets + 1,
                    "v2-host-loop-without-loop-points-preserves-history");

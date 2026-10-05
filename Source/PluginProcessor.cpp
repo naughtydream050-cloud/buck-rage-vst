@@ -154,7 +154,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
             // A backwards PPQ/sample jump in that state is still a loop
             // re-entry, so preserve the continuously-written history while
             // resetting the preset runtime at BAR1.
-            if (hostIsLooping && (samplePositionJump || actualDelta < 0.0))
+            if (hostIsLooping && (samplePositionJump || hostPpq < lastHostPpq))
                 discontinuityReason = TimelineScratchEngine::DiscontinuityReason::loopWrap;
             if (hostIsLooping && hostLoopPoints.hasValue())
             {
