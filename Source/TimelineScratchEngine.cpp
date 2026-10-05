@@ -43,7 +43,7 @@ void TimelineScratchEngine::prepare (double rate, int, int channels)
     forwardCycleSamples = forwardReadSamples = forwardFadeSamples = forwardCyclePosition = 0.0;
     forwardSourceSilenceSamples = 0.0;
     motionWindowSamples = motionWindowStartSerial = motionWindowEndSerial = 0.0;
-    motionPhase = motionCycleSamples = motionSourceSilenceSamples = 0.0;
+    motionPhase = motionCycleSamples = motionCapturePhase = motionSourceSilenceSamples = 0.0;
     motionCaptured = motionSourceEnded = motionSourceHasSignal = false;
     forwardSourceEnded = false;
     forwardSourceHasSignal = false;
@@ -69,7 +69,7 @@ void TimelineScratchEngine::release()
     forwardCycleSamples = forwardReadSamples = forwardFadeSamples = forwardCyclePosition = 0.0;
     forwardSourceSilenceSamples = 0.0;
     motionWindowSamples = motionWindowStartSerial = motionWindowEndSerial = 0.0;
-    motionPhase = motionCycleSamples = motionSourceSilenceSamples = 0.0;
+    motionPhase = motionCycleSamples = motionCapturePhase = motionSourceSilenceSamples = 0.0;
     motionCaptured = motionSourceEnded = motionSourceHasSignal = false;
     forwardSourceEnded = false;
     forwardSourceHasSignal = false;
@@ -89,6 +89,7 @@ void TimelineScratchEngine::resetTransport (bool preserveHistory) noexcept
     forwardSourceSilenceSamples = 0.0;
     motionSourceSilenceSamples = 0.0;
     motionSourceEnded = motionSourceHasSignal = motionCaptured = false;
+    motionCapturePhase = 0.0;
 }
 
 double TimelineScratchEngine::lengthInQuarters (Length length, double quartersPerBar) noexcept
@@ -185,6 +186,7 @@ void TimelineScratchEngine::beginBar (int bar, const Slot& slot, double quarters
         secondsPerQuarter * 0.5 * sampleRateHz / (double) speed);
     motionSourceSilenceSamples = 0.0;
     motionCaptured = motionSourceEnded = motionSourceHasSignal = false;
+    motionCapturePhase = 0.0;
 }
 
 bool TimelineScratchEngine::beginBackspinCapture() noexcept
@@ -284,7 +286,7 @@ bool TimelineScratchEngine::beginMotionCapture() noexcept
     if (! canRead (motionWindowStartSerial) || ! canRead (motionWindowEndSerial - 1.0))
         return false;
 
-    motionPhase = 0.0;
+    motionCapturePhase = motionPhase;
     motionCaptured = true;
     return true;
 }
@@ -318,7 +320,8 @@ TimelineScratchEngine::Diagnostics TimelineScratchEngine::getDiagnostics() const
              backspinCompletedWraps, transportResetCount, diagnosticEffectiveWet,
              lastDiscontinuityReason, forwardCycleSamples, forwardReadSamples,
              forwardCyclePosition, forwardCompletedWraps, forwardSourceEnded,
-             motionSourceEnded };
+             motionSourceEnded, motionPhase, motionCycleSamples,
+             motionCapturePhase, motionCaptured };
 }
 
 double TimelineScratchEngine::tapeBrakePlaybackRate (double effectPhase, float speed) noexcept
@@ -638,7 +641,7 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
             dragReadSerial = juce::jmin (dragWindowEndSerial - 1.0,
                                          dragReadSerial + dragRate);
         }
-        if (motionPreset && effectActive && motionCaptured && ! waitingForDry && ! motionSourceEnded)
+        if (motionPreset && effectActive && ! waitingForDry && ! motionSourceEnded)
             motionPhase = std::fmod (motionPhase + 1.0, juce::jmax (1.0, motionCycleSamples));
         ++writeSerial;
     }

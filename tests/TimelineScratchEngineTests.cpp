@@ -723,6 +723,37 @@ int main()
            "chirp-source-latch-ignores-input-restart");
     motionSilenceEngine.release();
 
+    // Cold-start BAR1 keeps the BAR-relative motion phase while the fixed
+    // capture window becomes readable. The previous implementation reset it
+    // to zero at delayed capture, causing an unstable first phrase.
+    for (const auto preset : { TimelineScratchEngine::Preset::chirp,
+                               TimelineScratchEngine::Preset::transform,
+                               TimelineScratchEngine::Preset::zigzag })
+    {
+        TimelineScratchEngine coldStart;
+        coldStart.prepare (48000.0, 512, 2);
+        const auto coldSlots = slots (preset, TimelineScratchEngine::Length::oneBar, 1.0f, 1.0f);
+        double phase = 0.0;
+        bool captured = false;
+        double capturePhase = 0.0;
+        for (int block = 0; block < 24; ++block)
+        {
+            fillTone (audio, (int64_t) block * audio.getNumSamples());
+            coldStart.process (audio, transport (0, phase), coldSlots);
+            const auto state = coldStart.getDiagnostics();
+            if (! captured && state.motionCaptured)
+            {
+                captured = true;
+                capturePhase = state.motionCapturePhase;
+            }
+            phase += transport (0, 0.0).barPhasePerSample * audio.getNumSamples();
+        }
+        check (captured && capturePhase > 1.0
+                   && capturePhase < coldStart.getDiagnostics().motionCycleSamples,
+               "cold-start-motion-capture-preserves-bar-phase");
+        coldStart.release();
+    }
+
     // A BAR that starts with more than 30 ms of silence must wait for a real
     // dry signal instead of latching source-ended before capture.  This is
     // the regression that made BAR1/BAR5 silent in four-bar phrases.

@@ -57,6 +57,8 @@ public:
                forwardCyclePosition = 0.0;
         uint32_t forwardRetriggerCount = 0;
         bool forwardSourceEnded = false, motionSourceEnded = false;
+        double motionPhase = 0.0, motionCycleSamples = 0.0, motionCapturePhase = 0.0;
+        bool motionCaptured = false;
     };
 
     void prepare (double sampleRate, int maxBlockSize, int channels);
@@ -110,7 +112,8 @@ private:
            forwardSourceSilenceSamples = 0.0;
     double motionWindowSamples = 0.0, motionWindowStartSerial = 0.0,
            motionWindowEndSerial = 0.0, motionPhase = 0.0,
-           motionCycleSamples = 0.0, motionSourceSilenceSamples = 0.0;
+           motionCycleSamples = 0.0, motionCapturePhase = 0.0,
+           motionSourceSilenceSamples = 0.0;
     int backspinWrapSamples = 1, backspinWrapProgress = 1;
     int forwardWrapSamples = 1, forwardWrapProgress = 1;
     uint32_t backspinCompletedWraps = 0, forwardCompletedWraps = 0;
