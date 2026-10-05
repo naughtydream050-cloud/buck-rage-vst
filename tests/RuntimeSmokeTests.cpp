@@ -1180,6 +1180,61 @@ int main()
     pass &= check (loopRebaseProcessor.getCurrentTimelineSlot() == 0
                    && loopRebaseProcessor.getScratchDiagnostics().transportResetCount == resetsBeforeLoop + 1,
                    "v2-host-loop-backward-ppq-rebases-to-bar-one");
+
+    // A four-BAR host loop must restart the configured BAR1..BAR4 effects on
+    // every pass.  This is intentionally a continuous sample-level run: the
+    // old regression only checked the slot number at the jump and never
+    // proved that a second pass became wet again.
+    for (const auto preset : { PluginStateModel::ScratchPreset::chirp,
+                               PluginStateModel::ScratchPreset::transform,
+                               PluginStateModel::ScratchPreset::zigzag })
+    {
+        ToyotomiHideyoshiAudioProcessor multiLoopProcessor;
+        juce::AudioBuffer<float> multiLoopAudio (2, 256);
+        multiLoopProcessor.prepareToPlay (48000, multiLoopAudio.getNumSamples());
+        for (int bar = 0; bar < 4; ++bar)
+        {
+            multiLoopProcessor.getStateModel().setSlotPreset (bar, preset);
+            multiLoopProcessor.getStateModel().setSlotLength (bar, PluginStateModel::NoteLength::oneBar);
+            multiLoopProcessor.getStateModel().setSlotSpeed (bar, 1.0f);
+            multiLoopProcessor.getStateModel().setSlotDepth (bar, 1.0f);
+        }
+        TestPlayHead multiLoopPlayHead;
+        multiLoopProcessor.setPlayHead (&multiLoopPlayHead);
+        const auto ppqPerBlock = 256.0 / 48000.0 * 130.0 / 60.0;
+        const auto blocksPerLoop = (int) std::ceil (16.0 / ppqPerBlock);
+        std::array<bool, 3> passWet {};
+        std::array<bool, 3> passAddressed {};
+        for (int passIndex = 0; passIndex < 3; ++passIndex)
+        {
+            for (int block = 0; block < blocksPerLoop; ++block)
+            {
+                const auto ppq = 12.0 + (double) block * ppqPerBlock;
+                multiLoopPlayHead.set (true, ppq, 130.0, 4, 4,
+                                       (int64_t) (passIndex * blocksPerLoop + block) * 256);
+                for (int sample = 0; sample < multiLoopAudio.getNumSamples(); ++sample)
+                {
+                    const auto n = (double) (passIndex * blocksPerLoop + block) * 256.0 + sample;
+                    const auto value = (float) (0.32 * std::sin (n * 0.017) + 0.14 * std::cos (n * 0.031));
+                    multiLoopAudio.setSample (0, sample, value);
+                    multiLoopAudio.setSample (1, sample, value);
+                }
+                multiLoopProcessor.processBlock (multiLoopAudio, midi);
+                const auto slot = multiLoopProcessor.getCurrentTimelineSlot();
+                const auto expectedSlot = (block * 256.0 * 130.0 / (60.0 * 48000.0 * 4.0));
+                const auto bar = juce::jlimit (0, 3, (int) std::floor (expectedSlot));
+                passAddressed[(size_t) passIndex] |= slot == bar;
+                passWet[(size_t) passIndex] |= slot == bar
+                    && multiLoopProcessor.getScratchDiagnostics().effectiveWet > 0.25f;
+            }
+        }
+        pass &= check (std::all_of (passAddressed.begin(), passAddressed.end(), [] (bool value) { return value; }),
+                       "v2-three-pass-loop-addresses-bars-one-through-four");
+        pass &= check (std::all_of (passWet.begin(), passWet.end(), [] (bool value) { return value; }),
+                       "v2-three-pass-loop-restores-wet-on-bar-one-through-four");
+        multiLoopProcessor.setPlayHead (nullptr);
+    }
+
     ToyotomiHideyoshiAudioProcessor internalTimelineProcessor;
     internalTimelineProcessor.prepareToPlay (48000, 32);
     internalTimelineProcessor.setHostSyncEnabled (false);
