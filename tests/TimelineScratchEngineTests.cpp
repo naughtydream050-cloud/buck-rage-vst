@@ -723,6 +723,73 @@ int main()
            "chirp-source-latch-ignores-input-restart");
     motionSilenceEngine.release();
 
+    // A BAR that starts with more than 30 ms of silence must wait for a real
+    // dry signal instead of latching source-ended before capture.  This is
+    // the regression that made BAR1/BAR5 silent in four-bar phrases.
+    for (const auto preset : { TimelineScratchEngine::Preset::chirp,
+                               TimelineScratchEngine::Preset::transform,
+                               TimelineScratchEngine::Preset::zigzag })
+    {
+        TimelineScratchEngine delayedCapture;
+        delayedCapture.prepare (48000.0, 512, 2);
+        for (int block = 0; block < 1000; ++block)
+        {
+            fill (audio, .7f);
+            delayedCapture.process (audio, transport (63, 0.0), dry);
+        }
+        const auto motionSlots = slots (preset, TimelineScratchEngine::Length::oneBar, 1.0f, 1.0f);
+        double phase = 0.0;
+        for (int block = 0; block < 4; ++block)
+        {
+            fill (audio, 0.0f);
+            delayedCapture.process (audio, transport (0, phase), motionSlots);
+            phase += transport (0, 0.0).barPhasePerSample * audio.getNumSamples();
+        }
+        const auto waiting = delayedCapture.getDiagnostics();
+        check (! waiting.motionSourceEnded && waiting.effectiveWet < 0.01f,
+               "motion-silence-waits-without-latching");
+        fillTone (audio, 1900000);
+        delayedCapture.process (audio, transport (0, phase), motionSlots);
+        const auto started = delayedCapture.getDiagnostics();
+        check (! started.motionSourceEnded && started.effectiveWet > 0.5f,
+               "motion-captures-after-signal-on-silent-bar");
+        delayedCapture.release();
+    }
+
+    // Eight consecutive BAR entries, including BAR1 and BAR5, must expose
+    // an active effect. DRAG is included to guard against false coupling to
+    // the motion source-silence detector.
+    for (const auto preset : { TimelineScratchEngine::Preset::chirp,
+                               TimelineScratchEngine::Preset::drag,
+                               TimelineScratchEngine::Preset::transform,
+                               TimelineScratchEngine::Preset::zigzag })
+    {
+        TimelineScratchEngine eightBarEngine;
+        eightBarEngine.prepare (48000.0, 512, 2);
+        for (int block = 0; block < 1000; ++block)
+        {
+            fillTone (audio, (int64_t) block * audio.getNumSamples());
+            eightBarEngine.process (audio, transport (63, 0.0), dry);
+        }
+        const auto barSlots = slots (preset, TimelineScratchEngine::Length::oneBar, 1.0f, 1.0f);
+        bool everyBarWet = true;
+        for (int bar = 0; bar < 8; ++bar)
+        {
+            bool barWet = false;
+            for (int block = 0; block < 4; ++block)
+            {
+                const auto first = (int64_t) (bar * 4 + block) * audio.getNumSamples();
+                fillTone (audio, first);
+                eightBarEngine.process (audio, transport (bar, 0.05), barSlots);
+                barWet |= eightBarEngine.getDiagnostics().effectiveWet > 0.5f
+                    && maximumDifferenceFromTone (audio, first) > 0.005f;
+            }
+            everyBarWet &= barWet;
+        }
+        check (everyBarWet, "eight-bar-chain-includes-bar1-and-bar5");
+        eightBarEngine.release();
+    }
+
     TimelineScratchEngine continuityEngine;
     continuityEngine.prepare (48000.0, 512, 2);
     bool allBarsAddressed = true;

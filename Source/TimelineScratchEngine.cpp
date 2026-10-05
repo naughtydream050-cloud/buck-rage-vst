@@ -14,6 +14,13 @@ constexpr float kForwardCutSilenceThreshold = 1.0e-4f;
 constexpr double kDragMinimumWindowSeconds = 0.125;
 constexpr double kMotionCaptureWindowSeconds = 0.125;
 constexpr double kMotionGateFadeSeconds = 0.003;
+
+bool isMotionPreset (TimelineScratchEngine::Preset preset) noexcept
+{
+    return preset == TimelineScratchEngine::Preset::chirp
+        || preset == TimelineScratchEngine::Preset::transform
+        || preset == TimelineScratchEngine::Preset::zigzag;
+}
 }
 
 void TimelineScratchEngine::prepare (double rate, int, int channels)
@@ -267,9 +274,7 @@ bool TimelineScratchEngine::beginDragCapture() noexcept
 
 bool TimelineScratchEngine::beginMotionCapture() noexcept
 {
-    const auto presetId = static_cast<int> (activeSlot.preset);
-    if (motionCaptured || presetId < static_cast<int> (Preset::chirp)
-        || presetId > static_cast<int> (Preset::zigzag))
+    if (motionCaptured || ! isMotionPreset (activeSlot.preset))
         return motionCaptured;
     const auto required = motionWindowSamples + kMinimumReadableDistance + 2.0;
     if (! motionSourceHasSignal || historyValidSamples() < required) return false;
@@ -305,8 +310,7 @@ TimelineScratchEngine::Diagnostics TimelineScratchEngine::getDiagnostics() const
     const auto captureWindow = activeSlot.preset == Preset::baby ? babyWindowSamples
         : activeSlot.preset == Preset::forwardCut ? forwardWindowSamples
         : activeSlot.preset == Preset::drag ? dragWindowSamples
-        : (static_cast<int> (activeSlot.preset) >= static_cast<int> (Preset::chirp)
-            && static_cast<int> (activeSlot.preset) <= static_cast<int> (Preset::zigzag))
+        : isMotionPreset (activeSlot.preset)
             ? motionWindowSamples : backspinWindowSamples;
     return { activeBar, activeSlot.preset, diagnosticEffectPhase, historyValidSamples(),
              captureWindow,
@@ -334,8 +338,7 @@ bool TimelineScratchEngine::isWetReady() const noexcept
             && canRead (babyWindowStartSerial) && canRead (babyWindowEndSerial))
         || (activeSlot.preset == Preset::drag && dragCaptured
             && canRead (dragReadSerial))
-        || ((static_cast<int> (activeSlot.preset) >= static_cast<int> (Preset::chirp)
-             && static_cast<int> (activeSlot.preset) <= static_cast<int> (Preset::zigzag))
+        || (isMotionPreset (activeSlot.preset)
             && motionCaptured && canRead (motionWindowStartSerial));
 }
 
@@ -406,8 +409,7 @@ float TimelineScratchEngine::wetSample (int channel, double barPhase, double qua
         diagnosticReadRate = juce::jlimit (0.25, 0.85, 0.45 * std::sqrt (speed));
         return read (history[(size_t) channel], dragReadSerial);
     }
-    const auto motionPreset = static_cast<int> (activeSlot.preset) >= static_cast<int> (Preset::chirp)
-        && static_cast<int> (activeSlot.preset) <= static_cast<int> (Preset::zigzag);
+    const auto motionPreset = isMotionPreset (activeSlot.preset);
     if (motionPreset && motionCaptured)
     {
         const auto u = juce::jlimit (0.0, 1.0,
@@ -562,8 +564,7 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
             else beginBar (bar, slots[(size_t) bar], transport.quartersPerBar, transport.secondsPerQuarter);
         }
 
-        const auto motionPreset = static_cast<int> (activeSlot.preset) >= static_cast<int> (Preset::chirp)
-            && static_cast<int> (activeSlot.preset) <= static_cast<int> (Preset::zigzag);
+    const auto motionPreset = isMotionPreset (activeSlot.preset);
         if (motionPreset && ! motionSourceEnded && ! waitingForDry)
         {
             if (std::abs (dryLeft) < kForwardCutSilenceThreshold
@@ -575,7 +576,8 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
                 motionSourceSilenceSamples = 0.0;
             }
 
-            if (motionSourceSilenceSamples >= sampleRateHz * kForwardCutSilenceHoldSeconds)
+            if (motionCaptured && motionSourceHasSignal
+                && motionSourceSilenceSamples >= sampleRateHz * kForwardCutSilenceHoldSeconds)
                 motionSourceEnded = true;
         }
 

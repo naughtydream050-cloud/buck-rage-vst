@@ -1092,14 +1092,14 @@ int main()
         juce::AudioBuffer<float> audibleAudio (2, 256);
         audibleProcessor.prepareToPlay (48000, audibleAudio.getNumSamples());
         audibleProcessor.setHostSyncEnabled (false);
-        for (int bar = 0; bar < 4; ++bar)
+        for (int bar = 0; bar < 8; ++bar)
             audibleProcessor.getStateModel().setSlotPreset (bar, preset);
         TestPlayHead audiblePlayHead;
         audibleProcessor.setPlayHead (&audiblePlayHead);
-        std::array<bool, 4> audibleBars {};
+        std::array<bool, 8> audibleBars {};
         bool audibleClockAdvanced = true;
         constexpr int blocksPerBar = 375;
-        for (int block = 0; block < blocksPerBar * 4; ++block)
+        for (int block = 0; block < blocksPerBar * 8; ++block)
         {
             audiblePlayHead.set (true, 0.0, 120.0, 4, 4, (int64_t) block * 256);
             for (int sample = 0; sample < audibleAudio.getNumSamples(); ++sample)
@@ -1124,10 +1124,10 @@ int main()
         pass &= check (audibleClockAdvanced && std::all_of (audibleBars.begin(), audibleBars.end(),
                            [] (bool wet) { return wet; }),
                        preset == PluginStateModel::ScratchPreset::backspin
-                           ? "v2-default-backspin-changes-audio-on-bars-1-through-4"
+                           ? "v2-default-backspin-changes-audio-on-bars-1-through-8"
                            : preset == PluginStateModel::ScratchPreset::tapeBrake
-                           ? "v2-default-tape-brake-changes-audio-on-bars-1-through-4"
-                           : "v2-default-drag-changes-audio-on-bars-1-through-4");
+                           ? "v2-default-tape-brake-changes-audio-on-bars-1-through-8"
+                           : "v2-default-drag-changes-audio-on-bars-1-through-8");
         audibleProcessor.setPlayHead (nullptr);
     }
 
