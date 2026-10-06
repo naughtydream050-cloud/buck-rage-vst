@@ -1290,6 +1290,10 @@ int main()
         const auto blocksPerLoop = (int) std::ceil (16.0 / ppqPerBlock);
         std::array<bool, 3> passWet {};
         std::array<bool, 3> passAddressed {};
+        std::array<double, 3> passDryEnergy {};
+        std::array<double, 3> passOutputEnergy {};
+        std::array<double, 3> passDeltaEnergy {};
+        std::array<int, 3> passSampleCount {};
         for (int passIndex = 0; passIndex < 3; ++passIndex)
         {
             for (int block = 0; block < blocksPerLoop; ++block)
@@ -1305,6 +1309,17 @@ int main()
                     multiLoopAudio.setSample (1, sample, value);
                 }
                 multiLoopProcessor.processBlock (multiLoopAudio, midi);
+                for (int sample = 0; sample < multiLoopAudio.getNumSamples(); ++sample)
+                {
+                    const auto n = (double) (passIndex * blocksPerLoop + block) * 256.0 + sample;
+                    const auto dry = (float) (0.32 * std::sin (n * 0.017) + 0.14 * std::cos (n * 0.031));
+                    const auto output = multiLoopAudio.getSample (0, sample);
+                    passDryEnergy[(size_t) passIndex] += (double) dry * dry;
+                    passOutputEnergy[(size_t) passIndex] += (double) output * output;
+                    const auto delta = (double) output - (double) dry;
+                    passDeltaEnergy[(size_t) passIndex] += delta * delta;
+                    ++passSampleCount[(size_t) passIndex];
+                }
                 const auto slot = multiLoopProcessor.getCurrentTimelineSlot();
                 const auto expectedSlot = (block * 256.0 * 130.0 / (60.0 * 48000.0 * 4.0));
                 const auto bar = juce::jlimit (0, 3, (int) std::floor (expectedSlot));
@@ -1317,6 +1332,22 @@ int main()
                        "v2-three-pass-loop-addresses-bars-one-through-four");
         pass &= check (std::all_of (passWet.begin(), passWet.end(), [] (bool value) { return value; }),
                        "v2-three-pass-loop-restores-wet-on-bar-one-through-four");
+        bool rmsEvidence = true;
+        for (size_t passIndex = 0; passIndex < passDryEnergy.size(); ++passIndex)
+        {
+            const auto count = std::max (1, passSampleCount[passIndex]);
+            const auto dryRms = std::sqrt (passDryEnergy[passIndex] / (double) count);
+            const auto outputRms = std::sqrt (passOutputEnergy[passIndex] / (double) count);
+            const auto deltaRms = std::sqrt (passDeltaEnergy[passIndex] / (double) count);
+            std::cout << "PASS AC-10 loop=" << (passIndex + 1)
+                      << " dryRms=" << dryRms
+                      << " outputRms=" << outputRms
+                      << " deltaRms=" << deltaRms << "\\n";
+            rmsEvidence &= std::isfinite (dryRms) && std::isfinite (outputRms)
+                        && std::isfinite (deltaRms) && dryRms > 0.0 && outputRms > 0.0
+                        && deltaRms > 1.0e-4;
+        }
+        pass &= check (rmsEvidence, "v2-three-pass-loop-bar-rms-and-effect-delta-evidence");
         multiLoopProcessor.setPlayHead (nullptr);
     }
 
