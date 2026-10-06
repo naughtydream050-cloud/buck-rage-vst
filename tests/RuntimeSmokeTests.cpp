@@ -1217,6 +1217,55 @@ int main()
                    "v2-host-loop-without-loop-points-preserves-history");
     loopNoPointsProcessor.setPlayHead (nullptr);
 
+    // FL can also omit both isLooping and LoopPoints while keeping the host
+    // sample timeline continuous.  A PPQ return to the established origin is
+    // still a loop re-entry, not a seek that clears the capture history.
+    ToyotomiHideyoshiAudioProcessor loopNoMetadataProcessor;
+    loopNoMetadataProcessor.prepareToPlay (48000, loopNoPointsAudio.getNumSamples());
+    loopNoMetadataProcessor.getStateModel().setSlotPreset (0, PluginStateModel::ScratchPreset::chirp);
+    loopNoMetadataProcessor.getStateModel().setSlotLength (0, PluginStateModel::NoteLength::oneBar);
+    loopNoMetadataProcessor.getStateModel().setSlotDepth (0, 1.0f);
+    TestPlayHead loopNoMetadataPlayHead;
+    loopNoMetadataProcessor.setPlayHead (&loopNoMetadataPlayHead);
+    bool loopNoMetadataWetAfterReentry = false;
+    for (int block = 0; block < 140; ++block)
+    {
+        loopNoMetadataPlayHead.set (true, 12.0 + loopNoPointsPpqPerBlock * block, 120.0, 4, 4,
+                                    (int64_t) block * 256, false);
+        for (int sample = 0; sample < loopNoPointsAudio.getNumSamples(); ++sample)
+        {
+            const auto n = (double) block * 256.0 + sample;
+            const auto value = (float) (0.31 * std::sin (n * 0.021) + 0.11 * std::cos (n * 0.037));
+            loopNoPointsAudio.setSample (0, sample, value);
+            loopNoPointsAudio.setSample (1, sample, value);
+        }
+        loopNoMetadataProcessor.processBlock (loopNoPointsAudio, midi);
+    }
+    const auto loopNoMetadataResets = loopNoMetadataProcessor.getScratchDiagnostics().transportResetCount;
+    loopNoMetadataPlayHead.set (true, 12.0, 120.0, 4, 4, (int64_t) 140 * 256, false);
+    loopNoPointsAudio.clear();
+    loopNoMetadataProcessor.processBlock (loopNoPointsAudio, midi);
+    const auto loopNoMetadataReason = loopNoMetadataProcessor.getScratchDiagnostics().discontinuityReason;
+    for (int block = 0; block < 80; ++block)
+    {
+        loopNoMetadataPlayHead.set (true, 12.0 + loopNoPointsPpqPerBlock * block, 120.0, 4, 4,
+                                    (int64_t) (141 + block) * 256, false);
+        for (int sample = 0; sample < loopNoPointsAudio.getNumSamples(); ++sample)
+        {
+            const auto n = (double) (141 + block) * 256.0 + sample;
+            const auto value = (float) (0.31 * std::sin (n * 0.021) + 0.11 * std::cos (n * 0.037));
+            loopNoPointsAudio.setSample (0, sample, value);
+            loopNoPointsAudio.setSample (1, sample, value);
+        }
+        loopNoMetadataProcessor.processBlock (loopNoPointsAudio, midi);
+        loopNoMetadataWetAfterReentry |= loopNoMetadataProcessor.getScratchDiagnostics().effectiveWet > 0.1f;
+    }
+    pass &= check (loopNoMetadataReason == TimelineScratchEngine::DiscontinuityReason::loopWrap
+                   && loopNoMetadataProcessor.getScratchDiagnostics().transportResetCount == loopNoMetadataResets + 1
+                   && loopNoMetadataWetAfterReentry,
+                   "v2-host-loop-without-metadata-reenters-chirp-wet");
+    loopNoMetadataProcessor.setPlayHead (nullptr);
+
     // A four-BAR host loop must restart the configured BAR1..BAR4 effects on
     // every pass.  This is intentionally a continuous sample-level run: the
     // old regression only checked the slot number at the jump and never

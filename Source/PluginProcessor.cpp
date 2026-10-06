@@ -118,6 +118,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         }
         const auto previousHostBlockSize = lastHostBlockSize;
         bool samplePositionJump = false;
+        bool samplePositionWentBackwards = false;
         if (hasHostSamplePosition)
         {
             if (haveLastHostSamplePosition)
@@ -125,6 +126,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
                 const auto expected = lastHostSamplePosition + (int64_t) lastHostBlockSize;
                 const auto error = hostSamplePosition - expected;
                 samplePositionJump = std::abs (error) > 2;
+                samplePositionWentBackwards = hostSamplePosition < lastHostSamplePosition;
             }
             lastHostSamplePosition = hostSamplePosition;
             lastHostBlockSize = buffer.getNumSamples();
@@ -132,7 +134,9 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         }
 
         bool ppqJump = false;
-        if (haveLastHostPpq)
+        const auto samplePositionIsContinuous = hasHostSamplePosition
+            && haveLastHostSamplePosition && ! samplePositionJump;
+        if (haveLastHostPpq && ! samplePositionIsContinuous)
         {
             const auto expectedDelta = (double) previousHostBlockSize / preparedSampleRate
                 * 0.5 * (lastHostBpmForContinuity + effectiveBpm) / 60.0;
@@ -164,6 +168,29 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
                     discontinuityReason = TimelineScratchEngine::DiscontinuityReason::loopWrap;
             }
         }
+
+        // When FL exposes a continuous sample timeline but omits loop metadata,
+        // a backward PPQ jump back to the Toyotomi origin is the loop boundary.
+        // Do not let ordinary PPQ jitter or a stale PPQ value reset the engine
+        // on every subsequent block; sample position remains authoritative.
+        if (! discontinuity && samplePositionIsContinuous && haveLastHostPpq)
+        {
+            const auto ppqPerSample = effectiveBpm / (60.0 * preparedSampleRate);
+            const auto backwardTolerance = ppqPerSample * (double) juce::jmax (4, buffer.getNumSamples());
+            if (hostPpq < lastHostPpq - backwardTolerance
+                && hostPpq <= hostPpqOrigin + backwardTolerance)
+            {
+                discontinuity = true;
+                discontinuityReason = TimelineScratchEngine::DiscontinuityReason::loopWrap;
+            }
+        }
+
+        // A host may report a backward sample jump without setting isLooping.
+        // Treat only a return to the established origin as loop re-entry; other
+        // jumps remain ordinary seek discontinuities and retain their reset path.
+        if (ppqJump && samplePositionWentBackwards && hostPpq <= hostPpqOrigin
+            + effectiveBpm / (60.0 * preparedSampleRate) * (double) juce::jmax (4, buffer.getNumSamples()))
+            discontinuityReason = TimelineScratchEngine::DiscontinuityReason::loopWrap;
 
         // Toyotomi BAR 1 starts at the host's actual play/seek/loop position,
         // never at the DAW's absolute PPQ zero.  The origin remains fixed over
