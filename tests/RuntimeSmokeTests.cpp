@@ -1303,9 +1303,13 @@ int main()
         {
             for (int block = 0; block < blocksPerLoop; ++block)
             {
+                // Model an actual host loop: both PPQ and host sample position
+                // return to the loop start for every pass.  The previous
+                // fixture advanced PPQ monotonically and therefore never
+                // exercised BAR1 re-entry.
                 const auto ppq = 12.0 + (double) block * ppqPerBlock;
                 multiLoopPlayHead.set (true, ppq, 130.0, 4, 4,
-                                       (int64_t) (passIndex * blocksPerLoop + block) * 256);
+                                       (int64_t) block * 256, true);
                 for (int sample = 0; sample < multiLoopAudio.getNumSamples(); ++sample)
                 {
                     const auto n = (double) (block * 256 + sample);
@@ -1403,7 +1407,7 @@ int main()
             for (int block = 0; block < blocksPerLoop; ++block)
             {
                 eightBarLoopPlayHead.set (true, 12.0 + (double) block * ppqPerBlock, 130.0, 4, 4,
-                                          (int64_t) (passIndex * blocksPerLoop + block) * 256, true);
+                                          (int64_t) block * 256, true);
                 for (int sample = 0; sample < eightBarLoopAudio.getNumSamples(); ++sample)
                 {
                     const auto fixtureSample = (block * 256 + sample) % fourBarFixtureSamples;
