@@ -1182,6 +1182,29 @@ int main()
                    && loopRebaseProcessor.getScratchDiagnostics().transportResetCount == resetsBeforeLoop + 1,
                    "v2-host-loop-backward-ppq-rebases-to-bar-one");
 
+    // A host may keep its absolute sample timeline continuous while reporting
+    // a loop return to a non-origin PPQ (for example a playlist loop beginning
+    // at BAR 2).  isLooping is the distinguishing signal in this case; a
+    // backward PPQ jump must still re-enter Toyotomi BAR1.
+    ToyotomiHideyoshiAudioProcessor nonOriginLoopProcessor;
+    nonOriginLoopProcessor.prepareToPlay (48000, 256);
+    TestPlayHead nonOriginLoopPlayHead;
+    nonOriginLoopProcessor.setPlayHead (&nonOriginLoopPlayHead);
+    juce::AudioBuffer<float> nonOriginLoopAudio (2, 256);
+    nonOriginLoopPlayHead.set (true, 16.0, 120.0, 4, 4, 0, true);
+    nonOriginLoopProcessor.processBlock (nonOriginLoopAudio, midi);
+    nonOriginLoopPlayHead.set (true, 24.0, 120.0, 4, 4, 256, true);
+    nonOriginLoopProcessor.processBlock (nonOriginLoopAudio, midi);
+    const auto nonOriginResets = nonOriginLoopProcessor.getScratchDiagnostics().transportResetCount;
+    nonOriginLoopPlayHead.set (true, 20.0, 120.0, 4, 4, 512, true);
+    nonOriginLoopProcessor.processBlock (nonOriginLoopAudio, midi);
+    pass &= check (nonOriginLoopProcessor.getCurrentTimelineSlot() == 0
+                   && nonOriginLoopProcessor.getScratchDiagnostics().discontinuityReason
+                          == TimelineScratchEngine::DiscontinuityReason::loopWrap
+                   && nonOriginLoopProcessor.getScratchDiagnostics().transportResetCount == nonOriginResets + 1,
+                   "v2-host-loop-nonorigin-ppq-with-continuous-samples-rebases-bar-one");
+    nonOriginLoopProcessor.setPlayHead (nullptr);
+
     // FL may report isLooping while leaving LoopPoints unavailable.  A
     // backwards PPQ/sample jump must still preserve history for the new BAR1
     // capture; treating it as an ordinary seek starves every preset again.

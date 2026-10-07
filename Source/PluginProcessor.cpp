@@ -178,7 +178,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
             const auto ppqPerSample = effectiveBpm / (60.0 * preparedSampleRate);
             const auto backwardTolerance = ppqPerSample * (double) juce::jmax (4, buffer.getNumSamples());
             if (hostPpq < lastHostPpq - backwardTolerance
-                && hostPpq <= hostPpqOrigin + backwardTolerance)
+                && (hostIsLooping || hostPpq <= hostPpqOrigin + backwardTolerance))
             {
                 discontinuity = true;
                 discontinuityReason = TimelineScratchEngine::DiscontinuityReason::loopWrap;
