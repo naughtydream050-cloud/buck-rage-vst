@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "task": "BAR1 volume difference and four-BAR loop return",
+  "repairStatus": "NOT_FIXED_USER_REPORTED",
+  "sourceBeforeDiagnostics": "fdef59fef28fceb7ef166558213b01ef60a564de",
+  "priorRun": "37578786777",
+  "priorCiConclusion": "success",
+  "candidateAndProgramFilesBinarySha256": "29D7C3CEB422C13DB3D1A8D607362073FDA68960AA37890A670AFB844BC84D26",
+  "loadedProcessBinaryVerification": "NOT_AVAILABLE_NO_FL_PROCESS_OBSERVED",
+  "candidatePromotionAudit": "INVALID_REQUIRED_JEV_AND_NINE_AC_GATE_NOT_RUN",
+  "rollback": "NOT_PERFORMED_USER_INSTRUCTION_REQUIRED",
+  "confirmedValidationGaps": [
+    "RuntimeSmoke per-BAR capture/wet checks still use OR aggregation rather than required continuous sample evidence",
+    "Actual FL transport and dry/capture/output PCM have not been captured",
+    "No executed same-real-FL-fixture before-FAIL after-PASS proof exists",
+    "Shared gate contains hard-coded evidence ranges, an incorrect RuntimeSmoke label sourced from engine-test lines, and automatic head/tail diff excerpts"
+  ],
+  "diagnosticOnlyFinding": "Motion capture eligibility tests current Dry signal and history length, without testing captured-window signal energy. Root cause remains unconfirmed.",
+  "originalRepairCriteria": {
+    "AC-01": "PENDING_REAL_FL_FIXTURE",
+    "AC-02": "PENDING_NEW_VERIFICATION",
+    "AC-03": "PENDING_ALL_SAMPLE_FOUR_AND_EIGHT_BAR_ASSERTIONS",
+    "AC-04": "PENDING_EACH_PASS_EACH_BAR_CONTINUOUS_WET_EVIDENCE",
+    "AC-05": "PENDING_NEW_VERIFICATION",
+    "AC-06": "PENDING_REAL_TRANSPORT_VERIFICATION",
+    "AC-07": "PENDING_NEW_FULL_MATRIX_VERIFICATION",
+    "AC-08": "PENDING_NEW_REGRESSION_VERIFICATION",
+    "AC-09": "PENDING_MEASURED_BAR_VOLUME_CAUSE_AND_FIX"
+  },
+  "promotion": "BLOCKED",
+  "diagnosticBuildIsRepair": false,
+  "next": "Build audio-preserving real-host recorder; obtain user FL capture; replay exact fixture before any behavioral change",
+  "tokenSavingsPercent": null,
+  "baseline": "UNKNOWN",
+  "flListeningAcceptance": "USER_REPORTED_FAIL"
+}

@@ -70,6 +70,31 @@ public:
     Diagnostics getDiagnostics() const noexcept;
     static double tapeBrakePlaybackRate (double effectPhase, float speed) noexcept;
 
+    // Diagnostic-only POD. Configure the observer outside process(); its callback
+    // must only copy into preallocated storage and must never block or do I/O.
+    struct SampleTrace final
+    {
+        uint64_t sampleIndex = 0, writerSerial = 0, barEntrySerial = 0;
+        int localBar = -1, activeBar = -1;
+        Preset preset = Preset::off;
+        double barPhase = 0.0, effectPhase = 0.0, historyValidSamples = 0.0;
+        double captureStartSerial = 0.0, captureEndSerial = 0.0;
+        bool captured = false, motionGateEnabled = false, wetEvaluated = false;
+        double motionPhase = 0.0, motionCycle = 0.0, gate = 0.0;
+        float dryLeft = 0.0f, dryRight = 0.0f, wetLeft = 0.0f, wetRight = 0.0f;
+        float outputLeft = 0.0f, outputRight = 0.0f, effectiveWet = 0.0f;
+        double readPosition = 0.0, readRate = 0.0;
+        bool sourceEnded = false, waitingForDry = false;
+        uint32_t transportResetCount = 0;
+        DiscontinuityReason resetReason = DiscontinuityReason::none;
+    };
+    using SampleTraceObserver = void (*) (const SampleTrace&, void* context) noexcept;
+    void setSampleTraceObserver (SampleTraceObserver observer, void* context) noexcept
+    {
+        traceObserver = observer;
+        traceContext = context;
+    }
+
 private:
     static double lengthInQuarters (Length, double quartersPerBar) noexcept;
     bool canRead (double serial) const noexcept;
@@ -124,7 +149,10 @@ private:
          motionCaptured = false, motionSourceEnded = false,
          motionSourceHasSignal = false;
     double diagnosticEffectPhase = 0.0, diagnosticReadPosition = 0.0, diagnosticReadRate = 0.0;
-    float diagnosticEffectiveWet = 0.0f;
+    float diagnosticEffectiveWet = 0.0f, diagnosticGate = 0.0f;
     uint32_t transportResetCount = 0;
     DiscontinuityReason lastDiscontinuityReason = DiscontinuityReason::none;
+    SampleTraceObserver traceObserver = nullptr;
+    void* traceContext = nullptr;
+    uint64_t barEntrySerial = 0;
 };

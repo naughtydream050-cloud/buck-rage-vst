@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <memory>
 
@@ -192,6 +193,102 @@ public:
 private:
     juce::AudioPlayHead::PositionInfo position;
 };
+
+bool testRealHostDiagnostic()
+{
+    const auto root = juce::File::getSpecialLocation (juce::File::tempDirectory)
+        .getChildFile ("toyotomi-real-host-test-" + juce::Uuid().toString());
+    bool exact = true, aligned = true, flushed = true, metadata = true;
+    int caseNumber = 0;
+    for (const auto preset : { PluginStateModel::ScratchPreset::chirp,
+                               PluginStateModel::ScratchPreset::transform,
+                               PluginStateModel::ScratchPreset::zigzag })
+        for (const auto sync : { true, false })
+        {
+            ToyotomiHideyoshiAudioProcessor a, b;
+            a.prepareToPlay (48000, 512); b.prepareToPlay (48000, 512);
+            for (auto* processor : { &a, &b })
+            {
+                processor->setHostSyncEnabled (sync);
+                processor->getStateModel().setSlotPreset (0, preset);
+                processor->getStateModel().setSlotLength (0, PluginStateModel::NoteLength::oneBar);
+                processor->getStateModel().setSlotDepth (0, 1.0f);
+            }
+            TestPlayHead headA, headB;
+            a.setPlayHead (&headA); b.setPlayHead (&headB);
+            const auto folder = root.getChildFile ("case-" + juce::String (caseNumber++));
+            flushed &= b.startHostDiagnosticForTest (folder, 2.0);
+            juce::AudioBuffer<float> plain (2, 512), observed (2, 512);
+            juce::MidiBuffer midi;
+            for (int block = 0; block < 30; ++block)
+            {
+                const auto sample = block * 512;
+                const auto ppq = 12.0 + (double) sample / 24000.0;
+                headA.set (true, ppq, 120, 4, 4, sample);
+                headB.set (true, ppq, 120, 4, 4, sample);
+                for (int i = 0; i < 512; ++i)
+                    for (int channel = 0; channel < 2; ++channel)
+                        plain.setSample (channel, i, .5f * std::sin ((float) (sample + i) * .0137f + channel));
+                observed.makeCopyOf (plain);
+                a.processBlock (plain, midi); b.processBlock (observed, midi);
+                for (int channel = 0; channel < 2; ++channel)
+                    exact &= std::memcmp (plain.getReadPointer (channel), observed.getReadPointer (channel),
+                                           512 * sizeof (float)) == 0;
+            }
+            b.stopHostDiagnosticForTest();
+            const auto receipt = juce::JSON::parse (folder.getChildFile ("session.json"));
+            flushed &= (bool) receipt["valid"] && (int64_t) receipt["framesWritten"] == 15360
+                && (int64_t) receipt["droppedRecords"] == 0;
+            aligned &= folder.getChildFile ("samples.bin").getSize() == 15360 * 164;
+            juce::FileInputStream trace (folder.getChildFile ("samples.bin"));
+            for (int64_t i = 0; i < 15360 && trace.openedOk(); ++i)
+            {
+                aligned &= trace.readInt64() == i;
+                aligned &= trace.readInt64() == i % 512;
+                aligned &= trace.readInt64() == i;
+                trace.setPosition ((i + 1) * 164);
+            }
+            const auto events = folder.getChildFile ("transport-events.jsonl").loadFileAsString();
+            const auto first = juce::JSON::parse (events.upToFirstOccurrenceOf ("\n", false, false));
+            metadata &= (bool) first["ppqPresent"] && (double) first["ppq"] == 12.0
+                && (bool) first["samplesPresent"] && (int64_t) first["hostSamples"] == 0
+                && (bool) first["hostSync"] == sync;
+            juce::WavAudioFormat format;
+            std::unique_ptr<juce::AudioFormatReader> wave (format.createReaderFor (
+                new juce::FileInputStream (folder.getChildFile ("output.wav")), true));
+            flushed &= wave != nullptr && wave->lengthInSamples == 15360
+                && wave->numChannels == 2 && wave->usesFloatingPointData;
+            a.releaseResources(); b.releaseResources();
+        }
+    // Offline overflow is intentionally forced; evidence must be invalid.
+    RealHostDiagnostic overflow;
+    const auto overflowFolder = root.getChildFile ("overflow");
+    const auto overflowStarted = overflow.startForTest (overflowFolder, 48000, 1, 2, false);
+    RealHostDiagnostic::Block block; block.playing = true;
+    overflow.beginBlock (block);
+    TimelineScratchEngine::SampleTrace sample;
+    for (int i = 0; i < 10; ++i) RealHostDiagnostic::observe (sample, &overflow);
+    overflow.stopAndFlush();
+    const auto overflowReceipt = juce::JSON::parse (overflowFolder.getChildFile ("session.json"));
+    const auto rejectsDrop = overflowStarted && ! (bool) overflowReceipt["valid"]
+        && (int64_t) overflowReceipt["droppedRecords"] > 0;
+    RealHostDiagnostic capped;
+    const auto capFolder = root.getChildFile ("cap");
+    const auto capStarted = capped.startForTest (capFolder, 48000, 0.001, 256, false);
+    capped.beginBlock (block);
+    for (int i = 0; i < 128; ++i) RealHostDiagnostic::observe (sample, &capped);
+    capped.stopAndFlush();
+    const auto capReceipt = juce::JSON::parse (capFolder.getChildFile ("session.json"));
+    const auto capWorks = capStarted && (bool) capReceipt["valid"]
+        && (bool) capReceipt["limitReached"] && (int64_t) capReceipt["framesWritten"] == 48;
+    bool pass = true;
+    pass &= check (exact, "real-host-diagnostic-processor-on-off-bit-exact-sync-on-off");
+    pass &= check (aligned, "real-host-diagnostic-all-pcm-sample-serials-aligned");
+    pass &= check (flushed && metadata, "real-host-diagnostic-thread-flush-wav-and-host-metadata");
+    pass &= check (rejectsDrop, "real-host-diagnostic-dropped-evidence-invalid");
+    pass &= check (capWorks, "real-host-diagnostic-bounded-sample-duration");
+    return pass;
+}
 
 bool noPlayingRed (const juce::Image& image)
 {
@@ -685,6 +782,7 @@ void appendBarPixelTrace (juce::Array<juce::var>& output, const juce::var& runti
 int main()
 {
     juce::ScopedJuceInitialiser_GUI gui; bool pass=true;
+    pass &= testRealHostDiagnostic();
     pass &= check(resourceIs("static_faceplate_1024x683_png",1024,683),"v2-static-faceplate-native");
     pass &= check(resourceIs("knob_ring_60_png",48,48) && resourceIs("knob_pointer_60_png",48,48),"v2-knob-assets-native");
     pass &= check(resourceIs("bypass_off_png",80,31) && resourceIs("bypass_on_png",80,31),"v2-bypass-native");

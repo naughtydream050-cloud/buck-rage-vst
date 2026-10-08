@@ -28,14 +28,41 @@ ToyotomiHideyoshiAudioProcessor::ToyotomiHideyoshiAudioProcessor()
 }
 void ToyotomiHideyoshiAudioProcessor::prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock)
 {
+    scratchEngine.setSampleTraceObserver (nullptr, nullptr);
     preparedSampleRate = juce::jmax (1.0, sampleRate);
     scratchEngine.prepare (preparedSampleRate, maximumExpectedSamplesPerBlock, getTotalNumInputChannels());
+    hostDiagnostic.configureFromMarker (preparedSampleRate);
+    if (hostDiagnostic.isEnabled())
+        scratchEngine.setSampleTraceObserver (RealHostDiagnostic::observe, &hostDiagnostic);
     internalQuarterPosition = lastHostPpq = hostPpqOrigin = 0.0;
     lastHostBpmForContinuity = 120.0;
     lastHostSamplePosition = 0; lastHostBlockSize = 0;
     haveLastHostPpq = haveLastHostSamplePosition = internalWasPlaying = haveHostPpqOrigin = false;
 }
-void ToyotomiHideyoshiAudioProcessor::releaseResources(){ scratchEngine.release(); }
+ToyotomiHideyoshiAudioProcessor::~ToyotomiHideyoshiAudioProcessor()
+{
+    scratchEngine.setSampleTraceObserver (nullptr, nullptr);
+    hostDiagnostic.stopAndFlush();
+}
+void ToyotomiHideyoshiAudioProcessor::releaseResources()
+{
+    scratchEngine.setSampleTraceObserver (nullptr, nullptr);
+    hostDiagnostic.stopAndFlush();
+    scratchEngine.release();
+}
+bool ToyotomiHideyoshiAudioProcessor::startHostDiagnosticForTest (const juce::File& folder,
+                                                                double seconds, size_t capacity, bool consumer)
+{
+    scratchEngine.setSampleTraceObserver (nullptr, nullptr);
+    const auto started = hostDiagnostic.startForTest (folder, preparedSampleRate, seconds, capacity, consumer);
+    if (started) scratchEngine.setSampleTraceObserver (RealHostDiagnostic::observe, &hostDiagnostic);
+    return started;
+}
+void ToyotomiHideyoshiAudioProcessor::stopHostDiagnosticForTest()
+{
+    scratchEngine.setSampleTraceObserver (nullptr, nullptr);
+    hostDiagnostic.stopAndFlush();
+}
 void ToyotomiHideyoshiAudioProcessor::getStateInformation(juce::MemoryBlock& d){if(auto x=stateModel.toValueTree().createXml())copyXmlToBinary(*x,d);} void ToyotomiHideyoshiAudioProcessor::setStateInformation(const void*d,int s){if(auto x=getXmlFromBinary(d,s))if(stateModel.fromValueTree(juce::ValueTree::fromXml(*x)))hostSyncEnabled.store(stateModel.getUiState().hostSync,std::memory_order_relaxed);}
 bool ToyotomiHideyoshiAudioProcessor::isBusesLayoutSupported(const BusesLayout& l)const{auto o=l.getMainOutputChannelSet();return(o==juce::AudioChannelSet::mono()||o==juce::AudioChannelSet::stereo())&&o==l.getMainInputChannelSet();}
 void ToyotomiHideyoshiAudioProcessor::publishPeak(std::atomic<float>&d,float v)noexcept{auto c=d.load();while(v>c&&!d.compare_exchange_weak(c,v)){}}
@@ -69,6 +96,9 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
     bool readPosition = false, playing = false, hostIsLooping = false;
     juce::Optional<juce::AudioPlayHead::LoopPoints> hostLoopPoints;
     int timelineSlot = -1; double hostPpq = 0.0;
+    const auto originBefore = hostPpqOrigin;
+    double rawHostPpq = 0.0;
+    bool rawHostPpqPresent = false;
     int64_t hostSamplePosition = 0;
     bool hasHostPpq = false, hasHostSamplePosition = false, discontinuity = false;
     auto discontinuityReason = TimelineScratchEngine::DiscontinuityReason::none;
@@ -79,6 +109,11 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
             playing = position->getIsPlaying();
             hostIsLooping = position->getIsLooping();
             hostLoopPoints = position->getLoopPoints();
+            if (auto ppq = position->getPpqPosition())
+            {
+                rawHostPpq = *ppq;
+                rawHostPpqPresent = true;
+            }
             if (auto bpm = position->getBpm()) hostBpm.store (*bpm, std::memory_order_relaxed);
             if (auto time = position->getTimeSignature())
             {
@@ -250,6 +285,27 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
     std::array<TimelineScratchEngine::Slot, PluginStateModel::kNumBars> snapshot;
     for (int bar = 0; bar < PluginStateModel::kNumBars; ++bar)
         snapshot[(size_t) bar] = unpackDspSlot (dspSlots[(size_t) bar].load (std::memory_order_acquire));
+    if (hostDiagnostic.isEnabled())
+    {
+        RealHostDiagnostic::Block block;
+        block.frames = buffer.getNumSamples(); block.sampleRate = preparedSampleRate;
+        block.bpm = effectiveBpm; block.numerator = numerator; block.denominator = denominator;
+        block.playing = playing; block.looping = hostIsLooping;
+        block.ppqPresent = rawHostPpqPresent; block.ppq = rawHostPpq;
+        block.samplesPresent = hasHostSamplePosition; block.hostSamples = hostSamplePosition;
+        block.loopPointsPresent = hostLoopPoints.hasValue();
+        if (hostLoopPoints.hasValue())
+        {
+            block.loopStart = hostLoopPoints->ppqStart;
+            block.loopEnd = hostLoopPoints->ppqEnd;
+        }
+        block.originBefore = originBefore; block.originAfter = hostPpqOrigin;
+        block.hostSync = hostSyncEnabled.load (std::memory_order_relaxed);
+        block.startBar = transport.startBar; block.startPhase = transport.startBarPhase;
+        block.loopBoundarySample = transport.loopBoundarySample;
+        block.resetRequested = transport.discontinuity; block.resetReason = transport.discontinuityReason;
+        hostDiagnostic.beginBlock (block);
+    }
     scratchEngine.process (buffer, transport, snapshot);
     if (buffer.getNumChannels() > 0) publishPeak (outputPeakLeft, buffer.getMagnitude (0, 0, buffer.getNumSamples()));
     if (buffer.getNumChannels() > 1) publishPeak (outputPeakRight, buffer.getMagnitude (1, 0, buffer.getNumSamples()));

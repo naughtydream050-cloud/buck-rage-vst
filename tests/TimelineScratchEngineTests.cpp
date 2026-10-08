@@ -2,6 +2,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -160,6 +161,82 @@ bool renderScratchWav (const char* presetName, TimelineScratchEngine::Preset pre
     file.write (reinterpret_cast<const char*> (rendered.data()), (std::streamsize) payloadBytes);
     return file.good() && payloadBytes > 0;
 }
+}
+
+void testSampleObserver()
+{
+    using Engine = TimelineScratchEngine;
+    struct Collector
+    {
+        std::array<Engine::SampleTrace, 512> records {};
+        size_t count = 0;
+        bool overflow = false;
+    };
+    const auto collect = [] (const Engine::SampleTrace& trace, void* context) noexcept
+    {
+        auto& c = *static_cast<Collector*> (context);
+        if (c.count < c.records.size()) c.records[c.count++] = trace;
+        else c.overflow = true;
+    };
+    bool sameAudio = true, traceAligned = true, everySlot = true, repeatedWet = true;
+    for (const auto preset : { Engine::Preset::off, Engine::Preset::forwardCut,
+                               Engine::Preset::backspin, Engine::Preset::chirp,
+                               Engine::Preset::baby, Engine::Preset::transform,
+                               Engine::Preset::drag, Engine::Preset::zigzag,
+                               Engine::Preset::tapeBrake })
+    {
+        Engine plain, observed;
+        Collector collector;
+        plain.prepare (48000, 512, 2); observed.prepare (48000, 512, 2);
+        observed.setSampleTraceObserver (collect, &collector);
+        const auto configuration = slots (preset, Engine::Length::oneBar);
+        std::array<std::array<uint64_t, 4>, 3> wetSamples {};
+        uint64_t total = 0;
+        for (int pass = 0; pass < 3; ++pass)
+            for (int first = 0; first < 384000; first += 512)
+            {
+                const auto frames = juce::jmin (512, 384000 - first);
+                juce::AudioBuffer<float> a (2, frames), b (2, frames);
+                fillTone (a, first); b.makeCopyOf (a);
+                Engine::Transport t;
+                t.playing = true; t.startBar = first / 96000;
+                t.startBarPhase = (double) (first % 96000) / 96000.0;
+                t.barPhasePerSample = 1.0 / 96000.0;
+                t.secondsPerQuarter = 0.5;
+                t.discontinuity = first == 0;
+                t.discontinuityReason = pass == 0 ? Engine::DiscontinuityReason::start
+                                                  : Engine::DiscontinuityReason::loopWrap;
+                collector.count = 0;
+                plain.process (a, t, configuration); observed.process (b, t, configuration);
+                for (int channel = 0; channel < 2; ++channel)
+                    sameAudio &= std::memcmp (a.getReadPointer (channel), b.getReadPointer (channel),
+                                               (size_t) frames * sizeof (float)) == 0;
+                traceAligned &= collector.count == (size_t) frames && ! collector.overflow;
+                for (size_t i = 0; i < collector.count; ++i)
+                {
+                    const auto& trace = collector.records[i];
+                    const auto expectedBar = (first + (int) i) / 96000;
+                    everySlot &= trace.localBar == expectedBar;
+                    traceAligned &= trace.sampleIndex == i && trace.writerSerial == total + i
+                        && trace.outputLeft == b.getSample (0, (int) i)
+                        && trace.outputRight == b.getSample (1, (int) i);
+                    if (trace.captured && trace.wetEvaluated && trace.effectiveWet > 0.99f
+                        && (! trace.motionGateEnabled || trace.gate > 0.5))
+                        ++wetSamples[(size_t) pass][(size_t) expectedBar];
+                }
+                total += (uint64_t) frames;
+            }
+        if (preset == Engine::Preset::chirp || preset == Engine::Preset::transform
+            || preset == Engine::Preset::zigzag)
+            for (int pass = 1; pass < 3; ++pass)
+                for (int bar = 0; bar < 4; ++bar)
+                    repeatedWet &= wetSamples[(size_t) pass][(size_t) bar] > 20000;
+        observed.setSampleTraceObserver (nullptr, nullptr);
+    }
+    check (sameAudio, "diagnostic-observer-on-off-bit-exact-all-nine-presets");
+    check (traceAligned, "diagnostic-observer-every-sample-pcm-serial-aligned");
+    check (everySlot, "diagnostic-observer-three-pass-four-bar-every-sample-slot");
+    check (repeatedWet, "diagnostic-observer-each-repeat-bar-sustained-gate-open-wet-count");
 }
 
 int main()
@@ -860,5 +937,6 @@ int main()
 
     engine.release(); babyEngine.release(); babyReleaseEngine.release(); babyColdEngine.release(); forwardEngine.release();
     backspinWrapEngine.release(); tapeEngine.release(); transitionEngine.release(); shortLengthEngine.release(); depthEngine.release(); offTransitionEngine.release(); barEngine.release(); continuityEngine.release();
+    testSampleObserver();
     return passed ? 0 : 1;
 }

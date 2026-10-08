@@ -30,6 +30,7 @@ void TimelineScratchEngine::prepare (double rate, int, int channels)
     historySamples = juce::jmax (8, juce::roundToInt (sampleRateHz * maxHistorySeconds));
     for (auto& channel : history) channel.assign ((size_t) historySamples, 0.0f);
     writeSerial = minimumReadableSerial = 0;
+    barEntrySerial = 0;
     activeBar = -1; wetRamp = 0.0f; waitingForDry = false;
     backspinCaptured = tapeBrakeCaptured = babyCaptured = forwardCaptured = dragCaptured = false;
     backspinWindowSamples = backspinWindowStartSerial = backspinWindowEndSerial = 0.0;
@@ -139,6 +140,7 @@ void TimelineScratchEngine::beginBar (int bar, const Slot& slot, double quarters
                                       double secondsPerQuarter) noexcept
 {
     activeBar = bar;
+    ++barEntrySerial;
     activeSlot = slot;
     activeDurationQuarters = juce::jmin (lengthInQuarters (slot.length, quartersPerBar), quartersPerBar);
     activeDurationQuarters = juce::jmin (activeDurationQuarters,
@@ -459,6 +461,7 @@ float TimelineScratchEngine::wetSample (int channel, double barPhase, double qua
             + position * juce::jmax (0.0, motionWindowSamples - 1.0);
         diagnosticReadPosition = serial;
         diagnosticReadRate = positionRate;
+        diagnosticGate = gate;
         return read (history[(size_t) channel], serial) * gate;
     }
     return 0.0f;
@@ -608,6 +611,9 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
             beginBar (bar, slots[(size_t) bar], transport.quartersPerBar, transport.secondsPerQuarter);
         }
 
+        float observedWet[2] {};
+        bool wetEvaluated = false;
+        diagnosticGate = 0.0f;
         for (int channel = 0; channel < channels; ++channel)
         {
             const auto dry = buffer.getSample (channel, sampleIndex);
@@ -616,9 +622,76 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
             if (effectiveWet > 0.0f)
             {
                 const auto wet = wetSample (channel, phase, transport.quartersPerBar);
+                observedWet[channel] = wet;
+                wetEvaluated = true;
                 buffer.setSample (channel, sampleIndex, dry * (1.0f - effectiveWet) + wet * effectiveWet);
             }
             write (channel, dry);
+        }
+
+        if (traceObserver != nullptr)
+        {
+            SampleTrace trace;
+            trace.sampleIndex = (uint64_t) sampleIndex;
+            trace.writerSerial = writeSerial;
+            trace.barEntrySerial = barEntrySerial;
+            trace.localBar = bar; trace.activeBar = activeBar; trace.preset = activeSlot.preset;
+            trace.barPhase = phase;
+            trace.effectPhase = activeDurationQuarters > 0.0
+                ? phase * transport.quartersPerBar / activeDurationQuarters : 0.0;
+            trace.historyValidSamples = historyValidSamples();
+            if (isMotionPreset (activeSlot.preset))
+            {
+                trace.captureStartSerial = motionWindowStartSerial;
+                trace.captureEndSerial = motionWindowEndSerial;
+                trace.captured = motionCaptured;
+                trace.motionGateEnabled = true;
+            }
+            else if (activeSlot.preset == Preset::backspin)
+            {
+                trace.captureStartSerial = backspinWindowStartSerial;
+                trace.captureEndSerial = backspinWindowEndSerial;
+                trace.captured = backspinCaptured;
+            }
+            else if (activeSlot.preset == Preset::baby)
+            {
+                trace.captureStartSerial = babyWindowStartSerial;
+                trace.captureEndSerial = babyWindowEndSerial;
+                trace.captured = babyCaptured;
+            }
+            else if (activeSlot.preset == Preset::forwardCut)
+            {
+                trace.captureStartSerial = forwardWindowStartSerial;
+                trace.captureEndSerial = forwardWindowEndSerial;
+                trace.captured = forwardCaptured;
+            }
+            else if (activeSlot.preset == Preset::drag)
+            {
+                trace.captureStartSerial = dragWindowStartSerial;
+                trace.captureEndSerial = dragWindowEndSerial;
+                trace.captured = dragCaptured;
+            }
+            else if (activeSlot.preset == Preset::tapeBrake)
+            {
+                trace.captureStartSerial = tapeWindowStartSerial;
+                trace.captureEndSerial = tapeWindowEndSerial;
+                trace.captured = tapeBrakeCaptured;
+            }
+            trace.motionPhase = motionPhase; trace.motionCycle = motionCycleSamples;
+            trace.gate = diagnosticGate; trace.wetEvaluated = wetEvaluated;
+            trace.dryLeft = dryLeft; trace.dryRight = dryRight;
+            trace.wetLeft = observedWet[0]; trace.wetRight = channels > 1 ? observedWet[1] : observedWet[0];
+            trace.outputLeft = channels > 0 ? buffer.getSample (0, sampleIndex) : 0.0f;
+            trace.outputRight = channels > 1 ? buffer.getSample (1, sampleIndex) : trace.outputLeft;
+            trace.effectiveWet = diagnosticEffectiveWet;
+            trace.readPosition = wetEvaluated ? diagnosticReadPosition : 0.0;
+            trace.readRate = wetEvaluated ? diagnosticReadRate : 0.0;
+            trace.sourceEnded = (activeSlot.preset == Preset::forwardCut && forwardSourceEnded)
+                || (isMotionPreset (activeSlot.preset) && motionSourceEnded);
+            trace.waitingForDry = waitingForDry;
+            trace.transportResetCount = transportResetCount;
+            trace.resetReason = lastDiscontinuityReason;
+            traceObserver (trace, traceContext);
         }
 
         if (activeSlot.preset == Preset::tapeBrake && effectActive && tapeBrakeCaptured && ! waitingForDry)

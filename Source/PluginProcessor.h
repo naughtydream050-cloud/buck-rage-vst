@@ -4,12 +4,13 @@
 #include <atomic>
 #include "PluginStateModel.h"
 #include "TimelineScratchEngine.h"
+#include "RealHostDiagnostic.h"
 
 class ToyotomiHideyoshiAudioProcessor final : public juce::AudioProcessor
 {
 public:
     ToyotomiHideyoshiAudioProcessor();
-    ~ToyotomiHideyoshiAudioProcessor() override = default;
+    ~ToyotomiHideyoshiAudioProcessor() override;
 
     void prepareToPlay (double sampleRate, int maximumExpectedSamplesPerBlock) override;
     void releaseResources() override;
@@ -49,6 +50,10 @@ public:
     TimelineScratchEngine::Diagnostics getScratchDiagnostics() const noexcept { return scratchEngine.getDiagnostics(); }
     PluginStateModel& getStateModel() noexcept { return stateModel; }
     const PluginStateModel& getStateModel() const noexcept { return stateModel; }
+    // Non-audio diagnostic/test interface; not UI, APVTS, state or automation.
+    bool startHostDiagnosticForTest (const juce::File& folder, double seconds,
+                                      size_t capacity = 32768, bool consumer = true);
+    void stopHostDiagnosticForTest();
 
 private:
     static void publishPeak (std::atomic<float>& destination, float value) noexcept;
@@ -69,6 +74,7 @@ private:
     std::atomic<int> currentTimelineSlot { -1 };
     std::array<std::atomic<uint64_t>, PluginStateModel::kNumBars> dspSlots;
     TimelineScratchEngine scratchEngine;
+    RealHostDiagnostic hostDiagnostic;
     double preparedSampleRate = 44100.0, internalQuarterPosition = 0.0,
            lastHostPpq = 0.0, lastHostBpmForContinuity = 120.0,
            hostPpqOrigin = 0.0;
