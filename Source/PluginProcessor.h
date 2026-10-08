@@ -79,9 +79,14 @@ private:
            lastHostPpq = 0.0, lastHostBpmForContinuity = 120.0,
            hostPpqOrigin = 0.0;
     int64_t lastHostSamplePosition = 0;
+    int64_t predictedLoopNextSample = 0, predictedLoopWrappedSample = 0,
+            predictedLoopPreviousSample = 0;
     int lastHostBlockSize = 0;
+    double predictedLoopStartPpq = 0.0, predictedLoopEndPpq = 0.0,
+           predictedLoopNextPpq = 0.0;
     bool internalWasPlaying = false, haveLastHostPpq = false,
-         haveLastHostSamplePosition = false, haveHostPpqOrigin = false;
+         haveLastHostSamplePosition = false, haveHostPpqOrigin = false,
+         predictedLoopPending = false, predictedLoopHadSamples = false;
     PluginStateModel stateModel;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ToyotomiHideyoshiAudioProcessor)

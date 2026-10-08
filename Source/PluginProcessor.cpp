@@ -38,6 +38,7 @@ void ToyotomiHideyoshiAudioProcessor::prepareToPlay(double sampleRate, int maxim
     lastHostBpmForContinuity = 120.0;
     lastHostSamplePosition = 0; lastHostBlockSize = 0;
     haveLastHostPpq = haveLastHostSamplePosition = internalWasPlaying = haveHostPpqOrigin = false;
+    predictedLoopPending = predictedLoopHadSamples = false;
 }
 ToyotomiHideyoshiAudioProcessor::~ToyotomiHideyoshiAudioProcessor()
 {
@@ -142,6 +143,27 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
     transport.barPhasePerSample = effectiveBpm / (60.0 * preparedSampleRate * quartersPerBar);
     if (hostSyncEnabled.load (std::memory_order_relaxed) && hasHostPpq)
     {
+        // The previous block may have crossed a known loop boundary inside
+        // the block. Match the next host callback to that already-applied
+        // event before considering its backward PPQ a second reset.
+        bool confirmedPredictedLoop = false;
+        double confirmedLoopStart = 0.0;
+        if (predictedLoopPending)
+        {
+            const auto ppqTolerance = juce::jmax (1.0e-6,
+                4.0 * effectiveBpm / (60.0 * preparedSampleRate));
+            const auto sameLoop = hostIsLooping && hostLoopPoints.hasValue()
+                && std::abs (hostLoopPoints->ppqStart - predictedLoopStartPpq) <= ppqTolerance
+                && std::abs (hostLoopPoints->ppqEnd - predictedLoopEndPpq) <= ppqTolerance;
+            const auto samePosition = std::abs (hostPpq - predictedLoopNextPpq) <= ppqTolerance;
+            const auto sampleMatches = ! predictedLoopHadSamples || ! hasHostSamplePosition
+                || std::abs (hostSamplePosition - predictedLoopNextSample) <= 4
+                || std::abs (hostSamplePosition - predictedLoopWrappedSample) <= 4
+                || hostSamplePosition == predictedLoopPreviousSample;
+            confirmedPredictedLoop = sameLoop && samePosition && sampleMatches;
+            confirmedLoopStart = predictedLoopStartPpq;
+            predictedLoopPending = false;
+        }
         // Prefer sample positions when they are trustworthy, but some hosts
         // expose a stale value while their PPQ stream remains continuous. A
         // stale sample position alone must not repeatedly clear history and
@@ -230,7 +252,15 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         // Toyotomi BAR 1 starts at the host's actual play/seek/loop position,
         // never at the DAW's absolute PPQ zero.  The origin remains fixed over
         // ordinary blocks, tempo edits and BAR boundaries.
-        if (! haveHostPpqOrigin || discontinuity)
+        if (confirmedPredictedLoop)
+        {
+            discontinuity = true;
+            discontinuityReason = TimelineScratchEngine::DiscontinuityReason::loopWrap;
+            hostPpqOrigin = confirmedLoopStart;
+            haveHostPpqOrigin = true;
+            transport.confirmedPredictedLoop = true;
+        }
+        else if (! haveHostPpqOrigin || discontinuity)
         {
             hostPpqOrigin = hostPpq;
             haveHostPpqOrigin = true;
@@ -258,11 +288,23 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
                 transport.loopBoundarySample = offset;
                 transport.loopStartBar = 0;
                 transport.loopStartPhase = 0.0;
+                predictedLoopPending = true;
+                predictedLoopHadSamples = hasHostSamplePosition;
+                predictedLoopStartPpq = hostLoopPoints->ppqStart;
+                predictedLoopEndPpq = hostLoopPoints->ppqEnd;
+                predictedLoopNextPpq = hostLoopPoints->ppqStart
+                    + (blockPpqEnd - hostLoopPoints->ppqEnd);
+                predictedLoopPreviousSample = hostSamplePosition;
+                predictedLoopNextSample = hostSamplePosition + buffer.getNumSamples();
+                predictedLoopWrappedSample = predictedLoopNextSample - (int64_t) std::llround (
+                    (hostLoopPoints->ppqEnd - hostLoopPoints->ppqStart)
+                    * 60.0 * preparedSampleRate / effectiveBpm);
             }
         }
     }
     else
     {
+        predictedLoopPending = false;
         if (hostSyncEnabled.load (std::memory_order_relaxed) && ! playing)
             haveHostPpqOrigin = false;
         if (playing && ! internalWasPlaying)

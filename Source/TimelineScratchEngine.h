@@ -25,6 +25,8 @@ public:
     struct Transport final
     {
         bool playing = false, discontinuity = false;
+        // A mid-block loop was already applied by the previous process call.
+        bool confirmedPredictedLoop = false;
         DiscontinuityReason discontinuityReason = DiscontinuityReason::none;
         int startBar = -1;
         double startBarPhase = 0.0, barPhasePerSample = 0.0, quartersPerBar = 4.0,

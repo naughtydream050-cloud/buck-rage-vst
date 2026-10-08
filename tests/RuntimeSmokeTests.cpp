@@ -177,7 +177,8 @@ class TestPlayHead final : public juce::AudioPlayHead
 {
 public:
     void set (bool isPlaying, double ppq, double bpm = 120.0, int numerator = 4, int denominator = 4,
-              int64_t timeInSamples = -1, bool isLooping = false)
+              int64_t timeInSamples = -1, bool isLooping = false,
+              double loopStart = 0.0, double loopEnd = 0.0)
     {
         position = {};
         position.setIsPlaying (isPlaying);
@@ -185,6 +186,8 @@ public:
         position.setBpm (bpm);
         position.setTimeSignature (juce::AudioPlayHead::TimeSignature { numerator, denominator });
         position.setIsLooping (isLooping);
+        if (loopEnd > loopStart)
+            position.setLoopPoints (juce::AudioPlayHead::LoopPoints { loopStart, loopEnd });
         if (timeInSamples >= 0) position.setTimeInSamples (timeInSamples);
     }
 
@@ -193,6 +196,70 @@ public:
 private:
     juce::AudioPlayHead::PositionInfo position;
 };
+
+bool testPredictedMotionLoopConfirmation()
+{
+    bool pass = true;
+    constexpr double sampleRate = 48000.0, bpm = 130.0;
+    constexpr int blockSize = 512;
+    const auto samplesPerQuarter = sampleRate * 60.0 / bpm;
+    const auto loopSamples = 16.0 * samplesPerQuarter;
+    const auto boundaryBlock = (int64_t) std::floor ((loopSamples - 1.0) / blockSize) * blockSize;
+    const auto ppqPerSample = bpm / (60.0 * sampleRate);
+    for (const auto preset : { PluginStateModel::ScratchPreset::chirp,
+                               PluginStateModel::ScratchPreset::transform,
+                               PluginStateModel::ScratchPreset::zigzag })
+    {
+        ToyotomiHideyoshiAudioProcessor processor;
+        processor.prepareToPlay (sampleRate, blockSize);
+        for (int bar = 0; bar < 4; ++bar)
+        {
+            processor.getStateModel().setSlotPreset (bar, preset);
+            processor.getStateModel().setSlotLength (bar, PluginStateModel::NoteLength::oneBar);
+            processor.getStateModel().setSlotDepth (bar, 1.0f);
+        }
+        TestPlayHead head;
+        processor.setPlayHead (&head);
+        juce::AudioBuffer<float> audio (2, blockSize);
+        juce::MidiBuffer midi;
+        uint32_t beforeBoundary = 0, afterBoundary = 0;
+        for (int64_t first = 0; first <= boundaryBlock; first += blockSize)
+        {
+            head.set (true, 12.0 + first * ppqPerSample, bpm, 4, 4,
+                      first, true, 12.0, 28.0);
+            for (int i = 0; i < blockSize; ++i)
+            {
+                const auto n = (double) ((first + i) % (int64_t) std::llround (loopSamples));
+                const auto value = (float) (0.32 * std::sin (n * 0.017)
+                                          + 0.14 * std::cos (n * 0.031));
+                audio.setSample (0, i, value); audio.setSample (1, i, value);
+            }
+            if (first == boundaryBlock)
+                beforeBoundary = processor.getScratchDiagnostics().transportResetCount;
+            processor.processBlock (audio, midi);
+            if (first == boundaryBlock)
+                afterBoundary = processor.getScratchDiagnostics().transportResetCount;
+        }
+        const auto carrySamples = (double) (boundaryBlock + blockSize) - loopSamples;
+        head.set (true, 12.0 + carrySamples * ppqPerSample, bpm, 4, 4,
+                  (int64_t) std::llround (carrySamples), true, 12.0, 28.0);
+        for (int i = 0; i < blockSize; ++i)
+        {
+            const auto n = (double) (std::llround (carrySamples) + i);
+            const auto value = (float) (0.32 * std::sin (n * 0.017)
+                                      + 0.14 * std::cos (n * 0.031));
+            audio.setSample (0, i, value); audio.setSample (1, i, value);
+        }
+        processor.processBlock (audio, midi);
+        const auto afterConfirmation = processor.getScratchDiagnostics().transportResetCount;
+        pass &= check (afterBoundary == beforeBoundary + 1
+                      && afterConfirmation == afterBoundary
+                      && processor.getCurrentTimelineSlot() == 0,
+                      "motion-four-bar-midblock-loop-has-one-logical-reset-and-bar1-reentry");
+        processor.setPlayHead (nullptr);
+    }
+    return pass;
+}
 
 bool testRealHostDiagnostic()
 {
@@ -783,6 +850,7 @@ int main()
 {
     juce::ScopedJuceInitialiser_GUI gui; bool pass=true;
     pass &= testRealHostDiagnostic();
+    pass &= testPredictedMotionLoopConfirmation();
     pass &= check(resourceIs("static_faceplate_1024x683_png",1024,683),"v2-static-faceplate-native");
     pass &= check(resourceIs("knob_ring_60_png",48,48) && resourceIs("knob_pointer_60_png",48,48),"v2-knob-assets-native");
     pass &= check(resourceIs("bypass_off_png",80,31) && resourceIs("bypass_on_png",80,31),"v2-bypass-native");

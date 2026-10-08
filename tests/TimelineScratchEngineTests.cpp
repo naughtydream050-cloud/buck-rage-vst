@@ -293,6 +293,7 @@ void testPredictedLoopIsAppliedOnce()
         confirmed.barPhasePerSample = step;
         confirmed.discontinuity = true;
         confirmed.discontinuityReason = Engine::DiscontinuityReason::loopWrap;
+        confirmed.confirmedPredictedLoop = true;
         observed.process (block, confirmed, configuration);
         observed.setSampleTraceObserver (nullptr, nullptr);
         // The predicted loop already entered BAR1 in the preceding block.

@@ -519,7 +519,8 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
                                      const std::array<Slot, 64>& slots) noexcept
 {
     if (historySamples <= 0 || sampleRateHz <= 0.0) return;
-    if (transport.discontinuity || ! transport.playing || transport.startBar < 0)
+    if ((transport.discontinuity && ! transport.confirmedPredictedLoop)
+        || ! transport.playing || transport.startBar < 0)
     {
         ++transportResetCount;
         lastDiscontinuityReason = transport.discontinuity ? transport.discontinuityReason
@@ -535,6 +536,8 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
         if (! loopBoundaryApplied && transport.loopBoundarySample >= 0
             && sampleIndex >= transport.loopBoundarySample)
         {
+            ++transportResetCount;
+            lastDiscontinuityReason = DiscontinuityReason::loopWrap;
             resetTransport (true);
             loopBoundaryApplied = true;
         }
