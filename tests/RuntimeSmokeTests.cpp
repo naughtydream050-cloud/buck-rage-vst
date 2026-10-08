@@ -203,16 +203,19 @@ bool testPredictedMotionLoopConfirmation()
     constexpr double sampleRate = 48000.0, bpm = 130.0;
     constexpr int blockSize = 512;
     const auto samplesPerQuarter = sampleRate * 60.0 / bpm;
-    const auto loopSamples = 16.0 * samplesPerQuarter;
-    const auto boundaryBlock = (int64_t) std::floor ((loopSamples - 1.0) / blockSize) * blockSize;
     const auto ppqPerSample = bpm / (60.0 * sampleRate);
+    for (const int loopBars : { 4, 8 })
+    {
+    const auto loopSamples = (double) loopBars * 4.0 * samplesPerQuarter;
+    const auto loopEndPpq = 12.0 + (double) loopBars * 4.0;
+    const auto boundaryBlock = (int64_t) std::floor ((loopSamples - 1.0) / blockSize) * blockSize;
     for (const auto preset : { PluginStateModel::ScratchPreset::chirp,
                                PluginStateModel::ScratchPreset::transform,
                                PluginStateModel::ScratchPreset::zigzag })
     {
         ToyotomiHideyoshiAudioProcessor processor;
         processor.prepareToPlay (sampleRate, blockSize);
-        for (int bar = 0; bar < 4; ++bar)
+        for (int bar = 0; bar < loopBars; ++bar)
         {
             processor.getStateModel().setSlotPreset (bar, preset);
             processor.getStateModel().setSlotLength (bar, PluginStateModel::NoteLength::oneBar);
@@ -226,7 +229,7 @@ bool testPredictedMotionLoopConfirmation()
         for (int64_t first = 0; first <= boundaryBlock; first += blockSize)
         {
             head.set (true, 12.0 + first * ppqPerSample, bpm, 4, 4,
-                      first, true, 12.0, 28.0);
+                      first, true, 12.0, loopEndPpq);
             for (int i = 0; i < blockSize; ++i)
             {
                 const auto n = (double) ((first + i) % (int64_t) std::llround (loopSamples));
@@ -242,7 +245,7 @@ bool testPredictedMotionLoopConfirmation()
         }
         const auto carrySamples = (double) (boundaryBlock + blockSize) - loopSamples;
         head.set (true, 12.0 + carrySamples * ppqPerSample, bpm, 4, 4,
-                  (int64_t) std::llround (carrySamples), true, 12.0, 28.0);
+                  (int64_t) std::llround (carrySamples), true, 12.0, loopEndPpq);
         for (int i = 0; i < blockSize; ++i)
         {
             const auto n = (double) (std::llround (carrySamples) + i);
@@ -251,12 +254,18 @@ bool testPredictedMotionLoopConfirmation()
             audio.setSample (0, i, value); audio.setSample (1, i, value);
         }
         processor.processBlock (audio, midi);
-        const auto afterConfirmation = processor.getScratchDiagnostics().transportResetCount;
+        const auto afterLoop = processor.getScratchDiagnostics();
+        const auto afterConfirmation = afterLoop.transportResetCount;
         pass &= check (afterBoundary == beforeBoundary + 1
                       && afterConfirmation == afterBoundary
-                      && processor.getCurrentTimelineSlot() == 0,
-                      "motion-four-bar-midblock-loop-has-one-logical-reset-and-bar1-reentry");
+                      && processor.getCurrentTimelineSlot() == 0
+                      && afterLoop.motionCaptured && ! afterLoop.motionSourceEnded
+                      && afterLoop.effectiveWet > 0.99f,
+                      loopBars == 4
+                          ? "motion-four-bar-midblock-loop-has-one-logical-reset-and-bar1-reentry"
+                          : "motion-eight-bar-midblock-loop-has-one-logical-reset-and-bar1-reentry");
         processor.setPlayHead (nullptr);
+    }
     }
     return pass;
 }

@@ -13,6 +13,7 @@ const groups = new Map();
 const capacity = Math.ceil(receipt.sampleRate * 10) + 8;
 const stamps = new Float64Array(capacity).fill(-1);
 const prefixes = new Float64Array(capacity);
+const inputPeaks = new Float32Array(capacity);
 let cumulativeInputPower = 0, firstWriter = -1, count = 0, carry = Buffer.alloc(0), nonfinite = 0;
 let lastClock = -1, lastWriter = -1;
 const seenCaptures = new Set();
@@ -38,6 +39,7 @@ for await (const chunk of createReadStream(join(folder, 'samples.bin'))) {
     if (firstWriter < 0) firstWriter = writer;
     stamps[writer % capacity] = writer;
     prefixes[writer % capacity] = cumulativeInputPower;
+    inputPeaks[writer % capacity] = Math.max(Math.abs(dryL), Math.abs(dryR));
     cumulativeInputPower += (dryL * dryL + dryR * dryR) / 2;
     stamps[(writer + 1) % capacity] = writer + 1;
     prefixes[(writer + 1) % capacity] = cumulativeInputPower;
@@ -47,6 +49,7 @@ for await (const chunk of createReadStream(join(folder, 'samples.bin'))) {
         samples: 0, localSlotMismatchSamples: 0, capturedSamples: 0, wetSamples: 0,
         gateOpenSamples: 0, gateOpenWetSamples: 0, sourceEndedSamples: 0,
         firstCaptureSample: null, captureStart: null, captureEnd: null, captureRms: null,
+        capturePeak: null,
         captureEnergyStatus: 'NOT_CAPTURED', captureChangedWithinEntry: false,
         dryPower: 0, outputPower: 0, wetPower: 0, gateOpenDeltaPower: 0,
         dryPeak: 0, outputPeak: 0, resetCount, resetReason };
@@ -77,6 +80,12 @@ for await (const chunk of createReadStream(join(folder, 'samples.bin'))) {
         const start = Math.floor(captureStart), finish = Math.floor(captureEnd);
         if (finish > start && start >= firstWriter && stamps[start % capacity] === start && stamps[finish % capacity] === finish) {
           g.captureRms = Math.sqrt(Math.max(0, prefixes[finish % capacity] - prefixes[start % capacity]) / (finish - start));
+          let peak = 0;
+          for (let serial = start; serial < finish; serial++) {
+            if (stamps[serial % capacity] !== serial) throw new Error('CAPTURE_WINDOW_SERIAL_MISMATCH');
+            peak = Math.max(peak, inputPeaks[serial % capacity]);
+          }
+          g.capturePeak = peak;
           g.captureEnergyStatus = 'MEASURED_INTEGER_SAMPLE_WINDOW';
         } else g.captureEnergyStatus = 'UNKNOWN_WINDOW_NOT_IN_CAPTURED_PCM';
       }
