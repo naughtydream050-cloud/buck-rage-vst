@@ -270,6 +270,80 @@ bool testPredictedMotionLoopConfirmation()
     return pass;
 }
 
+bool testMotionWetSurvivesThreeHostLoops()
+{
+    bool pass = true;
+    constexpr double sampleRate = 48000.0, bpm = 130.0;
+    constexpr int blockSize = 512;
+    constexpr double ppqPerSample = bpm / (60.0 * sampleRate);
+    for (const int loopBars : { 4, 8 })
+    {
+        const auto loopQuarters = (double) loopBars * 4.0;
+        const auto loopSamples = loopQuarters / ppqPerSample;
+        const auto blocks = (int) std::ceil (loopSamples * 3.0 / blockSize);
+        for (const auto preset : { PluginStateModel::ScratchPreset::chirp,
+                                   PluginStateModel::ScratchPreset::transform,
+                                   PluginStateModel::ScratchPreset::zigzag })
+        {
+            ToyotomiHideyoshiAudioProcessor processor;
+            processor.prepareToPlay (sampleRate, blockSize);
+            for (int bar = 0; bar < loopBars; ++bar)
+            {
+                processor.getStateModel().setSlotPreset (bar, preset);
+                processor.getStateModel().setSlotLength (bar, PluginStateModel::NoteLength::oneBar);
+                processor.getStateModel().setSlotSpeed (bar, 1.0f);
+                processor.getStateModel().setSlotDepth (bar, 1.0f);
+            }
+            TestPlayHead head;
+            processor.setPlayHead (&head);
+            juce::AudioBuffer<float> audio (2, blockSize);
+            juce::MidiBuffer midi;
+            bool continuous = true;
+            int checkedBlocks = 0;
+            for (int block = 0; block < blocks; ++block)
+            {
+                const auto absoluteSample = (double) block * blockSize;
+                const auto localSample = std::fmod (absoluteSample, loopSamples);
+                const auto passIndex = (int) std::floor (absoluteSample / loopSamples);
+                if (passIndex >= 3) break;
+                head.set (true, 12.0 + localSample * ppqPerSample, bpm, 4, 4,
+                          (int64_t) std::llround (localSample), true,
+                          12.0, 12.0 + loopQuarters);
+                for (int i = 0; i < blockSize; ++i)
+                {
+                    const auto sourceSample = std::fmod (absoluteSample + (double) i, loopSamples);
+                    const auto value = (float) (0.32 * std::sin (sourceSample * 0.017)
+                                              + 0.14 * std::cos (sourceSample * 0.031));
+                    audio.setSample (0, i, value);
+                    audio.setSample (1, i, value);
+                }
+                processor.processBlock (audio, midi);
+                const auto localEnd = std::fmod (absoluteSample + blockSize - 1.0, loopSamples);
+                const auto expectedBar = (int) std::floor (localEnd / (loopSamples / loopBars));
+                const auto withinBar = std::fmod (localEnd, loopSamples / loopBars);
+                // The first BAR needs 125 ms of history; each BAR transition
+                // uses an 8 ms ramp. Outside those bounded intervals, every
+                // block must stay captured and Wet, not merely one per BAR.
+                if (withinBar > sampleRate * 0.20
+                    && withinBar < loopSamples / loopBars - sampleRate * 0.02)
+                {
+                    const auto state = processor.getScratchDiagnostics();
+                    continuous &= state.playingBar == expectedBar
+                        && state.motionCaptured && ! state.motionSourceEnded
+                        && state.effectiveWet > 0.99f;
+                    ++checkedBlocks;
+                }
+            }
+            pass &= check (continuous && checkedBlocks > loopBars * 3 * 20,
+                           loopBars == 4
+                               ? "motion-four-bar-three-pass-block-continuous-wet"
+                               : "motion-eight-bar-three-pass-block-continuous-wet");
+            processor.setPlayHead (nullptr);
+        }
+    }
+    return pass;
+}
+
 bool testRealHostDiagnostic()
 {
     const auto root = juce::File::getSpecialLocation (juce::File::tempDirectory)
@@ -860,6 +934,7 @@ int main()
     juce::ScopedJuceInitialiser_GUI gui; bool pass=true;
     pass &= testRealHostDiagnostic();
     pass &= testPredictedMotionLoopConfirmation();
+    pass &= testMotionWetSurvivesThreeHostLoops();
     pass &= check(resourceIs("static_faceplate_1024x683_png",1024,683),"v2-static-faceplate-native");
     pass &= check(resourceIs("knob_ring_60_png",48,48) && resourceIs("knob_pointer_60_png",48,48),"v2-knob-assets-native");
     pass &= check(resourceIs("bypass_off_png",80,31) && resourceIs("bypass_on_png",80,31),"v2-bypass-native");
