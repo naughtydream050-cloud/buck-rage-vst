@@ -239,6 +239,72 @@ void testSampleObserver()
     check (repeatedWet, "diagnostic-observer-each-repeat-bar-sustained-gate-open-wet-count");
 }
 
+void testPredictedLoopIsAppliedOnce()
+{
+    using Engine = TimelineScratchEngine;
+    struct Collector
+    {
+        uint64_t firstEntry = 0, lastEntry = 0;
+        float firstWet = 0.0f;
+        bool sawSample = false;
+    } collector;
+    const auto collect = [] (const Engine::SampleTrace& trace, void* context) noexcept
+    {
+        auto& data = *static_cast<Collector*> (context);
+        if (! data.sawSample)
+        {
+            data.firstEntry = trace.barEntrySerial;
+            data.firstWet = trace.effectiveWet;
+            data.sawSample = true;
+        }
+        data.lastEntry = trace.barEntrySerial;
+    };
+
+    bool singleEntry = true;
+    for (const auto preset : { Engine::Preset::chirp, Engine::Preset::transform,
+                               Engine::Preset::zigzag })
+    {
+        Engine observed;
+        observed.prepare (48000.0, 512, 2);
+        juce::AudioBuffer<float> block (2, 512);
+        const auto configuration = slots (preset, Engine::Length::oneBar);
+        const auto step = 1.0 / 96000.0;
+        for (int index = 0; index < 20; ++index)
+        {
+            fillTone (block, (int64_t) index * 512);
+            auto t = transport (3, 0.5 + (double) index * 512.0 * step);
+            t.barPhasePerSample = step;
+            observed.process (block, t, configuration);
+        }
+
+        fillTone (block, 10240);
+        auto predicted = transport (3, 1.0 - 256.0 * step);
+        predicted.barPhasePerSample = step;
+        predicted.loopBoundarySample = 256;
+        predicted.loopStartBar = 0;
+        predicted.loopStartPhase = 0.0;
+        observed.setSampleTraceObserver (collect, &collector);
+        observed.process (block, predicted, configuration);
+        const auto predictedEntry = collector.lastEntry;
+
+        collector = {};
+        fillTone (block, 10752);
+        auto confirmed = transport (0, 256.0 * step);
+        confirmed.barPhasePerSample = step;
+        confirmed.discontinuity = true;
+        confirmed.discontinuityReason = Engine::DiscontinuityReason::loopWrap;
+        observed.process (block, confirmed, configuration);
+        observed.setSampleTraceObserver (nullptr, nullptr);
+        // The predicted loop already entered BAR1 in the preceding block.
+        // A second entry means the same host loop discarded that runtime.
+        singleEntry &= collector.sawSample && collector.firstEntry == predictedEntry
+            && collector.firstEntry == collector.lastEntry
+            && collector.firstEntry > 0;
+        observed.release();
+    }
+    check (singleEntry, "motion-predicted-loop-confirmation-has-one-bar1-entry");
+}
+
 int main()
 {
     constexpr std::array<double, 7> phases { .05, .10, .25, .50, .75, .90, .95 };
@@ -938,5 +1004,6 @@ int main()
     engine.release(); babyEngine.release(); babyReleaseEngine.release(); babyColdEngine.release(); forwardEngine.release();
     backspinWrapEngine.release(); tapeEngine.release(); transitionEngine.release(); shortLengthEngine.release(); depthEngine.release(); offTransitionEngine.release(); barEngine.release(); continuityEngine.release();
     testSampleObserver();
+    testPredictedLoopIsAppliedOnce();
     return passed ? 0 : 1;
 }
