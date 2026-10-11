@@ -842,7 +842,9 @@ int main()
     const auto chirpSlots = slots (TimelineScratchEngine::Preset::chirp,
                                    TimelineScratchEngine::Length::oneBar, 1.0f, 1.0f);
     double motionSilencePhase = 0.0;
-    for (int block = 0; block < 8; ++block)
+    // Advance beyond the 125 ms BAR-entry grace before testing the unchanged
+    // 30 ms source-ended hold.
+    for (int block = 0; block < 14; ++block)
     {
         fill (audio, .7f);
         motionSilenceEngine.process (audio, transport (1, motionSilencePhase), chirpSlots);
@@ -929,6 +931,59 @@ int main()
         check (! started.motionSourceEnded && started.effectiveWet > 0.5f,
                "motion-captures-after-signal-on-silent-bar");
         delayedCapture.release();
+    }
+
+    // Actual FL trace 20261011-193100 showed a 42.7 ms silent lead-in after
+    // seven milliseconds of signal at repeated BAR1 entries. A primed history
+    // made capture immediate, so the old 30 ms latch muted only later loop
+    // passes. The first 125 ms of a motion BAR is now a grace interval; once
+    // it has elapsed, the same 30 ms source-ended behaviour remains active.
+    for (const auto preset : { TimelineScratchEngine::Preset::chirp,
+                               TimelineScratchEngine::Preset::transform,
+                               TimelineScratchEngine::Preset::zigzag })
+    {
+        TimelineScratchEngine entryGapEngine;
+        entryGapEngine.prepare (48000.0, 512, 2);
+        for (int block = 0; block < 1000; ++block)
+        {
+            fill (audio, .7f);
+            entryGapEngine.process (audio, transport (63, 0.0), dry);
+        }
+        const auto motionSlots = slots (preset, TimelineScratchEngine::Length::oneBar, 1.0f, 1.0f);
+        double phase = 0.0;
+        int barSample = 0;
+        bool entryGapStayedLive = true, capturedAndWet = false;
+        for (int block = 0; block < 14; ++block)
+        {
+            for (int sample = 0; sample < audio.getNumSamples(); ++sample)
+            {
+                // 8 ms signal, 42.7 ms silence, then resumed source: the
+                // observed FL BAR1 boundary shape scaled to 48 kHz.
+                const auto source = (barSample < 384 || barSample >= 2432) ? .7f : 0.0f;
+                audio.setSample (0, sample, source);
+                audio.setSample (1, sample, source);
+                ++barSample;
+            }
+            const auto blockTransport = transport (0, phase);
+            entryGapEngine.process (audio, blockTransport, motionSlots);
+            const auto state = entryGapEngine.getDiagnostics();
+            entryGapStayedLive &= ! state.motionSourceEnded;
+            capturedAndWet |= state.motionCaptured && state.effectiveWet > .99f;
+            phase += blockTransport.barPhasePerSample * audio.getNumSamples();
+        }
+        check (entryGapStayedLive && capturedAndWet,
+               "motion-primed-entry-gap-does-not-latch-source-ended");
+
+        for (int block = 0; block < 3; ++block)
+        {
+            fill (audio, 0.0f);
+            const auto blockTransport = transport (0, phase);
+            entryGapEngine.process (audio, blockTransport, motionSlots);
+            phase += blockTransport.barPhasePerSample * audio.getNumSamples();
+        }
+        check (entryGapEngine.getDiagnostics().motionSourceEnded,
+               "motion-source-ended-still-latches-after-entry-grace");
+        entryGapEngine.release();
     }
 
     // Eight consecutive BAR entries, including BAR1 and BAR5, must expose

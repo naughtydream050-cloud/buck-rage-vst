@@ -573,7 +573,8 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
             else beginBar (bar, slots[(size_t) bar], transport.quartersPerBar, transport.secondsPerQuarter);
         }
 
-    const auto motionPreset = isMotionPreset (activeSlot.preset);
+        const auto elapsedQuarters = phase * transport.quartersPerBar;
+        const auto motionPreset = isMotionPreset (activeSlot.preset);
         if (motionPreset && ! motionSourceEnded && ! waitingForDry)
         {
             if (std::abs (dryLeft) < kForwardCutSilenceThreshold
@@ -585,12 +586,18 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
                 motionSourceSilenceSamples = 0.0;
             }
 
-            if (motionCaptured && motionSourceHasSignal
+            // FL can deliver a short silent lead-in at a loop boundary. Once
+            // history is primed, capture is immediate; without this BAR-entry
+            // grace the same lead-in latches source-ended only on later loop
+            // passes. Keep the normal hold unchanged, but do not arm it until
+            // one motion-window duration into the current BAR.
+            const auto motionSourceEndArmed = elapsedQuarters * transport.secondsPerQuarter
+                >= kMotionCaptureWindowSeconds;
+            if (motionSourceEndArmed && motionCaptured && motionSourceHasSignal
                 && motionSourceSilenceSamples >= sampleRateHz * kForwardCutSilenceHoldSeconds)
                 motionSourceEnded = true;
         }
 
-        const auto elapsedQuarters = phase * transport.quartersPerBar;
         diagnosticEffectPhase = activeDurationQuarters > 0.0 ? elapsedQuarters / activeDurationQuarters : 0.0;
         const auto effectActive = activeBar >= 0 && activeSlot.preset != Preset::off
             && elapsedQuarters < activeDurationQuarters;
