@@ -19,6 +19,7 @@ switch (ac) {
   case 'AC-02':
     requireText(source, /motionCycleSamples\s*=\s*juce::jmax\s*\(\s*1\.0,[\s\S]*secondsPerQuarter\s*\*\s*0\.5[\s\S]*sampleRateHz[\s\S]*speed\)/s, 'BPM speed cycle');
     requireText(source, /motionPhase\s*=\s*std::fmod\s*\(\s*motionPhase\s*\+\s*1\.0/, 'sample phase');
+    requireText(tests, /wetOutputSeen\s*\|=\s*state\.motionCaptured[\s\S]*tailEnergy\s*\(\s*audio\s*\)/s, 'measured wet output after capture');
     pass('SPEED appears only in cycle timing for motion');
     break;
   case 'AC-03':

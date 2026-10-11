@@ -952,7 +952,7 @@ int main()
         const auto motionSlots = slots (preset, TimelineScratchEngine::Length::oneBar, 1.0f, 1.0f);
         double phase = 0.0;
         int barSample = 0;
-        bool entryGapStayedLive = true, capturedAndWet = false;
+        bool entryGapStayedLive = true, capturedAndWet = false, wetOutputSeen = false;
         for (int block = 0; block < 14; ++block)
         {
             for (int sample = 0; sample < audio.getNumSamples(); ++sample)
@@ -969,9 +969,10 @@ int main()
             const auto state = entryGapEngine.getDiagnostics();
             entryGapStayedLive &= ! state.motionSourceEnded;
             capturedAndWet |= state.motionCaptured && state.effectiveWet > .99f;
+            wetOutputSeen |= state.motionCaptured && state.effectiveWet > .99f && tailEnergy (audio) > 0.01f;
             phase += blockTransport.barPhasePerSample * audio.getNumSamples();
         }
-        check (entryGapStayedLive && capturedAndWet,
+        check (entryGapStayedLive && capturedAndWet && wetOutputSeen,
                "motion-primed-entry-gap-does-not-latch-source-ended");
 
         for (int block = 0; block < 3; ++block)
@@ -992,7 +993,7 @@ int main()
         coldEntryGapEngine.prepare (48000.0, 512, 2);
         phase = 0.0;
         barSample = 0;
-        bool coldEntryStayedLive = true, coldEntryCapturedAndWet = false;
+        bool coldEntryStayedLive = true, coldEntryCapturedAndWet = false, coldEntryWetOutputSeen = false;
         for (int block = 0; block < 14; ++block)
         {
             for (int sample = 0; sample < audio.getNumSamples(); ++sample)
@@ -1007,9 +1008,10 @@ int main()
             const auto state = coldEntryGapEngine.getDiagnostics();
             coldEntryStayedLive &= ! state.motionSourceEnded;
             coldEntryCapturedAndWet |= state.motionCaptured && state.effectiveWet > .99f;
+            coldEntryWetOutputSeen |= state.motionCaptured && state.effectiveWet > .99f && tailEnergy (audio) > 0.01f;
             phase += blockTransport.barPhasePerSample * audio.getNumSamples();
         }
-        check (coldEntryStayedLive && coldEntryCapturedAndWet,
+        check (coldEntryStayedLive && coldEntryCapturedAndWet && coldEntryWetOutputSeen,
                "motion-cold-entry-gap-does-not-latch-source-ended");
         coldEntryGapEngine.release();
     }
