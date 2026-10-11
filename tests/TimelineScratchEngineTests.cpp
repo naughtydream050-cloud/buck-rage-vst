@@ -984,6 +984,34 @@ int main()
         check (entryGapEngine.getDiagnostics().motionSourceEnded,
                "motion-source-ended-still-latches-after-entry-grace");
         entryGapEngine.release();
+
+        // The same FL-shaped lead-in must also be safe on a cold BAR1.
+        // Capture becomes available only after the 125 ms history is written,
+        // but source-ended must never latch while that entry grace is active.
+        TimelineScratchEngine coldEntryGapEngine;
+        coldEntryGapEngine.prepare (48000.0, 512, 2);
+        phase = 0.0;
+        barSample = 0;
+        bool coldEntryStayedLive = true, coldEntryCapturedAndWet = false;
+        for (int block = 0; block < 14; ++block)
+        {
+            for (int sample = 0; sample < audio.getNumSamples(); ++sample)
+            {
+                const auto source = (barSample < 384 || barSample >= 2432) ? .7f : 0.0f;
+                audio.setSample (0, sample, source);
+                audio.setSample (1, sample, source);
+                ++barSample;
+            }
+            const auto blockTransport = transport (0, phase);
+            coldEntryGapEngine.process (audio, blockTransport, motionSlots);
+            const auto state = coldEntryGapEngine.getDiagnostics();
+            coldEntryStayedLive &= ! state.motionSourceEnded;
+            coldEntryCapturedAndWet |= state.motionCaptured && state.effectiveWet > .99f;
+            phase += blockTransport.barPhasePerSample * audio.getNumSamples();
+        }
+        check (coldEntryStayedLive && coldEntryCapturedAndWet,
+               "motion-cold-entry-gap-does-not-latch-source-ended");
+        coldEntryGapEngine.release();
     }
 
     // Eight consecutive BAR entries, including BAR1 and BAR5, must expose
