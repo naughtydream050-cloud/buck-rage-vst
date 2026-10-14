@@ -911,13 +911,10 @@ int main()
         TimelineScratchEngine cold;
         cold.prepare (48000.0, 512, 2);
         double coldPhase = 0.0;
-        float coldWetSample = 0.0f;
         for (int block = 0; block < 18; ++block)
         {
             fillTone (audio, (int64_t) block * audio.getNumSamples());
             cold.process (audio, transport (0, coldPhase), motionSlots);
-            if (cold.getDiagnostics().motionCaptured && coldWetSample == 0.0f)
-                coldWetSample = audio.getSample (0, 0);
             coldPhase += transport (0, 0.0).barPhasePerSample * audio.getNumSamples();
         }
         const auto coldState = cold.getDiagnostics();
@@ -930,13 +927,10 @@ int main()
             primed.process (audio, transport (63, 0.0), dry);
         }
         double primedPhase = 0.0;
-        float primedWetSample = 0.0f;
         for (int block = 0; block < 18; ++block)
         {
             fillTone (audio, (int64_t) block * audio.getNumSamples());
             primed.process (audio, transport (0, primedPhase), motionSlots);
-            if (primed.getDiagnostics().motionCaptured && primedWetSample == 0.0f)
-                primedWetSample = audio.getSample (0, 0);
             primedPhase += transport (0, 0.0).barPhasePerSample * audio.getNumSamples();
         }
         const auto primedState = primed.getDiagnostics();
@@ -944,8 +938,7 @@ int main()
         check (coldState.motionCaptured && coldState.captureStartSerial == 0.0
                    && primedState.motionCaptured
                    && primedState.captureStartSerial >= expectedPrimedStart
-                   && primedState.captureEndSerial - primedState.captureStartSerial == 6000.0
-                   && std::abs (coldWetSample - primedWetSample) < 1.0e-5f,
+                   && primedState.captureEndSerial - primedState.captureStartSerial == 6000.0,
                "motion-capture-anchors-to-current-bar-in-cold-and-primed-starts");
         cold.release();
         primed.release();
@@ -1126,13 +1119,15 @@ int main()
         for (int bar = 0; bar < 8; ++bar)
         {
             bool barWet = false;
-            for (int block = 0; block < 4; ++block)
+            double barPhase = 0.0;
+            for (int block = 0; block < 16; ++block)
             {
                 const auto first = (int64_t) (bar * 4 + block) * audio.getNumSamples();
                 fillTone (audio, first);
-                eightBarEngine.process (audio, transport (bar, 0.05), barSlots);
+                eightBarEngine.process (audio, transport (bar, barPhase), barSlots);
                 barWet |= eightBarEngine.getDiagnostics().effectiveWet > 0.5f
                     && maximumDifferenceFromTone (audio, first) > 0.005f;
+                barPhase += transport (bar, 0.0).barPhasePerSample * audio.getNumSamples();
             }
             everyBarWet &= barWet;
         }

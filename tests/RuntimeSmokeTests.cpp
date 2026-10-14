@@ -246,14 +246,23 @@ bool testPredictedMotionLoopConfirmation()
         const auto carrySamples = (double) (boundaryBlock + blockSize) - loopSamples;
         head.set (true, 12.0 + carrySamples * ppqPerSample, bpm, 4, 4,
                   (int64_t) std::llround (carrySamples), true, 12.0, loopEndPpq);
-        for (int i = 0; i < blockSize; ++i)
+        // A new current-BAR capture intentionally waits for 125 ms of
+        // readable material.  Feed enough of the resumed BAR before checking
+        // the re-entry; one carry block is not a valid capture assertion.
+        for (int carryBlock = 0; carryBlock < 16; ++carryBlock)
         {
-            const auto n = (double) (std::llround (carrySamples) + i);
-            const auto value = (float) (0.32 * std::sin (n * 0.017)
-                                      + 0.14 * std::cos (n * 0.031));
-            audio.setSample (0, i, value); audio.setSample (1, i, value);
+            const auto blockStart = carrySamples + (double) carryBlock * blockSize;
+            head.set (true, 12.0 + blockStart * ppqPerSample, bpm, 4, 4,
+                      (int64_t) std::llround (blockStart), true, 12.0, loopEndPpq);
+            for (int i = 0; i < blockSize; ++i)
+            {
+                const auto n = blockStart + i;
+                const auto value = (float) (0.32 * std::sin (n * 0.017)
+                                          + 0.14 * std::cos (n * 0.031));
+                audio.setSample (0, i, value); audio.setSample (1, i, value);
+            }
+            processor.processBlock (audio, midi);
         }
-        processor.processBlock (audio, midi);
         const auto afterLoop = processor.getScratchDiagnostics();
         const auto afterConfirmation = afterLoop.transportResetCount;
         pass &= check (afterBoundary == beforeBoundary + 1

@@ -352,8 +352,8 @@ TimelineScratchEngine::Diagnostics TimelineScratchEngine::getDiagnostics() const
         : activeSlot.preset == Preset::tapeBrake ? tapeWindowEndSerial
         : backspinWindowEndSerial;
     return { activeBar, activeSlot.preset, diagnosticEffectPhase, historyValidSamples(),
-             captureWindow, captureStart, captureEnd,
-             diagnosticReadPosition, diagnosticReadRate,
+             captureWindow, diagnosticReadPosition, diagnosticReadRate,
+             captureStart, captureEnd,
              backspinCompletedWraps, transportResetCount, diagnosticEffectiveWet,
              lastDiscontinuityReason, forwardCycleSamples, forwardReadSamples,
              forwardCyclePosition, forwardCompletedWraps, forwardSourceEnded,
