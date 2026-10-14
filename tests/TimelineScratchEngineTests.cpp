@@ -900,6 +900,57 @@ int main()
         coldStart.release();
     }
 
+    // The capture anchor must be the current BAR's input in both cold and
+    // history-primed starts.  A retrospective history anchor makes the first
+    // BAR use a different, quieter phrase than later BARs.
+    for (const auto preset : { TimelineScratchEngine::Preset::chirp,
+                               TimelineScratchEngine::Preset::transform,
+                               TimelineScratchEngine::Preset::zigzag })
+    {
+        const auto motionSlots = slots (preset, TimelineScratchEngine::Length::oneBar, 1.0f, 1.0f);
+        TimelineScratchEngine cold;
+        cold.prepare (48000.0, 512, 2);
+        double coldPhase = 0.0;
+        float coldWetSample = 0.0f;
+        for (int block = 0; block < 18; ++block)
+        {
+            fillTone (audio, (int64_t) block * audio.getNumSamples());
+            cold.process (audio, transport (0, coldPhase), motionSlots);
+            if (cold.getDiagnostics().motionCaptured && coldWetSample == 0.0f)
+                coldWetSample = audio.getSample (0, 0);
+            coldPhase += transport (0, 0.0).barPhasePerSample * audio.getNumSamples();
+        }
+        const auto coldState = cold.getDiagnostics();
+
+        TimelineScratchEngine primed;
+        primed.prepare (48000.0, 512, 2);
+        for (int block = 0; block < 1000; ++block)
+        {
+            fillTone (audio, (int64_t) block * audio.getNumSamples());
+            primed.process (audio, transport (63, 0.0), dry);
+        }
+        double primedPhase = 0.0;
+        float primedWetSample = 0.0f;
+        for (int block = 0; block < 18; ++block)
+        {
+            fillTone (audio, (int64_t) block * audio.getNumSamples());
+            primed.process (audio, transport (0, primedPhase), motionSlots);
+            if (primed.getDiagnostics().motionCaptured && primedWetSample == 0.0f)
+                primedWetSample = audio.getSample (0, 0);
+            primedPhase += transport (0, 0.0).barPhasePerSample * audio.getNumSamples();
+        }
+        const auto primedState = primed.getDiagnostics();
+        const auto expectedPrimedStart = 1000.0 * (double) audio.getNumSamples();
+        check (coldState.motionCaptured && coldState.captureStartSerial == 0.0
+                   && primedState.motionCaptured
+                   && primedState.captureStartSerial >= expectedPrimedStart
+                   && primedState.captureEndSerial - primedState.captureStartSerial == 6000.0
+                   && std::abs (coldWetSample - primedWetSample) < 1.0e-5f,
+               "motion-capture-anchors-to-current-bar-in-cold-and-primed-starts");
+        cold.release();
+        primed.release();
+    }
+
     // A BAR that starts with more than 30 ms of silence must wait for a real
     // dry signal instead of latching source-ended before capture.  This is
     // the regression that made BAR1/BAR5 silent in four-bar phrases.
@@ -925,13 +976,49 @@ int main()
         const auto waiting = delayedCapture.getDiagnostics();
         check (! waiting.motionSourceEnded && waiting.effectiveWet < 0.01f,
                "motion-silence-waits-without-latching");
-        fillTone (audio, 1900000);
-        delayedCapture.process (audio, transport (0, phase), motionSlots);
+        bool startedCapture = false;
+        for (int block = 0; block < 16; ++block)
+        {
+            fillTone (audio, 1900000 + block * audio.getNumSamples());
+            delayedCapture.process (audio, transport (0, phase), motionSlots);
+            phase += transport (0, 0.0).barPhasePerSample * audio.getNumSamples();
+            startedCapture |= delayedCapture.getDiagnostics().motionCaptured;
+        }
         const auto started = delayedCapture.getDiagnostics();
-        check (! started.motionSourceEnded && started.effectiveWet > 0.5f,
-               "motion-captures-after-signal-on-silent-bar");
+        check (startedCapture && ! started.motionSourceEnded && started.effectiveWet > 0.5f,
+               "motion-captures-current-bar-after-signal-on-silent-bar");
         delayedCapture.release();
     }
+
+    // A short gap and a one-channel source are still one valid candidate; the
+    // 30 ms cancellation only applies to a continuously silent candidate.
+    TimelineScratchEngine shortGapEngine;
+    shortGapEngine.prepare (48000.0, 512, 2);
+    const auto shortGapSlots = slots (TimelineScratchEngine::Preset::chirp,
+                                      TimelineScratchEngine::Length::oneBar, 1.0f, 1.0f);
+    double shortGapPhase = 0.0;
+    fill (audio, 0.7f);
+    shortGapEngine.process (audio, transport (0, shortGapPhase), shortGapSlots);
+    shortGapPhase += transport (0, 0.0).barPhasePerSample * audio.getNumSamples();
+    for (int block = 0; block < 2; ++block)
+    {
+        fill (audio, 0.0f);
+        shortGapEngine.process (audio, transport (0, shortGapPhase), shortGapSlots);
+        shortGapPhase += transport (0, 0.0).barPhasePerSample * audio.getNumSamples();
+    }
+    bool oneChannelCaptured = false;
+    for (int block = 0; block < 16; ++block)
+    {
+        audio.clear();
+        for (int sample = 0; sample < audio.getNumSamples(); ++sample)
+            audio.setSample (0, sample, 0.6f);
+        shortGapEngine.process (audio, transport (0, shortGapPhase), shortGapSlots);
+        shortGapPhase += transport (0, 0.0).barPhasePerSample * audio.getNumSamples();
+        oneChannelCaptured |= shortGapEngine.getDiagnostics().motionCaptured;
+    }
+    check (oneChannelCaptured && shortGapEngine.getDiagnostics().motionCandidateCancelCount == 0,
+           "motion-20ms-gap-and-one-channel-signal-keep-candidate");
+    shortGapEngine.release();
 
     // Actual FL trace 20261011-193100 showed a 42.7 ms silent lead-in after
     // seven milliseconds of signal at repeated BAR1 entries. A primed history
@@ -953,7 +1040,7 @@ int main()
         double phase = 0.0;
         int barSample = 0;
         bool entryGapStayedLive = true, capturedAndWet = false, wetOutputSeen = false;
-        for (int block = 0; block < 14; ++block)
+        for (int block = 0; block < 40; ++block)
         {
             for (int sample = 0; sample < audio.getNumSamples(); ++sample)
             {
@@ -972,7 +1059,8 @@ int main()
             wetOutputSeen |= state.motionCaptured && state.effectiveWet > .99f && tailEnergy (audio) > 0.01f;
             phase += blockTransport.barPhasePerSample * audio.getNumSamples();
         }
-        check (entryGapStayedLive && capturedAndWet && wetOutputSeen,
+        check (entryGapStayedLive && capturedAndWet && wetOutputSeen
+                   && entryGapEngine.getDiagnostics().motionCandidateCancelCount > 0,
                "motion-primed-entry-gap-does-not-latch-source-ended");
 
         for (int block = 0; block < 3; ++block)
@@ -994,7 +1082,7 @@ int main()
         phase = 0.0;
         barSample = 0;
         bool coldEntryStayedLive = true, coldEntryCapturedAndWet = false, coldEntryWetOutputSeen = false;
-        for (int block = 0; block < 14; ++block)
+        for (int block = 0; block < 40; ++block)
         {
             for (int sample = 0; sample < audio.getNumSamples(); ++sample)
             {
@@ -1011,7 +1099,8 @@ int main()
             coldEntryWetOutputSeen |= state.motionCaptured && state.effectiveWet > .99f && tailEnergy (audio) > 0.01f;
             phase += blockTransport.barPhasePerSample * audio.getNumSamples();
         }
-        check (coldEntryStayedLive && coldEntryCapturedAndWet && coldEntryWetOutputSeen,
+        check (coldEntryStayedLive && coldEntryCapturedAndWet && coldEntryWetOutputSeen
+                   && coldEntryGapEngine.getDiagnostics().motionCandidateCancelCount > 0,
                "motion-cold-entry-gap-does-not-latch-source-ended");
         coldEntryGapEngine.release();
     }

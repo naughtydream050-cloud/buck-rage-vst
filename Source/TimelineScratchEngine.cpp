@@ -45,7 +45,11 @@ void TimelineScratchEngine::prepare (double rate, int, int channels)
     forwardSourceSilenceSamples = 0.0;
     motionWindowSamples = motionWindowStartSerial = motionWindowEndSerial = 0.0;
     motionPhase = motionCycleSamples = motionCapturePhase = motionSourceSilenceSamples = 0.0;
+    motionCandidateStartSerial = -1.0;
+    motionCandidateSilenceSamples = 0.0;
+    motionCandidateCancelCount = 0;
     motionCaptured = motionSourceEnded = motionSourceHasSignal = false;
+    motionCandidateActive = false;
     forwardSourceEnded = false;
     forwardSourceHasSignal = false;
     backspinWrapSamples = backspinWrapProgress = 1;
@@ -71,7 +75,11 @@ void TimelineScratchEngine::release()
     forwardSourceSilenceSamples = 0.0;
     motionWindowSamples = motionWindowStartSerial = motionWindowEndSerial = 0.0;
     motionPhase = motionCycleSamples = motionCapturePhase = motionSourceSilenceSamples = 0.0;
+    motionCandidateStartSerial = -1.0;
+    motionCandidateSilenceSamples = 0.0;
+    motionCandidateCancelCount = 0;
     motionCaptured = motionSourceEnded = motionSourceHasSignal = false;
+    motionCandidateActive = false;
     forwardSourceEnded = false;
     forwardSourceHasSignal = false;
     backspinWrapSamples = backspinWrapProgress = 1;
@@ -91,6 +99,9 @@ void TimelineScratchEngine::resetTransport (bool preserveHistory) noexcept
     motionSourceSilenceSamples = 0.0;
     motionSourceEnded = motionSourceHasSignal = motionCaptured = false;
     motionCapturePhase = 0.0;
+    motionCandidateStartSerial = -1.0;
+    motionCandidateSilenceSamples = 0.0;
+    motionCandidateActive = false;
 }
 
 double TimelineScratchEngine::lengthInQuarters (Length length, double quartersPerBar) noexcept
@@ -189,6 +200,9 @@ void TimelineScratchEngine::beginBar (int bar, const Slot& slot, double quarters
     motionSourceSilenceSamples = 0.0;
     motionCaptured = motionSourceEnded = motionSourceHasSignal = false;
     motionCapturePhase = 0.0;
+    motionCandidateStartSerial = -1.0;
+    motionCandidateSilenceSamples = 0.0;
+    motionCandidateActive = false;
 }
 
 bool TimelineScratchEngine::beginBackspinCapture() noexcept
@@ -280,16 +294,25 @@ bool TimelineScratchEngine::beginMotionCapture() noexcept
 {
     if (motionCaptured || ! isMotionPreset (activeSlot.preset))
         return motionCaptured;
-    const auto required = motionWindowSamples + kMinimumReadableDistance + 2.0;
-    if (! motionSourceHasSignal || historyValidSamples() < required) return false;
+    if (! motionCandidateActive || motionCandidateStartSerial < 0.0)
+        return false;
 
-    motionWindowEndSerial = (double) writeSerial - kMinimumReadableDistance;
-    motionWindowStartSerial = motionWindowEndSerial - motionWindowSamples;
+    // Capture the current BAR's candidate range, not the most recent
+    // retrospective history.  The candidate is only readable once its full
+    // 125 ms plus the existing writer safety margin has arrived.
+    const auto readableAt = motionCandidateStartSerial + motionWindowSamples
+        + kMinimumReadableDistance;
+    if ((double) writeSerial < readableAt) return false;
+
+    motionWindowStartSerial = motionCandidateStartSerial;
+    motionWindowEndSerial = motionCandidateStartSerial + motionWindowSamples;
     if (! canRead (motionWindowStartSerial) || ! canRead (motionWindowEndSerial - 1.0))
         return false;
 
     motionCapturePhase = motionPhase;
+    motionSourceSilenceSamples = 0.0;
     motionCaptured = true;
+    motionCandidateActive = false;
     return true;
 }
 
@@ -316,14 +339,27 @@ TimelineScratchEngine::Diagnostics TimelineScratchEngine::getDiagnostics() const
         : activeSlot.preset == Preset::drag ? dragWindowSamples
         : isMotionPreset (activeSlot.preset)
             ? motionWindowSamples : backspinWindowSamples;
+    const auto captureStart = isMotionPreset (activeSlot.preset) ? motionWindowStartSerial
+        : activeSlot.preset == Preset::baby ? babyWindowStartSerial
+        : activeSlot.preset == Preset::drag ? dragWindowStartSerial
+        : activeSlot.preset == Preset::forwardCut ? forwardWindowStartSerial
+        : activeSlot.preset == Preset::tapeBrake ? tapeWindowStartSerial
+        : backspinWindowStartSerial;
+    const auto captureEnd = isMotionPreset (activeSlot.preset) ? motionWindowEndSerial
+        : activeSlot.preset == Preset::baby ? babyWindowEndSerial
+        : activeSlot.preset == Preset::drag ? dragWindowEndSerial
+        : activeSlot.preset == Preset::forwardCut ? forwardWindowEndSerial
+        : activeSlot.preset == Preset::tapeBrake ? tapeWindowEndSerial
+        : backspinWindowEndSerial;
     return { activeBar, activeSlot.preset, diagnosticEffectPhase, historyValidSamples(),
-             captureWindow,
+             captureWindow, captureStart, captureEnd,
              diagnosticReadPosition, diagnosticReadRate,
              backspinCompletedWraps, transportResetCount, diagnosticEffectiveWet,
              lastDiscontinuityReason, forwardCycleSamples, forwardReadSamples,
              forwardCyclePosition, forwardCompletedWraps, forwardSourceEnded,
              motionSourceEnded, motionPhase, motionCycleSamples,
-             motionCapturePhase, motionCaptured };
+             motionCapturePhase, motionCaptured, motionCandidateStartSerial,
+             motionCandidateSilenceSamples, motionCandidateCancelCount };
 }
 
 double TimelineScratchEngine::tapeBrakePlaybackRate (double effectPhase, float speed) noexcept
@@ -577,25 +613,61 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
         const auto motionPreset = isMotionPreset (activeSlot.preset);
         if (motionPreset && ! motionSourceEnded && ! waitingForDry)
         {
-            if (std::abs (dryLeft) < kForwardCutSilenceThreshold
-                && std::abs (dryRight) < kForwardCutSilenceThreshold)
-                motionSourceSilenceSamples += 1.0;
+            const auto inputHasSignal = std::abs (dryLeft) >= kForwardCutSilenceThreshold
+                || std::abs (dryRight) >= kForwardCutSilenceThreshold;
+
+            if (! motionCaptured)
+            {
+                // A candidate is anchored to the current BAR's Dry input.  It
+                // is deliberately independent of the retained history so the
+                // first BAR cannot capture a weaker retrospective tail.
+                if (! motionCandidateActive)
+                {
+                    if (inputHasSignal)
+                    {
+                        motionCandidateActive = true;
+                        motionCandidateStartSerial = (double) writeSerial;
+                        motionCandidateSilenceSamples = 0.0;
+                        motionSourceHasSignal = true;
+                    }
+                }
+                else if (inputHasSignal)
+                {
+                    motionCandidateSilenceSamples = 0.0;
+                    motionSourceHasSignal = true;
+                }
+                else
+                {
+                    motionCandidateSilenceSamples += 1.0;
+                    if (motionCandidateSilenceSamples
+                        >= sampleRateHz * kForwardCutSilenceHoldSeconds)
+                    {
+                        motionCandidateActive = false;
+                        motionCandidateStartSerial = -1.0;
+                        motionCandidateSilenceSamples = 0.0;
+                        motionSourceHasSignal = false;
+                        ++motionCandidateCancelCount;
+                    }
+                }
+            }
             else
             {
-                motionSourceHasSignal = true;
-                motionSourceSilenceSamples = 0.0;
-            }
+                if (! inputHasSignal)
+                    motionSourceSilenceSamples += 1.0;
+                else
+                {
+                    motionSourceHasSignal = true;
+                    motionSourceSilenceSamples = 0.0;
+                }
 
-            // FL can deliver a short silent lead-in at a loop boundary. Once
-            // history is primed, capture is immediate; without this BAR-entry
-            // grace the same lead-in latches source-ended only on later loop
-            // passes. Keep the normal hold unchanged, but do not arm it until
-            // one motion-window duration into the current BAR.
-            const auto motionSourceEndArmed = elapsedQuarters * transport.secondsPerQuarter
-                >= kMotionCaptureWindowSeconds;
-            if (motionSourceEndArmed && motionCaptured && motionSourceHasSignal
-                && motionSourceSilenceSamples >= sampleRateHz * kForwardCutSilenceHoldSeconds)
-                motionSourceEnded = true;
+                // Preserve the existing BAR-entry grace and post-capture
+                // source-ended latch.  Waiting samples never arm this latch.
+                const auto motionSourceEndArmed = elapsedQuarters * transport.secondsPerQuarter
+                    >= kMotionCaptureWindowSeconds;
+                if (motionSourceEndArmed && motionSourceHasSignal
+                    && motionSourceSilenceSamples >= sampleRateHz * kForwardCutSilenceHoldSeconds)
+                    motionSourceEnded = true;
+            }
         }
 
         diagnosticEffectPhase = activeDurationQuarters > 0.0 ? elapsedQuarters / activeDurationQuarters : 0.0;
@@ -688,6 +760,9 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
                 trace.captured = tapeBrakeCaptured;
             }
             trace.motionPhase = motionPhase; trace.motionCycle = motionCycleSamples;
+            trace.motionCandidateStartSerial = motionCandidateStartSerial;
+            trace.motionCandidateSilenceSamples = motionCandidateSilenceSamples;
+            trace.motionCandidateCancelCount = motionCandidateCancelCount;
             trace.gate = diagnosticGate; trace.wetEvaluated = wetEvaluated;
             trace.dryLeft = dryLeft; trace.dryRight = dryRight;
             trace.wetLeft = observedWet[0]; trace.wetRight = channels > 1 ? observedWet[1] : observedWet[0];

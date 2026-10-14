@@ -52,6 +52,7 @@ public:
         Preset preset = Preset::off;
         double effectPhase = 0.0, historyValidSamples = 0.0,
                captureWindowSamples = 0.0, readPosition = 0.0, readRate = 0.0;
+        double captureStartSerial = 0.0, captureEndSerial = 0.0;
         uint32_t wrapCount = 0, transportResetCount = 0;
         float effectiveWet = 0.0f;
         DiscontinuityReason discontinuityReason = DiscontinuityReason::none;
@@ -61,6 +62,8 @@ public:
         bool forwardSourceEnded = false, motionSourceEnded = false;
         double motionPhase = 0.0, motionCycleSamples = 0.0, motionCapturePhase = 0.0;
         bool motionCaptured = false;
+        double motionCandidateStartSerial = -1.0, motionCandidateSilenceSamples = 0.0;
+        uint32_t motionCandidateCancelCount = 0;
     };
 
     void prepare (double sampleRate, int maxBlockSize, int channels);
@@ -82,6 +85,8 @@ public:
         double barPhase = 0.0, effectPhase = 0.0, historyValidSamples = 0.0;
         double captureStartSerial = 0.0, captureEndSerial = 0.0;
         bool captured = false, motionGateEnabled = false, wetEvaluated = false;
+        double motionCandidateStartSerial = -1.0, motionCandidateSilenceSamples = 0.0;
+        uint32_t motionCandidateCancelCount = 0;
         double motionPhase = 0.0, motionCycle = 0.0, gate = 0.0;
         float dryLeft = 0.0f, dryRight = 0.0f, wetLeft = 0.0f, wetRight = 0.0f;
         float outputLeft = 0.0f, outputRight = 0.0f, effectiveWet = 0.0f;
@@ -140,7 +145,9 @@ private:
     double motionWindowSamples = 0.0, motionWindowStartSerial = 0.0,
            motionWindowEndSerial = 0.0, motionPhase = 0.0,
            motionCycleSamples = 0.0, motionCapturePhase = 0.0,
-           motionSourceSilenceSamples = 0.0;
+           motionSourceSilenceSamples = 0.0,
+           motionCandidateStartSerial = -1.0,
+           motionCandidateSilenceSamples = 0.0;
     int backspinWrapSamples = 1, backspinWrapProgress = 1;
     int forwardWrapSamples = 1, forwardWrapProgress = 1;
     uint32_t backspinCompletedWraps = 0, forwardCompletedWraps = 0;
@@ -149,7 +156,8 @@ private:
          babyCaptured = false, forwardCaptured = false, forwardSourceEnded = false,
          forwardSourceHasSignal = false, dragCaptured = false,
          motionCaptured = false, motionSourceEnded = false,
-         motionSourceHasSignal = false;
+         motionSourceHasSignal = false, motionCandidateActive = false;
+    uint32_t motionCandidateCancelCount = 0;
     double diagnosticEffectPhase = 0.0, diagnosticReadPosition = 0.0, diagnosticReadRate = 0.0;
     float diagnosticEffectiveWet = 0.0f, diagnosticGate = 0.0f;
     uint32_t transportResetCount = 0;
