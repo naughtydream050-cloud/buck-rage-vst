@@ -1459,9 +1459,9 @@ int main()
     ToyotomiHideyoshiAudioProcessor staleSampleProcessor;
     juce::AudioBuffer<float> staleSampleAudio (2, 256);
     staleSampleProcessor.prepareToPlay (48000, staleSampleAudio.getNumSamples());
-    staleSampleProcessor.getStateModel().setSlotPreset (0, PluginStateModel::ScratchPreset::backspin);
-    staleSampleProcessor.getStateModel().setSlotLength (0, PluginStateModel::NoteLength::oneBar);
-    staleSampleProcessor.getStateModel().setSlotDepth (0, 1.0f);
+    staleSampleProcessor.getStateModel().setSlotPreset (3, PluginStateModel::ScratchPreset::backspin);
+    staleSampleProcessor.getStateModel().setSlotLength (3, PluginStateModel::NoteLength::oneBar);
+    staleSampleProcessor.getStateModel().setSlotDepth (3, 1.0f);
     TestPlayHead staleSamplePlayHead;
     staleSampleProcessor.setPlayHead (&staleSamplePlayHead);
     bool staleSampleWetObserved = false;
@@ -1475,7 +1475,7 @@ int main()
     }
     pass &= check (staleSampleProcessor.getScratchDiagnostics().transportResetCount == 1
                    && staleSampleWetObserved
-                   && staleSampleProcessor.getCurrentTimelineSlot() == 0,
+                   && staleSampleProcessor.getCurrentTimelineSlot() == 3,
                    "v2-host-stale-sample-position-preserves-history-and-backspin-wet");
     staleSampleProcessor.setPlayHead (nullptr);
 
@@ -1486,9 +1486,9 @@ int main()
     juce::AudioBuffer<float> longBlockAudio (2, 1024), shortBlockAudio (2, 64);
     variableBlockProcessor.prepareToPlay (48000, longBlockAudio.getNumSamples());
     auto& variableBlockState = variableBlockProcessor.getStateModel();
-    variableBlockState.setSlotPreset (0, PluginStateModel::ScratchPreset::backspin);
-    variableBlockState.setSlotLength (0, PluginStateModel::NoteLength::oneBar);
-    variableBlockState.setSlotDepth (0, 1.0f);
+    variableBlockState.setSlotPreset (3, PluginStateModel::ScratchPreset::backspin);
+    variableBlockState.setSlotLength (3, PluginStateModel::NoteLength::oneBar);
+    variableBlockState.setSlotDepth (3, 1.0f);
     TestPlayHead variableBlockPlayHead;
     variableBlockProcessor.setPlayHead (&variableBlockPlayHead);
     int64_t processedSamples = 0;
@@ -1504,7 +1504,7 @@ int main()
         processedSamples += blockAudio.getNumSamples();
     }
     pass &= check (variableBlockProcessor.getScratchDiagnostics().transportResetCount == 1
-                   && variableBlockWetObserved && variableBlockProcessor.getCurrentTimelineSlot() == 0,
+                   && variableBlockWetObserved && variableBlockProcessor.getCurrentTimelineSlot() == 3,
                    "v2-host-sync-on-variable-blocks-keep-backspin-wet-and-history");
     variableBlockProcessor.setPlayHead (nullptr);
 
@@ -1669,12 +1669,12 @@ int main()
     loopNoPointsProcessor.setPlayHead (nullptr);
 
     // If loop metadata is absent, do not guess that a backward position is a
-    // return to Toyotomi BAR1; preserve the absolute target slot.
+    // return to absolute PPQ 12 (Toyotomi BAR4); preserve the absolute slot.
     ToyotomiHideyoshiAudioProcessor loopNoMetadataProcessor;
     loopNoMetadataProcessor.prepareToPlay (48000, loopNoPointsAudio.getNumSamples());
-    loopNoMetadataProcessor.getStateModel().setSlotPreset (0, PluginStateModel::ScratchPreset::chirp);
-    loopNoMetadataProcessor.getStateModel().setSlotLength (0, PluginStateModel::NoteLength::oneBar);
-    loopNoMetadataProcessor.getStateModel().setSlotDepth (0, 1.0f);
+    loopNoMetadataProcessor.getStateModel().setSlotPreset (3, PluginStateModel::ScratchPreset::chirp);
+    loopNoMetadataProcessor.getStateModel().setSlotLength (3, PluginStateModel::NoteLength::oneBar);
+    loopNoMetadataProcessor.getStateModel().setSlotDepth (3, 1.0f);
     TestPlayHead loopNoMetadataPlayHead;
     loopNoMetadataProcessor.setPlayHead (&loopNoMetadataPlayHead);
     bool loopNoMetadataWetAfterReentry = false;
