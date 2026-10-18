@@ -38,6 +38,7 @@ void ToyotomiHideyoshiAudioProcessor::prepareToPlay(double sampleRate, int maxim
     lastHostBpmForContinuity = 120.0;
     lastHostSamplePosition = 0; lastHostBlockSize = 0;
     haveLastHostPpq = haveLastHostSamplePosition = haveLastObservedHostPpq = internalWasPlaying = false;
+    lastHostPpqWasExtrapolated = false;
     predictedLoopPending = predictedLoopHadSamples = false;
 }
 ToyotomiHideyoshiAudioProcessor::~ToyotomiHideyoshiAudioProcessor()
@@ -137,6 +138,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
     const auto denominator = getEffectiveTimeSignatureDenominator();
     const auto quartersPerBar = juce::jmax (0.25, (double) numerator * 4.0 / (double) denominator);
     TimelineScratchEngine::Transport transport;
+    bool hostPpqIsExtrapolated = false;
     transport.playing = playing;
     transport.quartersPerBar = quartersPerBar;
     transport.secondsPerQuarter = 60.0 / effectiveBpm;
@@ -149,6 +151,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         hostPpq = lastHostPpq + elapsedSamples / preparedSampleRate
             * (lastHostBpmForContinuity + effectiveBpm) / 120.0;
         hasHostPpq = true;
+        hostPpqIsExtrapolated = true;
     }
 
     if (syncEnabled && hasHostPpq)
@@ -205,15 +208,30 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         if (haveLastHostPpq)
         {
             const auto rawDelta = rawHostPpqPresent ? rawHostPpq - lastObservedHostPpq : 0.0;
-            stalePpq = rawHostPpqPresent && haveLastObservedHostPpq
+            // A host can resume its PPQ stream at the synthetic position we
+            // extrapolated during the preceding stale/missing callback. That
+            // catch-up callback may have zero PPQ delta even though the audio
+            // clock advanced normally; it is synchronization, not a seek.
+            const auto ppqCaughtUpToExtrapolation = rawHostPpqPresent
+                && lastHostPpqWasExtrapolated
+                && std::abs (rawHostPpq - lastHostPpq) <= ppqTolerance
+                && expectedDelta > ppqTolerance;
+            if (ppqCaughtUpToExtrapolation)
+                hostPpq = rawHostPpq;
+            stalePpq = ! ppqCaughtUpToExtrapolation
+                && rawHostPpqPresent && haveLastObservedHostPpq
                 && std::abs (rawDelta) <= ppqTolerance && expectedDelta > ppqTolerance;
             if (stalePpq)
+            {
                 hostPpq = lastHostPpq + expectedDelta;
+                hostPpqIsExtrapolated = true;
+            }
 
             const auto actualDelta = hostPpq - lastHostPpq;
             const auto error = actualDelta - expectedDelta;
             const auto jumpTolerance = juce::jmax (ppqTolerance, std::abs (expectedDelta) * 0.35);
-            if (! stalePpq && (actualDelta < -ppqTolerance || std::abs (error) > jumpTolerance))
+            if (! stalePpq && ! ppqCaughtUpToExtrapolation
+                && (actualDelta < -ppqTolerance || std::abs (error) > jumpTolerance))
                 ppqJump = true;
         }
 
@@ -263,6 +281,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
             haveLastObservedHostPpq = true;
         }
         lastHostPpq = hostPpq;
+        lastHostPpqWasExtrapolated = hostPpqIsExtrapolated;
         lastHostBpmForContinuity = effectiveBpm;
         lastHostBlockSize = buffer.getNumSamples();
         haveLastHostPpq = true;
@@ -313,6 +332,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         timelineSlot = transport.startBar;
         haveLastHostPpq = haveLastHostSamplePosition = false;
         haveLastObservedHostPpq = false;
+        lastHostPpqWasExtrapolated = false;
     }
     else
     {
@@ -325,6 +345,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
             lastHostPpq = lastObservedHostPpq = 0.0;
             lastHostSamplePosition = 0;
             lastHostBlockSize = 0;
+            lastHostPpqWasExtrapolated = false;
         }
         transport.playing = false;
         transport.startBar = -1;

@@ -86,6 +86,7 @@ private:
            predictedLoopNextPpq = 0.0;
     bool internalWasPlaying = false, haveLastHostPpq = false,
          haveLastHostSamplePosition = false, haveLastObservedHostPpq = false,
+         lastHostPpqWasExtrapolated = false,
          predictedLoopPending = false, predictedLoopHadSamples = false;
     PluginStateModel stateModel;
 
