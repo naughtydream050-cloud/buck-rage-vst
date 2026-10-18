@@ -178,11 +178,11 @@ class TestPlayHead final : public juce::AudioPlayHead
 public:
     void set (bool isPlaying, double ppq, double bpm = 120.0, int numerator = 4, int denominator = 4,
               int64_t timeInSamples = -1, bool isLooping = false,
-              double loopStart = 0.0, double loopEnd = 0.0)
+              double loopStart = 0.0, double loopEnd = 0.0, bool includePpq = true)
     {
         position = {};
         position.setIsPlaying (isPlaying);
-        position.setPpqPosition (ppq);
+        if (includePpq) position.setPpqPosition (ppq);
         position.setBpm (bpm);
         position.setTimeSignature (juce::AudioPlayHead::TimeSignature { numerator, denominator });
         position.setIsLooping (isLooping);
@@ -196,6 +196,170 @@ public:
 private:
     juce::AudioPlayHead::PositionInfo position;
 };
+
+bool testAbsoluteHostBarSync()
+{
+    bool pass = true;
+    struct Mapping final { double ppq; int numerator, denominator, slot; double phase; const char* name; };
+    const Mapping mappings[] = {
+        { 0.0, 4, 4, 0, 0.0, "bar1" },
+        { 12.0, 4, 4, 3, 0.0, "bar4" },
+        { 92.0, 4, 4, 23, 0.0, "bar24" },
+        { 124.0, 4, 4, 31, 0.0, "bar32" },
+        { 252.0, 4, 4, 63, 0.0, "bar64" },
+        { 256.0, 4, 4, 0, 0.0, "bar65-wraps-to-bar1" },
+        { 100.5, 4, 4, 25, 0.125, "fractional-bar26" },
+        { 3.0, 6, 8, 1, 0.0, "six-eight-bar2" }
+    };
+    juce::MidiBuffer midi;
+    for (const auto& mapping : mappings)
+    {
+        ToyotomiHideyoshiAudioProcessor processor;
+        processor.prepareToPlay (48000.0, 64);
+        processor.setHostSyncEnabled (true);
+        processor.getStateModel().setSlotPreset (mapping.slot, PluginStateModel::ScratchPreset::drag);
+        processor.getStateModel().setSlotLength (mapping.slot, PluginStateModel::NoteLength::oneBar);
+        processor.getStateModel().setSlotDepth (mapping.slot, 1.0f);
+        TestPlayHead head;
+        processor.setPlayHead (&head);
+        head.set (true, mapping.ppq, 120.0, mapping.numerator, mapping.denominator, 0);
+        juce::AudioBuffer<float> audio (2, 64);
+        for (int i = 0; i < audio.getNumSamples(); ++i)
+        {
+            const auto sample = 0.25f * std::sin ((float) i * 0.13f);
+            audio.setSample (0, i, sample); audio.setSample (1, i, sample);
+        }
+        processor.processBlock (audio, midi);
+        const auto diagnostics = processor.getScratchDiagnostics();
+        const auto phaseMatches = std::abs (diagnostics.effectPhase - mapping.phase) < 0.002;
+        pass &= check (processor.getCurrentTimelineSlot() == mapping.slot
+                       && diagnostics.playingBar == mapping.slot && phaseMatches,
+                       mapping.name);
+        processor.setPlayHead (nullptr);
+    }
+
+    ToyotomiHideyoshiAudioProcessor seekProcessor;
+    seekProcessor.prepareToPlay (48000.0, 64);
+    seekProcessor.setHostSyncEnabled (true);
+    TestPlayHead seekHead;
+    seekProcessor.setPlayHead (&seekHead);
+    juce::AudioBuffer<float> seekAudio (2, 64);
+    seekAudio.clear();
+    seekHead.set (true, 12.0, 120.0, 4, 4, 0);
+    seekProcessor.processBlock (seekAudio, midi);
+    auto resets = seekProcessor.getScratchDiagnostics().transportResetCount;
+    seekHead.set (true, 20.0, 120.0, 4, 4, 64);
+    seekProcessor.processBlock (seekAudio, midi);
+    auto diagnostics = seekProcessor.getScratchDiagnostics();
+    pass &= check (seekProcessor.getCurrentTimelineSlot() == 5 && diagnostics.playingBar == 5
+                   && diagnostics.transportResetCount == resets + 1, "absolute-forward-seek-with-continuous-samples");
+    resets = diagnostics.transportResetCount;
+    seekHead.set (true, 12.5, 120.0, 4, 4, 128);
+    seekProcessor.processBlock (seekAudio, midi);
+    diagnostics = seekProcessor.getScratchDiagnostics();
+    pass &= check (seekProcessor.getCurrentTimelineSlot() == 3 && diagnostics.playingBar == 3
+                   && diagnostics.transportResetCount == resets + 1, "absolute-backward-seek-with-continuous-samples");
+    resets = diagnostics.transportResetCount;
+    seekHead.set (true, 13.5, 120.0, 4, 4, 192);
+    seekProcessor.processBlock (seekAudio, midi);
+    diagnostics = seekProcessor.getScratchDiagnostics();
+    pass &= check (seekProcessor.getCurrentTimelineSlot() == 3 && diagnostics.playingBar == 3
+                   && diagnostics.transportResetCount == resets + 1, "same-bar-phase-seek-reenters-once");
+
+    ToyotomiHideyoshiAudioProcessor stoppedSeekProcessor;
+    stoppedSeekProcessor.prepareToPlay (48000.0, 64);
+    stoppedSeekProcessor.setHostSyncEnabled (true);
+    TestPlayHead stoppedSeekHead;
+    stoppedSeekProcessor.setPlayHead (&stoppedSeekHead);
+    stoppedSeekHead.set (false, 12.0, 120.0, 4, 4, 0);
+    stoppedSeekProcessor.processBlock (seekAudio, midi);
+    stoppedSeekHead.set (false, 92.0, 120.0, 4, 4, 0);
+    stoppedSeekProcessor.processBlock (seekAudio, midi);
+    stoppedSeekHead.set (true, 92.0, 120.0, 4, 4, 64);
+    stoppedSeekProcessor.processBlock (seekAudio, midi);
+    pass &= check (stoppedSeekProcessor.getCurrentTimelineSlot() == 23
+                   && stoppedSeekProcessor.getScratchDiagnostics().playingBar == 23,
+                   "stopped-seek-then-play-starts-at-absolute-bar24");
+
+    ToyotomiHideyoshiAudioProcessor stopRestartProcessor;
+    stopRestartProcessor.prepareToPlay (48000.0, 64);
+    stopRestartProcessor.setHostSyncEnabled (true);
+    TestPlayHead stopRestartHead;
+    stopRestartProcessor.setPlayHead (&stopRestartHead);
+    stopRestartHead.set (true, 12.0, 120.0, 4, 4, 0);
+    stopRestartProcessor.processBlock (seekAudio, midi);
+    stopRestartHead.set (true, 16.0, 120.0, 4, 4, 64);
+    stopRestartProcessor.processBlock (seekAudio, midi);
+    stopRestartHead.set (false, 12.0, 120.0, 4, 4, 128);
+    stopRestartProcessor.processBlock (seekAudio, midi);
+    const auto resetsAtStop = stopRestartProcessor.getScratchDiagnostics().transportResetCount;
+    stopRestartHead.set (true, 12.0, 120.0, 4, 4, 192);
+    stopRestartProcessor.processBlock (seekAudio, midi);
+    pass &= check (stopRestartProcessor.getCurrentTimelineSlot() == 3
+                   && stopRestartProcessor.getScratchDiagnostics().transportResetCount == resetsAtStop + 1,
+                   "host-stop-clears-continuity-anchor-before-absolute-restart");
+
+    ToyotomiHideyoshiAudioProcessor tempoChangeProcessor;
+    tempoChangeProcessor.prepareToPlay (48000.0, 64);
+    tempoChangeProcessor.setHostSyncEnabled (true);
+    TestPlayHead tempoChangeHead;
+    tempoChangeProcessor.setPlayHead (&tempoChangeHead);
+    tempoChangeHead.set (true, 12.0, 120.0, 4, 4, 0);
+    tempoChangeProcessor.processBlock (seekAudio, midi);
+    const auto resetsBeforeTempoChange = tempoChangeProcessor.getScratchDiagnostics().transportResetCount;
+    tempoChangeHead.set (true, 12.0 + 64.0 * 130.0 / (60.0 * 48000.0), 130.0, 4, 4, 64);
+    tempoChangeProcessor.processBlock (seekAudio, midi);
+    pass &= check (tempoChangeProcessor.getScratchDiagnostics().transportResetCount == resetsBeforeTempoChange
+                   && tempoChangeProcessor.getCurrentTimelineSlot() == 3,
+                   "host-tempo-change-preserves-absolute-bar-and-does-not-reset");
+
+    ToyotomiHideyoshiAudioProcessor stalePpqProcessor;
+    stalePpqProcessor.prepareToPlay (48000.0, 512);
+    stalePpqProcessor.setHostSyncEnabled (true);
+    TestPlayHead stalePpqHead;
+    stalePpqProcessor.setPlayHead (&stalePpqHead);
+    juce::AudioBuffer<float> staleAudio (2, 512);
+    staleAudio.clear();
+    uint32_t beforeStale = 0;
+    for (int block = 0; block < 220; ++block)
+    {
+        stalePpqHead.set (true, 0.0, 120.0, 4, 4, (int64_t) block * 512);
+        stalePpqProcessor.processBlock (staleAudio, midi);
+        if (block == 0) beforeStale = stalePpqProcessor.getScratchDiagnostics().transportResetCount;
+    }
+    pass &= check (stalePpqProcessor.getCurrentTimelineSlot() >= 1
+                   && stalePpqProcessor.getScratchDiagnostics().transportResetCount == beforeStale,
+                   "stale-ppq-extrapolates-with-continuous-sample-position");
+
+    ToyotomiHideyoshiAudioProcessor staleSamplesProcessor;
+    staleSamplesProcessor.prepareToPlay (48000.0, 512);
+    staleSamplesProcessor.setHostSyncEnabled (true);
+    TestPlayHead staleSamplesHead;
+    staleSamplesProcessor.setPlayHead (&staleSamplesHead);
+    juce::AudioBuffer<float> staleSamplesAudio (2, 512);
+    staleSamplesAudio.clear();
+    for (int block = 0; block < 3; ++block)
+    {
+        staleSamplesHead.set (true, (double) block * 512.0 * 120.0 / (60.0 * 48000.0),
+                              120.0, 4, 4, 0);
+        staleSamplesProcessor.processBlock (staleSamplesAudio, midi);
+    }
+    pass &= check (staleSamplesProcessor.getScratchDiagnostics().transportResetCount == 1,
+                   "stale-sample-position-does-not-reset-valid-ppq-progression");
+
+    ToyotomiHideyoshiAudioProcessor unavailableProcessor;
+    unavailableProcessor.prepareToPlay (48000.0, 64);
+    unavailableProcessor.setHostSyncEnabled (true);
+    TestPlayHead unavailableHead;
+    unavailableProcessor.setPlayHead (&unavailableHead);
+    unavailableHead.set (true, 0.0, 120.0, 4, 4, 0, false, 0.0, 0.0, false);
+    unavailableProcessor.processBlock (seekAudio, midi);
+    pass &= check (unavailableProcessor.getCurrentTimelineSlot() == -1
+                   && unavailableProcessor.getScratchDiagnostics().playingBar == -1,
+                   "missing-host-position-does-not-fabricate-slot");
+    unavailableProcessor.setPlayHead (nullptr);
+    return pass;
+}
 
 bool testPredictedMotionLoopConfirmation()
 {
@@ -217,9 +381,9 @@ bool testPredictedMotionLoopConfirmation()
         processor.prepareToPlay (sampleRate, blockSize);
         for (int bar = 0; bar < loopBars; ++bar)
         {
-            processor.getStateModel().setSlotPreset (bar, preset);
-            processor.getStateModel().setSlotLength (bar, PluginStateModel::NoteLength::oneBar);
-            processor.getStateModel().setSlotDepth (bar, 1.0f);
+            processor.getStateModel().setSlotPreset (bar + 3, preset);
+            processor.getStateModel().setSlotLength (bar + 3, PluginStateModel::NoteLength::oneBar);
+            processor.getStateModel().setSlotDepth (bar + 3, 1.0f);
         }
         TestPlayHead head;
         processor.setPlayHead (&head);
@@ -267,7 +431,7 @@ bool testPredictedMotionLoopConfirmation()
         const auto afterConfirmation = afterLoop.transportResetCount;
         pass &= check (afterBoundary == beforeBoundary + 1
                       && afterConfirmation == afterBoundary
-                      && processor.getCurrentTimelineSlot() == 0
+                      && processor.getCurrentTimelineSlot() == 3
                       && afterLoop.motionCaptured && ! afterLoop.motionSourceEnded
                       && afterLoop.effectiveWet > 0.99f,
                       loopBars == 4
@@ -288,8 +452,10 @@ bool testMotionWetSurvivesThreeHostLoops()
     for (const int loopBars : { 4, 8 })
     {
         const auto loopQuarters = (double) loopBars * 4.0;
-        const auto loopSamples = loopQuarters / ppqPerSample;
-        const auto blocks = (int) std::ceil (loopSamples * 3.0 / blockSize);
+        const auto exactLoopSamples = loopQuarters / ppqPerSample;
+        const auto blocksPerLoop = (int) std::floor (exactLoopSamples / blockSize);
+        const auto loopSamples = (double) blocksPerLoop * blockSize;
+        const auto blocks = blocksPerLoop * 3;
         for (const auto preset : { PluginStateModel::ScratchPreset::chirp,
                                    PluginStateModel::ScratchPreset::transform,
                                    PluginStateModel::ScratchPreset::zigzag })
@@ -298,10 +464,10 @@ bool testMotionWetSurvivesThreeHostLoops()
             processor.prepareToPlay (sampleRate, blockSize);
             for (int bar = 0; bar < loopBars; ++bar)
             {
-                processor.getStateModel().setSlotPreset (bar, preset);
-                processor.getStateModel().setSlotLength (bar, PluginStateModel::NoteLength::oneBar);
-                processor.getStateModel().setSlotSpeed (bar, 1.0f);
-                processor.getStateModel().setSlotDepth (bar, 1.0f);
+                processor.getStateModel().setSlotPreset (bar + 3, preset);
+                processor.getStateModel().setSlotLength (bar + 3, PluginStateModel::NoteLength::oneBar);
+                processor.getStateModel().setSlotSpeed (bar + 3, 1.0f);
+                processor.getStateModel().setSlotDepth (bar + 3, 1.0f);
             }
             TestPlayHead head;
             processor.setPlayHead (&head);
@@ -313,7 +479,7 @@ bool testMotionWetSurvivesThreeHostLoops()
             {
                 const auto absoluteSample = (double) block * blockSize;
                 const auto localSample = std::fmod (absoluteSample, loopSamples);
-                const auto passIndex = (int) std::floor (absoluteSample / loopSamples);
+                const auto passIndex = block / blocksPerLoop;
                 if (passIndex >= 3) break;
                 head.set (true, 12.0 + localSample * ppqPerSample, bpm, 4, 4,
                           (int64_t) std::llround (localSample), true,
@@ -328,7 +494,7 @@ bool testMotionWetSurvivesThreeHostLoops()
                 }
                 processor.processBlock (audio, midi);
                 const auto localEnd = std::fmod (absoluteSample + blockSize - 1.0, loopSamples);
-                const auto expectedBar = (int) std::floor (localEnd / (loopSamples / loopBars));
+                const auto expectedBar = 3 + (int) std::floor (localEnd / (loopSamples / loopBars));
                 const auto withinBar = std::fmod (localEnd, loopSamples / loopBars);
                 // The first BAR needs 125 ms of history; each BAR transition
                 // uses an 8 ms ramp. Outside those bounded intervals, every
@@ -944,6 +1110,7 @@ int main()
     pass &= testRealHostDiagnostic();
     pass &= testPredictedMotionLoopConfirmation();
     pass &= testMotionWetSurvivesThreeHostLoops();
+    pass &= testAbsoluteHostBarSync();
     pass &= check(resourceIs("static_faceplate_1024x683_png",1024,683),"v2-static-faceplate-native");
     pass &= check(resourceIs("knob_ring_60_png",48,48) && resourceIs("knob_pointer_60_png",48,48),"v2-knob-assets-native");
     pass &= check(resourceIs("bypass_off_png",80,31) && resourceIs("bypass_on_png",80,31),"v2-bypass-native");
@@ -1391,8 +1558,8 @@ int main()
         audibleProcessor.setPlayHead (nullptr);
     }
 
-    // A host's PPQ origin is not necessarily zero: FL may start or loop at an
-    // arbitrary playlist position.  Every such start must be Toyotomi BAR 1.
+    // Host PPQ is absolute: the slot and red playhead must track DAW BAR
+    // positions, while the yellow edit selection remains independent.
     juce::AudioBuffer<float> rebaseAudio (2, 96000);
     ToyotomiHideyoshiAudioProcessor rebaseProcessor;
     rebaseProcessor.prepareToPlay (48000, rebaseAudio.getNumSamples());
@@ -1401,7 +1568,7 @@ int main()
     bool allRebasedBarsAddressed = true;
     for (int bar = 0; bar < 64; ++bar)
     {
-        rebasePlayHead.set (true, 12.0 + 4.0 * (double) bar, 120.0, 4, 4,
+        rebasePlayHead.set (true, 4.0 * (double) bar, 120.0, 4, 4,
                             (int64_t) rebaseAudio.getNumSamples() * bar);
         rebaseAudio.clear();
         rebaseProcessor.processBlock (rebaseAudio, midi);
@@ -1409,18 +1576,20 @@ int main()
     }
     const auto rebaseResetsAfter64Bars = rebaseProcessor.getScratchDiagnostics().transportResetCount;
     pass &= check (allRebasedBarsAddressed && rebaseResetsAfter64Bars == 1,
-                   "v2-host-nonzero-ppq-12-rebases-bars-1-through-64-without-boundary-reset");
+                   "host-absolute-ppq-addresses-bars-1-through-64-without-boundary-reset");
 
     ToyotomiHideyoshiAudioProcessor fractionalStartProcessor;
     juce::AudioBuffer<float> fractionalStartAudio (2, 1);
     fractionalStartProcessor.prepareToPlay (48000, fractionalStartAudio.getNumSamples());
     TestPlayHead fractionalStartPlayHead;
     fractionalStartProcessor.setPlayHead (&fractionalStartPlayHead);
+    fractionalStartProcessor.getStateModel().setSlotPreset (25, PluginStateModel::ScratchPreset::drag);
+    fractionalStartProcessor.getStateModel().setSlotLength (25, PluginStateModel::NoteLength::oneBar);
     fractionalStartPlayHead.set (true, 100.5, 120.0, 4, 4, 0);
     fractionalStartProcessor.processBlock (fractionalStartAudio, midi);
-    pass &= check (fractionalStartProcessor.getCurrentTimelineSlot() == 0
-                   && fractionalStartProcessor.getScratchDiagnostics().effectPhase < 0.001,
-                   "v2-host-nonzero-fractional-ppq-start-rebases-bar-one-phase-zero");
+    pass &= check (fractionalStartProcessor.getCurrentTimelineSlot() == 25
+                   && std::abs (fractionalStartProcessor.getScratchDiagnostics().effectPhase - 0.125) < 0.01,
+                   "host-absolute-fractional-ppq-start-addresses-bar26-phase-0125");
 
     ToyotomiHideyoshiAudioProcessor loopRebaseProcessor;
     loopRebaseProcessor.prepareToPlay (48000, rebaseAudio.getNumSamples());
@@ -1437,14 +1606,14 @@ int main()
     loopRebasePlayHead.set (true, 12.0, 120.0, 4, 4, 0);
     rebaseAudio.clear();
     loopRebaseProcessor.processBlock (rebaseAudio, midi);
-    pass &= check (loopRebaseProcessor.getCurrentTimelineSlot() == 0
+    pass &= check (loopRebaseProcessor.getCurrentTimelineSlot() == 3
                    && loopRebaseProcessor.getScratchDiagnostics().transportResetCount == resetsBeforeLoop + 1,
-                   "v2-host-loop-backward-ppq-rebases-to-bar-one");
+                   "host-backward-seek-retains-absolute-bar4-slot");
 
     // A host may keep its absolute sample timeline continuous while reporting
     // a loop return to a non-origin PPQ (for example a playlist loop beginning
-    // at BAR 2).  isLooping is the distinguishing signal in this case; a
-    // backward PPQ jump must still re-enter Toyotomi BAR1.
+    // at BAR 5). isLooping indicates a loop event, but does not rebase the
+    // absolute BAR address to BAR1.
     ToyotomiHideyoshiAudioProcessor nonOriginLoopProcessor;
     nonOriginLoopProcessor.prepareToPlay (48000, 256);
     TestPlayHead nonOriginLoopPlayHead;
@@ -1457,22 +1626,22 @@ int main()
     const auto nonOriginResets = nonOriginLoopProcessor.getScratchDiagnostics().transportResetCount;
     nonOriginLoopPlayHead.set (true, 20.0, 120.0, 4, 4, 512, true);
     nonOriginLoopProcessor.processBlock (nonOriginLoopAudio, midi);
-    pass &= check (nonOriginLoopProcessor.getCurrentTimelineSlot() == 0
+    pass &= check (nonOriginLoopProcessor.getCurrentTimelineSlot() == 5
                    && nonOriginLoopProcessor.getScratchDiagnostics().discontinuityReason
                           == TimelineScratchEngine::DiscontinuityReason::loopWrap
                    && nonOriginLoopProcessor.getScratchDiagnostics().transportResetCount == nonOriginResets + 1,
-                   "v2-host-loop-nonorigin-ppq-with-continuous-samples-rebases-bar-one");
+                   "host-loop-nonorigin-ppq-retains-absolute-bar6-slot");
     nonOriginLoopProcessor.setPlayHead (nullptr);
 
     // FL may report isLooping while leaving LoopPoints unavailable.  A
-    // backwards PPQ/sample jump must still preserve history for the new BAR1
-    // capture; treating it as an ordinary seek starves every preset again.
+    // backwards PPQ/sample jump is recognized from the host loop flag; its
+    // absolute loop-start BAR is preserved.
     ToyotomiHideyoshiAudioProcessor loopNoPointsProcessor;
     juce::AudioBuffer<float> loopNoPointsAudio (2, 256);
     loopNoPointsProcessor.prepareToPlay (48000, loopNoPointsAudio.getNumSamples());
-    loopNoPointsProcessor.getStateModel().setSlotPreset (0, PluginStateModel::ScratchPreset::backspin);
-    loopNoPointsProcessor.getStateModel().setSlotLength (0, PluginStateModel::NoteLength::oneBar);
-    loopNoPointsProcessor.getStateModel().setSlotDepth (0, 1.0f);
+    loopNoPointsProcessor.getStateModel().setSlotPreset (3, PluginStateModel::ScratchPreset::backspin);
+    loopNoPointsProcessor.getStateModel().setSlotLength (3, PluginStateModel::NoteLength::oneBar);
+    loopNoPointsProcessor.getStateModel().setSlotDepth (3, 1.0f);
     TestPlayHead loopNoPointsPlayHead;
     loopNoPointsProcessor.setPlayHead (&loopNoPointsPlayHead);
     const auto loopNoPointsPpqPerBlock = 256.0 / 48000.0 * 120.0 / 60.0;
@@ -1499,9 +1668,8 @@ int main()
                    "v2-host-loop-without-loop-points-preserves-history");
     loopNoPointsProcessor.setPlayHead (nullptr);
 
-    // FL can also omit both isLooping and LoopPoints while keeping the host
-    // sample timeline continuous.  A PPQ return to the established origin is
-    // still a loop re-entry, not a seek that clears the capture history.
+    // If loop metadata is absent, do not guess that a backward position is a
+    // return to Toyotomi BAR1; preserve the absolute target slot.
     ToyotomiHideyoshiAudioProcessor loopNoMetadataProcessor;
     loopNoMetadataProcessor.prepareToPlay (48000, loopNoPointsAudio.getNumSamples());
     loopNoMetadataProcessor.getStateModel().setSlotPreset (0, PluginStateModel::ScratchPreset::chirp);
@@ -1542,13 +1710,15 @@ int main()
         loopNoMetadataProcessor.processBlock (loopNoPointsAudio, midi);
         loopNoMetadataWetAfterReentry |= loopNoMetadataProcessor.getScratchDiagnostics().effectiveWet > 0.1f;
     }
-    pass &= check (loopNoMetadataReason == TimelineScratchEngine::DiscontinuityReason::loopWrap
+    pass &= check (loopNoMetadataReason == TimelineScratchEngine::DiscontinuityReason::ppqJump
+                   && loopNoMetadataProcessor.getCurrentTimelineSlot() == 3
                    && loopNoMetadataProcessor.getScratchDiagnostics().transportResetCount == loopNoMetadataResets + 1
                    && loopNoMetadataWetAfterReentry,
                    "v2-host-loop-without-metadata-reenters-chirp-wet");
     loopNoMetadataProcessor.setPlayHead (nullptr);
 
-    // A four-BAR host loop must restart the configured BAR1..BAR4 effects on
+    // A four-BAR host loop at absolute PPQ 12 must replay the configured
+    // absolute BAR4..BAR7 effects on
     // every pass.  This is intentionally a continuous sample-level run: the
     // old regression only checked the slot number at the jump and never
     // proved that a second pass became wet again.
@@ -1561,15 +1731,15 @@ int main()
         multiLoopProcessor.prepareToPlay (48000, multiLoopAudio.getNumSamples());
         for (int bar = 0; bar < 4; ++bar)
         {
-            multiLoopProcessor.getStateModel().setSlotPreset (bar, preset);
-            multiLoopProcessor.getStateModel().setSlotLength (bar, PluginStateModel::NoteLength::oneBar);
-            multiLoopProcessor.getStateModel().setSlotSpeed (bar, 1.0f);
-            multiLoopProcessor.getStateModel().setSlotDepth (bar, 1.0f);
+            multiLoopProcessor.getStateModel().setSlotPreset (bar + 3, preset);
+            multiLoopProcessor.getStateModel().setSlotLength (bar + 3, PluginStateModel::NoteLength::oneBar);
+            multiLoopProcessor.getStateModel().setSlotSpeed (bar + 3, 1.0f);
+            multiLoopProcessor.getStateModel().setSlotDepth (bar + 3, 1.0f);
         }
         TestPlayHead multiLoopPlayHead;
         multiLoopProcessor.setPlayHead (&multiLoopPlayHead);
         const auto ppqPerBlock = 256.0 / 48000.0 * 130.0 / 60.0;
-        const auto blocksPerLoop = (int) std::ceil (16.0 / ppqPerBlock);
+        const auto blocksPerLoop = (int) std::floor (16.0 / ppqPerBlock);
         // A loop-level OR is not proof that BAR1 resumed: BAR2..BAR4 can
         // mask a failed BAR1.  Keep the same four-BAR source fixture on every
         // pass and retain behavioural evidence for each Preset × pass × BAR.
@@ -1581,14 +1751,17 @@ int main()
         std::array<std::array<double, 4>, 3> passBarOutputEnergy {};
         std::array<std::array<double, 4>, 3> passBarDeltaEnergy {};
         std::array<std::array<int, 4>, 3> passBarSampleCount {};
+        std::array<std::array<bool, 4>, 3> passBarSteadyState {};
+        std::array<std::array<int, 4>, 3> passBarSteadyChecks {};
+        for (auto& perPass : passBarSteadyState) perPass.fill (true);
+        bool allBlockSlotsAddressed = true;
         for (int passIndex = 0; passIndex < 3; ++passIndex)
         {
             for (int block = 0; block < blocksPerLoop; ++block)
             {
                 // Model an actual host loop: both PPQ and host sample position
-                // return to the loop start for every pass.  The previous
-                // fixture advanced PPQ monotonically and therefore never
-                // exercised BAR1 re-entry.
+                // return to absolute PPQ 12 for every pass. The loop is
+                // block-aligned here so every rendered block is in range.
                 const auto ppq = 12.0 + (double) block * ppqPerBlock;
                 multiLoopPlayHead.set (true, ppq, 130.0, 4, 4,
                                        (int64_t) block * 256, true);
@@ -1614,14 +1787,26 @@ int main()
                     ++passBarSampleCount[(size_t) passIndex][(size_t) bar];
                 }
                 const auto slot = multiLoopProcessor.getCurrentTimelineSlot();
-                const auto expectedSlot = (block * 256.0 * 130.0 / (60.0 * 48000.0 * 4.0));
-                const auto bar = juce::jlimit (0, 3, (int) std::floor (expectedSlot));
+                const auto expectedSlot = 3.0 + (block * 256.0 * 130.0 / (60.0 * 48000.0 * 4.0));
+                const auto bar = juce::jlimit (0, 3, (int) std::floor (expectedSlot - 3.0));
                 const auto diagnostics = multiLoopProcessor.getScratchDiagnostics();
-                passBarAddressed[(size_t) passIndex][(size_t) bar] |= slot == bar;
-                passBarWet[(size_t) passIndex][(size_t) bar] |= slot == bar
+                allBlockSlotsAddressed &= slot == (int) std::floor (expectedSlot) % 64;
+                passBarAddressed[(size_t) passIndex][(size_t) bar] = true;
+                passBarWet[(size_t) passIndex][(size_t) bar] |= slot == (int) std::floor (expectedSlot) % 64
                     && diagnostics.effectiveWet > 0.25f;
                 passBarCaptured[(size_t) passIndex][(size_t) bar] |= diagnostics.motionCaptured;
                 passBarSourceLive[(size_t) passIndex][(size_t) bar] |= ! diagnostics.motionSourceEnded;
+                const auto withinBar = std::fmod ((double) block * 256.0,
+                    48000.0 * 60.0 / 130.0 * 4.0);
+                if (withinBar > 48000.0 * 0.20
+                    && withinBar < 48000.0 * 60.0 / 130.0 * 4.0 - 48000.0 * 0.02)
+                {
+                    passBarSteadyState[(size_t) passIndex][(size_t) bar]
+                        &= slot == (int) std::floor (expectedSlot) % 64
+                        && diagnostics.motionCaptured && ! diagnostics.motionSourceEnded
+                        && diagnostics.effectiveWet > 0.99f;
+                    ++passBarSteadyChecks[(size_t) passIndex][(size_t) bar];
+                }
             }
         }
         bool perBarEvidence = true;
@@ -1634,7 +1819,7 @@ int main()
                 const auto outputRms = std::sqrt (passBarOutputEnergy[passIndex][bar] / (double) count);
                 const auto deltaRms = std::sqrt (passBarDeltaEnergy[passIndex][bar] / (double) count);
                 std::cout << "BAR_LOOP_EVIDENCE preset=" << (int) preset
-                          << " pass=" << (passIndex + 1) << " bar=" << (bar + 1)
+                          << " pass=" << (passIndex + 1) << " bar=" << (bar + 4)
                           << " addressed=" << passBarAddressed[passIndex][bar]
                           << " captured=" << passBarCaptured[passIndex][bar]
                           << " sourceLive=" << passBarSourceLive[passIndex][bar]
@@ -1645,14 +1830,16 @@ int main()
                 perBarEvidence &= passBarAddressed[passIndex][bar]
                     && passBarCaptured[passIndex][bar]
                     && passBarSourceLive[passIndex][bar]
+                    && passBarSteadyState[passIndex][bar]
+                    && passBarSteadyChecks[passIndex][bar] > 0
                     && passBarWet[passIndex][bar]
                     && std::isfinite (dryRms) && std::isfinite (outputRms)
                     && std::isfinite (deltaRms) && dryRms > 0.0 && outputRms > 0.0
                     && deltaRms > 1.0e-4;
             }
         }
-        pass &= check (perBarEvidence,
-                       "v2-three-pass-loop-per-preset-pass-bar-capture-wet-and-rms-evidence");
+        pass &= check (allBlockSlotsAddressed && perBarEvidence,
+                       "three-pass-loop-per-preset-absolute-bar-capture-wet-and-rms-evidence");
         multiLoopProcessor.setPlayHead (nullptr);
     }
 
@@ -1669,15 +1856,15 @@ int main()
         eightBarLoopProcessor.prepareToPlay (48000, eightBarLoopAudio.getNumSamples());
         for (int bar = 0; bar < 8; ++bar)
         {
-            eightBarLoopProcessor.getStateModel().setSlotPreset (bar, preset);
-            eightBarLoopProcessor.getStateModel().setSlotLength (bar, PluginStateModel::NoteLength::oneBar);
-            eightBarLoopProcessor.getStateModel().setSlotSpeed (bar, 1.0f);
-            eightBarLoopProcessor.getStateModel().setSlotDepth (bar, 1.0f);
+            eightBarLoopProcessor.getStateModel().setSlotPreset (bar + 3, preset);
+            eightBarLoopProcessor.getStateModel().setSlotLength (bar + 3, PluginStateModel::NoteLength::oneBar);
+            eightBarLoopProcessor.getStateModel().setSlotSpeed (bar + 3, 1.0f);
+            eightBarLoopProcessor.getStateModel().setSlotDepth (bar + 3, 1.0f);
         }
         TestPlayHead eightBarLoopPlayHead;
         eightBarLoopProcessor.setPlayHead (&eightBarLoopPlayHead);
         const auto ppqPerBlock = 256.0 / 48000.0 * 130.0 / 60.0;
-        const auto blocksPerLoop = (int) std::ceil (32.0 / ppqPerBlock);
+        const auto blocksPerLoop = (int) std::floor (32.0 / ppqPerBlock);
         const auto fourBarFixtureSamples = (int) std::round (16.0 * 60.0 / 130.0 * 48000.0);
         std::array<std::array<bool, 8>, 3> passBarAddressed {};
         std::array<std::array<bool, 8>, 3> passBarCaptured {};
@@ -1685,6 +1872,10 @@ int main()
         std::array<std::array<bool, 8>, 3> passBarSourceLive {};
         std::array<std::array<double, 8>, 3> passBarDeltaEnergy {};
         std::array<std::array<int, 8>, 3> passBarSampleCount {};
+        std::array<std::array<bool, 8>, 3> passBarSteadyState {};
+        std::array<std::array<int, 8>, 3> passBarSteadyChecks {};
+        for (auto& perPass : passBarSteadyState) perPass.fill (true);
+        bool allBlockSlotsAddressed = true;
         for (int passIndex = 0; passIndex < 3; ++passIndex)
             for (int block = 0; block < blocksPerLoop; ++block)
             {
@@ -1699,15 +1890,27 @@ int main()
                     eightBarLoopAudio.setSample (1, sample, value);
                 }
                 eightBarLoopProcessor.processBlock (eightBarLoopAudio, midi);
-                const auto expectedSlot = (block * 256.0 * 130.0 / (60.0 * 48000.0 * 4.0));
-                const auto bar = juce::jlimit (0, 7, (int) std::floor (expectedSlot));
+                const auto expectedSlot = 3.0 + (block * 256.0 * 130.0 / (60.0 * 48000.0 * 4.0));
+                const auto bar = juce::jlimit (0, 7, (int) std::floor (expectedSlot - 3.0));
                 const auto diagnostics = eightBarLoopProcessor.getScratchDiagnostics();
                 const auto slot = eightBarLoopProcessor.getCurrentTimelineSlot();
-                passBarAddressed[(size_t) passIndex][(size_t) bar] |= slot == bar;
+                allBlockSlotsAddressed &= slot == (int) std::floor (expectedSlot) % 64;
+                passBarAddressed[(size_t) passIndex][(size_t) bar] = true;
                 passBarCaptured[(size_t) passIndex][(size_t) bar] |= diagnostics.motionCaptured;
-                passBarWet[(size_t) passIndex][(size_t) bar] |= slot == bar
+                passBarWet[(size_t) passIndex][(size_t) bar] |= slot == (int) std::floor (expectedSlot) % 64
                     && diagnostics.effectiveWet > 0.25f;
                 passBarSourceLive[(size_t) passIndex][(size_t) bar] |= ! diagnostics.motionSourceEnded;
+                const auto withinBar = std::fmod ((double) block * 256.0,
+                    48000.0 * 60.0 / 130.0 * 4.0);
+                if (withinBar > 48000.0 * 0.20
+                    && withinBar < 48000.0 * 60.0 / 130.0 * 4.0 - 48000.0 * 0.02)
+                {
+                    passBarSteadyState[(size_t) passIndex][(size_t) bar]
+                        &= slot == (int) std::floor (expectedSlot) % 64
+                        && diagnostics.motionCaptured && ! diagnostics.motionSourceEnded
+                        && diagnostics.effectiveWet > 0.99f;
+                    ++passBarSteadyChecks[(size_t) passIndex][(size_t) bar];
+                }
                 for (int sample = 0; sample < eightBarLoopAudio.getNumSamples(); ++sample)
                 {
                     const auto fixtureSample = (block * 256 + sample) % fourBarFixtureSamples;
@@ -1725,7 +1928,7 @@ int main()
                 const auto count = std::max (1, passBarSampleCount[passIndex][bar]);
                 const auto deltaRms = std::sqrt (passBarDeltaEnergy[passIndex][bar] / (double) count);
                 std::cout << "BAR_LOOP_EVIDENCE preset=" << (int) preset
-                          << " loopBars=8 pass=" << (passIndex + 1) << " bar=" << (bar + 1)
+                          << " loopBars=8 pass=" << (passIndex + 1) << " bar=" << (bar + 4)
                           << " addressed=" << passBarAddressed[passIndex][bar]
                           << " captured=" << passBarCaptured[passIndex][bar]
                           << " sourceLive=" << passBarSourceLive[passIndex][bar]
@@ -1734,11 +1937,13 @@ int main()
                 perBarEvidence &= passBarAddressed[passIndex][bar]
                     && passBarCaptured[passIndex][bar]
                     && passBarSourceLive[passIndex][bar]
+                    && passBarSteadyState[passIndex][bar]
+                    && passBarSteadyChecks[passIndex][bar] > 0
                     && passBarWet[passIndex][bar]
                     && std::isfinite (deltaRms) && deltaRms > 1.0e-4;
             }
-        pass &= check (perBarEvidence,
-                       "v2-eight-bar-loop-per-preset-pass-bar-capture-wet-and-effect-evidence");
+        pass &= check (allBlockSlotsAddressed && perBarEvidence,
+                       "eight-bar-loop-per-preset-absolute-bar-capture-wet-and-effect-evidence");
         eightBarLoopProcessor.setPlayHead (nullptr);
     }
 

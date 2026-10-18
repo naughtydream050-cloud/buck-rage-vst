@@ -76,8 +76,8 @@ private:
     TimelineScratchEngine scratchEngine;
     RealHostDiagnostic hostDiagnostic;
     double preparedSampleRate = 44100.0, internalQuarterPosition = 0.0,
-           lastHostPpq = 0.0, lastHostBpmForContinuity = 120.0,
-           hostPpqOrigin = 0.0;
+           lastHostPpq = 0.0, lastObservedHostPpq = 0.0,
+           lastHostBpmForContinuity = 120.0;
     int64_t lastHostSamplePosition = 0;
     int64_t predictedLoopNextSample = 0, predictedLoopWrappedSample = 0,
             predictedLoopPreviousSample = 0;
@@ -85,7 +85,7 @@ private:
     double predictedLoopStartPpq = 0.0, predictedLoopEndPpq = 0.0,
            predictedLoopNextPpq = 0.0;
     bool internalWasPlaying = false, haveLastHostPpq = false,
-         haveLastHostSamplePosition = false, haveHostPpqOrigin = false,
+         haveLastHostSamplePosition = false, haveLastObservedHostPpq = false,
          predictedLoopPending = false, predictedLoopHadSamples = false;
     PluginStateModel stateModel;
 
