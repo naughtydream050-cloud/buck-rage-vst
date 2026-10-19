@@ -269,17 +269,22 @@ bool testAbsoluteHostBarSync()
     ToyotomiHideyoshiAudioProcessor stoppedSeekProcessor;
     stoppedSeekProcessor.prepareToPlay (48000.0, 64);
     stoppedSeekProcessor.setHostSyncEnabled (true);
+    stoppedSeekProcessor.getStateModel().selectBar (10);
     TestPlayHead stoppedSeekHead;
     stoppedSeekProcessor.setPlayHead (&stoppedSeekHead);
     stoppedSeekHead.set (false, 12.0, 120.0, 4, 4, 0);
     stoppedSeekProcessor.processBlock (seekAudio, midi);
     stoppedSeekHead.set (false, 92.0, 120.0, 4, 4, 0);
     stoppedSeekProcessor.processBlock (seekAudio, midi);
+    const auto selectedBarAfterStoppedSeek = stoppedSeekProcessor.getStateModel().getUiState().selectedBar;
     stoppedSeekHead.set (true, 92.0, 120.0, 4, 4, 64);
     stoppedSeekProcessor.processBlock (seekAudio, midi);
     pass &= check (stoppedSeekProcessor.getCurrentTimelineSlot() == 23
                    && stoppedSeekProcessor.getScratchDiagnostics().playingBar == 23,
                    "stopped-seek-then-play-starts-at-absolute-bar24");
+    pass &= check (selectedBarAfterStoppedSeek == 10
+                   && stoppedSeekProcessor.getStateModel().getUiState().selectedBar == 10,
+                   "stopped-host-seek-preserves-yellow-edit-selection");
 
     ToyotomiHideyoshiAudioProcessor stopRestartProcessor;
     stopRestartProcessor.prepareToPlay (48000.0, 64);
@@ -358,6 +363,72 @@ bool testAbsoluteHostBarSync()
                    && unavailableProcessor.getScratchDiagnostics().playingBar == -1,
                    "missing-host-position-does-not-fabricate-slot");
     unavailableProcessor.setPlayHead (nullptr);
+    return pass;
+}
+
+bool testHostPpqJitterAndVariableBlocksDoNotReset()
+{
+    bool pass = true;
+    constexpr double sampleRate = 48000.0;
+    constexpr double bpm = 130.0;
+    constexpr double ppqPerSample = bpm / (60.0 * sampleRate);
+    constexpr int maxBlockSize = 256;
+
+    ToyotomiHideyoshiAudioProcessor processor;
+    processor.prepareToPlay (sampleRate, maxBlockSize);
+    processor.setHostSyncEnabled (true);
+    TestPlayHead head;
+    processor.setPlayHead (&head);
+    juce::MidiBuffer midi;
+    juce::AudioBuffer<float> audio (2, maxBlockSize);
+    const int blockSizes[] { 64, 128, 256, 96, 192, 80, 144 };
+    int64_t samplePosition = 0;
+    int initialSlot = -1;
+    uint32_t resetsAfterStart = 0;
+    bool crossedBarBoundary = false;
+
+    for (int block = 0; block < 900; ++block)
+    {
+        const auto blockSize = blockSizes[block % (int) (sizeof (blockSizes) / sizeof (blockSizes[0]))];
+        audio.setSize (2, blockSize, false, false, true);
+        for (int sample = 0; sample < blockSize; ++sample)
+        {
+            const auto value = 0.2f * std::sin ((float) (samplePosition + sample) * 0.013f);
+            audio.setSample (0, sample, value);
+            audio.setSample (1, sample, value);
+        }
+
+        const auto jitterSamples = block == 0 ? 0.0 : ((block & 1) != 0 ? 2.0 : -2.0);
+        const auto ppq = (double) samplePosition * ppqPerSample + jitterSamples * ppqPerSample;
+        head.set (true, ppq, bpm, 4, 4, samplePosition);
+        processor.processBlock (audio, midi);
+
+        const auto diagnostics = processor.getScratchDiagnostics();
+        const auto currentSlot = processor.getCurrentTimelineSlot();
+        if (block == 0)
+        {
+            initialSlot = currentSlot;
+            resetsAfterStart = diagnostics.transportResetCount;
+        }
+        else if (currentSlot != initialSlot)
+            crossedBarBoundary = true;
+
+        bool outputIsFinite = true;
+        for (int channel = 0; channel < audio.getNumChannels(); ++channel)
+            for (int sample = 0; sample < audio.getNumSamples(); ++sample)
+                if (! std::isfinite (audio.getSample (channel, sample)))
+                    outputIsFinite = false;
+        pass &= check (outputIsFinite, "host-ppq-small-jitter-variable-blocks-finite-output");
+
+        samplePosition += blockSize;
+    }
+
+    const auto finalDiagnostics = processor.getScratchDiagnostics();
+    pass &= check (crossedBarBoundary && finalDiagnostics.transportResetCount == resetsAfterStart,
+                   "host-ppq-small-jitter-and-variable-blocks-do-not-reset");
+    pass &= check (processor.getCurrentTimelineSlot() >= 1,
+                   "host-ppq-jitter-test-crossed-absolute-bar-boundary");
+    processor.setPlayHead (nullptr);
     return pass;
 }
 
@@ -1111,6 +1182,7 @@ int main()
     pass &= testPredictedMotionLoopConfirmation();
     pass &= testMotionWetSurvivesThreeHostLoops();
     pass &= testAbsoluteHostBarSync();
+    pass &= testHostPpqJitterAndVariableBlocksDoNotReset();
     pass &= check(resourceIs("static_faceplate_1024x683_png",1024,683),"v2-static-faceplate-native");
     pass &= check(resourceIs("knob_ring_60_png",48,48) && resourceIs("knob_pointer_60_png",48,48),"v2-knob-assets-native");
     pass &= check(resourceIs("bypass_off_png",80,31) && resourceIs("bypass_on_png",80,31),"v2-bypass-native");
