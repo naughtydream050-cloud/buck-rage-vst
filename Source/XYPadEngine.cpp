@@ -664,13 +664,14 @@ bool XYPadEngine::renderScrubAndPitch (Slot& slot, int frames) noexcept
                           magnitude * static_cast<float> (std::sin (outputPhase)));
             }
             fft->performRealOnlyInverseTransform (fftWork2.get());
-            const auto synthesisScale = 1.0f / static_cast<float> (fftSize);
             for (int i = 0; i < fftSize; ++i)
             {
                 const auto dest = frameStart + offset + i;
                 if (dest < 0 || dest >= frames) continue;
                 const auto hann = static_cast<float> (0.5 - 0.5 * std::cos (2.0 * kPi * i / (fftSize - 1)));
-                const auto value = fftWork2[static_cast<size_t> (i)] * synthesisScale * hann;
+                // JUCE 7.0.12 normalizes performRealOnlyInverseTransform() by
+                // 1/N internally. Applying a second 1/N here attenuates XY by 66 dB.
+                const auto value = fftWork2[static_cast<size_t> (i)] * hann;
                 input[static_cast<size_t> (dest) * 2u + static_cast<size_t> (channel)] += value;
                 if (channel == 0) overlapNorm[static_cast<size_t> (dest)] += hann * hann;
             }
