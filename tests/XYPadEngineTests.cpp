@@ -118,6 +118,8 @@ bool renderOneBar (XYPadEngine& engine, bool playback, double phaseStart,
 
 int main()
 {
+    check (sizeof (XYPadEngine) < 64u * 1024u,
+           "fixed-64-bar-tables-do-not-consume-windows-thread-stack");
     XYPadEngine queueProbe;
     check (XYPadEngineTestAccess::queueIsBoundedAndFifo (queueProbe),
            "render-job-spsc-queue-bounded-fifo-and-overflow-rejected");

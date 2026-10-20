@@ -59,13 +59,23 @@ XYPadEngine::~XYPadEngine()
     release();
 }
 
+XYPadEngine::XYPadEngine() noexcept
+    : slots (new (std::nothrow) Slot[static_cast<size_t> (kBarCount)]),
+      publishedTrajectories (new (std::nothrow) AtomicTrajectory[static_cast<size_t> (kBarCount)]),
+      activeTrajectories (new (std::nothrow) Trajectory[static_cast<size_t> (kBarCount)])
+{
+}
+
 bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank) noexcept
 {
     const std::lock_guard<std::mutex> lifecycleLock (nonRealtimeLifecycleMutex);
     stopWorker();
     enabled.store (false, std::memory_order_release);
-    for (auto& slot : slots)
+    if (! slots || ! publishedTrajectories || ! activeTrajectories)
+        return false;
+    for (int i = 0; i < kBarCount; ++i)
     {
+        auto& slot = slots[static_cast<size_t> (i)];
         slot.pcm.reset();
         slot.state.store (State::empty, std::memory_order_relaxed);
         slot.generation.fetch_add (1, std::memory_order_relaxed);
@@ -83,7 +93,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank)
     renderQueueHead.store (0, std::memory_order_relaxed);
     renderQueueTail.store (0, std::memory_order_relaxed);
     activeTrajectory = {};
-    activeTrajectories = {};
+    std::fill_n (activeTrajectories.get(), kBarCount, Trajectory {});
 
     if (! std::isfinite (rate) || rate <= 0.0 || rate > kMaxSampleRate
         || maximumBlockSize <= 0)
@@ -102,12 +112,13 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank)
     const auto floatCount = static_cast<size_t> (maxFramesPerBar) * 2u;
     try
     {
-        for (auto& slot : slots)
+        for (int i = 0; i < kBarCount; ++i)
         {
+            auto& slot = slots[static_cast<size_t> (i)];
             slot.pcm.reset (new (std::nothrow) float[floatCount]);
             if (! slot.pcm)
             {
-                for (auto& allocated : slots) allocated.pcm.reset();
+                for (int j = 0; j < kBarCount; ++j) slots[static_cast<size_t> (j)].pcm.reset();
                 maxFramesPerBar = 0;
                 return false;
             }
@@ -125,7 +136,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank)
         if (! scratch || ! fftWork || ! fftWork2 || ! overlapNorm || ! previousInputPhase
             || ! synthesisPhase || ! phaseInitialized || ! fft)
         {
-            for (auto& slot : slots) slot.pcm.reset();
+            for (int i = 0; i < kBarCount; ++i) slots[static_cast<size_t> (i)].pcm.reset();
             scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
             previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
             maxFramesPerBar = 0;
@@ -137,7 +148,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank)
     catch (...)
     {
         stopWorker();
-        for (auto& slot : slots) slot.pcm.reset();
+        for (int i = 0; i < kBarCount; ++i) slots[static_cast<size_t> (i)].pcm.reset();
         scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
         previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
         maxFramesPerBar = 0;
@@ -152,8 +163,9 @@ void XYPadEngine::release() noexcept
     const std::lock_guard<std::mutex> lifecycleLock (nonRealtimeLifecycleMutex);
     enabled.store (false, std::memory_order_release);
     stopWorker();
-    for (auto& slot : slots)
+    for (int i = 0; slots && i < kBarCount; ++i)
     {
+        auto& slot = slots[static_cast<size_t> (i)];
         slot.state.store (State::empty, std::memory_order_relaxed);
         slot.pcm.reset();
         slot.frames.store (0, std::memory_order_relaxed);
@@ -178,6 +190,8 @@ void XYPadEngine::setTrajectory (int bar,
                                  uint32_t revision) noexcept
 {
     if (bar < 0 || bar >= kBarCount)
+        return;
+    if (! publishedTrajectories)
         return;
     auto& target = publishedTrajectories[static_cast<size_t> (bar)];
     auto seq = target.sequence.load (std::memory_order_relaxed);
@@ -310,9 +324,12 @@ void XYPadEngine::process (const juce::AudioBuffer<float>& source,
         || rendered.getNumSamples() < framesInBlock || readyMask.getNumChannels() < 1
         || readyMask.getNumSamples() < framesInBlock)
     {
-        for (auto& slot : slots)
+        for (int slotIndex = 0; slots && slotIndex < kBarCount; ++slotIndex)
+        {
+            auto& slot = slots[static_cast<size_t> (slotIndex)];
             if (slot.state.load (std::memory_order_acquire) == State::capturing)
                 slot.state.store (State::empty, std::memory_order_release);
+        }
         activeBar = -1;
         return;
     }
@@ -324,9 +341,12 @@ void XYPadEngine::process (const juce::AudioBuffer<float>& source,
     if (! std::isfinite (framesPerBar) || framesPerBar < 1.0
         || framesPerBar > static_cast<double> (maxFramesPerBar))
     {
-        for (auto& slot : slots)
+        for (int slotIndex = 0; slots && slotIndex < kBarCount; ++slotIndex)
+        {
+            auto& slot = slots[static_cast<size_t> (slotIndex)];
             if (slot.state.load (std::memory_order_acquire) == State::capturing)
                 slot.state.store (State::empty, std::memory_order_release);
+        }
         activeBar = -1;
         return;
     }
@@ -675,7 +695,7 @@ void XYPadEngine::workerLoop() noexcept
         RenderJob job;
         if (dequeueRenderJob (job))
         {
-            if (job.bar >= slots.size())
+            if (! slots || job.bar >= static_cast<uint32_t> (kBarCount))
                 continue;
             auto& slot = slots[job.bar];
             auto expected = State::queued;
@@ -726,7 +746,8 @@ XYPadEngine::State XYPadEngine::getState (int bar) const noexcept
 {
     if (bar < 0 || bar >= kBarCount)
         return State::empty;
-    return slots[static_cast<size_t> (bar)].state.load (std::memory_order_acquire);
+    return slots ? slots[static_cast<size_t> (bar)].state.load (std::memory_order_acquire)
+                 : State::empty;
 }
 
 float XYPadEngine::mixLayers (float dry, float presetOutput, float xyWet,

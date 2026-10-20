@@ -34,7 +34,7 @@ public:
         uint32_t timingGeneration = 0;
     };
 
-    XYPadEngine() noexcept = default;
+    XYPadEngine() noexcept;
     ~XYPadEngine();
     XYPadEngine (const XYPadEngine&) = delete;
     XYPadEngine& operator= (const XYPadEngine&) = delete;
@@ -113,13 +113,16 @@ private:
 
     double sampleRate = 0.0;
     int maxFramesPerBar = 0, maxBlock = 0;
-    std::array<Slot, kBarCount> slots {};
+    // These fixed-size BAR tables exceed the default Windows thread stack when
+    // embedded in a JUCE processor/test fixture. Allocate them off the audio
+    // thread while preserving fixed capacity and the same indexed access.
+    std::unique_ptr<Slot[]> slots;
     static constexpr uint32_t kRenderQueueCapacity = 64;
     std::array<RenderJob, kRenderQueueCapacity> renderQueue {};
     std::atomic<uint32_t> renderQueueHead { 0 }, renderQueueTail { 0 };
-    std::array<AtomicTrajectory, kBarCount> publishedTrajectories {};
+    std::unique_ptr<AtomicTrajectory[]> publishedTrajectories;
     Trajectory activeTrajectory {};
-    std::array<Trajectory, kBarCount> activeTrajectories {};
+    std::unique_ptr<Trajectory[]> activeTrajectories;
     int activeBar = -1;
     uint32_t activeRevision = 0;
     std::unique_ptr<float[]> scratch;
