@@ -15,6 +15,15 @@
  #include <BinaryData.h>
 #endif
 
+class RuntimeSmokeTestAccess
+{
+public:
+    static XYPadEngine::State getXyState (const ToyotomiHideyoshiAudioProcessor& processor) noexcept
+    {
+        return processor.xyEngine.getState (0);
+    }
+};
+
 namespace
 {
 bool check (bool ok, const char* name) { std::cout << (ok ? "PASS " : "FAIL ") << name << '\n'; return ok; }
@@ -207,15 +216,6 @@ struct XyIntegrationRender
     std::vector<float> bypassPass;
     std::vector<float> stoppedPass;
     bool readyBeforeReplay = false;
-};
-
-class RuntimeSmokeTestAccess
-{
-public:
-    static XYPadEngine::State getXyState (const ToyotomiHideyoshiAudioProcessor& processor) noexcept
-    {
-        return processor.xyEngine.getState (0);
-    }
 };
 
 XyIntegrationRender renderProcessorXyIntegration (bool addTrajectory,
