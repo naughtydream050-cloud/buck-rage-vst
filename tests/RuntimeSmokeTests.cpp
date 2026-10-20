@@ -380,8 +380,8 @@ bool testXyLayerIndependenceAtProcessorBoundary()
     for (size_t i = 0; i + 1 < noTrajectory.secondPass.size(); i += 2)
     {
         const auto n = static_cast<double> (i / 2);
-        const auto inputL = 0.2f * std::sin (2.0 * 3.141592653589793 * 220.0 * n / 48000.0);
-        const auto inputR = inputL * 0.5f;
+        const float inputL = 0.2f * std::sin (2.0 * 3.141592653589793 * 220.0 * n / 48000.0);
+        const float inputR = inputL * 0.5f;
         noTrajectoryIsExactDry &= std::memcmp (&noTrajectory.firstPass[i], &inputL, sizeof (float)) == 0
             && std::memcmp (&noTrajectory.firstPass[i + 1], &inputR, sizeof (float)) == 0
             && std::memcmp (&noTrajectory.secondPass[i], &inputL, sizeof (float)) == 0
@@ -397,8 +397,8 @@ bool testXyLayerIndependenceAtProcessorBoundary()
     for (size_t i = 0; i + 1 < zeroDepth.secondPass.size(); i += 2)
     {
         const auto n = static_cast<double> (i / 2);
-        const auto inputL = 0.2f * std::sin (2.0 * 3.141592653589793 * 220.0 * n / 48000.0);
-        const auto inputR = inputL * 0.5f;
+        const float inputL = 0.2f * std::sin (2.0 * 3.141592653589793 * 220.0 * n / 48000.0);
+        const float inputR = inputL * 0.5f;
         depthZeroBitExactDry &= std::memcmp (&zeroDepth.firstPass[i], &inputL, sizeof (float)) == 0
             && std::memcmp (&zeroDepth.firstPass[i + 1], &inputR, sizeof (float)) == 0
             && std::memcmp (&zeroDepth.secondPass[i], &inputL, sizeof (float)) == 0
@@ -408,13 +408,13 @@ bool testXyLayerIndependenceAtProcessorBoundary()
 
     // Isolate XY's contribution by subtracting the corresponding preset-only
     // render. Changing preset controls must not change the independent XY layer.
-    const auto xyControlsDefault = renderProcessorXyIntegration (true, PluginStateModel::ScratchPreset::drag,
+    const auto xyControlsDefault = renderProcessorXyIntegration (true, PluginStateModel::ScratchPreset::off,
         false, PluginStateModel::NoteLength::oneBar, 1.0f, 0.0f, 0.8f);
-    const auto presetControlsDefault = renderProcessorXyIntegration (false, PluginStateModel::ScratchPreset::drag,
+    const auto presetControlsDefault = renderProcessorXyIntegration (false, PluginStateModel::ScratchPreset::off,
         false, PluginStateModel::NoteLength::oneBar, 1.0f, 0.0f, 0.8f);
-    const auto xyControlsChanged = renderProcessorXyIntegration (true, PluginStateModel::ScratchPreset::drag,
+    const auto xyControlsChanged = renderProcessorXyIntegration (true, PluginStateModel::ScratchPreset::off,
         false, PluginStateModel::NoteLength::sixteenth, 4.0f, 12.0f, 0.8f);
-    const auto presetControlsChanged = renderProcessorXyIntegration (false, PluginStateModel::ScratchPreset::drag,
+    const auto presetControlsChanged = renderProcessorXyIntegration (false, PluginStateModel::ScratchPreset::off,
         false, PluginStateModel::NoteLength::sixteenth, 4.0f, 12.0f, 0.8f);
     bool xyIndependentOfPresetControls = xyControlsDefault.readyBeforeReplay
         && xyControlsChanged.readyBeforeReplay
