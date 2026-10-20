@@ -351,6 +351,9 @@ int main()
         previous = current;
     }
     const auto estimatedDownHz = crossings * sampleRate / (2.0 * (72000 - 48000));
+    if (! downReady || std::abs (estimatedDownHz - 110.0) / 110.0 >= 0.01)
+        std::cerr << "PITCH_DOWN_DIAGNOSTIC ready=" << downReady
+                  << " estimated_hz=" << estimatedDownHz << '\n';
     check (downReady && std::abs (estimatedDownHz - 110.0) / 110.0 < 0.01,
            "pitch-bottom-minus-12-semitones");
     auto downStream = juce::File::getCurrentWorkingDirectory()
@@ -421,9 +424,18 @@ int main()
         replay.secondsPerQuarter = 60.0 / bpm;
         replay.timingGeneration = 1;
         allBars.process (in, out, mask, replay, 512);
-        allIndependent = allIndependent && mask.getSample (0, 128) > 0.5f
-            && std::abs (out.getSample (0, 128) - level) < 2.0e-3f
-            && std::abs (out.getSample (1, 128) + level * 0.5f) < 2.0e-3f;
+        const auto maskReady = mask.getSample (0, 128) > 0.5f;
+        const auto left = out.getSample (0, 128);
+        const auto right = out.getSample (1, 128);
+        const auto barMatches = maskReady && std::abs (left - level) < 2.0e-3f
+            && std::abs (right + level * 0.5f) < 2.0e-3f;
+        if (! barMatches && allIndependent)
+            std::cerr << "BAR_ISOLATION_DIAGNOSTIC bar=" << bar
+                      << " mask=" << mask.getSample (0, 128)
+                      << " left=" << left << " expected_left=" << level
+                      << " right=" << right << " expected_right=" << -level * 0.5f
+                      << " state=" << static_cast<int> (allBars.getState (bar)) << '\n';
+        allIndependent = allIndependent && barMatches;
     }
     check (barsReady == XYPadEngine::kBarCount, "all-64-bar-states-ready");
     check (allIndependent, "all-64-bars-replay-their-own-stereo-capture");
