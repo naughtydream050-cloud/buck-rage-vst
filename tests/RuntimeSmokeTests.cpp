@@ -7,6 +7,9 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
+#include <chrono>
+#include <thread>
+#include <vector>
 
 #if __has_include(<BinaryData.h>)
  #include <BinaryData.h>
@@ -196,6 +199,140 @@ public:
 private:
     juce::AudioPlayHead::PositionInfo position;
 };
+
+struct XyIntegrationRender
+{
+    std::vector<float> firstPass;
+    std::vector<float> secondPass;
+    std::vector<float> bypassPass;
+    std::vector<float> stoppedPass;
+};
+
+XyIntegrationRender renderProcessorXyIntegration (bool addTrajectory,
+                                                  PluginStateModel::ScratchPreset preset,
+                                                  bool exerciseBypassAndStop)
+{
+    constexpr double rate = 48000.0, bpm = 300.0;
+    constexpr int blockSize = 512;
+    constexpr int blocksPerBar = 75;
+    juce::MidiBuffer midi;
+    ToyotomiHideyoshiAudioProcessor processor;
+    processor.prepareToPlay (rate, blockSize);
+    processor.setHostSyncEnabled (true);
+    auto& state = processor.getStateModel();
+    state.setSlotPreset (0, preset);
+    state.setSlotLength (0, PluginStateModel::NoteLength::oneBar);
+    state.setSlotSpeed (0, 1.0f);
+    state.setSlotPitch (0, 0.0f);
+    state.setSlotDepth (0, 0.8f);
+    if (addTrajectory)
+    {
+        state.beginSlotXYMotion (0, 0.0f, 0.5f);
+        state.appendSlotXYMotion (0, 1.0f, 0.5f, 4.0 * 60.0 / bpm);
+    }
+
+    TestPlayHead playHead;
+    processor.setPlayHead (&playHead);
+    XyIntegrationRender result;
+    const auto renderPass = [&] (std::vector<float>& destination)
+    {
+        destination.resize (static_cast<size_t> (blocksPerBar * blockSize * 2));
+        juce::AudioBuffer<float> audio (2, blockSize);
+        int64_t barSample = 0;
+        for (int block = 0; block < blocksPerBar; ++block)
+        {
+            for (int i = 0; i < blockSize; ++i)
+            {
+                const auto sample = 0.2f * std::sin (2.0 * 3.141592653589793
+                    * 220.0 * static_cast<double> (barSample + i) / rate);
+                audio.setSample (0, i, sample);
+                audio.setSample (1, i, sample * 0.5f);
+            }
+            const auto ppq = static_cast<double> (barSample) * bpm / (60.0 * rate);
+            playHead.set (true, ppq, bpm, 4, 4, barSample, true, 0.0, 4.0);
+            processor.processBlock (audio, midi);
+            for (int i = 0; i < blockSize; ++i)
+            {
+                const auto offset = static_cast<size_t> (i + block * blockSize) * 2u;
+                destination[offset] = audio.getSample (0, i);
+                destination[offset + 1u] = audio.getSample (1, i);
+            }
+            barSample += blockSize;
+        }
+    };
+    renderPass (result.firstPass);
+    std::this_thread::sleep_for (std::chrono::milliseconds (150));
+    renderPass (result.secondPass);
+    if (exerciseBypassAndStop)
+    {
+        state.setBypass (true);
+        renderPass (result.bypassPass);
+        state.setBypass (false);
+        std::vector<float> stopped (static_cast<size_t> (blocksPerBar * blockSize * 2));
+        juce::AudioBuffer<float> audio (2, blockSize);
+        for (int block = 0; block < blocksPerBar; ++block)
+        {
+            for (int i = 0; i < blockSize; ++i)
+            {
+                const auto sample = 0.2f * std::sin (2.0 * 3.141592653589793
+                    * 220.0 * static_cast<double> (block * blockSize + i) / rate);
+                audio.setSample (0, i, sample);
+                audio.setSample (1, i, sample * 0.5f);
+            }
+            playHead.set (false, 0.0, bpm, 4, 4, 0, true, 0.0, 4.0);
+            processor.processBlock (audio, midi);
+            for (int i = 0; i < blockSize; ++i)
+            {
+                const auto offset = static_cast<size_t> (i + block * blockSize) * 2u;
+                stopped[offset] = audio.getSample (0, i);
+                stopped[offset + 1u] = audio.getSample (1, i);
+            }
+        }
+        result.stoppedPass = std::move (stopped);
+    }
+    processor.setPlayHead (nullptr);
+    return result;
+}
+
+bool testXyLayerIndependenceAtProcessorBoundary()
+{
+    const auto baseline = renderProcessorXyIntegration (false, PluginStateModel::ScratchPreset::drag, true);
+    const auto withXy = renderProcessorXyIntegration (true, PluginStateModel::ScratchPreset::drag, true);
+    bool firstPassBitExact = baseline.firstPass.size() == withXy.firstPass.size();
+    bool replayDiffers = baseline.secondPass.size() == withXy.secondPass.size();
+    bool allFinite = true;
+    double replayDifference = 0.0;
+    for (size_t i = 0; i < std::min (baseline.firstPass.size(), withXy.firstPass.size()); ++i)
+    {
+        firstPassBitExact &= std::memcmp (&baseline.firstPass[i], &withXy.firstPass[i], sizeof (float)) == 0;
+        replayDifference += std::abs (static_cast<double> (baseline.secondPass[i]) - withXy.secondPass[i]);
+        allFinite &= std::isfinite (withXy.secondPass[i]);
+    }
+    replayDiffers &= replayDifference > 1.0;
+    bool bypassDry = withXy.bypassPass.size() == baseline.bypassPass.size()
+        && ! withXy.bypassPass.empty() && withXy.stoppedPass.size() == withXy.bypassPass.size();
+    // Bypass must return the existing preset-only baseline; STOP must return
+    // the exact dry input. Neither case may include stale ready XY PCM.
+    for (size_t i = 0; i + 1 < withXy.bypassPass.size(); i += 2)
+    {
+        const auto n = static_cast<double> (i / 2);
+        const auto expectedL = 0.2f * std::sin (2.0 * 3.141592653589793 * 220.0 * n / 48000.0);
+        const auto expectedR = expectedL * 0.5f;
+        bypassDry &= std::memcmp (&withXy.bypassPass[i], &baseline.bypassPass[i], sizeof (float)) == 0
+                  && std::memcmp (&withXy.bypassPass[i + 1], &baseline.bypassPass[i + 1], sizeof (float)) == 0;
+        bypassDry &= std::abs (withXy.stoppedPass[i] - expectedL) < 1.0e-6f
+                  && std::abs (withXy.stoppedPass[i + 1] - expectedR) < 1.0e-6f;
+    }
+    bool pass = check (firstPassBitExact, "xy-incomplete-first-pass-is-bit-exact-preset-only");
+    pass &= check (replayDiffers && allFinite, "xy-ready-replay-adds-finite-layer-with-preset-active");
+    pass &= check (bypassDry, "xy-ready-bypass-and-stop-never-play-stale-xy");
+    const auto xyOnly = renderProcessorXyIntegration (true, PluginStateModel::ScratchPreset::off, false);
+    double xyOnlyDifference = 0.0;
+    for (size_t i = 0; i < std::min (xyOnly.firstPass.size(), xyOnly.secondPass.size()); ++i)
+        xyOnlyDifference += std::abs (static_cast<double> (xyOnly.firstPass[i]) - xyOnly.secondPass[i]);
+    pass &= check (xyOnlyDifference > 1.0, "preset-off-xy-ready-replay-remains-audible");
+    return pass;
+}
 
 bool testAbsoluteHostBarSync()
 {
@@ -1181,6 +1318,7 @@ int main()
     pass &= testRealHostDiagnostic();
     pass &= testPredictedMotionLoopConfirmation();
     pass &= testMotionWetSurvivesThreeHostLoops();
+    pass &= testXyLayerIndependenceAtProcessorBoundary();
     pass &= testAbsoluteHostBarSync();
     pass &= testHostPpqJitterAndVariableBlocksDoNotReset();
     pass &= check(resourceIs("static_faceplate_1024x683_png",1024,683),"v2-static-faceplate-native");

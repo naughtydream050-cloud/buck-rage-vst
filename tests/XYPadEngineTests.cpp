@@ -2,10 +2,38 @@
 
 #include <chrono>
 #include <cmath>
+#include <atomic>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <thread>
 #include <memory>
+#include <new>
+
+namespace AllocationAudit
+{
+std::atomic<bool> enabled { false };
+std::atomic<uint32_t> count { 0 };
+}
+
+void* operator new (std::size_t size)
+{
+    if (AllocationAudit::enabled.load (std::memory_order_relaxed))
+        AllocationAudit::count.fetch_add (1, std::memory_order_relaxed);
+    if (auto* memory = std::malloc (size == 0 ? 1 : size)) return memory;
+    throw std::bad_alloc();
+}
+void* operator new[] (std::size_t size)
+{
+    if (AllocationAudit::enabled.load (std::memory_order_relaxed))
+        AllocationAudit::count.fetch_add (1, std::memory_order_relaxed);
+    if (auto* memory = std::malloc (size == 0 ? 1 : size)) return memory;
+    throw std::bad_alloc();
+}
+void operator delete (void* memory) noexcept { std::free (memory); }
+void operator delete[] (void* memory) noexcept { std::free (memory); }
+void operator delete (void* memory, std::size_t) noexcept { std::free (memory); }
+void operator delete[] (void* memory, std::size_t) noexcept { std::free (memory); }
 
 class XYPadEngineTestAccess
 {
@@ -55,6 +83,24 @@ public:
         XYPadEngine::interpolateTrajectory (trajectory, 0.5, x, y);
         return std::abs (x - 0.7f) < 1.0e-6f && std::abs (y - 0.375f) < 1.0e-6f;
     }
+
+    static float interpolateSource (const float* source, int frames, double position) noexcept
+    {
+        return XYPadEngine::interpolate (source, frames, position);
+    }
+
+    static void stopWorkerForAllocationProbe (XYPadEngine& engine)
+    {
+        engine.workerExit.store (true, std::memory_order_release);
+        if (engine.worker.joinable()) engine.worker.join();
+    }
+
+    static bool fillRenderQueue (XYPadEngine& engine)
+    {
+        for (uint32_t i = 0; i < XYPadEngine::kRenderQueueCapacity; ++i)
+            if (! engine.enqueueRenderJob ({ i % XYPadEngine::kBarCount, i + 1u })) return false;
+        return ! engine.enqueueRenderJob ({ 0u, 999u });
+    }
 };
 
 namespace
@@ -74,7 +120,8 @@ void check (bool condition, const char* name)
 bool renderOneBar (XYPadEngine& engine, bool playback, double phaseStart,
                    double phaseStep, juce::AudioBuffer<float>& source,
                    juce::AudioBuffer<float>& output, juce::AudioBuffer<float>& mask,
-                   int& serial, int bar, int frames, double toneHz = 440.0, bool ramp = false)
+                   int& serial, int bar, int frames, double toneHz = 440.0, bool ramp = false,
+                   double rightPhaseOffset = 0.0)
 {
     constexpr int block = 512;
     juce::AudioBuffer<float> in (2, block), out (2, block), ready (1, block);
@@ -86,11 +133,14 @@ bool renderOneBar (XYPadEngine& engine, bool playback, double phaseStart,
         for (int i = 0; i < count; ++i)
         {
             const auto absolute = playback ? i + b * block : serial + i;
+            const auto angle = 2.0 * 3.141592653589793 * toneHz * absolute / 48000.0;
             const auto sample = ramp
                 ? 2.0 * std::fmod (static_cast<double> (absolute), 4096.0) / 4096.0 - 1.0
-                : std::sin (2.0 * 3.141592653589793 * toneHz * absolute / 48000.0);
+                : std::sin (angle);
+            const auto rightSample = ramp ? sample * 0.5
+                                          : 0.5 * std::sin (angle + rightPhaseOffset);
             in.setSample (0, i, static_cast<float> (sample));
-            in.setSample (1, i, static_cast<float> (sample * 0.5));
+            in.setSample (1, i, static_cast<float> (rightSample));
         }
         XYPadEngine::Transport transport;
         transport.playing = true;
@@ -125,6 +175,75 @@ int main()
            "render-job-spsc-queue-bounded-fifo-and-overflow-rejected");
     check (XYPadEngineTestAccess::sampleTimelineAndInterpolationAreBounded(),
            "sample-exact-bar-loop-mapping-and-time-normalized-trajectory-interpolation");
+    const float interpolationFixture[] { -1.0f, -0.25f, 0.5f, 1.0f };
+    bool scalarInterpolationMatches = true;
+    for (const auto x : { 0.0, 0.125, 0.5, 0.875, 1.0 })
+    {
+        const auto forwardPosition = x * 3.0;
+        const auto reversePosition = (1.0 - x) * 3.0;
+        const auto forwardExpected = interpolationFixture[static_cast<int> (forwardPosition)]
+            + (interpolationFixture[juce::jmin (3, static_cast<int> (forwardPosition) + 1)]
+            - interpolationFixture[static_cast<int> (forwardPosition)])
+            * static_cast<float> (forwardPosition - std::floor (forwardPosition));
+        const auto reverseExpected = interpolationFixture[static_cast<int> (reversePosition)]
+            + (interpolationFixture[juce::jmin (3, static_cast<int> (reversePosition) + 1)]
+            - interpolationFixture[static_cast<int> (reversePosition)])
+            * static_cast<float> (reversePosition - std::floor (reversePosition));
+        scalarInterpolationMatches &= std::abs (XYPadEngineTestAccess::interpolateSource (
+            interpolationFixture, 4, forwardPosition) - forwardExpected) <= 2.0e-6f;
+        scalarInterpolationMatches &= std::abs (XYPadEngineTestAccess::interpolateSource (
+            interpolationFixture, 4, reversePosition) - reverseExpected) <= 2.0e-6f;
+    }
+    scalarInterpolationMatches &= XYPadEngineTestAccess::interpolateSource (interpolationFixture, 4, -3.0) == -1.0f
+        && XYPadEngineTestAccess::interpolateSource (interpolationFixture, 4, 8.0) == 1.0f;
+    check (scalarInterpolationMatches, "forward-reverse-linear-read-matches-scalar-reference-and-clamps-endpoints");
+    XYPadEngine allocationProbe;
+    bool allocationPrepared = allocationProbe.prepare (48000.0, 512);
+    if (allocationPrepared) XYPadEngineTestAccess::stopWorkerForAllocationProbe (allocationProbe);
+    juce::AudioBuffer<float> allocationInput (2, 512), allocationOutput (2, 512), allocationMask (1, 512);
+    allocationInput.clear(); allocationOutput.clear(); allocationMask.clear();
+    XYPadEngine::Transport allocationTransport;
+    allocationTransport.playing = true;
+    allocationTransport.startBar = 0;
+    allocationTransport.phasePerSample = 1.0 / 128000.0;
+    AllocationAudit::count.store (0, std::memory_order_relaxed);
+    AllocationAudit::enabled.store (true, std::memory_order_release);
+    if (allocationPrepared)
+        allocationProbe.process (allocationInput, allocationOutput, allocationMask, allocationTransport, 512);
+    AllocationAudit::enabled.store (false, std::memory_order_release);
+    check (allocationPrepared && AllocationAudit::count.load (std::memory_order_relaxed) == 0,
+           "audio-process-path-performs-no-global-heap-allocation");
+    allocationProbe.release();
+
+    XYPadEngine overflowProbe;
+    const auto overflowPrepared = overflowProbe.prepare (44100.0, 512);
+    if (overflowPrepared)
+        XYPadEngineTestAccess::stopWorkerForAllocationProbe (overflowProbe);
+    const auto queueFilled = overflowPrepared
+        && XYPadEngineTestAccess::fillRenderQueue (overflowProbe);
+    const std::vector<PluginStateModel::MotionPoint> overflowTrajectory {{ 0.0f, 0.5f, 0.0 },
+                                                                         { 1.0f, 0.5f, 0.8 }};
+    overflowProbe.setTrajectory (0, overflowTrajectory, 1);
+    juce::AudioBuffer<float> overflowInput (2, 512), overflowOutput (2, 512), overflowMask (1, 512);
+    overflowInput.clear();
+    double overflowWetSamples = 0.0;
+    const auto overflowFrames = static_cast<int> (44100.0 * 4.0 * 60.0 / 300.0);
+    for (int captured = 0; overflowPrepared && captured < overflowFrames; captured += 512)
+    {
+        XYPadEngine::Transport transport;
+        transport.playing = true;
+        transport.startBar = 0;
+        transport.startPhase = static_cast<double> (captured) / overflowFrames;
+        transport.phasePerSample = 1.0 / overflowFrames;
+        transport.timingGeneration = 1;
+        overflowProbe.process (overflowInput, overflowOutput, overflowMask, transport,
+                               juce::jmin (512, overflowFrames - captured));
+        overflowWetSamples += overflowMask.getMagnitude (0, 0, juce::jmin (512, overflowFrames - captured));
+    }
+    check (queueFilled && overflowProbe.getState (0) == XYPadEngine::State::empty
+           && overflowWetSamples == 0.0,
+           "render-queue-overflow-drops-only-xy-and-never-publishes-partial-capture");
+    overflowProbe.release();
     XYPadEngine unsupported;
     check (! unsupported.prepare (192000.0, 512, true) && ! unsupported.isEnabled(),
            "unsupported-allocation-configuration-disables-xy-safely");
@@ -182,6 +301,22 @@ int main()
         finite = finite && std::isfinite (dummyOutput.getSample (0, i))
                          && std::isfinite (dummyOutput.getSample (1, i));
     check (finite, "ready-render-is-finite-stereo");
+    auto estimateFrequency = [sampleRate] (const juce::AudioBuffer<float>& audio, int start, int end)
+    {
+        int zeroCrossings = 0;
+        auto previousSample = audio.getSample (0, start);
+        for (int i = start + 1; i < end; ++i)
+        {
+            const auto sample = audio.getSample (0, i);
+            if ((previousSample <= 0.0f && sample > 0.0f)
+                || (previousSample >= 0.0f && sample < 0.0f))
+                ++zeroCrossings;
+            previousSample = sample;
+        }
+        return zeroCrossings * sampleRate / (2.0 * (end - start));
+    };
+    check (std::abs (estimateFrequency (dummyOutput, 48000, 72000) - 440.0) / 440.0 < 0.01,
+           "pitch-middle-zero-semitones-preserves-frequency");
 
     juce::File wavFile = juce::File::getCurrentWorkingDirectory().getChildFile ("xy-diagnostic-forward-neutral.wav");
     auto stream = wavFile.createOutputStream();
@@ -201,6 +336,21 @@ int main()
     check (engine.getState (0) == XYPadEngine::State::ready
            && transitionMask.getMagnitude (0, 0, 8) == 0.0f,
            "stop-keeps-ready-bar-but-does-not-play-stale-xy");
+
+    XYPadEngine::Transport seekAway;
+    seekAway.playing = true;
+    seekAway.startBar = 1;
+    seekAway.phasePerSample = 1.0 / frames;
+    seekAway.quartersPerBar = 4.0;
+    seekAway.secondsPerQuarter = 60.0 / 90.0;
+    seekAway.timingGeneration = 1;
+    engine.process (transitionInput, transitionOutput, transitionMask, seekAway, 8);
+    XYPadEngine::Transport seekBack = seekAway;
+    seekBack.startBar = 0;
+    engine.process (transitionInput, transitionOutput, transitionMask, seekBack, 8);
+    check (engine.getState (0) == XYPadEngine::State::ready
+           && transitionMask.getSample (0, 0) > 0.5f,
+           "seek-away-and-return-preserves-completed-bar-capture");
 
     XYPadEngine::Transport wrapped;
     wrapped.playing = true;
@@ -343,16 +493,7 @@ int main()
     serial = 0;
     const auto downReady = renderOneBar (engine, true, 0.0, 1.0 / frames,
         dummySource, dummyOutput, dummyMask, serial, 4, frames, 220.0);
-    crossings = 0;
-    previous = dummyOutput.getSample (0, 48000);
-    for (int i = 48001; i < 72000; ++i)
-    {
-        const auto current = dummyOutput.getSample (0, i);
-        if ((previous <= 0.0f && current > 0.0f) || (previous >= 0.0f && current < 0.0f))
-            ++crossings;
-        previous = current;
-    }
-    const auto estimatedDownHz = crossings * sampleRate / (2.0 * (72000 - 48000));
+    const auto estimatedDownHz = estimateFrequency (dummyOutput, 48000, 72000);
     if (! downReady || std::abs (estimatedDownHz - 110.0) / 110.0 >= 0.01)
         std::cerr << "PITCH_DOWN_DIAGNOSTIC ready=" << downReady
                   << " estimated_hz=" << estimatedDownHz << '\n';
@@ -366,6 +507,86 @@ int main()
     check (downWriter != nullptr && downWriter->writeFromAudioSampleBuffer (dummyOutput, 0, frames),
            "diagnostic-wave-pitch-down-written");
     downWriter.reset();
+
+    // Repeat +12 st with forward X. The earlier reverse-X fixture is the
+    // direction-independent counterpart required by the plan.
+    std::vector<PluginStateModel::MotionPoint> pitchUpForward {
+        { 0.0f, 0.0f, 0.0 }, { 1.0f, 0.0f, 8.0 / 3.0 }
+    };
+    engine.setTrajectory (5, pitchUpForward, 61);
+    serial = 0;
+    renderOneBar (engine, false, 0.0, 1.0 / frames, dummySource, dummyOutput,
+                  dummyMask, serial, 5, frames, 440.0);
+    const auto upForwardDeadline = std::chrono::steady_clock::now() + std::chrono::seconds (12);
+    while (engine.getState (5) != XYPadEngine::State::ready
+           && std::chrono::steady_clock::now() < upForwardDeadline)
+        std::this_thread::sleep_for (std::chrono::milliseconds (5));
+    serial = 0;
+    const auto upForwardReady = renderOneBar (engine, true, 0.0, 1.0 / frames,
+        dummySource, dummyOutput, dummyMask, serial, 5, frames, 440.0);
+    const auto upForwardHz = estimateFrequency (dummyOutput, 48000, 72000);
+    check (upForwardReady && std::abs (upForwardHz - 880.0) / 880.0 < 0.01,
+           "pitch-plus-12-is-independent-of-forward-x-slope");
+
+    // Repeat -12 st with reverse X; this complements the existing forward-X
+    // pitch-down fixture without changing the pitch trajectory.
+    std::vector<PluginStateModel::MotionPoint> pitchDownReverse {
+        { 1.0f, 1.0f, 0.0 }, { 0.0f, 1.0f, 8.0 / 3.0 }
+    };
+    engine.setTrajectory (6, pitchDownReverse, 62);
+    serial = 0;
+    renderOneBar (engine, false, 0.0, 1.0 / frames, dummySource, dummyOutput,
+                  dummyMask, serial, 6, frames, 220.0);
+    const auto downReverseDeadline = std::chrono::steady_clock::now() + std::chrono::seconds (12);
+    while (engine.getState (6) != XYPadEngine::State::ready
+           && std::chrono::steady_clock::now() < downReverseDeadline)
+        std::this_thread::sleep_for (std::chrono::milliseconds (5));
+    serial = 0;
+    const auto downReverseReady = renderOneBar (engine, true, 0.0, 1.0 / frames,
+        dummySource, dummyOutput, dummyMask, serial, 6, frames, 220.0);
+    const auto downReverseHz = estimateFrequency (dummyOutput, 48000, 72000);
+    check (downReverseReady && std::abs (downReverseHz - 110.0) / 110.0 < 0.01,
+           "pitch-minus-12-is-independent-of-reverse-x-slope");
+
+    // A phase-offset stereo sine verifies that both channels follow the same
+    // X path through reverse scrubbing and neutral independent pitch.
+    const auto expectedStereoPhase = 0.65;
+    std::vector<PluginStateModel::MotionPoint> stereoReverse {
+        { 1.0f, 0.5f, 0.0 }, { 0.0f, 0.5f, 8.0 / 3.0 }
+    };
+    engine.setTrajectory (7, stereoReverse, 63);
+    serial = 0;
+    renderOneBar (engine, false, 0.0, 1.0 / frames, dummySource, dummyOutput,
+                  dummyMask, serial, 7, frames, 440.0, false, expectedStereoPhase);
+    const auto stereoDeadline = std::chrono::steady_clock::now() + std::chrono::seconds (12);
+    while (engine.getState (7) != XYPadEngine::State::ready
+           && std::chrono::steady_clock::now() < stereoDeadline)
+        std::this_thread::sleep_for (std::chrono::milliseconds (5));
+    serial = 0;
+    const auto stereoReady = renderOneBar (engine, true, 0.0, 1.0 / frames,
+        dummySource, dummyOutput, dummyMask, serial, 7, frames, 440.0, false, expectedStereoPhase);
+    double leftSine = 0.0, leftCosine = 0.0, rightSine = 0.0, rightCosine = 0.0;
+    constexpr int phaseStart = 48000, phaseEnd = 72000;
+    for (int i = phaseStart; i < phaseEnd; ++i)
+    {
+        const auto phase = 2.0 * 3.141592653589793 * 440.0 * (i - phaseStart) / sampleRate;
+        const auto sine = std::sin (phase), cosine = std::cos (phase);
+        leftSine += dummyOutput.getSample (0, i) * sine;
+        leftCosine += dummyOutput.getSample (0, i) * cosine;
+        rightSine += dummyOutput.getSample (1, i) * sine;
+        rightCosine += dummyOutput.getSample (1, i) * cosine;
+    }
+    const auto leftPhase = std::atan2 (leftCosine, leftSine);
+    const auto rightPhase = std::atan2 (rightCosine, rightSine);
+    const auto measuredStereoPhase = std::abs (std::remainder (rightPhase - leftPhase, 2.0 * 3.141592653589793));
+    check (stereoReady && std::abs (measuredStereoPhase - expectedStereoPhase) < 0.12,
+           "stereo-phase-offset-preserved-through-linked-reverse-read");
+
+    const auto hadReadyBeforeRateChange = engine.getState (7) == XYPadEngine::State::ready;
+    const auto sampleRateReprepared = engine.prepare (44100.0, 512);
+    check (hadReadyBeforeRateChange && sampleRateReprepared
+           && engine.getState (7) == XYPadEngine::State::empty,
+           "sample-rate-change-invalidates-old-rendered-bar");
 
     engine.release();
 
