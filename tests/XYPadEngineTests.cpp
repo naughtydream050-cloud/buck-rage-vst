@@ -1,5 +1,6 @@
 #include "XYPadEngine.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <atomic>
@@ -87,6 +88,84 @@ public:
     static float interpolateSource (const float* source, int frames, double position) noexcept
     {
         return XYPadEngine::interpolate (source, frames, position);
+    }
+
+    struct TransitionMeasurement
+    {
+        int transitionFrames = 0;
+        int observedFrames = 0;
+        int longestMismatchRun = 0;
+        double finalTargetErrorInSourceSamples = 0.0;
+        bool allReadsInRange = true;
+        bool allFinite = true;
+        bool exercised = false;
+    };
+
+    static TransitionMeasurement measureTransition (XYPadEngine& engine,
+                                                     const std::vector<PluginStateModel::MotionPoint>& points,
+                                                     int frames)
+    {
+        TransitionMeasurement result;
+        if (! engine.slots || ! engine.slots[0].pcm || ! engine.scratch
+            || frames < engine.fftSize || frames > engine.maxFramesPerBar)
+            return result;
+
+        auto& slot = engine.slots[0];
+        slot.captureTrajectory = {};
+        slot.captureTrajectory.count = static_cast<int> (std::min<size_t> (
+            points.size(), static_cast<size_t> (XYPadEngine::kMaxPoints)));
+        for (int i = 0; i < slot.captureTrajectory.count; ++i)
+        {
+            const auto& point = points[static_cast<size_t> (i)];
+            slot.captureTrajectory.x[static_cast<size_t> (i)] = point.x;
+            slot.captureTrajectory.y[static_cast<size_t> (i)] = point.y;
+            slot.captureTrajectory.time[static_cast<size_t> (i)] = point.timeSeconds;
+        }
+        for (int i = 0; i < frames; ++i)
+        {
+            const auto encodedPosition = static_cast<float> (i) / static_cast<float> (frames - 1);
+            slot.pcm[static_cast<size_t> (i) * 2u] = encodedPosition;
+            slot.pcm[static_cast<size_t> (i) * 2u + 1u] = -encodedPosition;
+        }
+        result.transitionFrames = juce::jmax (1, juce::roundToInt (engine.sampleRate * 0.003));
+        result.allReadsInRange = true;
+        result.allFinite = engine.renderScrubAndPitch (slot, frames);
+
+        int mismatchRun = 0;
+        for (int i = 0; i < frames; ++i)
+        {
+            float x = 0.5f, y = 0.5f;
+            const auto phase = static_cast<double> (i) / static_cast<double> (frames - 1);
+            XYPadEngine::interpolateTrajectory (slot.captureTrajectory, phase, x, y);
+            x = juce::jlimit (0.0f, 1.0f, x);
+            const auto target = static_cast<double> (x) * static_cast<double> (frames - 1);
+            const auto rendered = static_cast<double> (engine.scratch[static_cast<size_t> (i) * 2u]);
+            const auto renderedRight = static_cast<double> (engine.scratch[static_cast<size_t> (i) * 2u + 1u]);
+            const auto inferredRead = rendered * static_cast<double> (frames - 1);
+            const auto inferredRightRead = -renderedRight * static_cast<double> (frames - 1);
+            const auto inRange = std::isfinite (inferredRead) && inferredRead >= -1.0e-3
+                              && inferredRead <= static_cast<double> (frames - 1) + 1.0e-3
+                              && std::isfinite (inferredRightRead) && inferredRightRead >= -1.0e-3
+                              && inferredRightRead <= static_cast<double> (frames - 1) + 1.0e-3;
+            result.allReadsInRange = result.allReadsInRange && inRange;
+            result.allFinite = result.allFinite && std::isfinite (rendered) && std::isfinite (renderedRight);
+            const auto mismatch = std::abs (rendered - target / static_cast<double> (frames - 1)) > 2.0e-6;
+            if (mismatch)
+            {
+                ++result.observedFrames;
+                ++mismatchRun;
+                result.longestMismatchRun = juce::jmax (result.longestMismatchRun, mismatchRun);
+            }
+            else
+            {
+                if (mismatchRun > 0) result.exercised = true;
+                mismatchRun = 0;
+            }
+            if (i == frames - 1)
+                result.finalTargetErrorInSourceSamples = std::abs (inferredRead - target);
+        }
+        if (mismatchRun > 0) result.exercised = true;
+        return result;
     }
 
     static void stopWorkerForAllocationProbe (XYPadEngine& engine)
@@ -264,6 +343,40 @@ int main()
 
     constexpr double sampleRate = 48000.0;
     constexpr int frames = static_cast<int> (sampleRate * 4.0 * 60.0 / 90.0);
+    XYPadEngine transitionProbe;
+    const auto transitionPrepared = transitionProbe.prepare (sampleRate, 512);
+    if (transitionPrepared)
+        XYPadEngineTestAccess::stopWorkerForAllocationProbe (transitionProbe);
+    constexpr int transitionFixtureFrames = 8192;
+    const std::vector<PluginStateModel::MotionPoint> reversalTransition {
+        { 0.1f, 0.5f, 0.0 }, { 0.9f, 0.5f, 0.5 }, { 0.2f, 0.5f, 1.0 }
+    };
+    const std::vector<PluginStateModel::MotionPoint> rateJumpTransition {
+        { 0.1f, 0.5f, 0.0 }, { 0.9f, 0.5f, 0.01 }, { 0.95f, 0.5f, 1.0 }
+    };
+    const auto reversalMeasurement = transitionPrepared
+        ? XYPadEngineTestAccess::measureTransition (transitionProbe, reversalTransition, transitionFixtureFrames)
+        : XYPadEngineTestAccess::TransitionMeasurement {};
+    const auto jumpMeasurement = transitionPrepared
+        ? XYPadEngineTestAccess::measureTransition (transitionProbe, rateJumpTransition, transitionFixtureFrames)
+        : XYPadEngineTestAccess::TransitionMeasurement {};
+    const auto expectedTransitionFrames = juce::roundToInt (sampleRate * 0.003);
+    check (transitionPrepared && reversalMeasurement.exercised
+           && reversalMeasurement.longestMismatchRun == expectedTransitionFrames - 1
+           && reversalMeasurement.longestMismatchRun <= expectedTransitionFrames,
+           "ac07-reversal-transition-duration-measured-at-three-ms-bound");
+    check (transitionPrepared && jumpMeasurement.exercised
+           && jumpMeasurement.longestMismatchRun == expectedTransitionFrames - 1
+           && jumpMeasurement.longestMismatchRun <= expectedTransitionFrames,
+           "ac07-over-four-x-rate-jump-transition-duration-measured-at-three-ms-bound");
+    check (reversalMeasurement.allReadsInRange && jumpMeasurement.allReadsInRange,
+           "ac07-position-coded-source-reads-remain-within-capture-range");
+    check (reversalMeasurement.allFinite && jumpMeasurement.allFinite
+           && reversalMeasurement.finalTargetErrorInSourceSamples <= 1.0
+           && jumpMeasurement.finalTargetErrorInSourceSamples <= 1.0,
+           "ac07-finite-render-and-target-convergence-within-one-source-sample");
+    transitionProbe.release();
+
     XYPadEngine engine;
     check (engine.prepare (sampleRate, 512), "prepare-48k-fixed-bank");
 

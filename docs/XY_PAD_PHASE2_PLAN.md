@@ -150,6 +150,16 @@ AC-14. Deterministic XY tests, TimelineScratchEngineTests, RuntimeSmokeTests,
   cover forward, reverse, hold, fold/jump, and pitch extremes.
 AC-15. Jev 1.13 reviews all AC individually against this exact plan/hash and evidence;
   any FAIL/UNKNOWN/unavailable blocks candidate promotion.
-AC-16. Codex/Sol reviews complete diff/tests/Jev and successful artifact provenance.
-  Artifact and candidate bundle/internal binary hashes match; candidate is only
-  updated after approval. FL Studio listening remains NOT TESTED until the user tests.
+AC-16. Before promotion, verify that the successful CI artifact is bound to the
+  exact source HEAD/run and record ZIP, bundle-tree, AMD64 PE, and internal binary
+  SHA-256 values. The current candidate remains untouched during this review;
+  FL Studio listening remains NOT TESTED until the user tests.
+
+### Post-promotion verification (required, after AC-01..AC-16 PASS and Sol approval)
+
+Sol/Codex approval is a separate release decision after the Jev gate; it is not
+evidence that Jev can judge before that decision exists. Only after the approved
+receipt is issued may the official promotion command update candidate. Then verify
+that the promoted candidate's complete bundle tree and internal binary SHA-256
+match the same CI artifact, and preserve the prior candidate backup. A failed
+post-promotion hash check blocks D testing and requires a controlled rollback/review.
