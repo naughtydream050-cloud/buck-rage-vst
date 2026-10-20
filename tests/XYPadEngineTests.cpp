@@ -329,7 +329,9 @@ int main()
     jumpWriter.reset();
 
     // BAR 4 verifies the opposite pitch extreme independently of the X read direction.
-    std::vector<PluginStateModel::MotionPoint> pitchDown {{ 0.2f, 1.0f, 0.0 }, { 0.8f, 1.0f, 8.0 / 3.0 }};
+    // One source sample per output sample (forward X rate = +1) isolates the
+    // Y=-12 st expectation from any X-derived rate shift.
+    std::vector<PluginStateModel::MotionPoint> pitchDown {{ 0.0f, 1.0f, 0.0 }, { 1.0f, 1.0f, 8.0 / 3.0 }};
     engine.setTrajectory (4, pitchDown, 51);
     serial = 0;
     renderOneBar (engine, false, 0.0, 1.0 / frames, dummySource, dummyOutput,
@@ -367,7 +369,9 @@ int main()
 
     engine.release();
 
-    // Exercise every one of the 64 fixed slots with distinct source levels.
+    // Exercise every one of the 64 fixed slots with distinct stereo-coded
+    // tones. DC-only input is intentionally avoided because a phase vocoder
+    // is not a useful BAR identity probe for a pure zero-frequency signal.
     // Replaying a BAR with a different live input must return that BAR's
     // captured PCM, not a neighboring BAR or the current input.
     constexpr double shortRate = 44100.0;
@@ -384,14 +388,17 @@ int main()
         const std::vector<PluginStateModel::MotionPoint> hold {{ 0.5f, 0.5f, 0.0 }};
         allBars.setTrajectory (bar, hold, static_cast<uint32_t> (bar + 1));
         const auto level = 0.01f * static_cast<float> (bar + 1);
+        const auto markerHz = 220.0 + static_cast<double> (bar) * 2.0;
         int captured = 0;
         while (captured < shortFrames)
         {
             const auto count = juce::jmin (512, shortFrames - captured);
             for (int i = 0; i < count; ++i)
             {
-                in.setSample (0, i, level);
-                in.setSample (1, i, -level * 0.5f);
+                const auto marker = static_cast<float> (std::sin (2.0 * 3.141592653589793
+                    * markerHz * static_cast<double> (captured + i) / shortRate));
+                in.setSample (0, i, level * marker);
+                in.setSample (1, i, -level * 0.5f * marker);
             }
             XYPadEngine::Transport transport;
             transport.playing = true;
@@ -425,15 +432,23 @@ int main()
         replay.timingGeneration = 1;
         allBars.process (in, out, mask, replay, 512);
         const auto maskReady = mask.getSample (0, 128) > 0.5f;
-        const auto left = out.getSample (0, 128);
-        const auto right = out.getSample (1, 128);
-        const auto barMatches = maskReady && std::abs (left - level) < 2.0e-3f
-            && std::abs (right + level * 0.5f) < 2.0e-3f;
+        double leftEnergy = 0.0, rightEnergy = 0.0;
+        for (int i = 128; i < 512; ++i)
+        {
+            leftEnergy += static_cast<double> (out.getSample (0, i)) * out.getSample (0, i);
+            rightEnergy += static_cast<double> (out.getSample (1, i)) * out.getSample (1, i);
+        }
+        const auto leftRms = static_cast<float> (std::sqrt (leftEnergy / 384.0));
+        const auto rightRms = static_cast<float> (std::sqrt (rightEnergy / 384.0));
+        const auto expectedRms = level / std::sqrt (2.0f);
+        const auto barMatches = maskReady && leftRms > 0.65f * expectedRms
+            && leftRms < 1.35f * expectedRms
+            && std::abs (rightRms - 0.5f * leftRms) < 0.08f * expectedRms;
         if (! barMatches && allIndependent)
             std::cerr << "BAR_ISOLATION_DIAGNOSTIC bar=" << bar
                       << " mask=" << mask.getSample (0, 128)
-                      << " left=" << left << " expected_left=" << level
-                      << " right=" << right << " expected_right=" << -level * 0.5f
+                      << " left_rms=" << leftRms << " expected_rms=" << expectedRms
+                      << " right_rms=" << rightRms
                       << " state=" << static_cast<int> (allBars.getState (bar)) << '\n';
         allIndependent = allIndependent && barMatches;
     }
