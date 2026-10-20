@@ -444,7 +444,7 @@ int main()
         const auto barMatches = maskReady && leftRms > 0.65f * expectedRms
             && leftRms < 1.35f * expectedRms
             && std::abs (rightRms - 0.5f * leftRms) < 0.08f * expectedRms;
-        if (! barMatches && allIndependent)
+        if (! barMatches)
             std::cerr << "BAR_ISOLATION_DIAGNOSTIC bar=" << bar
                       << " mask=" << mask.getSample (0, 128)
                       << " left_rms=" << leftRms << " expected_rms=" << expectedRms
