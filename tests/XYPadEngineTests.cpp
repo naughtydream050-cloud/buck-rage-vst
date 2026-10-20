@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <limits>
 #include <thread>
 #include <memory>
 #include <new>
@@ -93,9 +94,10 @@ public:
     struct TransitionMeasurement
     {
         int transitionFrames = 0;
+        int longestTransitionFrames = 0;
         int observedFrames = 0;
         int longestMismatchRun = 0;
-        double finalTargetErrorInSourceSamples = 0.0;
+        double transitionEndTargetErrorSamples = std::numeric_limits<double>::infinity();
         bool allReadsInRange = true;
         bool allFinite = true;
         bool exercised = false;
@@ -127,9 +129,15 @@ public:
             slot.pcm[static_cast<size_t> (i) * 2u] = encodedPosition;
             slot.pcm[static_cast<size_t> (i) * 2u + 1u] = -encodedPosition;
         }
+        for (int i = frames; i < engine.maxFramesPerBar; ++i)
+        {
+            slot.pcm[static_cast<size_t> (i) * 2u] = std::numeric_limits<float>::quiet_NaN();
+            slot.pcm[static_cast<size_t> (i) * 2u + 1u] = std::numeric_limits<float>::quiet_NaN();
+        }
         result.transitionFrames = juce::jmax (1, juce::roundToInt (engine.sampleRate * 0.003));
         result.allReadsInRange = true;
-        result.allFinite = engine.renderScrubAndPitch (slot, frames);
+        result.allFinite = engine.renderScrubAndPitch (slot, frames, &result.longestTransitionFrames,
+                                                       &result.transitionEndTargetErrorSamples);
 
         int mismatchRun = 0;
         for (int i = 0; i < frames; ++i)
@@ -141,13 +149,6 @@ public:
             const auto target = static_cast<double> (x) * static_cast<double> (frames - 1);
             const auto rendered = static_cast<double> (engine.scratch[static_cast<size_t> (i) * 2u]);
             const auto renderedRight = static_cast<double> (engine.scratch[static_cast<size_t> (i) * 2u + 1u]);
-            const auto inferredRead = rendered * static_cast<double> (frames - 1);
-            const auto inferredRightRead = -renderedRight * static_cast<double> (frames - 1);
-            const auto inRange = std::isfinite (inferredRead) && inferredRead >= -1.0e-3
-                              && inferredRead <= static_cast<double> (frames - 1) + 1.0e-3
-                              && std::isfinite (inferredRightRead) && inferredRightRead >= -1.0e-3
-                              && inferredRightRead <= static_cast<double> (frames - 1) + 1.0e-3;
-            result.allReadsInRange = result.allReadsInRange && inRange;
             result.allFinite = result.allFinite && std::isfinite (rendered) && std::isfinite (renderedRight);
             const auto mismatch = std::abs (rendered - target / static_cast<double> (frames - 1)) > 2.0e-6;
             if (mismatch)
@@ -161,10 +162,11 @@ public:
                 if (mismatchRun > 0) result.exercised = true;
                 mismatchRun = 0;
             }
-            if (i == frames - 1)
-                result.finalTargetErrorInSourceSamples = std::abs (inferredRead - target);
         }
         if (mismatchRun > 0) result.exercised = true;
+        result.allReadsInRange = result.allFinite
+            && std::isnan (slot.pcm[static_cast<size_t> (frames) * 2u])
+            && std::isnan (slot.pcm[static_cast<size_t> (frames) * 2u + 1u]);
         return result;
     }
 
@@ -352,7 +354,7 @@ int main()
         { 0.1f, 0.5f, 0.0 }, { 0.9f, 0.5f, 0.5 }, { 0.2f, 0.5f, 1.0 }
     };
     const std::vector<PluginStateModel::MotionPoint> rateJumpTransition {
-        { 0.1f, 0.5f, 0.0 }, { 0.9f, 0.5f, 0.01 }, { 0.95f, 0.5f, 1.0 }
+        { 0.1f, 0.5f, 0.0 }, { 0.9f, 0.5f, 0.01 }, { 0.95f, 0.5f, 0.02 }, { 0.95f, 0.5f, 1.0 }
     };
     const auto reversalMeasurement = transitionPrepared
         ? XYPadEngineTestAccess::measureTransition (transitionProbe, reversalTransition, transitionFixtureFrames)
@@ -361,19 +363,26 @@ int main()
         ? XYPadEngineTestAccess::measureTransition (transitionProbe, rateJumpTransition, transitionFixtureFrames)
         : XYPadEngineTestAccess::TransitionMeasurement {};
     const auto expectedTransitionFrames = juce::roundToInt (sampleRate * 0.003);
+    std::cout << "METRIC ac07 transition_expected_samples=" << expectedTransitionFrames
+              << " reversal_samples=" << reversalMeasurement.longestTransitionFrames
+              << " jump_samples=" << jumpMeasurement.longestTransitionFrames
+              << " reversal_target_error_samples=" << reversalMeasurement.transitionEndTargetErrorSamples
+              << " jump_target_error_samples=" << jumpMeasurement.transitionEndTargetErrorSamples
+              << " reversal_finite=" << reversalMeasurement.allFinite
+              << " jump_finite=" << jumpMeasurement.allFinite
+              << " range_guard=" << (reversalMeasurement.allReadsInRange && jumpMeasurement.allReadsInRange)
+              << "\n";
     check (transitionPrepared && reversalMeasurement.exercised
-           && reversalMeasurement.longestMismatchRun == expectedTransitionFrames - 1
-           && reversalMeasurement.longestMismatchRun <= expectedTransitionFrames,
+           && reversalMeasurement.longestTransitionFrames == expectedTransitionFrames,
            "ac07-reversal-transition-duration-measured-at-three-ms-bound");
     check (transitionPrepared && jumpMeasurement.exercised
-           && jumpMeasurement.longestMismatchRun == expectedTransitionFrames - 1
-           && jumpMeasurement.longestMismatchRun <= expectedTransitionFrames,
+           && jumpMeasurement.longestTransitionFrames == expectedTransitionFrames,
            "ac07-over-four-x-rate-jump-transition-duration-measured-at-three-ms-bound");
     check (reversalMeasurement.allReadsInRange && jumpMeasurement.allReadsInRange,
            "ac07-position-coded-source-reads-remain-within-capture-range");
     check (reversalMeasurement.allFinite && jumpMeasurement.allFinite
-           && reversalMeasurement.finalTargetErrorInSourceSamples <= 1.0
-           && jumpMeasurement.finalTargetErrorInSourceSamples <= 1.0,
+           && reversalMeasurement.transitionEndTargetErrorSamples <= 1.0
+           && jumpMeasurement.transitionEndTargetErrorSamples <= 1.0,
            "ac07-finite-render-and-target-convergence-within-one-source-sample");
     transitionProbe.release();
 

@@ -206,6 +206,16 @@ struct XyIntegrationRender
     std::vector<float> secondPass;
     std::vector<float> bypassPass;
     std::vector<float> stoppedPass;
+    bool readyBeforeReplay = false;
+};
+
+class RuntimeSmokeTestAccess
+{
+public:
+    static XYPadEngine::State getXyState (const ToyotomiHideyoshiAudioProcessor& processor) noexcept
+    {
+        return processor.xyEngine.getState (0);
+    }
 };
 
 XyIntegrationRender renderProcessorXyIntegration (bool addTrajectory,
@@ -261,7 +271,14 @@ XyIntegrationRender renderProcessorXyIntegration (bool addTrajectory,
         }
     };
     renderPass (result.firstPass);
-    std::this_thread::sleep_for (std::chrono::milliseconds (150));
+    if (addTrajectory)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds (5);
+        while (RuntimeSmokeTestAccess::getXyState (processor) != XYPadEngine::State::ready
+               && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for (std::chrono::milliseconds (1));
+        result.readyBeforeReplay = RuntimeSmokeTestAccess::getXyState (processor) == XYPadEngine::State::ready;
+    }
     renderPass (result.secondPass);
     if (exerciseBypassAndStop)
     {
@@ -324,7 +341,8 @@ bool testXyLayerIndependenceAtProcessorBoundary()
                   && std::abs (withXy.stoppedPass[i + 1] - expectedR) < 1.0e-6f;
     }
     bool pass = check (firstPassBitExact, "xy-incomplete-first-pass-is-bit-exact-preset-only");
-    pass &= check (replayDiffers && allFinite, "xy-ready-replay-adds-finite-layer-with-preset-active");
+    pass &= check (withXy.readyBeforeReplay && replayDiffers && allFinite,
+                   "xy-ready-replay-adds-finite-layer-with-preset-active");
     pass &= check (bypassDry, "xy-ready-bypass-and-stop-never-play-stale-xy");
     const auto xyOnly = renderProcessorXyIntegration (true, PluginStateModel::ScratchPreset::off, false);
     double xyOnlyDifference = 0.0;

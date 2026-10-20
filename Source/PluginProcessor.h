@@ -57,6 +57,7 @@ public:
     void stopHostDiagnosticForTest();
 
 private:
+    friend class RuntimeSmokeTestAccess;
     static void publishPeak (std::atomic<float>& destination, float value) noexcept;
     static uint64_t packDspSlot (const PluginStateModel::TimelineSlot&) noexcept;
     static TimelineScratchEngine::Slot unpackDspSlot (uint64_t) noexcept;

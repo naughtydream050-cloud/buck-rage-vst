@@ -481,7 +481,8 @@ bool XYPadEngine::renderSlot (Slot& slot) noexcept
     return renderScrubAndPitch (slot, frames);
 }
 
-bool XYPadEngine::renderScrubAndPitch (Slot& slot, int frames) noexcept
+bool XYPadEngine::renderScrubAndPitch (Slot& slot, int frames, int* longestTransitionFrames,
+                                      double* transitionEndTargetErrorSamples) noexcept
 {
     auto* input = slot.pcm.get();
     auto* out = scratch.get();
@@ -497,6 +498,11 @@ bool XYPadEngine::renderScrubAndPitch (Slot& slot, int frames) noexcept
     bool haveLastRead = false;
     double lastReadPosition = 0.0;
     int holdPhase = 0;
+    int transitionRunFrames = 0;
+    if (longestTransitionFrames != nullptr)
+        *longestTransitionFrames = 0;
+    if (transitionEndTargetErrorSamples != nullptr)
+        *transitionEndTargetErrorSamples = std::numeric_limits<double>::infinity();
     const auto transitionFrames = juce::jmax (1, juce::roundToInt (sampleRate * kTransitionSeconds));
     const auto holdFrames = juce::jmax (8, juce::roundToInt (sampleRate * kHoldLoopSeconds));
     const auto seamFrames = juce::jmax (2, juce::roundToInt (sampleRate * kHoldSeamSeconds));
@@ -569,8 +575,17 @@ bool XYPadEngine::renderScrubAndPitch (Slot& slot, int frames) noexcept
         }
         if (transitionRemaining > 0)
         {
+            if (transitionRemaining == 1 && transitionEndTargetErrorSamples != nullptr)
+                *transitionEndTargetErrorSamples = std::abs (readPosition - target);
+            ++transitionRunFrames;
+            if (longestTransitionFrames != nullptr)
+                *longestTransitionFrames = juce::jmax (*longestTransitionFrames, transitionRunFrames);
             --transitionRemaining;
             transitionFrom = juce::jlimit (0.0, static_cast<double> (frames - 1), transitionFrom + (delta < 0.0 ? -1.0 : 1.0));
+        }
+        else
+        {
+            transitionRunFrames = 0;
         }
         lastReadPosition = readPosition;
         haveLastRead = true;

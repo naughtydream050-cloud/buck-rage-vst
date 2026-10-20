@@ -108,7 +108,8 @@ private:
     bool enqueueRenderJob (RenderJob) noexcept;
     bool dequeueRenderJob (RenderJob&) noexcept;
     bool renderSlot (Slot&) noexcept;
-    bool renderScrubAndPitch (Slot&, int frames) noexcept;
+    bool renderScrubAndPitch (Slot&, int frames, int* longestTransitionFrames = nullptr,
+                              double* transitionEndTargetErrorSamples = nullptr) noexcept;
     void stopWorker() noexcept;
 
     double sampleRate = 0.0;
