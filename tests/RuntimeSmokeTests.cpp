@@ -22,6 +22,21 @@ public:
     {
         return processor.xyEngine.getState (0);
     }
+
+    static XYPadEngine::Transport getXyTransport (const ToyotomiHideyoshiAudioProcessor& processor) noexcept
+    {
+        return processor.xyTransport;
+    }
+};
+
+class XYPadEngineTestAccess
+{
+public:
+    static void sampleTimeline (const XYPadEngine::Transport& transport, int sample, int totalSamples,
+                                int& bar, double& phase) noexcept
+    {
+        XYPadEngine::sampleTimeline (transport, sample, totalSamples, bar, phase);
+    }
 };
 
 namespace
@@ -220,7 +235,11 @@ struct XyIntegrationRender
 
 XyIntegrationRender renderProcessorXyIntegration (bool addTrajectory,
                                                   PluginStateModel::ScratchPreset preset,
-                                                  bool exerciseBypassAndStop)
+                                                  bool exerciseBypassAndStop,
+                                                  PluginStateModel::NoteLength length = PluginStateModel::NoteLength::oneBar,
+                                                  float speed = 1.0f,
+                                                  float pitch = 0.0f,
+                                                  float depth = 0.8f)
 {
     constexpr double rate = 48000.0, bpm = 300.0;
     constexpr int blockSize = 512;
@@ -231,10 +250,10 @@ XyIntegrationRender renderProcessorXyIntegration (bool addTrajectory,
     processor.setHostSyncEnabled (true);
     auto& state = processor.getStateModel();
     state.setSlotPreset (0, preset);
-    state.setSlotLength (0, PluginStateModel::NoteLength::oneBar);
-    state.setSlotSpeed (0, 1.0f);
-    state.setSlotPitch (0, 0.0f);
-    state.setSlotDepth (0, 0.8f);
+    state.setSlotLength (0, length);
+    state.setSlotSpeed (0, speed);
+    state.setSlotPitch (0, pitch);
+    state.setSlotDepth (0, depth);
     if (addTrajectory)
     {
         state.beginSlotXYMotion (0, 0.0f, 0.5f);
@@ -326,8 +345,10 @@ bool testXyLayerIndependenceAtProcessorBoundary()
         allFinite &= std::isfinite (withXy.secondPass[i]);
     }
     replayDiffers &= replayDifference > 1.0;
-    bool bypassDry = withXy.bypassPass.size() == baseline.bypassPass.size()
+    bool bypassEqualsPresetOnly = withXy.bypassPass.size() == baseline.bypassPass.size()
         && ! withXy.bypassPass.empty() && withXy.stoppedPass.size() == withXy.bypassPass.size();
+    bool stoppedEqualsDry = withXy.stoppedPass.size() == withXy.bypassPass.size()
+        && ! withXy.stoppedPass.empty();
     // Bypass must return the existing preset-only baseline; STOP must return
     // the exact dry input. Neither case may include stale ready XY PCM.
     for (size_t i = 0; i + 1 < withXy.bypassPass.size(); i += 2)
@@ -335,20 +356,206 @@ bool testXyLayerIndependenceAtProcessorBoundary()
         const auto n = static_cast<double> (i / 2);
         const auto expectedL = 0.2f * std::sin (2.0 * 3.141592653589793 * 220.0 * n / 48000.0);
         const auto expectedR = expectedL * 0.5f;
-        bypassDry &= std::memcmp (&withXy.bypassPass[i], &baseline.bypassPass[i], sizeof (float)) == 0
-                  && std::memcmp (&withXy.bypassPass[i + 1], &baseline.bypassPass[i + 1], sizeof (float)) == 0;
-        bypassDry &= std::abs (withXy.stoppedPass[i] - expectedL) < 1.0e-6f
-                  && std::abs (withXy.stoppedPass[i + 1] - expectedR) < 1.0e-6f;
+        bypassEqualsPresetOnly &= std::memcmp (&withXy.bypassPass[i], &baseline.bypassPass[i], sizeof (float)) == 0
+                               && std::memcmp (&withXy.bypassPass[i + 1], &baseline.bypassPass[i + 1], sizeof (float)) == 0;
+        stoppedEqualsDry &= std::abs (withXy.stoppedPass[i] - expectedL) < 1.0e-6f
+                         && std::abs (withXy.stoppedPass[i + 1] - expectedR) < 1.0e-6f;
     }
     bool pass = check (firstPassBitExact, "xy-incomplete-first-pass-is-bit-exact-preset-only");
     pass &= check (withXy.readyBeforeReplay && replayDiffers && allFinite,
                    "xy-ready-replay-adds-finite-layer-with-preset-active");
-    pass &= check (bypassDry, "xy-ready-bypass-and-stop-never-play-stale-xy");
+    pass &= check (bypassEqualsPresetOnly, "xy-ready-bypass-excludes-xy-and-matches-preset-only");
+    pass &= check (stoppedEqualsDry, "xy-stopped-transport-returns-dry-without-stale-pcm");
     const auto xyOnly = renderProcessorXyIntegration (true, PluginStateModel::ScratchPreset::off, false);
     double xyOnlyDifference = 0.0;
     for (size_t i = 0; i < std::min (xyOnly.firstPass.size(), xyOnly.secondPass.size()); ++i)
         xyOnlyDifference += std::abs (static_cast<double> (xyOnly.firstPass[i]) - xyOnly.secondPass[i]);
     pass &= check (xyOnlyDifference > 1.0, "preset-off-xy-ready-replay-remains-audible");
+
+    // A BAR without a trajectory must remain the exact preset-only path on
+    // both passes; it must not inherit a prior XY slot or add an empty layer.
+    const auto noTrajectory = renderProcessorXyIntegration (false, PluginStateModel::ScratchPreset::off, false);
+    bool noTrajectoryIsExactDry = ! noTrajectory.firstPass.empty()
+        && noTrajectory.firstPass.size() == noTrajectory.secondPass.size();
+    for (size_t i = 0; i + 1 < noTrajectory.secondPass.size(); i += 2)
+    {
+        const auto n = static_cast<double> (i / 2);
+        const auto inputL = 0.2f * std::sin (2.0 * 3.141592653589793 * 220.0 * n / 48000.0);
+        const auto inputR = inputL * 0.5f;
+        noTrajectoryIsExactDry &= std::memcmp (&noTrajectory.firstPass[i], &inputL, sizeof (float)) == 0
+            && std::memcmp (&noTrajectory.firstPass[i + 1], &inputR, sizeof (float)) == 0
+            && std::memcmp (&noTrajectory.secondPass[i], &inputL, sizeof (float)) == 0
+            && std::memcmp (&noTrajectory.secondPass[i + 1], &inputR, sizeof (float)) == 0;
+    }
+    pass &= check (noTrajectoryIsExactDry, "xy-no-trajectory-and-preset-off-are-bit-exact-dry");
+
+    // DEPTH=0 must bypass both layers exactly, including after XY is READY.
+    const auto zeroDepth = renderProcessorXyIntegration (true, PluginStateModel::ScratchPreset::drag,
+        false, PluginStateModel::NoteLength::oneBar, 4.0f, 12.0f, 0.0f);
+    bool depthZeroBitExactDry = zeroDepth.readyBeforeReplay && ! zeroDepth.firstPass.empty()
+        && zeroDepth.firstPass.size() == zeroDepth.secondPass.size();
+    for (size_t i = 0; i + 1 < zeroDepth.secondPass.size(); i += 2)
+    {
+        const auto n = static_cast<double> (i / 2);
+        const auto inputL = 0.2f * std::sin (2.0 * 3.141592653589793 * 220.0 * n / 48000.0);
+        const auto inputR = inputL * 0.5f;
+        depthZeroBitExactDry &= std::memcmp (&zeroDepth.firstPass[i], &inputL, sizeof (float)) == 0
+            && std::memcmp (&zeroDepth.firstPass[i + 1], &inputR, sizeof (float)) == 0
+            && std::memcmp (&zeroDepth.secondPass[i], &inputL, sizeof (float)) == 0
+            && std::memcmp (&zeroDepth.secondPass[i + 1], &inputR, sizeof (float)) == 0;
+    }
+    pass &= check (depthZeroBitExactDry, "xy-depth-zero-is-bit-exact-dry-before-and-after-ready");
+
+    // Isolate XY's contribution by subtracting the corresponding preset-only
+    // render. Changing preset controls must not change the independent XY layer.
+    const auto xyControlsDefault = renderProcessorXyIntegration (true, PluginStateModel::ScratchPreset::drag,
+        false, PluginStateModel::NoteLength::oneBar, 1.0f, 0.0f, 0.8f);
+    const auto presetControlsDefault = renderProcessorXyIntegration (false, PluginStateModel::ScratchPreset::drag,
+        false, PluginStateModel::NoteLength::oneBar, 1.0f, 0.0f, 0.8f);
+    const auto xyControlsChanged = renderProcessorXyIntegration (true, PluginStateModel::ScratchPreset::drag,
+        false, PluginStateModel::NoteLength::sixteenth, 4.0f, 12.0f, 0.8f);
+    const auto presetControlsChanged = renderProcessorXyIntegration (false, PluginStateModel::ScratchPreset::drag,
+        false, PluginStateModel::NoteLength::sixteenth, 4.0f, 12.0f, 0.8f);
+    bool xyIndependentOfPresetControls = xyControlsDefault.readyBeforeReplay
+        && xyControlsChanged.readyBeforeReplay
+        && xyControlsDefault.secondPass.size() == presetControlsDefault.secondPass.size()
+        && xyControlsChanged.secondPass.size() == presetControlsChanged.secondPass.size()
+        && xyControlsDefault.secondPass.size() == xyControlsChanged.secondPass.size();
+    double maxXyDeltaDifference = 0.0;
+    for (size_t i = 0; i < xyControlsDefault.secondPass.size() && xyIndependentOfPresetControls; ++i)
+    {
+        const auto deltaDefault = static_cast<double> (xyControlsDefault.secondPass[i])
+                                - presetControlsDefault.secondPass[i];
+        const auto deltaChanged = static_cast<double> (xyControlsChanged.secondPass[i])
+                                - presetControlsChanged.secondPass[i];
+        maxXyDeltaDifference = std::max (maxXyDeltaDifference, std::abs (deltaDefault - deltaChanged));
+    }
+    std::cout << "METRIC ac09 preset_control_xy_delta_max_error=" << maxXyDeltaDifference << "\n";
+    pass &= check (xyIndependentOfPresetControls && maxXyDeltaDifference < 2.0e-6,
+                   "xy-render-is-independent-of-preset-length-speed-and-pitch");
+    return pass;
+}
+
+bool testXyTransportUsesProcessorClock()
+{
+    constexpr double rate = 48000.0;
+    const int blockSizes[] { 64, 127, 512, 1024, 256 };
+    bool pass = true;
+    juce::MidiBuffer midi;
+
+    // Host Sync ON: each sample's XY BAR/phase follows an independent PPQ
+    // clock, including a tempo change and non-zero starting position.
+    ToyotomiHideyoshiAudioProcessor hostProcessor;
+    hostProcessor.prepareToPlay (rate, 1024);
+    hostProcessor.setHostSyncEnabled (true);
+    TestPlayHead hostHead;
+    hostProcessor.setPlayHead (&hostHead);
+    double expectedPpq = 100.25;
+    int64_t hostSamples = 0;
+    for (int block = 0; block < 5; ++block)
+    {
+        const auto bpm = block < 2 ? 120.0 : 137.0;
+        const auto frames = blockSizes[block];
+        hostHead.set (true, expectedPpq, bpm, 4, 4, hostSamples);
+        juce::AudioBuffer<float> audio (2, frames);
+        audio.clear();
+        hostProcessor.processBlock (audio, midi);
+        const auto xy = RuntimeSmokeTestAccess::getXyTransport (hostProcessor);
+        const auto expectedBarPosition = expectedPpq / 4.0;
+        const auto expectedBar = static_cast<int> (std::floor (expectedBarPosition)) % 64;
+        const auto expectedPhase = expectedBarPosition - std::floor (expectedBarPosition);
+        const auto expectedPhasePerSample = bpm / (60.0 * rate * 4.0);
+        bool everySampleMatches = xy.playing && xy.startBar == expectedBar
+            && std::abs (xy.startPhase - expectedPhase) < 1.0e-10
+            && std::abs (xy.phasePerSample - expectedPhasePerSample) < 1.0e-14;
+        for (int sample = 0; sample < frames; ++sample)
+        {
+            int bar = -1; double phase = 0.0;
+            XYPadEngineTestAccess::sampleTimeline (xy, sample, frames, bar, phase);
+            const auto expectedSampleBarPosition = (expectedPpq
+                + static_cast<double> (sample) * expectedPhasePerSample * 4.0) / 4.0;
+            const auto expectedSampleBar = static_cast<int> (std::floor (expectedSampleBarPosition)) % 64;
+            const auto expectedSamplePhase = expectedSampleBarPosition - std::floor (expectedSampleBarPosition);
+            everySampleMatches &= bar == expectedSampleBar && std::abs (phase - expectedSamplePhase) < 1.0e-10;
+        }
+        pass &= everySampleMatches;
+        expectedPpq += static_cast<double> (frames) * bpm / (60.0 * rate);
+        hostSamples += frames;
+    }
+    pass &= check (pass, "ac03-host-sync-xy-phase-is-sample-exact-through-variable-blocks-and-tempo-change");
+    hostProcessor.setPlayHead (nullptr);
+
+    // Host Sync OFF: deliberately unrelated host PPQ must not affect XY phase;
+    // the internal musical clock is continuous across variable blocks.
+    ToyotomiHideyoshiAudioProcessor internalProcessor;
+    internalProcessor.prepareToPlay (rate, 1024);
+    internalProcessor.setHostSyncEnabled (false);
+    internalProcessor.getStateModel().setInternalBpm (133.0);
+    TestPlayHead unrelatedHead;
+    internalProcessor.setPlayHead (&unrelatedHead);
+    int64_t elapsed = 0;
+    bool internalMatches = true;
+    for (int block = 0; block < 5; ++block)
+    {
+        const auto frames = blockSizes[block];
+        unrelatedHead.set (true, 500.0 + block * 10.0, 197.0, 4, 4, elapsed);
+        juce::AudioBuffer<float> audio (2, frames);
+        audio.clear();
+        internalProcessor.processBlock (audio, midi);
+        const auto xy = RuntimeSmokeTestAccess::getXyTransport (internalProcessor);
+        const auto expectedPosition = static_cast<double> (elapsed) * 133.0 / (60.0 * rate * 4.0);
+        const auto expectedBar = static_cast<int> (std::floor (expectedPosition)) % 64;
+        const auto expectedPhase = expectedPosition - std::floor (expectedPosition);
+        const auto expectedRate = 133.0 / (60.0 * rate * 4.0);
+        internalMatches &= xy.playing && xy.startBar == expectedBar
+            && std::abs (xy.startPhase - expectedPhase) < 1.0e-10
+            && std::abs (xy.phasePerSample - expectedRate) < 1.0e-14;
+        for (int sample = 0; sample < frames; ++sample)
+        {
+            int bar = -1; double phase = 0.0;
+            XYPadEngineTestAccess::sampleTimeline (xy, sample, frames, bar, phase);
+            const auto samplePosition = static_cast<double> (elapsed + sample) * 133.0 / (60.0 * rate * 4.0);
+            const auto sampleBar = static_cast<int> (std::floor (samplePosition)) % 64;
+            const auto samplePhase = samplePosition - std::floor (samplePosition);
+            internalMatches &= bar == sampleBar && std::abs (phase - samplePhase) < 1.0e-10;
+        }
+        elapsed += frames;
+    }
+    pass &= check (internalMatches, "ac03-host-sync-off-xy-uses-continuous-internal-clock-not-host-ppq");
+    internalProcessor.setPlayHead (nullptr);
+
+    // A predicted mid-block loop must be forwarded to XY with exact boundary
+    // and target BAR/phase, rather than restarting at the block origin.
+    ToyotomiHideyoshiAudioProcessor loopProcessor;
+    loopProcessor.prepareToPlay (rate, 256);
+    loopProcessor.setHostSyncEnabled (true);
+    TestPlayHead loopHead;
+    loopProcessor.setPlayHead (&loopHead);
+    loopHead.set (true, 7.99, 120.0, 4, 4, 0, true, 0.0, 8.0);
+    juce::AudioBuffer<float> loopAudio (2, 256);
+    loopAudio.clear();
+    loopProcessor.processBlock (loopAudio, midi);
+    const auto loopXy = RuntimeSmokeTestAccess::getXyTransport (loopProcessor);
+    const auto expectedBoundary = static_cast<int> (std::ceil ((8.0 - 7.99) / (120.0 / (60.0 * rate))));
+    pass &= check (loopXy.loopBoundarySample == expectedBoundary && loopXy.loopStartBar == 0
+                   && std::abs (loopXy.loopStartPhase) < 1.0e-12,
+                   "ac03-midblock-host-loop-boundary-is-forwarded-to-xy-clock");
+    bool loopSamplesMatch = loopXy.loopBoundarySample == expectedBoundary;
+    for (int sample = 0; sample < loopAudio.getNumSamples(); ++sample)
+    {
+        int bar = -1; double phase = 0.0;
+        XYPadEngineTestAccess::sampleTimeline (loopXy, sample, loopAudio.getNumSamples(), bar, phase);
+        const auto beforeWrap = sample < expectedBoundary;
+        const auto barPosition = beforeWrap
+            ? (7.99 / 4.0 + static_cast<double> (sample) * loopXy.phasePerSample)
+            : static_cast<double> (sample - expectedBoundary) * loopXy.phasePerSample;
+        const auto expectedBar = beforeWrap
+            ? static_cast<int> (std::floor (barPosition)) % 64 : 0;
+        const auto expectedPhase = barPosition - std::floor (barPosition);
+        loopSamplesMatch &= bar == expectedBar && std::abs (phase - expectedPhase) < 1.0e-10;
+    }
+    pass &= check (loopSamplesMatch, "ac03-looped-xy-sample-clock-has-no-phase-reset-at-midblock-boundary");
+    loopProcessor.setPlayHead (nullptr);
     return pass;
 }
 
@@ -1337,6 +1544,7 @@ int main()
     pass &= testPredictedMotionLoopConfirmation();
     pass &= testMotionWetSurvivesThreeHostLoops();
     pass &= testXyLayerIndependenceAtProcessorBoundary();
+    pass &= testXyTransportUsesProcessorClock();
     pass &= testAbsoluteHostBarSync();
     pass &= testHostPpqJitterAndVariableBlocksDoNotReset();
     pass &= check(resourceIs("static_faceplate_1024x683_png",1024,683),"v2-static-faceplate-native");
