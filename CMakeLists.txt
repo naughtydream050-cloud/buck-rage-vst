@@ -53,6 +53,7 @@ juce_add_binary_data(ToyotomiHideyoshiAssets
 target_sources(ToyotomiHideyoshi PRIVATE
     Source/PluginProcessor.cpp
     Source/TimelineScratchEngine.cpp
+    Source/XYPadEngine.cpp
     Source/PluginEditorV2.cpp
     Source/PluginStateModel.cpp
 )
@@ -70,6 +71,7 @@ if (TOYOTOMI_BUILD_STATE_TESTS)
     target_sources(ToyotomiHideyoshiRuntimeSmoke PRIVATE
         Source/PluginProcessor.cpp
         Source/TimelineScratchEngine.cpp
+        Source/XYPadEngine.cpp
         Source/PluginEditorV2.cpp
         Source/PluginStateModel.cpp
         tests/RuntimeSmokeTests.cpp)
@@ -79,7 +81,19 @@ if (TOYOTOMI_BUILD_STATE_TESTS)
     target_link_libraries(ToyotomiHideyoshiRuntimeSmoke PRIVATE
         ToyotomiHideyoshiAssets
         juce::juce_audio_utils
-        juce::juce_graphics)
+        juce::juce_graphics
+        juce::juce_dsp)
+
+    juce_add_console_app(ToyotomiHideyoshiXYEngineTests PRODUCT_NAME "Toyotomi Hideyoshi XY Engine Tests")
+    juce_generate_juce_header(ToyotomiHideyoshiXYEngineTests)
+    target_sources(ToyotomiHideyoshiXYEngineTests PRIVATE
+        Source/XYPadEngine.cpp
+        Source/PluginStateModel.cpp
+        tests/XYPadEngineTests.cpp)
+    target_include_directories(ToyotomiHideyoshiXYEngineTests PRIVATE Source)
+    target_link_libraries(ToyotomiHideyoshiXYEngineTests PRIVATE
+        juce::juce_audio_utils
+        juce::juce_dsp)
 
     juce_add_console_app(ToyotomiHideyoshiScratchEngineTests PRODUCT_NAME "Toyotomi Hideyoshi Scratch Engine Tests")
     juce_generate_juce_header(ToyotomiHideyoshiScratchEngineTests)
@@ -100,6 +114,7 @@ target_link_libraries(ToyotomiHideyoshi PRIVATE
     ToyotomiHideyoshiAssets
     juce::juce_audio_utils
     juce::juce_graphics
+    juce::juce_dsp
     PUBLIC
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags

@@ -5,6 +5,7 @@
 #include "PluginStateModel.h"
 #include "TimelineScratchEngine.h"
 #include "RealHostDiagnostic.h"
+#include "XYPadEngine.h"
 
 class ToyotomiHideyoshiAudioProcessor final : public juce::AudioProcessor
 {
@@ -69,11 +70,16 @@ private:
     std::atomic<bool> hostSyncAvailable { false };
     std::atomic<bool> hostPlaying { false };
     std::atomic<bool> hostSyncEnabled { true };
+    std::atomic<bool> xyBypass { false };
     std::atomic<double> internalBpmForDsp { 120.0 };
     std::atomic<int> internalTimeSigNumeratorForDsp { 4 }, internalTimeSigDenominatorForDsp { 4 };
     std::atomic<int> currentTimelineSlot { -1 };
     std::array<std::atomic<uint64_t>, PluginStateModel::kNumBars> dspSlots;
     TimelineScratchEngine scratchEngine;
+    juce::AudioBuffer<float> xyDryBuffer, xyRenderedBuffer, xyReadyMask;
+    XYPadEngine::Transport xyTransport;
+    uint32_t xyTimingGeneration = 1;
+    int64_t xyTimingKey = 0;
     RealHostDiagnostic hostDiagnostic;
     double preparedSampleRate = 44100.0, internalQuarterPosition = 0.0,
            lastHostPpq = 0.0, lastObservedHostPpq = 0.0,
@@ -89,6 +95,7 @@ private:
          lastHostPpqWasExtrapolated = false,
          predictedLoopPending = false, predictedLoopHadSamples = false;
     PluginStateModel stateModel;
+    XYPadEngine xyEngine;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ToyotomiHideyoshiAudioProcessor)
 };

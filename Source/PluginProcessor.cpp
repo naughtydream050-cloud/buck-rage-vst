@@ -18,8 +18,14 @@ ToyotomiHideyoshiAudioProcessor::ToyotomiHideyoshiAudioProcessor()
 {
     for (auto& slot : dspSlots) slot.store (packDspSlot (PluginStateModel::TimelineSlot {}), std::memory_order_relaxed);
     stateModel.setDspSlotChangedCallback ([this] (int bar, const PluginStateModel::TimelineSlot& slot) { publishDspSlot (bar, slot); });
+    stateModel.setDspXYMotionChangedCallback ([this] (int bar,
+        const std::vector<PluginStateModel::MotionPoint>& points, uint32_t revision)
+    {
+        xyEngine.setTrajectory (bar, points, revision);
+    });
     stateModel.setDspTimingChangedCallback ([this] (const PluginStateModel::UiState& ui)
     {
+        xyBypass.store (ui.bypass, std::memory_order_relaxed);
         hostSyncEnabled.store (ui.hostSync, std::memory_order_relaxed);
         internalBpmForDsp.store (ui.internalBpm, std::memory_order_relaxed);
         internalTimeSigNumeratorForDsp.store (ui.internalTimeSigNumerator, std::memory_order_relaxed);
@@ -31,6 +37,12 @@ void ToyotomiHideyoshiAudioProcessor::prepareToPlay(double sampleRate, int maxim
     scratchEngine.setSampleTraceObserver (nullptr, nullptr);
     preparedSampleRate = juce::jmax (1.0, sampleRate);
     scratchEngine.prepare (preparedSampleRate, maximumExpectedSamplesPerBlock, getTotalNumInputChannels());
+    xyDryBuffer.setSize (2, maximumExpectedSamplesPerBlock, false, true, true);
+    xyRenderedBuffer.setSize (2, maximumExpectedSamplesPerBlock, false, true, true);
+    xyReadyMask.setSize (1, maximumExpectedSamplesPerBlock, false, true, true);
+    // Reserve the bounded XY bank before processBlock can run. A later UI
+    // recording only publishes atomic trajectory data and never reallocates.
+    xyEngine.prepare (preparedSampleRate, maximumExpectedSamplesPerBlock, true);
     hostDiagnostic.configureFromMarker (preparedSampleRate);
     if (hostDiagnostic.isEnabled())
         scratchEngine.setSampleTraceObserver (RealHostDiagnostic::observe, &hostDiagnostic);
@@ -40,6 +52,8 @@ void ToyotomiHideyoshiAudioProcessor::prepareToPlay(double sampleRate, int maxim
     haveLastHostPpq = haveLastHostSamplePosition = haveLastObservedHostPpq = internalWasPlaying = false;
     lastHostPpqWasExtrapolated = false;
     predictedLoopPending = predictedLoopHadSamples = false;
+    xyTimingKey = 0;
+    xyTimingGeneration = 1;
 }
 ToyotomiHideyoshiAudioProcessor::~ToyotomiHideyoshiAudioProcessor()
 {
@@ -51,6 +65,10 @@ void ToyotomiHideyoshiAudioProcessor::releaseResources()
     scratchEngine.setSampleTraceObserver (nullptr, nullptr);
     hostDiagnostic.stopAndFlush();
     scratchEngine.release();
+    xyEngine.release();
+    xyDryBuffer.setSize (0, 0);
+    xyRenderedBuffer.setSize (0, 0);
+    xyReadyMask.setSize (0, 0);
 }
 bool ToyotomiHideyoshiAudioProcessor::startHostDiagnosticForTest (const juce::File& folder,
                                                                 double seconds, size_t capacity, bool consumer)
@@ -378,7 +396,76 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         block.resetRequested = transport.discontinuity; block.resetReason = transport.discontinuityReason;
         hostDiagnostic.beginBlock (block);
     }
+    uint64_t timingHash = 1469598103934665603ull;
+    const auto addTimingValue = [&timingHash] (uint64_t value)
+    {
+        timingHash = (timingHash ^ value) * 1099511628211ull;
+    };
+    addTimingValue (static_cast<uint64_t> (std::llround (effectiveBpm * 1000.0)));
+    addTimingValue (static_cast<uint64_t> (numerator));
+    addTimingValue (static_cast<uint64_t> (denominator));
+    addTimingValue (static_cast<uint64_t> (std::llround (preparedSampleRate)));
+    const auto timingKey = static_cast<int64_t> (timingHash);
+    if (timingKey != xyTimingKey)
+    {
+        xyTimingKey = timingKey;
+        ++xyTimingGeneration;
+        if (xyTimingGeneration == 0) ++xyTimingGeneration;
+    }
+    xyTransport.playing = transport.playing && syncEnabled ? (playing && hasHostPpq) : transport.playing;
+    xyTransport.startBar = transport.startBar;
+    xyTransport.startPhase = transport.startBarPhase;
+    xyTransport.phasePerSample = transport.barPhasePerSample;
+    xyTransport.loopBoundarySample = transport.loopBoundarySample;
+    xyTransport.loopStartBar = transport.loopStartBar;
+    xyTransport.loopStartPhase = transport.loopStartPhase;
+    xyTransport.quartersPerBar = quartersPerBar;
+    xyTransport.secondsPerQuarter = 60.0 / effectiveBpm;
+    xyTransport.timingGeneration = xyTimingGeneration;
+
+    const auto canRunXY = xyEngine.isEnabled() && buffer.getNumSamples() <= xyDryBuffer.getNumSamples();
+    if (canRunXY)
+    {
+        for (int channel = 0; channel < juce::jmin (2, buffer.getNumChannels()); ++channel)
+            xyDryBuffer.copyFrom (channel, 0, buffer, channel, 0, buffer.getNumSamples());
+        if (buffer.getNumChannels() == 1)
+            xyDryBuffer.copyFrom (1, 0, buffer, 0, 0, buffer.getNumSamples());
+        xyEngine.process (xyDryBuffer, xyRenderedBuffer, xyReadyMask, xyTransport, buffer.getNumSamples());
+    }
+
     scratchEngine.process (buffer, transport, snapshot);
+    if (canRunXY && ! xyBypass.load (std::memory_order_relaxed)
+        && xyReadyMask.getNumSamples() >= buffer.getNumSamples())
+    {
+        auto* mask = xyReadyMask.getReadPointer (0);
+        const auto channels = juce::jmin (2, buffer.getNumChannels());
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+        {
+            if (mask[i] <= 0.5f) continue;
+            int bar = transport.startBar;
+            double phase = transport.startBarPhase + transport.barPhasePerSample * i;
+            if (transport.loopBoundarySample >= 0 && i >= transport.loopBoundarySample)
+            {
+                phase = transport.loopStartPhase + transport.barPhasePerSample * (i - transport.loopBoundarySample);
+                bar = transport.loopStartBar;
+            }
+            const auto crossed = static_cast<int> (std::floor (phase));
+            bar = (bar + crossed) % PluginStateModel::kNumBars;
+            if (bar < 0) bar += PluginStateModel::kNumBars;
+            const auto slot = snapshot[static_cast<size_t> (bar)];
+            const auto depth = juce::jlimit (0.0f, 1.0f, slot.depth);
+            if (depth <= 0.0f) continue;
+            const auto isPresetActive = slot.preset != TimelineScratchEngine::Preset::off;
+            for (int channel = 0; channel < channels; ++channel)
+            {
+                const auto dry = xyDryBuffer.getSample (channel, i);
+                const auto xy = xyRenderedBuffer.getSample (channel, i);
+                const auto presetOutput = buffer.getSample (channel, i);
+                buffer.setSample (channel, i,
+                    XYPadEngine::mixLayers (dry, presetOutput, xy, depth, isPresetActive));
+            }
+        }
+    }
     if (buffer.getNumChannels() > 0) publishPeak (outputPeakLeft, buffer.getMagnitude (0, 0, buffer.getNumSamples()));
     if (buffer.getNumChannels() > 1) publishPeak (outputPeakRight, buffer.getMagnitude (1, 0, buffer.getNumSamples()));
     hostPlaying.store (playing, std::memory_order_relaxed);

@@ -80,13 +80,19 @@ std::vector<PluginStateModel::MotionPoint> PluginStateModel::presetMotion (Scrat
     if (preset == ScratchPreset::backspin) return {{ 1,.3f },{ .72f,.45f },{ .42f,.65f },{ .12f,.8f }};
     return {{ 0,.65f },{ .35f,.45f },{ .7f,.3f },{ 1,.5f }};
 }
-void PluginStateModel::reset() { slots = {}; ui = UiState {}; notifyAllDspSlotsChanged(); notifyDspTimingChanged(); }
+void PluginStateModel::reset() { slots = {}; ui = UiState {}; notifyAllDspSlotsChanged(); notifyAllDspXYMotionsChanged(); notifyDspTimingChanged(); }
 const PluginStateModel::TimelineSlot& PluginStateModel::getSlot (int bar) const noexcept { return slots[static_cast<size_t> (barIndex (bar))]; }
 PluginStateModel::TimelineSlot& PluginStateModel::mutableSlot (int bar) noexcept { return slots[static_cast<size_t> (barIndex (bar))]; }
 void PluginStateModel::setDspSlotChangedCallback (std::function<void (int, const TimelineSlot&)> callback)
 {
     dspSlotChanged = std::move (callback);
     notifyAllDspSlotsChanged();
+}
+void PluginStateModel::setDspXYMotionChangedCallback (
+    std::function<void (int, const std::vector<MotionPoint>&, uint32_t)> callback)
+{
+    dspXYMotionChanged = std::move (callback);
+    notifyAllDspXYMotionsChanged();
 }
 void PluginStateModel::setDspTimingChangedCallback (std::function<void (const UiState&)> callback)
 {
@@ -97,9 +103,25 @@ void PluginStateModel::notifyDspSlotChanged (int bar)
 {
     if (dspSlotChanged) dspSlotChanged (barIndex (bar), slots[(size_t) barIndex (bar)]);
 }
+void PluginStateModel::notifyDspXYMotionChanged (int bar)
+{
+    if (! dspXYMotionChanged) return;
+    const auto index = barIndex (bar);
+    static const std::vector<MotionPoint> noMotion;
+    const auto& slot = slots[static_cast<size_t> (index)];
+    const auto& motion = slot.xyMotionExists ? slot.xyMotion : noMotion;
+    auto& revision = xyDspRevisions[static_cast<size_t> (index)];
+    ++revision;
+    if (revision == 0) ++revision;
+    dspXYMotionChanged (index, motion, revision);
+}
 void PluginStateModel::notifyAllDspSlotsChanged()
 {
     for (int bar = 0; bar < kNumBars; ++bar) notifyDspSlotChanged (bar);
+}
+void PluginStateModel::notifyAllDspXYMotionsChanged()
+{
+    for (int bar = 0; bar < kNumBars; ++bar) notifyDspXYMotionChanged (bar);
 }
 void PluginStateModel::notifyDspTimingChanged()
 {
@@ -110,7 +132,7 @@ void PluginStateModel::selectTab (int tab)
     ui.selectedTab = juce::jlimit (0, 3, tab);
 }
 void PluginStateModel::selectBar (int bar) { ui.selectedBar = bar == kNoSelectedBar ? kNoSelectedBar : barIndex (bar); }
-void PluginStateModel::setBypass (bool enabled) { ui.bypass = enabled; }
+void PluginStateModel::setBypass (bool enabled) { ui.bypass = enabled; notifyDspTimingChanged(); }
 void PluginStateModel::setHostSync (bool enabled) { ui.hostSync = enabled; notifyDspTimingChanged(); }
 void PluginStateModel::setInternalBpm (double value)
 {
@@ -134,7 +156,7 @@ void PluginStateModel::setSlotPitch (int bar, float value) { mutableSlot (bar).p
 void PluginStateModel::setSlotDepth (int bar, float value) { mutableSlot (bar).depth = finiteClamp (value, 0.0f, 1.0f, 0.5f); notifyDspSlotChanged (bar); }
 void PluginStateModel::setSlotMotion (int bar, const std::vector<MotionPoint>& motion) { auto& slot = mutableSlot (bar); slot.motion = sanitiseMotion (motion); slot.customMotion = true; slot.preset = ScratchPreset::custom; notifyDspSlotChanged (bar); }
 void PluginStateModel::clearSlotMotion (int bar) { auto& slot = mutableSlot (bar); slot.motion.clear(); slot.customMotion = false; if (slot.preset == ScratchPreset::custom) slot.preset = ScratchPreset::off; notifyDspSlotChanged (bar); }
-void PluginStateModel::resetSlot (int bar) { mutableSlot (bar) = TimelineSlot {}; notifyDspSlotChanged (bar); }
+void PluginStateModel::resetSlot (int bar) { mutableSlot (bar) = TimelineSlot {}; notifyDspSlotChanged (bar); notifyDspXYMotionChanged (bar); }
 void PluginStateModel::setSelectedPreset (ScratchPreset preset) { if (hasSelectedBar (ui.selectedBar)) setSlotPreset (ui.selectedBar, preset); }
 void PluginStateModel::setSelectedLength (NoteLength value) { if (hasSelectedBar (ui.selectedBar)) setSlotLength (ui.selectedBar, value); }
 void PluginStateModel::setSelectedSpeed (float value) { if (hasSelectedBar (ui.selectedBar)) setSlotSpeed (ui.selectedBar, value); }
@@ -164,8 +186,9 @@ void PluginStateModel::appendSlotXYMotion (int bar, float x, float y, double ela
     slot.xyMotion = sanitiseXYMotion (slot.xyMotion);
     slot.xyMotionExists = ! slot.xyMotion.empty();
     slot.xyMotionDurationSeconds = slot.xyMotionExists ? slot.xyMotion.back().timeSeconds : 0.0;
+    notifyDspXYMotionChanged (bar);
 }
-void PluginStateModel::clearSlotXYMotion (int bar) { auto& slot = mutableSlot (bar); slot.xyMotion.clear(); slot.xyMotionExists = false; slot.xyMotionDurationSeconds = 0.0; }
+void PluginStateModel::clearSlotXYMotion (int bar) { auto& slot = mutableSlot (bar); slot.xyMotion.clear(); slot.xyMotionExists = false; slot.xyMotionDurationSeconds = 0.0; notifyDspXYMotionChanged (bar); }
 void PluginStateModel::resetSlotXYPosition (int bar) { setSlotXYPosition (bar, 0.5f, 0.5f); }
 void PluginStateModel::setSelectedXYPosition (float x, float y) { if (hasSelectedBar (ui.selectedBar)) setSlotXYPosition (ui.selectedBar, x, y); }
 void PluginStateModel::beginSelectedXYMotion (float x, float y) { if (hasSelectedBar (ui.selectedBar)) beginSlotXYMotion (ui.selectedBar, x, y); }
@@ -261,6 +284,7 @@ bool PluginStateModel::fromValueTree (const juce::ValueTree& root)
     slots = std::move (parsed.slots);
     ui = parsed.ui;
     notifyAllDspSlotsChanged();
+    notifyAllDspXYMotionsChanged();
     notifyDspTimingChanged();
     return true;
 }

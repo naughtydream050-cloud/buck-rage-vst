@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <vector>
 
@@ -56,6 +57,7 @@ public:
     // converts this into an atomic fixed DSP snapshot; processBlock never
     // traverses TimelineSlot or its vectors.
     void setDspSlotChangedCallback (std::function<void (int, const TimelineSlot&)>);
+    void setDspXYMotionChangedCallback (std::function<void (int, const std::vector<MotionPoint>&, uint32_t)>);
     void setDspTimingChangedCallback (std::function<void (const UiState&)>);
 
     void selectTab (int); // view page only
@@ -108,7 +110,9 @@ private:
     static std::vector<MotionPoint> sanitiseXYMotion (const std::vector<MotionPoint>&);
     static std::vector<MotionPoint> presetMotion (ScratchPreset);
     void notifyDspSlotChanged (int);
+    void notifyDspXYMotionChanged (int);
     void notifyAllDspSlotsChanged();
+    void notifyAllDspXYMotionsChanged();
     void notifyDspTimingChanged();
     TimelineSlot& mutableSlot (int) noexcept;
 
@@ -116,5 +120,7 @@ private:
     UiState ui {};
     TimelineSlot fallback {};
     std::function<void (int, const TimelineSlot&)> dspSlotChanged;
+    std::function<void (int, const std::vector<MotionPoint>&, uint32_t)> dspXYMotionChanged;
     std::function<void (const UiState&)> dspTimingChanged;
+    std::array<uint32_t, kNumBars> xyDspRevisions {};
 };

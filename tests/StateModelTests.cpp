@@ -146,6 +146,38 @@ int main()
     check (separateXY && ! xyRestored.getSlot (9).xyMotionExists,
            "xy-bars-11-27-43-59-have-zero-cross-bar-contamination");
 
+    PluginStateModel dspPublished;
+    std::array<std::vector<PluginStateModel::MotionPoint>, PluginStateModel::kNumBars> publishedMotion {};
+    std::array<uint32_t, PluginStateModel::kNumBars> publishedRevision {};
+    int xyPublishCount = 0;
+    dspPublished.setDspXYMotionChangedCallback ([&] (int bar,
+        const std::vector<PluginStateModel::MotionPoint>& points, uint32_t revision)
+    {
+        ++xyPublishCount;
+        publishedMotion[static_cast<size_t> (bar)] = points;
+        publishedRevision[static_cast<size_t> (bar)] = revision;
+    });
+    xyPublishCount = 0;
+    check (dspPublished.fromValueTree (xyState) && xyPublishCount == PluginStateModel::kNumBars,
+           "xy-state-restore-publishes-all-64-bounded-dsp-snapshots");
+    bool publishedMatchesState = true;
+    for (int bar = 0; bar < PluginStateModel::kNumBars; ++bar)
+    {
+        const auto& expectedMotion = xyRestored.getSlot (bar).xyMotion;
+        publishedMatchesState = publishedMatchesState
+            && publishedMotion[static_cast<size_t> (bar)] == expectedMotion
+            && publishedRevision[static_cast<size_t> (bar)] != 0;
+    }
+    check (publishedMatchesState,
+           "xy-dsp-snapshots-match-persisted-coordinates-and-times-per-bar");
+    const auto otherBarRevision = publishedRevision[11];
+    const auto beforeEditRevision = publishedRevision[10];
+    dspPublished.appendSlotXYMotion (10, 0.33f, 0.44f, 1.25);
+    check (publishedRevision[10] != beforeEditRevision
+           && publishedRevision[11] == otherBarRevision
+           && publishedMotion[10].back().timeSeconds == 1.25,
+           "xy-edit-advances-only-that-bars-dsp-generation-with-exact-time");
+
     // v1 migration deliberately takes each legacy BAR's Count 0 as its new
     // timeline slot: the former 1024-slot hierarchy no longer exists in UI.
     juce::ValueTree legacy ("ToyotomiHideyoshiState");
