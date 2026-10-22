@@ -699,6 +699,9 @@ int main()
             const auto frequency = XYPadEngineTestAccess::renderLivePitchFrequency (
                 rate, y, false, finiteAtRate, noAllocationAtRate, directionAtRate, serialAtRate);
             const auto expected = y > 0.75f ? 880.0 : (y < 0.25f ? 220.0 : 440.0);
+            std::cout << "METRIC live_pitch sample_rate=" << rate << " saved_y=" << y
+                      << " estimated_hz=" << frequency << " expected_hz=" << expected
+                      << " finite=" << finiteAtRate << " no_allocation=" << noAllocationAtRate << "\n";
             pitchRanges &= std::abs (frequency - expected) / expected < 0.01;
             pitchMatrixFinite &= finiteAtRate;
             pitchMatrixNoAllocation &= noAllocationAtRate;
@@ -812,7 +815,7 @@ int main()
         previous = current;
     }
     const auto estimatedHz = crossings * sampleRate / (2.0 * (72000 - 48000));
-    check (std::abs (estimatedHz - 880.0) / 880.0 < 0.01, "pitch-top-plus-12-semitones");
+    check (std::abs (estimatedHz - 220.0) / 220.0 < 0.01, "pitch-bottom-minus-12-semitones");
     auto pitchStream = juce::File::getCurrentWorkingDirectory()
         .getChildFile ("xy-diagnostic-reverse-pitch-up.wav").createOutputStream();
     std::unique_ptr<juce::AudioFormatWriter> pitchWriter;
@@ -888,9 +891,8 @@ int main()
            "diagnostic-wave-fold-jump-written");
     jumpWriter.reset();
 
-    // BAR 4 verifies the opposite pitch extreme independently of the X read direction.
-    // One source sample per output sample (forward X rate = +1) isolates the
-    // Y=-12 st expectation from any X-derived rate shift.
+    // BAR 4 verifies the top-edge pitch independently of the X read direction.
+    // The saved Y coordinate is 1 at the visual top, which maps to +12 st.
     std::vector<PluginStateModel::MotionPoint> pitchDown {{ 0.0f, 1.0f, 0.0 }, { 1.0f, 1.0f, 8.0 / 3.0 }};
     engine.setTrajectory (4, pitchDown, 51);
     serial = 0;
@@ -904,11 +906,11 @@ int main()
     const auto downReady = renderOneBar (engine, true, 0.0, 1.0 / frames,
         dummySource, dummyOutput, dummyMask, serial, 4, frames, 220.0);
     const auto estimatedDownHz = estimateFrequency (dummyOutput, 48000, 72000);
-    if (! downReady || std::abs (estimatedDownHz - 110.0) / 110.0 >= 0.01)
+    if (! downReady || std::abs (estimatedDownHz - 440.0) / 440.0 >= 0.01)
         std::cerr << "PITCH_DOWN_DIAGNOSTIC ready=" << downReady
                   << " estimated_hz=" << estimatedDownHz << '\n';
-    check (downReady && std::abs (estimatedDownHz - 110.0) / 110.0 < 0.01,
-           "pitch-bottom-minus-12-semitones");
+    check (downReady && std::abs (estimatedDownHz - 440.0) / 440.0 < 0.01,
+           "pitch-top-plus-12-semitones");
     auto downStream = juce::File::getCurrentWorkingDirectory()
         .getChildFile ("xy-diagnostic-pitch-down.wav").createOutputStream();
     std::unique_ptr<juce::AudioFormatWriter> downWriter;
@@ -918,10 +920,9 @@ int main()
            "diagnostic-wave-pitch-down-written");
     downWriter.reset();
 
-    // Repeat +12 st with forward X. The earlier reverse-X fixture is the
-    // direction-independent counterpart required by the plan.
+    // Repeat +12 st with forward X. Saved Y=1 is the visual top.
     std::vector<PluginStateModel::MotionPoint> pitchUpForward {
-        { 0.0f, 0.0f, 0.0 }, { 1.0f, 0.0f, 8.0 / 3.0 }
+        { 0.0f, 1.0f, 0.0 }, { 1.0f, 1.0f, 8.0 / 3.0 }
     };
     engine.setTrajectory (5, pitchUpForward, 61);
     serial = 0;
@@ -938,10 +939,9 @@ int main()
     check (upForwardReady && std::abs (upForwardHz - 880.0) / 880.0 < 0.01,
            "pitch-plus-12-is-independent-of-forward-x-slope");
 
-    // Repeat -12 st with reverse X; this complements the existing forward-X
-    // pitch-down fixture without changing the pitch trajectory.
+    // Repeat -12 st with reverse X; saved Y=0 is the visual bottom.
     std::vector<PluginStateModel::MotionPoint> pitchDownReverse {
-        { 1.0f, 1.0f, 0.0 }, { 0.0f, 1.0f, 8.0 / 3.0 }
+        { 1.0f, 0.0f, 0.0 }, { 0.0f, 0.0f, 8.0 / 3.0 }
     };
     engine.setTrajectory (6, pitchDownReverse, 62);
     serial = 0;

@@ -1422,8 +1422,12 @@ float XYPadEngine::mixLayers (float dry, float presetOutput, float xyWet,
     const auto boundedXyBlend = juce::jlimit (0.0f, 1.0f,
         std::isfinite (xyBlend) ? xyBlend : 0.0f);
     if (! presetActive)
+    {
+        if (boundedXyBlend <= 0.0f)
+            return dry;
         return dry * (1.0f - boundedDepth)
              + boundedDepth * (dry * (1.0f - boundedXyBlend) + xyWet * boundedXyBlend);
+    }
 
     constexpr float equalPower = 0.7071067811865475f;
     const auto presetWet = (presetOutput - dry * (1.0f - boundedDepth)) / boundedDepth;

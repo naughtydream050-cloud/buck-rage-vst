@@ -372,10 +372,15 @@ bool testXyLayerIndependenceAtProcessorBoundary()
         const auto n = static_cast<double> (source);
         const auto expectedL = 0.2f * std::sin (2.0 * 3.141592653589793 * 220.0 * n / 48000.0);
         const auto expectedR = expectedL * 0.5f;
-        bypassEqualsPresetOnly &= std::memcmp (&withXy.bypassPass[i], &baseline.bypassPass[i], sizeof (float)) == 0
-                               && std::memcmp (&withXy.bypassPass[i + 1], &baseline.bypassPass[i + 1], sizeof (float)) == 0;
-        stoppedEqualsDry &= std::abs (withXy.stoppedPass[i] - expectedL) < 1.0e-6f
-                         && std::abs (withXy.stoppedPass[i + 1] - expectedR) < 1.0e-6f;
+        // The transport/control transition is itself sample-aligned to the
+        // fixed-latency output, so ignore only its known 1024-sample drain.
+        if (local >= latencySamples)
+        {
+            bypassEqualsPresetOnly &= std::memcmp (&withXy.bypassPass[i], &baseline.bypassPass[i], sizeof (float)) == 0
+                                   && std::memcmp (&withXy.bypassPass[i + 1], &baseline.bypassPass[i + 1], sizeof (float)) == 0;
+            stoppedEqualsDry &= std::abs (withXy.stoppedPass[i] - expectedL) < 1.0e-6f
+                             && std::abs (withXy.stoppedPass[i + 1] - expectedR) < 1.0e-6f;
+        }
     }
     bool pass = check (firstPassHasLiveXy, "xy-live-layer-is-audible-on-first-visit-to-recorded-bar");
     pass &= check (replayDiffers && allFinite,
@@ -1682,7 +1687,13 @@ int main()
     // transport independently before the UI Timer consumes either peak.
     juce::AudioBuffer<float> meterProbe (2, 32); meterProbe.clear();
     meterProbe.setSample (0, 0, 0.75f); meterProbe.setSample (1, 0, 0.25f);
-    juce::MidiBuffer meterMidi; processor.processBlock (meterProbe, meterMidi);
+    juce::MidiBuffer meterMidi;
+    processor.processBlock (meterProbe, meterMidi);
+    for (int block = 0; block < 32; ++block)
+    {
+        meterProbe.clear();
+        processor.processBlock (meterProbe, meterMidi);
+    }
     pass &= check (std::abs (processor.consumeOutputPeak (0) - 0.75f) < 0.0001f
                 && std::abs (processor.consumeOutputPeak (1) - 0.25f) < 0.0001f,
                    "v2-output-meter-post-dsp-lr-peak-transport");
