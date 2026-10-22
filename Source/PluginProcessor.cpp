@@ -40,7 +40,6 @@ void ToyotomiHideyoshiAudioProcessor::prepareToPlay(double sampleRate, int maxim
     delayedDry = {};
     delayedPreset = {};
     delayedDepth = {};
-    delayedXyBlend = {};
     delayedPresetActive = {};
     delayedXyBypass = {};
     outputDelayWriteIndex = 0;
