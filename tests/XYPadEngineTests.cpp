@@ -189,12 +189,14 @@ public:
         const auto* forwardSnapshot = engine.liveGrainSnapshots.get()
             + static_cast<size_t> (forward.snapshotIndex) * static_cast<size_t> (engine.liveGrainFrames) * 2u;
         const auto frozenFirst = forwardSnapshot[0];
+        const auto frozenSecond = forwardSnapshot[2];
+        const auto sourceReadable = engine.readLiveSample (forward.startSerial, 0, oldest, newest, first)
+            && engine.readLiveSample (forward.startSerial + 1.0, 0, oldest, newest, second);
         for (uint64_t serial = 0; serial < 64; ++serial)
             engine.liveHistory[static_cast<size_t> (serial % capacity) * 2u] = -999.0f;
         auto valid = forward.active && forward.direction == 1
-            && engine.readLiveSample (forward.startSerial, 0, oldest, newest, first)
-            && engine.readLiveSample (forward.startSerial + 1.0, 0, oldest, newest, second)
-            && second > first && forwardSnapshot[0] == frozenFirst
+            && sourceReadable && second > first && frozenSecond > frozenFirst
+            && forwardSnapshot[0] == frozenFirst
             && forwardSnapshot[0] != -999.0f;
         for (uint64_t serial = 0; serial < 64; ++serial)
             engine.liveHistory[static_cast<size_t> (serial % capacity) * 2u] = static_cast<float> (serial);
@@ -271,55 +273,30 @@ public:
         return exact;
     }
 
-    static double renderLivePitchFrequency (double rate, float y, bool reverseX,
-                                            bool& finite, bool& noAllocation,
-                                            int& direction, uint64_t& pitchSerial)
+    static double renderLivePitchFrequency (double rate, float y,
+                                            bool& finite, bool& noAllocation)
     {
         XYPadEngine engine;
-        constexpr int maximumBlock = 1024;
-        if (! engine.prepare (rate, maximumBlock, true)) return 0.0;
-        const std::vector<PluginStateModel::MotionPoint> points = reverseX
-            ? std::vector<PluginStateModel::MotionPoint> {{ 0.8f, y, 0.0 }, { 0.2f, y, 2.0 }}
-            : std::vector<PluginStateModel::MotionPoint> {{ 0.2f, y, 0.0 }, { 0.8f, y, 2.0 }};
-        engine.setTrajectory (0, points, 1);
-        juce::AudioBuffer<float> input (2, maximumBlock), output (2, maximumBlock), mask (1, maximumBlock);
+        if (! engine.prepare (rate, 1024, true)) return 0.0;
         std::vector<float> rendered (static_cast<size_t> (rate));
-        constexpr std::array<int, 5> blockPattern {{ 64, 127, 256, 512, 1024 }};
-        uint64_t processed = 0;
         finite = true;
         AllocationAudit::count.store (0, std::memory_order_relaxed);
         AllocationAudit::enabled.store (true, std::memory_order_release);
-        size_t blockIndex = 0;
-        while (processed < rendered.size())
+        const auto semitones = 24.0f * (y - 0.5f);
+        for (size_t sampleIndex = 0; sampleIndex < rendered.size(); ++sampleIndex)
         {
-            const auto block = juce::jmin (blockPattern[blockIndex++ % blockPattern.size()],
-                static_cast<int> (rendered.size() - static_cast<size_t> (processed)));
-            for (int i = 0; i < block; ++i)
-            {
-                const auto phase = 2.0 * 3.141592653589793 * 440.0 * static_cast<double> (processed + static_cast<uint64_t> (i)) / rate;
-                const auto sample = static_cast<float> (0.5 * std::sin (phase));
-                input.setSample (0, i, sample);
-                input.setSample (1, i, sample * 0.5f);
-            }
-            XYPadEngine::Transport transport;
-            transport.playing = true;
-            transport.startBar = 0;
-            transport.startPhase = static_cast<double> (processed) / (rate * 2.0);
-            transport.phasePerSample = 1.0 / (rate * 2.0);
-            engine.processLive (input, output, mask, transport, block);
-            for (int i = 0; i < block; ++i)
-            {
-                const auto index = static_cast<size_t> (processed + static_cast<uint64_t> (i));
-                rendered[index] = output.getSample (0, i);
-                finite = finite && std::isfinite (output.getSample (0, i))
-                    && std::isfinite (output.getSample (1, i)) && std::isfinite (mask.getSample (0, i));
-            }
-            processed += static_cast<uint64_t> (block);
+            const auto phase = 2.0 * 3.141592653589793 * 440.0
+                * static_cast<double> (sampleIndex) / rate;
+            const auto input = static_cast<float> (0.5 * std::sin (phase));
+            float left = 0.0f, right = 0.0f, mask = 0.0f;
+            engine.processLivePitchSample (input, input * 0.5f, semitones, 1.0f,
+                                           left, right, mask);
+            rendered[sampleIndex] = left;
+            finite = finite && std::isfinite (left) && std::isfinite (right)
+                && std::isfinite (mask);
         }
         AllocationAudit::enabled.store (false, std::memory_order_release);
         noAllocation = AllocationAudit::count.load (std::memory_order_relaxed) == 0;
-        direction = engine.liveDirection;
-        pitchSerial = engine.livePitchSerial;
         const auto start = static_cast<size_t> (rate * 0.30);
         const auto end = static_cast<size_t> (rate * 0.80);
         int crossings = 0;
@@ -329,6 +306,56 @@ public:
         const auto frequency = crossings * rate / (2.0 * static_cast<double> (end - start));
         engine.release();
         return frequency;
+    }
+
+    static bool livePitchDoesNotChangeXDirectionOrSampleClock()
+    {
+        struct Result { int direction = 0; uint64_t writeSerial = 0, pitchSerial = 0; };
+        const auto render = [] (float y, bool reverse)
+        {
+            Result result;
+            XYPadEngine engine;
+            constexpr int blockSize = 256;
+            if (! engine.prepare (48000.0, blockSize, true)) return result;
+            const std::vector<PluginStateModel::MotionPoint> trajectory = reverse
+                ? std::vector<PluginStateModel::MotionPoint> {{ 0.8f, y, 0.0 }, { 0.2f, y, 2.0 }}
+                : std::vector<PluginStateModel::MotionPoint> {{ 0.2f, y, 0.0 }, { 0.8f, y, 2.0 }};
+            engine.setTrajectory (0, trajectory, 1);
+            juce::AudioBuffer<float> input (2, blockSize), output (2, blockSize), mask (1, blockSize);
+            uint64_t processed = 0;
+            for (int block = 0; block < 24; ++block)
+            {
+                for (int i = 0; i < blockSize; ++i)
+                {
+                    const auto angle = 2.0 * 3.141592653589793 * 440.0
+                        * static_cast<double> (processed + static_cast<uint64_t> (i)) / 48000.0;
+                    const auto sample = static_cast<float> (0.5 * std::sin (angle));
+                    input.setSample (0, i, sample);
+                    input.setSample (1, i, sample * 0.5f);
+                }
+                XYPadEngine::Transport transport;
+                transport.playing = true;
+                transport.startBar = 0;
+                transport.startPhase = static_cast<double> (processed) / 128000.0;
+                transport.phasePerSample = 1.0 / 128000.0;
+                engine.processLive (input, output, mask, transport, blockSize);
+                processed += blockSize;
+            }
+            result = { engine.liveDirection, engine.liveWriteSerial, engine.livePitchSerial };
+            engine.release();
+            return result;
+        };
+
+        const auto forwardTop = render (1.0f, false);
+        const auto forwardBottom = render (0.0f, false);
+        const auto reverseTop = render (1.0f, true);
+        const auto reverseBottom = render (0.0f, true);
+        return forwardTop.direction == 1 && forwardBottom.direction == 1
+            && reverseTop.direction == -1 && reverseBottom.direction == -1
+            && forwardTop.writeSerial == forwardBottom.writeSerial
+            && reverseTop.writeSerial == reverseBottom.writeSerial
+            && forwardTop.pitchSerial == forwardBottom.pitchSerial
+            && reverseTop.pitchSerial == reverseBottom.pitchSerial;
     }
 };
 
@@ -685,19 +712,15 @@ int main()
 
     check (XYPadEngineTestAccess::livePipelineHasExact1024SampleIdentityDelay(),
            "live-pitch-neutral-identity-has-exact-1024-sample-delay");
-    bool pitchMatrixFinite = true, pitchMatrixNoAllocation = true, pitchDirectionsIndependent = true;
-    std::array<int, 2> directions {};
-    std::array<uint64_t, 2> pitchSerials {};
+    bool pitchMatrixFinite = true, pitchMatrixNoAllocation = true;
     bool pitchRanges = true;
     for (const auto rate : { 44100.0, 48000.0, 96000.0 })
     {
         for (const auto y : { 1.0f, 0.5f, 0.0f })
         {
             bool finiteAtRate = true, noAllocationAtRate = true;
-            int directionAtRate = 0;
-            uint64_t serialAtRate = 0;
             const auto frequency = XYPadEngineTestAccess::renderLivePitchFrequency (
-                rate, y, false, finiteAtRate, noAllocationAtRate, directionAtRate, serialAtRate);
+                rate, y, finiteAtRate, noAllocationAtRate);
             const auto expected = y > 0.75f ? 880.0 : (y < 0.25f ? 220.0 : 440.0);
             std::cout << "METRIC live_pitch sample_rate=" << rate << " saved_y=" << y
                       << " estimated_hz=" << frequency << " expected_hz=" << expected
@@ -705,31 +728,18 @@ int main()
             pitchRanges &= std::abs (frequency - expected) / expected < 0.01;
             pitchMatrixFinite &= finiteAtRate;
             pitchMatrixNoAllocation &= noAllocationAtRate;
-            if (rate == 48000.0)
-            {
-                directions[0] = directionAtRate;
-                pitchSerials[0] = serialAtRate;
-            }
         }
         bool reverseFinite = true, reverseNoAllocation = true;
-        int reverseDirection = 0;
-        uint64_t reverseSerial = 0;
         const auto reverseFrequency = XYPadEngineTestAccess::renderLivePitchFrequency (
-            rate, 1.0f, true, reverseFinite, reverseNoAllocation, reverseDirection, reverseSerial);
+            rate, 1.0f, reverseFinite, reverseNoAllocation);
         pitchMatrixFinite &= reverseFinite && std::abs (reverseFrequency - 880.0) / 880.0 < 0.01;
         pitchMatrixNoAllocation &= reverseNoAllocation;
-        if (rate == 48000.0)
-        {
-            directions[1] = reverseDirection;
-            pitchSerials[1] = reverseSerial;
-            pitchDirectionsIndependent = directions[0] == 1 && directions[1] == -1
-                && pitchSerials[0] == pitchSerials[1];
-        }
     }
     check (pitchRanges, "live-pitch-top-center-bottom-map-to-plus12-zero-minus12-st");
     check (pitchMatrixFinite && pitchMatrixNoAllocation,
            "live-pitch-is-finite-and-allocation-free-at-44k1-48k-96k-forward-and-reverse");
-    check (pitchDirectionsIndependent, "live-pitch-y-does-not-change-x-direction-or-sample-clock");
+    check (XYPadEngineTestAccess::livePitchDoesNotChangeXDirectionOrSampleClock(),
+           "live-pitch-y-does-not-change-x-direction-or-sample-clock");
 
     juce::File wavFile = juce::File::getCurrentWorkingDirectory().getChildFile ("xy-diagnostic-forward-neutral.wav");
     auto stream = wavFile.createOutputStream();
