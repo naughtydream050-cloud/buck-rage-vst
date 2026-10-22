@@ -36,6 +36,14 @@ void ToyotomiHideyoshiAudioProcessor::prepareToPlay(double sampleRate, int maxim
 {
     scratchEngine.setSampleTraceObserver (nullptr, nullptr);
     preparedSampleRate = juce::jmax (1.0, sampleRate);
+    setLatencySamples (xyReportedLatencySamples);
+    delayedDry = {};
+    delayedPreset = {};
+    delayedDepth = {};
+    delayedXyBlend = {};
+    delayedPresetActive = {};
+    delayedXyBypass = {};
+    outputDelayWriteIndex = 0;
     scratchEngine.prepare (preparedSampleRate, maximumExpectedSamplesPerBlock, getTotalNumInputChannels());
     xyDryBuffer.setSize (2, maximumExpectedSamplesPerBlock, false, true, true);
     xyRenderedBuffer.setSize (2, maximumExpectedSamplesPerBlock, false, true, true);
@@ -422,49 +430,72 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
     xyTransport.quartersPerBar = quartersPerBar;
     xyTransport.secondsPerQuarter = 60.0 / effectiveBpm;
     xyTransport.timingGeneration = xyTimingGeneration;
+    xyTransport.resetHistory = transport.discontinuity
+        && transport.discontinuityReason != TimelineScratchEngine::DiscontinuityReason::loopWrap;
 
-    const auto canRunXY = xyEngine.isEnabled() && buffer.getNumSamples() <= xyDryBuffer.getNumSamples();
-    if (canRunXY)
+    const auto canCopyDry = buffer.getNumSamples() <= xyDryBuffer.getNumSamples();
+    const auto canRunXY = xyEngine.isEnabled() && canCopyDry;
+    if (canCopyDry)
     {
         for (int channel = 0; channel < juce::jmin (2, buffer.getNumChannels()); ++channel)
             xyDryBuffer.copyFrom (channel, 0, buffer, channel, 0, buffer.getNumSamples());
         if (buffer.getNumChannels() == 1)
             xyDryBuffer.copyFrom (1, 0, buffer, 0, 0, buffer.getNumSamples());
-        xyEngine.process (xyDryBuffer, xyRenderedBuffer, xyReadyMask, xyTransport, buffer.getNumSamples());
+    }
+    if (canRunXY)
+    {
+        xyEngine.processLive (xyDryBuffer, xyRenderedBuffer, xyReadyMask, xyTransport, buffer.getNumSamples());
     }
 
     scratchEngine.process (buffer, transport, snapshot);
-    if (canRunXY && ! xyBypass.load (std::memory_order_relaxed)
-        && xyReadyMask.getNumSamples() >= buffer.getNumSamples())
+    const auto channels = juce::jmin (2, buffer.getNumChannels());
+    const auto hasXyBlock = canRunXY && xyReadyMask.getNumSamples() >= buffer.getNumSamples()
+                         && xyRenderedBuffer.getNumSamples() >= buffer.getNumSamples();
+    const auto currentXyBypass = xyBypass.load (std::memory_order_relaxed);
+    for (int i = 0; i < buffer.getNumSamples(); ++i)
     {
-        auto* mask = xyReadyMask.getReadPointer (0);
-        const auto channels = juce::jmin (2, buffer.getNumChannels());
-        for (int i = 0; i < buffer.getNumSamples(); ++i)
+        int bar = transport.startBar;
+        double phase = transport.startBarPhase + transport.barPhasePerSample * i;
+        if (transport.loopBoundarySample >= 0 && i >= transport.loopBoundarySample)
         {
-            if (mask[i] <= 0.5f) continue;
-            int bar = transport.startBar;
-            double phase = transport.startBarPhase + transport.barPhasePerSample * i;
-            if (transport.loopBoundarySample >= 0 && i >= transport.loopBoundarySample)
-            {
-                phase = transport.loopStartPhase + transport.barPhasePerSample * (i - transport.loopBoundarySample);
-                bar = transport.loopStartBar;
-            }
-            const auto crossed = static_cast<int> (std::floor (phase));
-            bar = (bar + crossed) % PluginStateModel::kNumBars;
-            if (bar < 0) bar += PluginStateModel::kNumBars;
-            const auto slot = snapshot[static_cast<size_t> (bar)];
-            const auto depth = juce::jlimit (0.0f, 1.0f, slot.depth);
-            if (depth <= 0.0f) continue;
-            const auto isPresetActive = slot.preset != TimelineScratchEngine::Preset::off;
-            for (int channel = 0; channel < channels; ++channel)
-            {
-                const auto dry = xyDryBuffer.getSample (channel, i);
-                const auto xy = xyRenderedBuffer.getSample (channel, i);
-                const auto presetOutput = buffer.getSample (channel, i);
-                buffer.setSample (channel, i,
-                    XYPadEngine::mixLayers (dry, presetOutput, xy, depth, isPresetActive));
-            }
+            phase = transport.loopStartPhase + transport.barPhasePerSample * (i - transport.loopBoundarySample);
+            bar = transport.loopStartBar;
         }
+        const auto crossed = static_cast<int> (std::floor (phase));
+        bar = (bar + crossed) % PluginStateModel::kNumBars;
+        if (bar < 0) bar += PluginStateModel::kNumBars;
+        const auto hasCurrentBar = bar >= 0 && bar < PluginStateModel::kNumBars
+            && transport.playing;
+        const auto slot = hasCurrentBar ? snapshot[static_cast<size_t> (bar)]
+                                         : TimelineScratchEngine::Slot {};
+        const auto currentDepth = hasCurrentBar ? juce::jlimit (0.0f, 1.0f, slot.depth) : 0.0f;
+        const auto currentPresetActive = hasCurrentBar
+            && slot.preset != TimelineScratchEngine::Preset::off;
+        const auto currentXyBlend = hasXyBlock ? juce::jlimit (0.0f, 1.0f,
+            xyReadyMask.getSample (0, i)) : 0.0f;
+        const auto readIndex = static_cast<size_t> (outputDelayWriteIndex);
+        const auto delayedDepthValue = delayedDepth[readIndex];
+        const auto delayedBlendValue = delayedXyBlend[readIndex];
+        const auto delayedPresetValue = delayedPresetActive[readIndex] != 0;
+        const auto delayedBypassValue = delayedXyBypass[readIndex] != 0;
+        delayedDepth[readIndex] = currentDepth;
+        delayedXyBlend[readIndex] = currentXyBlend;
+        delayedPresetActive[readIndex] = currentPresetActive ? 1u : 0u;
+        delayedXyBypass[readIndex] = currentXyBypass ? 1u : 0u;
+        for (int channel = 0; channel < channels; ++channel)
+        {
+            const auto inputDry = canCopyDry ? xyDryBuffer.getSample (channel, i) : 0.0f;
+            const auto inputPreset = buffer.getSample (channel, i);
+            const auto dry = delayedDry[static_cast<size_t> (channel)][readIndex];
+            const auto preset = delayedPreset[static_cast<size_t> (channel)][readIndex];
+            const auto xy = hasXyBlock ? xyRenderedBuffer.getSample (channel, i) : 0.0f;
+            delayedDry[static_cast<size_t> (channel)][readIndex] = inputDry;
+            delayedPreset[static_cast<size_t> (channel)][readIndex] = inputPreset;
+            const auto blend = delayedBypassValue ? 0.0f : delayedBlendValue;
+            buffer.setSample (channel, i, XYPadEngine::mixLayers (dry, preset, xy,
+                delayedDepthValue, delayedPresetValue, blend));
+        }
+        outputDelayWriteIndex = (outputDelayWriteIndex + 1) % xyReportedLatencySamples;
     }
     if (buffer.getNumChannels() > 0) publishPeak (outputPeakLeft, buffer.getMagnitude (0, 0, buffer.getNumSamples()));
     if (buffer.getNumChannels() > 1) publishPeak (outputPeakRight, buffer.getMagnitude (1, 0, buffer.getNumSamples()));

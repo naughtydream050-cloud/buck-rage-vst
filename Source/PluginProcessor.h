@@ -2,6 +2,8 @@
 
 #include <JuceHeader.h>
 #include <atomic>
+#include <array>
+#include <cstdint>
 #include "PluginStateModel.h"
 #include "TimelineScratchEngine.h"
 #include "RealHostDiagnostic.h"
@@ -79,6 +81,13 @@ private:
     TimelineScratchEngine scratchEngine;
     juce::AudioBuffer<float> xyDryBuffer, xyRenderedBuffer, xyReadyMask;
     XYPadEngine::Transport xyTransport;
+    static constexpr int xyReportedLatencySamples = 1024;
+    std::array<std::array<float, xyReportedLatencySamples>, 2> delayedDry {};
+    std::array<std::array<float, xyReportedLatencySamples>, 2> delayedPreset {};
+    std::array<float, xyReportedLatencySamples> delayedDepth {};
+    std::array<float, xyReportedLatencySamples> delayedXyBlend {};
+    std::array<uint8_t, xyReportedLatencySamples> delayedPresetActive {}, delayedXyBypass {};
+    int outputDelayWriteIndex = 0;
     uint32_t xyTimingGeneration = 1;
     int64_t xyTimingKey = 0;
     RealHostDiagnostic hostDiagnostic;

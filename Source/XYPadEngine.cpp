@@ -86,14 +86,38 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank)
     }
     scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
     previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
+    liveHistory.reset(); liveHistorySerials.reset(); liveGrainSnapshots.reset(); liveHoldSnapshot.reset();
+    livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
+    livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
+    livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
+    livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
     sampleRate = rate;
     maxBlock = maximumBlockSize;
     activeBar = -1;
+    liveHistoryCapacityFrames = liveWarmupFrames = liveGrainFrames = liveHopFrames = 0;
+    liveTransitionFrames = 0;
+    liveWriteSerial = liveHistoryValidFrames = 0;
+    liveGrains.fill (LiveGrain {});
+    liveStationaryFrames = liveHoldPhase = 0;
+    liveHoldMix = 0.0f;
+    liveHoldReady = false;
+    liveActiveBar = -1;
+    liveActiveTrajectory = {};
+    liveWetGain = 0.0f;
+    liveHavePreviousX = liveHaveSignal = livePendingTransition = liveWasPlaying = false;
     activeRevision = 0;
     renderQueueHead.store (0, std::memory_order_relaxed);
     renderQueueTail.store (0, std::memory_order_relaxed);
     activeTrajectory = {};
     std::fill_n (activeTrajectories.get(), kBarCount, Trajectory {});
+    liveSamplesToLaunch = 0;
+    liveSilenceFramesCount = 0;
+    liveActiveRevision = 0;
+    livePreviousX = 0.5f;
+    liveDirection = 1;
+    livePitchSerial = 0;
+    liveSmoothedSemitones = livePitchWetMix = 0.0f;
+    livePitchSmoothingCoefficient = 0.0f;
 
     if (! std::isfinite (rate) || rate <= 0.0 || rate > kMaxSampleRate
         || maximumBlockSize <= 0)
@@ -110,6 +134,12 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank)
         return false;
     maxFramesPerBar = static_cast<int> (requestedFrames);
     const auto floatCount = static_cast<size_t> (maxFramesPerBar) * 2u;
+    liveHistoryCapacityFrames = juce::jmin (static_cast<int> (kMaxLiveHistoryFrames),
+                                             juce::jmax (1, juce::roundToInt (rate * kLiveHistorySeconds) + 2));
+    liveWarmupFrames = juce::jmax (1, juce::roundToInt (rate * kLiveWarmupSeconds));
+    liveGrainFrames = juce::jmax (1, juce::roundToInt (rate * kLiveGrainSeconds));
+    liveHopFrames = juce::jmax (1, juce::roundToInt (rate * kLiveHopSeconds));
+    liveTransitionFrames = juce::jmax (1, juce::roundToInt (rate * 0.003));
     try
     {
         for (int i = 0; i < kBarCount; ++i)
@@ -133,15 +163,48 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank)
         synthesisPhase.reset (new (std::nothrow) double[phaseCount]);
         phaseInitialized.reset (new (std::nothrow) uint8_t[phaseCount]);
         fft = std::make_unique<juce::dsp::FFT> (11);
+        liveHistory.reset (new (std::nothrow) float[static_cast<size_t> (liveHistoryCapacityFrames) * 2u]);
+        liveHistorySerials.reset (new (std::nothrow) uint64_t[static_cast<size_t> (liveHistoryCapacityFrames)]);
+        liveGrainSnapshots.reset (new (std::nothrow) float[static_cast<size_t> (kLiveGrainCapacity)
+                                                           * static_cast<size_t> (liveGrainFrames) * 2u]);
+        liveHoldSnapshot.reset (new (std::nothrow) float[static_cast<size_t> (liveGrainFrames) * 2u]);
+        livePitchFft = std::make_unique<juce::dsp::FFT> (10);
+        livePitchFftWork.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchFftSize) * 2u]);
+        livePitchFftWork2.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchFftSize) * 2u]);
+        livePitchInputRing.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchFftSize) * 2u]);
+        livePitchIdentityDelay.reset (new (std::nothrow) float[static_cast<size_t> (kLivePipelineLatency) * 2u]);
+        livePitchSemitoneDelay.reset (new (std::nothrow) float[static_cast<size_t> (kLivePipelineLatency)]);
+        livePitchMaskDelay.reset (new (std::nothrow) float[static_cast<size_t> (kLivePipelineLatency)]);
+        livePitchOlaLeft.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchOlaCapacity)]);
+        livePitchOlaRight.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchOlaCapacity)]);
+        livePitchOlaNorm.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchOlaCapacity)]);
+        livePitchPreviousPhase.reset (new (std::nothrow) double[static_cast<size_t> (kLivePitchBins)]);
+        livePitchSynthesisPhase.reset (new (std::nothrow) double[static_cast<size_t> (kLivePitchBins)]);
+        livePitchPhaseInitialized.reset (new (std::nothrow) uint8_t[static_cast<size_t> (kLivePitchBins)]);
+        livePitchSmoothingCoefficient = static_cast<float> (1.0 - std::exp (-1.0 / (rate * 0.005)));
         if (! scratch || ! fftWork || ! fftWork2 || ! overlapNorm || ! previousInputPhase
-            || ! synthesisPhase || ! phaseInitialized || ! fft)
+            || ! synthesisPhase || ! phaseInitialized || ! fft || ! liveHistory || ! liveHistorySerials
+            || ! liveGrainSnapshots || ! liveHoldSnapshot || ! livePitchFft || ! livePitchFftWork
+            || ! livePitchFftWork2 || ! livePitchInputRing || ! livePitchIdentityDelay
+            || ! livePitchSemitoneDelay || ! livePitchMaskDelay || ! livePitchOlaLeft
+            || ! livePitchOlaRight || ! livePitchOlaNorm || ! livePitchPreviousPhase
+            || ! livePitchSynthesisPhase || ! livePitchPhaseInitialized)
         {
             for (int i = 0; i < kBarCount; ++i) slots[static_cast<size_t> (i)].pcm.reset();
             scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
-            previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
+            previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset();
+            liveHistory.reset(); liveHistorySerials.reset(); liveGrainSnapshots.reset(); liveHoldSnapshot.reset();
+            livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
+            livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
+            livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
+            livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
             maxFramesPerBar = 0;
             return false;
         }
+        std::fill_n (liveHistory.get(), static_cast<size_t> (liveHistoryCapacityFrames) * 2u, 0.0f);
+        std::fill_n (liveHistorySerials.get(), static_cast<size_t> (liveHistoryCapacityFrames),
+                     std::numeric_limits<uint64_t>::max());
+        clearLivePitchState();
         workerExit.store (false, std::memory_order_release);
         worker = std::thread ([this] { workerLoop(); });
     }
@@ -151,6 +214,11 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank)
         for (int i = 0; i < kBarCount; ++i) slots[static_cast<size_t> (i)].pcm.reset();
         scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
         previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
+        liveHistory.reset(); liveHistorySerials.reset(); liveGrainSnapshots.reset(); liveHoldSnapshot.reset();
+        livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
+        livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
+        livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
+        livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
         maxFramesPerBar = 0;
         return false;
     }
@@ -172,11 +240,217 @@ void XYPadEngine::release() noexcept
     }
     scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
     previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
+    liveHistory.reset(); liveHistorySerials.reset(); liveGrainSnapshots.reset(); liveHoldSnapshot.reset();
+    livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
+    livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
+    livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
+    livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
     maxFramesPerBar = maxBlock = 0;
     sampleRate = 0.0;
     activeBar = -1;
+    liveHistoryCapacityFrames = liveWarmupFrames = liveGrainFrames = liveHopFrames = 0;
+    liveTransitionFrames = 0;
+    liveWriteSerial = liveHistoryValidFrames = 0;
+    liveSamplesToLaunch = 0;
+    liveSilenceFramesCount = 0;
+    liveGrains.fill (LiveGrain {});
+    liveStationaryFrames = liveHoldPhase = 0;
+    liveHoldMix = 0.0f;
+    liveHoldReady = false;
+    liveActiveBar = -1;
+    liveActiveRevision = 0;
+    liveActiveTrajectory = {};
+    livePreviousX = 0.5f;
+    liveWetGain = 0.0f;
+    liveDirection = 1;
+    liveHavePreviousX = liveHaveSignal = livePendingTransition = liveWasPlaying = false;
+    livePitchSerial = 0;
+    liveSmoothedSemitones = livePitchWetMix = 0.0f;
+    livePitchSmoothingCoefficient = 0.0f;
     renderQueueHead.store (0, std::memory_order_relaxed);
     renderQueueTail.store (0, std::memory_order_relaxed);
+}
+
+void XYPadEngine::clearLivePitchState() noexcept
+{
+    if (livePitchInputRing) std::fill_n (livePitchInputRing.get(), static_cast<size_t> (kLivePitchFftSize) * 2u, 0.0f);
+    if (livePitchIdentityDelay) std::fill_n (livePitchIdentityDelay.get(), static_cast<size_t> (kLivePipelineLatency) * 2u, 0.0f);
+    if (livePitchSemitoneDelay) std::fill_n (livePitchSemitoneDelay.get(), static_cast<size_t> (kLivePipelineLatency), 0.0f);
+    if (livePitchMaskDelay) std::fill_n (livePitchMaskDelay.get(), static_cast<size_t> (kLivePipelineLatency), 0.0f);
+    if (livePitchOlaLeft) std::fill_n (livePitchOlaLeft.get(), static_cast<size_t> (kLivePitchOlaCapacity), 0.0f);
+    if (livePitchOlaRight) std::fill_n (livePitchOlaRight.get(), static_cast<size_t> (kLivePitchOlaCapacity), 0.0f);
+    if (livePitchOlaNorm) std::fill_n (livePitchOlaNorm.get(), static_cast<size_t> (kLivePitchOlaCapacity), 0.0f);
+    if (livePitchPreviousPhase) std::fill_n (livePitchPreviousPhase.get(), static_cast<size_t> (kLivePitchBins), 0.0);
+    if (livePitchSynthesisPhase) std::fill_n (livePitchSynthesisPhase.get(), static_cast<size_t> (kLivePitchBins), 0.0);
+    if (livePitchPhaseInitialized) std::fill_n (livePitchPhaseInitialized.get(), static_cast<size_t> (kLivePitchBins), uint8_t (0));
+    livePitchSerial = 0;
+    liveSmoothedSemitones = livePitchWetMix = 0.0f;
+}
+
+void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, float semitones,
+                                          float wetMask, float& outputLeft,
+                                          float& outputRight, float& outputMask) noexcept
+{
+    if (! livePitchFft || ! livePitchFftWork || ! livePitchFftWork2 || ! livePitchInputRing
+        || ! livePitchIdentityDelay || ! livePitchSemitoneDelay || ! livePitchMaskDelay
+        || ! livePitchOlaLeft || ! livePitchOlaRight || ! livePitchOlaNorm
+        || ! livePitchPreviousPhase || ! livePitchSynthesisPhase || ! livePitchPhaseInitialized)
+    {
+        outputLeft = outputRight = outputMask = 0.0f;
+        return;
+    }
+
+    const auto serial = livePitchSerial;
+    const auto delayIndex = static_cast<size_t> (serial % static_cast<uint64_t> (kLivePipelineLatency));
+    const auto delayedLeft = livePitchIdentityDelay[delayIndex * 2u];
+    const auto delayedRight = livePitchIdentityDelay[delayIndex * 2u + 1u];
+    const auto delayedSemitones = livePitchSemitoneDelay[delayIndex];
+    const auto delayedMask = livePitchMaskDelay[delayIndex];
+    livePitchIdentityDelay[delayIndex * 2u] = std::isfinite (inputLeft) ? inputLeft : 0.0f;
+    livePitchIdentityDelay[delayIndex * 2u + 1u] = std::isfinite (inputRight) ? inputRight : 0.0f;
+    livePitchSemitoneDelay[delayIndex] = std::isfinite (semitones)
+        ? juce::jlimit (-12.0f, 12.0f, semitones) : 0.0f;
+    livePitchMaskDelay[delayIndex] = std::isfinite (wetMask)
+        ? juce::jlimit (0.0f, 1.0f, wetMask) : 0.0f;
+
+    const auto inputIndex = static_cast<size_t> (serial % static_cast<uint64_t> (kLivePitchFftSize));
+    livePitchInputRing[inputIndex * 2u] = std::isfinite (inputLeft) ? inputLeft : 0.0f;
+    livePitchInputRing[inputIndex * 2u + 1u] = std::isfinite (inputRight) ? inputRight : 0.0f;
+
+    if ((serial + 1u) >= static_cast<uint64_t> (kLivePitchFftSize)
+        && ((serial + 1u) % static_cast<uint64_t> (kLivePitchHopSize)) == 0u)
+    {
+        const auto frameStart = serial + 1u - static_cast<uint64_t> (kLivePitchFftSize);
+        const auto pitchControlSerial = frameStart + static_cast<uint64_t> (kLivePitchFftSize / 2);
+        const auto ratioDelayIndex = static_cast<size_t> (pitchControlSerial
+            % static_cast<uint64_t> (kLivePipelineLatency));
+        const auto frameSemitones = juce::jlimit (-12.0, 12.0,
+            static_cast<double> (livePitchSemitoneDelay[ratioDelayIndex]));
+        const auto ratio = std::pow (2.0, frameSemitones / 12.0);
+        std::array<double, static_cast<size_t> (kLivePitchBins)> leftPhase {};
+        const auto readBin = [] (const float* data, int bin, bool imaginary) noexcept
+        {
+            if (bin == 0) return imaginary ? 0.0f : data[0];
+            if (bin == kLivePitchFftSize / 2) return imaginary ? 0.0f : data[1];
+            return data[2 * bin + (imaginary ? 1 : 0)];
+        };
+        const auto writeBin = [] (float* data, int bin, float real, float imaginary) noexcept
+        {
+            if (bin == 0) { data[0] = real; return; }
+            if (bin == kLivePitchFftSize / 2) { data[1] = real; return; }
+            data[2 * bin] = real;
+            data[2 * bin + 1] = imaginary;
+        };
+
+        for (int channel = 0; channel < 2; ++channel)
+        {
+            auto* work = livePitchFftWork.get();
+            std::fill_n (work, static_cast<size_t> (kLivePitchFftSize) * 2u, 0.0f);
+            for (int frame = 0; frame < kLivePitchFftSize; ++frame)
+            {
+                const auto sourceSerial = frameStart + static_cast<uint64_t> (frame);
+                const auto sourceIndex = static_cast<size_t> (sourceSerial
+                    % static_cast<uint64_t> (kLivePitchFftSize));
+                const auto hann = 0.5 - 0.5 * std::cos (2.0 * kPi * frame / (kLivePitchFftSize - 1));
+                work[static_cast<size_t> (frame)] = livePitchInputRing[sourceIndex * 2u
+                    + static_cast<size_t> (channel)] * static_cast<float> (hann);
+            }
+            livePitchFft->performRealOnlyForwardTransform (work);
+            auto* transformed = livePitchFftWork2.get();
+            std::fill_n (transformed, static_cast<size_t> (kLivePitchFftSize) * 2u, 0.0f);
+
+            if (channel == 0)
+            {
+                for (int bin = 0; bin < kLivePitchBins; ++bin)
+                {
+                    const auto sourceBin = static_cast<double> (bin) / ratio;
+                    if (sourceBin > kLivePitchFftSize / 2.0) { leftPhase[static_cast<size_t> (bin)] = 0.0; continue; }
+                    const auto low = static_cast<int> (sourceBin);
+                    const auto high = juce::jmin (kLivePitchFftSize / 2, low + 1);
+                    const auto fraction = static_cast<float> (sourceBin - low);
+                    const auto real = readBin (work, low, false)
+                        + (readBin (work, high, false) - readBin (work, low, false)) * fraction;
+                    const auto imag = readBin (work, low, true)
+                        + (readBin (work, high, true) - readBin (work, low, true)) * fraction;
+                    const auto magnitude = std::hypot (real, imag);
+                    const auto phase = std::atan2 (imag, real);
+                    leftPhase[static_cast<size_t> (bin)] = phase;
+                    const auto index = static_cast<size_t> (bin);
+                    auto& previous = livePitchPreviousPhase[index];
+                    auto& synthesis = livePitchSynthesisPhase[index];
+                    if (bin == 0 || bin == kLivePitchFftSize / 2)
+                        synthesis = phase;
+                    else if (livePitchPhaseInitialized[index] == 0)
+                    {
+                        synthesis = phase;
+                        livePitchPhaseInitialized[index] = 1;
+                    }
+                    else
+                    {
+                        const auto expected = 2.0 * kPi * sourceBin * kLivePitchHopSize / kLivePitchFftSize;
+                        const auto residual = std::remainder (phase - previous - expected, 2.0 * kPi);
+                        const auto instantaneousBin = sourceBin + residual * kLivePitchFftSize
+                            / (2.0 * kPi * kLivePitchHopSize);
+                        synthesis += 2.0 * kPi * instantaneousBin * ratio * kLivePitchHopSize
+                            / kLivePitchFftSize;
+                    }
+                    previous = phase;
+                    writeBin (transformed, bin,
+                        magnitude * static_cast<float> (std::cos (synthesis)),
+                        magnitude * static_cast<float> (std::sin (synthesis)));
+                }
+            }
+            else
+            {
+                for (int bin = 0; bin < kLivePitchBins; ++bin)
+                {
+                    const auto sourceBin = static_cast<double> (bin) / ratio;
+                    if (sourceBin > kLivePitchFftSize / 2.0) continue;
+                    const auto low = static_cast<int> (sourceBin);
+                    const auto high = juce::jmin (kLivePitchFftSize / 2, low + 1);
+                    const auto fraction = static_cast<float> (sourceBin - low);
+                    const auto real = readBin (work, low, false)
+                        + (readBin (work, high, false) - readBin (work, low, false)) * fraction;
+                    const auto imag = readBin (work, low, true)
+                        + (readBin (work, high, true) - readBin (work, low, true)) * fraction;
+                    const auto phase = std::atan2 (imag, real);
+                    const auto phaseOffset = std::remainder (phase - leftPhase[static_cast<size_t> (bin)], 2.0 * kPi);
+                    const auto outputPhase = livePitchSynthesisPhase[static_cast<size_t> (bin)] + phaseOffset;
+                    const auto magnitude = std::hypot (real, imag);
+                    writeBin (transformed, bin,
+                        magnitude * static_cast<float> (std::cos (outputPhase)),
+                        magnitude * static_cast<float> (std::sin (outputPhase)));
+                }
+            }
+            livePitchFft->performRealOnlyInverseTransform (transformed);
+            auto* ola = channel == 0 ? livePitchOlaLeft.get() : livePitchOlaRight.get();
+            for (int frame = 0; frame < kLivePitchFftSize; ++frame)
+            {
+                const auto hann = static_cast<float> (0.5 - 0.5 * std::cos (2.0 * kPi * frame
+                    / (kLivePitchFftSize - 1)));
+                const auto targetSerial = frameStart + static_cast<uint64_t> (kLivePipelineLatency + frame);
+                const auto targetIndex = static_cast<size_t> (targetSerial
+                    % static_cast<uint64_t> (kLivePitchOlaCapacity));
+                ola[targetIndex] += transformed[static_cast<size_t> (frame)] * hann;
+                if (channel == 0) livePitchOlaNorm[targetIndex] += hann * hann;
+            }
+        }
+    }
+
+    const auto olaIndex = static_cast<size_t> (serial % static_cast<uint64_t> (kLivePitchOlaCapacity));
+    const auto norm = livePitchOlaNorm[olaIndex];
+    const auto pitchedLeft = norm > 1.0e-8f ? livePitchOlaLeft[olaIndex] / norm : delayedLeft;
+    const auto pitchedRight = norm > 1.0e-8f ? livePitchOlaRight[olaIndex] / norm : delayedRight;
+    livePitchOlaLeft[olaIndex] = livePitchOlaRight[olaIndex] = livePitchOlaNorm[olaIndex] = 0.0f;
+
+    const auto pitchTarget = std::abs (delayedSemitones) >= 0.01f ? 1.0f : 0.0f;
+    const auto pitchMixStep = 1.0f / static_cast<float> (juce::jmax (1, juce::roundToInt (sampleRate * 0.005)));
+    if (livePitchWetMix < pitchTarget) livePitchWetMix = juce::jmin (pitchTarget, livePitchWetMix + pitchMixStep);
+    else if (livePitchWetMix > pitchTarget) livePitchWetMix = juce::jmax (pitchTarget, livePitchWetMix - pitchMixStep);
+    outputLeft = delayedLeft + (pitchedLeft - delayedLeft) * livePitchWetMix;
+    outputRight = delayedRight + (pitchedRight - delayedRight) * livePitchWetMix;
+    outputMask = delayedMask;
+    ++livePitchSerial;
 }
 
 void XYPadEngine::stopWorker() noexcept
@@ -473,6 +747,378 @@ void XYPadEngine::process (const juce::AudioBuffer<float>& source,
     }
 }
 
+bool XYPadEngine::readLiveSample (double serial, int channel, uint64_t oldestSerial,
+                                  uint64_t newestSerial, float& value) const noexcept
+{
+    if (liveHistory == nullptr || liveHistorySerials == nullptr
+        || liveHistoryCapacityFrames <= 1 || channel < 0 || channel > 1
+        || ! std::isfinite (serial) || serial < static_cast<double> (oldestSerial)
+        || serial > static_cast<double> (newestSerial))
+        return false;
+
+    const auto lower = static_cast<uint64_t> (std::floor (serial));
+    const auto upper = juce::jmin (newestSerial, lower + 1u);
+    const auto lowerIndex = static_cast<size_t> (lower % static_cast<uint64_t> (liveHistoryCapacityFrames));
+    const auto upperIndex = static_cast<size_t> (upper % static_cast<uint64_t> (liveHistoryCapacityFrames));
+    if (liveHistorySerials[lowerIndex] != lower || liveHistorySerials[upperIndex] != upper)
+        return false;
+    const auto fraction = static_cast<float> (serial - static_cast<double> (lower));
+    const auto a = liveHistory[lowerIndex * 2u + static_cast<size_t> (channel)];
+    const auto b = liveHistory[upperIndex * 2u + static_cast<size_t> (channel)];
+    value = a + (b - a) * fraction;
+    return std::isfinite (value);
+}
+
+void XYPadEngine::launchLiveGrain (float x, int direction, bool transition,
+                                   uint64_t oldestSerial, uint64_t newestSerial) noexcept
+{
+    if (liveGrainFrames <= 1 || liveGrainFrames > liveHistoryCapacityFrames
+        || newestSerial < oldestSerial)
+        return;
+    const auto available = newestSerial - oldestSerial + 1u;
+    if (available < static_cast<uint64_t> (liveGrainFrames))
+        return;
+
+    const auto span = static_cast<double> (available - static_cast<uint64_t> (liveGrainFrames));
+    const auto offset = static_cast<double> (juce::jlimit (0.0f, 1.0f, x)) * span;
+    const auto start = direction >= 0
+        ? static_cast<double> (oldestSerial) + offset
+        : static_cast<double> (oldestSerial) + offset + static_cast<double> (liveGrainFrames - 1);
+
+    LiveGrain* destination = nullptr;
+    for (auto& grain : liveGrains)
+        if (! grain.active) { destination = &grain; break; }
+    if (destination == nullptr)
+    {
+        destination = &liveGrains[0];
+        for (auto& grain : liveGrains)
+            if (grain.age > destination->age) destination = &grain;
+    }
+    if (liveGrainSnapshots == nullptr)
+        return;
+    const auto snapshotIndex = static_cast<int> (destination - liveGrains.data());
+    auto* snapshot = liveGrainSnapshots.get()
+                   + static_cast<size_t> (snapshotIndex) * static_cast<size_t> (liveGrainFrames) * 2u;
+    for (int age = 0; age < liveGrainFrames; ++age)
+    {
+        const auto serial = start + static_cast<double> ((direction >= 0 ? 1 : -1) * age);
+        float left = 0.0f, right = 0.0f;
+        if (! readLiveSample (serial, 0, oldestSerial, newestSerial, left)
+            || ! readLiveSample (serial, 1, oldestSerial, newestSerial, right))
+            return;
+        snapshot[static_cast<size_t> (age) * 2u] = left;
+        snapshot[static_cast<size_t> (age) * 2u + 1u] = right;
+    }
+    destination->startSerial = start;
+    destination->direction = direction >= 0 ? 1 : -1;
+    destination->age = 0;
+    destination->fadeInFrames = transition ? liveTransitionFrames : 0;
+    destination->fadeOutRemaining = 0;
+    destination->snapshotIndex = snapshotIndex;
+    destination->active = true;
+    if (transition)
+        for (auto& grain : liveGrains)
+            if (grain.active && &grain != destination)
+                grain.fadeOutRemaining = liveTransitionFrames;
+}
+
+void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
+                               juce::AudioBuffer<float>& rendered,
+                               juce::AudioBuffer<float>& readyMask,
+                               const Transport& transport, int frameCount) noexcept
+{
+    const auto frames = juce::jlimit (0, source.getNumSamples(), frameCount);
+    const auto outputChannels = juce::jmin (2, rendered.getNumChannels());
+    for (int channel = 0; channel < rendered.getNumChannels(); ++channel)
+        rendered.clear (channel, 0, juce::jmin (frames, rendered.getNumSamples()));
+    if (readyMask.getNumChannels() > 0)
+        readyMask.clear (0, 0, juce::jmin (frames, readyMask.getNumSamples()));
+
+    if (! enabled.load (std::memory_order_acquire) || liveHistory == nullptr
+        || liveHistorySerials == nullptr || liveGrainSnapshots == nullptr
+        || livePitchInputRing == nullptr || livePitchIdentityDelay == nullptr
+        || ! transport.playing || transport.startBar < 0
+        || frames <= 0 || frames > maxBlock || rendered.getNumSamples() < frames
+        || readyMask.getNumChannels() < 1 || readyMask.getNumSamples() < frames)
+    {
+        if (liveWasPlaying) clearLivePitchState();
+        liveGrains.fill (LiveGrain {});
+        liveHistoryValidFrames = 0;
+        liveWriteSerial = 0;
+        liveSamplesToLaunch = 0;
+        liveSilenceFramesCount = 0;
+        liveActiveBar = -1;
+        liveActiveRevision = 0;
+        liveActiveTrajectory = {};
+        livePreviousX = 0.5f;
+        liveDirection = 1;
+        liveWetGain = 0.0f;
+        liveHavePreviousX = false;
+        liveHaveSignal = false;
+        livePendingTransition = false;
+        liveStationaryFrames = liveHoldPhase = 0;
+        liveHoldMix = 0.0f;
+        liveHoldReady = false;
+        liveWasPlaying = false;
+        return;
+    }
+
+    liveWasPlaying = true;
+    if (transport.resetHistory)
+    {
+        // A seek or fresh transport start invalidates the old audio timeline.
+        // Keep the monotonic serial, but require new samples before any grain
+        // can reference the ring again. Loop wraps deliberately retain it.
+        liveGrains.fill (LiveGrain {});
+        liveHistoryValidFrames = 0;
+        liveSamplesToLaunch = 0;
+        liveSilenceFramesCount = 0;
+        liveActiveBar = -1;
+        liveActiveRevision = 0;
+        liveActiveTrajectory = {};
+        livePreviousX = 0.5f;
+        liveDirection = 1;
+        liveWetGain = 0.0f;
+        liveHavePreviousX = false;
+        liveHaveSignal = false;
+        livePendingTransition = false;
+        liveStationaryFrames = liveHoldPhase = 0;
+        liveHoldMix = 0.0f;
+        liveHoldReady = false;
+        clearLivePitchState();
+    }
+    const auto sourceChannels = source.getNumChannels();
+    const auto rampFrames = juce::jmax (1, juce::roundToInt (sampleRate * 0.008));
+    const auto silenceFrames = juce::jmax (1, juce::roundToInt (sampleRate * 0.030));
+    const auto* sourceLeft = sourceChannels > 0 ? source.getReadPointer (0) : nullptr;
+    const auto* sourceRight = sourceChannels > 1 ? source.getReadPointer (1) : sourceLeft;
+    auto* outputLeft = outputChannels > 0 ? rendered.getWritePointer (0) : nullptr;
+    auto* outputRight = outputChannels > 1 ? rendered.getWritePointer (1) : nullptr;
+    auto* mask = readyMask.getWritePointer (0);
+    int silentFrames = liveSilenceFramesCount;
+
+    for (int i = 0; i < frames; ++i)
+    {
+        const auto dryLeft = sourceLeft != nullptr && std::isfinite (sourceLeft[i]) ? sourceLeft[i] : 0.0f;
+        const auto dryRight = sourceRight != nullptr && std::isfinite (sourceRight[i]) ? sourceRight[i] : dryLeft;
+        const auto writeIndex = static_cast<size_t> (liveWriteSerial
+            % static_cast<uint64_t> (liveHistoryCapacityFrames));
+        liveHistory[writeIndex * 2u] = dryLeft;
+        liveHistory[writeIndex * 2u + 1u] = dryRight;
+        liveHistorySerials[writeIndex] = liveWriteSerial;
+        ++liveWriteSerial;
+        liveHistoryValidFrames = juce::jmin (static_cast<uint64_t> (liveHistoryCapacityFrames),
+                                              liveHistoryValidFrames + 1u);
+        const auto newestSerial = liveWriteSerial - 1u;
+        const auto oldestSerial = newestSerial + 1u - liveHistoryValidFrames;
+
+        const auto isSilent = std::abs (dryLeft) < 1.0e-4f && std::abs (dryRight) < 1.0e-4f;
+        silentFrames = isSilent ? juce::jmin (silenceFrames, silentFrames + 1) : 0;
+        if (! isSilent) liveHaveSignal = true;
+        liveSilenceFramesCount = silentFrames;
+
+        int bar = -1;
+        double phase = 0.0;
+        sampleTimeline (transport, i, frames, bar, phase);
+        if (bar != liveActiveBar)
+        {
+            liveActiveBar = bar;
+            liveGrains.fill (LiveGrain {});
+            liveSamplesToLaunch = 0;
+            liveWetGain = 0.0f;
+            liveHavePreviousX = false;
+            livePendingTransition = false;
+            liveStationaryFrames = liveHoldPhase = 0;
+            liveHoldMix = 0.0f;
+            liveHoldReady = false;
+            Trajectory candidate;
+            if (publishedTrajectories != nullptr
+                && readTrajectory (publishedTrajectories[static_cast<size_t> (bar)], candidate))
+                liveActiveTrajectory = candidate;
+            else
+                liveActiveTrajectory = {};
+            liveActiveRevision = liveActiveTrajectory.revision;
+        }
+
+        float x = 0.5f, y = 0.5f;
+        interpolateTrajectory (liveActiveTrajectory, phase, x, y);
+        const auto pitchTargetSemitones = liveActiveTrajectory.count > 0
+            ? juce::jlimit (-12.0f, 12.0f, 24.0f * (y - 0.5f)) : 0.0f;
+        liveSmoothedSemitones += (pitchTargetSemitones - liveSmoothedSemitones)
+                               * livePitchSmoothingCoefficient;
+        x = juce::jlimit (0.0f, 1.0f, x);
+        auto direction = liveDirection;
+        auto targetJump = false;
+        if (liveHavePreviousX)
+        {
+            const auto delta = x - livePreviousX;
+            if (delta > 1.0e-6f) direction = 1;
+            else if (delta < -1.0e-6f) direction = -1;
+            targetJump = direction != liveDirection || std::abs (delta) > 0.05f;
+            liveStationaryFrames = std::abs (delta) <= 1.0e-6f
+                ? juce::jmin (juce::jmax (1, juce::roundToInt (sampleRate * 0.002)), liveStationaryFrames + 1)
+                : 0;
+        }
+        else
+            liveStationaryFrames = 0;
+        livePendingTransition = livePendingTransition || targetJump;
+        livePreviousX = x;
+        liveHavePreviousX = true;
+        liveDirection = direction;
+
+        const auto hasHistory = liveHistoryValidFrames >= static_cast<uint64_t> (liveWarmupFrames)
+                             && liveHistoryValidFrames >= static_cast<uint64_t> (liveGrainFrames);
+        const auto stationaryFramesRequired = juce::jmax (1, juce::roundToInt (sampleRate * 0.002));
+        if (! liveHoldReady && liveActiveTrajectory.count > 0 && hasHistory
+            && liveStationaryFrames >= stationaryFramesRequired && liveHoldSnapshot != nullptr)
+        {
+            const auto holdStart = newestSerial + 1u - static_cast<uint64_t> (liveGrainFrames);
+            bool holdCopyValid = true;
+            for (int holdFrame = 0; holdFrame < liveGrainFrames; ++holdFrame)
+            {
+                float left = 0.0f, right = 0.0f;
+                const auto serial = static_cast<double> (holdStart + static_cast<uint64_t> (holdFrame));
+                holdCopyValid = holdCopyValid
+                    && readLiveSample (serial, 0, oldestSerial, newestSerial, left)
+                    && readLiveSample (serial, 1, oldestSerial, newestSerial, right);
+                if (! holdCopyValid) break;
+                liveHoldSnapshot[static_cast<size_t> (holdFrame) * 2u] = left;
+                liveHoldSnapshot[static_cast<size_t> (holdFrame) * 2u + 1u] = right;
+            }
+            if (holdCopyValid)
+            {
+                liveHoldReady = true;
+                liveHoldPhase = 0;
+            }
+        }
+        if (liveActiveTrajectory.count > 0 && hasHistory && liveSamplesToLaunch <= 0)
+        {
+            launchLiveGrain (x, direction, livePendingTransition, oldestSerial, newestSerial);
+            livePendingTransition = false;
+            liveSamplesToLaunch = liveHopFrames;
+        }
+        if (liveSamplesToLaunch > 0) --liveSamplesToLaunch;
+
+        double wetLeft = 0.0, wetRight = 0.0, windowTotal = 0.0;
+        bool readFailure = false;
+        for (auto& grain : liveGrains)
+        {
+            if (! grain.active) continue;
+            if (grain.age >= liveGrainFrames)
+            {
+                grain.active = false;
+                continue;
+            }
+            if (grain.snapshotIndex < 0 || grain.snapshotIndex >= kLiveGrainCapacity)
+            {
+                readFailure = true;
+                grain.active = false;
+                continue;
+            }
+            const auto* snapshot = liveGrainSnapshots.get()
+                + static_cast<size_t> (grain.snapshotIndex) * static_cast<size_t> (liveGrainFrames) * 2u;
+            const auto left = snapshot[static_cast<size_t> (grain.age) * 2u];
+            const auto right = snapshot[static_cast<size_t> (grain.age) * 2u + 1u];
+            const auto windowPhase = static_cast<double> (grain.age)
+                                   / static_cast<double> (juce::jmax (1, liveGrainFrames - 1));
+            const auto window = 0.5 - 0.5 * std::cos (2.0 * kPi * windowPhase);
+            auto transitionGain = 1.0;
+            if (grain.fadeInFrames > 0)
+                transitionGain *= juce::jlimit (0.0, 1.0,
+                    static_cast<double> (grain.age) / grain.fadeInFrames);
+            if (grain.fadeOutRemaining > 0)
+            {
+                transitionGain *= juce::jlimit (0.0, 1.0,
+                    static_cast<double> (grain.fadeOutRemaining) / liveTransitionFrames);
+                --grain.fadeOutRemaining;
+            }
+            if (grain.fadeInFrames > 0 && grain.age >= grain.fadeInFrames)
+                grain.fadeInFrames = 0;
+            const auto weightedWindow = window * transitionGain;
+            wetLeft += static_cast<double> (left) * weightedWindow;
+            wetRight += static_cast<double> (right) * weightedWindow;
+            windowTotal += weightedWindow;
+            ++grain.age;
+        }
+
+        const auto holdTarget = liveHoldReady && liveStationaryFrames >= stationaryFramesRequired ? 1.0f : 0.0f;
+        const auto holdStep = 1.0f / static_cast<float> (juce::jmax (1, liveTransitionFrames));
+        if (liveHoldMix < holdTarget) liveHoldMix = juce::jmin (holdTarget, liveHoldMix + holdStep);
+        else if (liveHoldMix > holdTarget) liveHoldMix = juce::jmax (holdTarget, liveHoldMix - holdStep);
+        if (liveHoldReady && liveHoldSnapshot != nullptr && liveGrainFrames > 1)
+        {
+            const auto seamFrames = juce::jlimit (1, liveGrainFrames / 2,
+                                                   juce::roundToInt (sampleRate * 0.002));
+            const auto seamStart = liveGrainFrames - seamFrames;
+            const auto phase = juce::jlimit (0, liveGrainFrames - 1, liveHoldPhase);
+            auto loopLeft = liveHoldSnapshot[static_cast<size_t> (phase) * 2u];
+            auto loopRight = liveHoldSnapshot[static_cast<size_t> (phase) * 2u + 1u];
+            if (phase >= seamStart)
+            {
+                const auto blend = static_cast<double> (phase - seamStart)
+                    / static_cast<double> (juce::jmax (1, seamFrames - 1));
+                const auto head = phase - seamStart;
+                const auto a = std::cos (blend * kPi * 0.5);
+                const auto b = std::sin (blend * kPi * 0.5);
+                loopLeft = static_cast<float> (loopLeft * a
+                    + liveHoldSnapshot[static_cast<size_t> (head) * 2u] * b);
+                loopRight = static_cast<float> (loopRight * a
+                    + liveHoldSnapshot[static_cast<size_t> (head) * 2u + 1u] * b);
+            }
+            const auto normalizedLeft = windowTotal > 1.0e-9 ? wetLeft / windowTotal : 0.0;
+            const auto normalizedRight = windowTotal > 1.0e-9 ? wetRight / windowTotal : 0.0;
+            wetLeft = normalizedLeft * std::cos (liveHoldMix * kPi * 0.5)
+                    + static_cast<double> (loopLeft) * std::sin (liveHoldMix * kPi * 0.5);
+            wetRight = normalizedRight * std::cos (liveHoldMix * kPi * 0.5)
+                     + static_cast<double> (loopRight) * std::sin (liveHoldMix * kPi * 0.5);
+            windowTotal = 1.0;
+            liveHoldPhase = (liveHoldPhase + 1) % liveGrainFrames;
+            if (holdTarget == 0.0f && liveHoldMix == 0.0f)
+                liveHoldReady = false;
+        }
+
+        const auto hasWet = liveActiveTrajectory.count > 0 && hasHistory
+                         && windowTotal > 1.0e-9 && ! readFailure;
+        const auto sourceEnded = silentFrames >= silenceFrames;
+        if (sourceEnded)
+        {
+            // Do not let the rolling history replay a stale pre-silence grain
+            // after the live input resumes.
+            liveGrains.fill (LiveGrain {});
+            liveSamplesToLaunch = 0;
+            liveHistoryValidFrames = 0;
+            liveHaveSignal = false;
+            liveHoldReady = false;
+            liveHoldMix = 0.0f;
+            liveStationaryFrames = liveHoldPhase = 0;
+        }
+        const auto targetGain = hasWet && liveHaveSignal && ! sourceEnded ? 1.0f : 0.0f;
+        const auto step = 1.0f / static_cast<float> (rampFrames);
+        if (liveWetGain < targetGain) liveWetGain = juce::jmin (targetGain, liveWetGain + step);
+        else if (liveWetGain > targetGain) liveWetGain = juce::jmax (targetGain, liveWetGain - step);
+
+        auto xStageLeft = 0.0f, xStageRight = 0.0f;
+        if (hasWet || liveWetGain > 0.0f)
+        {
+            xStageLeft = windowTotal > 1.0e-9 ? static_cast<float> (wetLeft / windowTotal) : 0.0f;
+            xStageRight = windowTotal > 1.0e-9 ? static_cast<float> (wetRight / windowTotal) : 0.0f;
+        }
+        if (readFailure)
+        {
+            liveGrains.fill (LiveGrain {});
+            liveWetGain = 0.0f;
+            liveSamplesToLaunch = 0;
+        }
+        float delayedLeft = 0.0f, delayedRight = 0.0f, delayedMask = 0.0f;
+        processLivePitchSample (xStageLeft, xStageRight, liveSmoothedSemitones,
+                                readFailure ? 0.0f : liveWetGain,
+                                delayedLeft, delayedRight, delayedMask);
+        if (outputLeft != nullptr) outputLeft[i] = delayedLeft;
+        if (outputRight != nullptr) outputRight[i] = delayedRight;
+        mask[i] = delayedMask;
+    }
+}
+
 bool XYPadEngine::renderSlot (Slot& slot) noexcept
 {
     const auto frames = slot.frames.load (std::memory_order_acquire);
@@ -611,7 +1257,8 @@ bool XYPadEngine::renderScrubAndPitch (Slot& slot, int frames, int* longestTrans
             const auto phase = static_cast<double> (centre) / static_cast<double> (juce::jmax (1, frames - 1));
             float x = 0.5f, y = 0.5f;
             interpolateTrajectory (trajectory, phase, x, y);
-            const auto semitones = 24.0 * (0.5 - static_cast<double> (y));
+            // UI/state coordinates use y=1 at the top of the pad.
+            const auto semitones = 24.0 * (static_cast<double> (y) - 0.5);
             const auto ratio = std::pow (2.0, semitones / 12.0);
             const auto offset = -fftSize / 2;
             std::fill_n (fftWork.get(), static_cast<size_t> (fftSize) * 2u, 0.0f);
@@ -767,16 +1414,22 @@ XYPadEngine::State XYPadEngine::getState (int bar) const noexcept
 }
 
 float XYPadEngine::mixLayers (float dry, float presetOutput, float xyWet,
-                              float depth, bool presetActive) noexcept
+                              float depth, bool presetActive, float xyBlend) noexcept
 {
     const auto boundedDepth = juce::jlimit (0.0f, 1.0f, depth);
     if (boundedDepth <= 0.0f)
         return dry;
+    const auto boundedXyBlend = juce::jlimit (0.0f, 1.0f,
+        std::isfinite (xyBlend) ? xyBlend : 0.0f);
     if (! presetActive)
-        return dry * (1.0f - boundedDepth) + xyWet * boundedDepth;
+        return dry * (1.0f - boundedDepth)
+             + boundedDepth * (dry * (1.0f - boundedXyBlend) + xyWet * boundedXyBlend);
 
     constexpr float equalPower = 0.7071067811865475f;
     const auto presetWet = (presetOutput - dry * (1.0f - boundedDepth)) / boundedDepth;
-    return dry * (1.0f - boundedDepth)
-         + boundedDepth * (equalPower * presetWet + equalPower * xyWet);
+    const auto layered = dry * (1.0f - boundedDepth)
+                       + boundedDepth * (equalPower * presetWet + equalPower * xyWet);
+    // Fade from the unchanged preset path into the parallel XY/preset mix. This
+    // keeps XY's warmup and source-silence ramps from dipping the preset level.
+    return presetOutput + (layered - presetOutput) * boundedXyBlend;
 }

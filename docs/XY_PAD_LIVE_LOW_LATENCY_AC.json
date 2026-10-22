@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "approvedBy": "Sol",
+  "status": "APPROVED",
+  "approvedPlanSha256": "afecb981150273788a022eb2c1abd5bc5a65507dbff507f5787f750cefca6407",
+  "criteria": [
+    {"id":"AC-01","requirement":"The 64 saved BAR trajectories remain independent and retain exact save/restore data.","check":["PASS:XYPadEngineTests:64-bar-trajectory-independence-and-roundtrip"]},
+    {"id":"AC-02","requirement":"A trajectory on BAR 4 affects its first live pass without waiting for another loop.","check":["PASS:XYPadEngineTests:first-visit-BAR4-live-wet"]},
+    {"id":"AC-03","requirement":"Cold start waits no longer than 20 ms valid history, then reaches specified Wet within 8 ms after the fixed 1024-sample pipeline delay.","check":["PASS:XYPadEngineTests:cold-start-warmup-and-ramp"]},
+    {"id":"AC-04","requirement":"X rise/fall reads forward/reverse with scalar linear-reference error at most 2e-6 and no unsafe reads.","check":["PASS:XYPadEngineTests:forward-reverse-reference-and-bounds"]},
+    {"id":"AC-05","requirement":"Stationary X uses a 20 ms grain with 2 ms seam; resume, folds, and jumps crossfade within 3 ms and remain finite.","check":["PASS:XYPadEngineTests:hold-fold-jump-transitions"]},
+    {"id":"AC-06","requirement":"UI Y top/center/bottom maps to +12/0/-12 semitones with stable-tone frequency error at most 1 percent.","check":["PASS:XYPadEngineTests:pitch-sign-range-frequency"]},
+    {"id":"AC-07","requirement":"Changing Y does not change X read position, direction, or BAR phase.","check":["PASS:XYPadEngineTests:pitch-independent-of-scrub"]},
+    {"id":"AC-08","requirement":"The complete processor pipeline has exactly 1024 samples latency independent of block size.","check":["PASS:RuntimeSmokeTests:fixed-1024-sample-latency"]},
+    {"id":"AC-09","requirement":"Depth zero and bypass equal bit-exact delayed Dry; preset-only equals legacy preset output delayed exactly 1024 samples.","check":["PASS:RuntimeSmokeTests:delayed-dry-bypass-and-legacy-preset"]},
+    {"id":"AC-10","requirement":"XY-only, preset-only, combined, preset OFF plus XY, no trajectory, insufficient history, silence, bypass, and STOP are distinct; XY unavailability never disables preset.","check":["PASS:RuntimeSmokeTests:xy-preset-layer-independence"]},
+    {"id":"AC-11","requirement":"Host Sync ON/OFF, tempo changes, 4/8 BAR loops and 64 BAR processing retain sample-accurate slot and control timing across variable blocks.","check":["PASS:XYPadEngineTests:transport-and-trajectory-phase"]},
+    {"id":"AC-12","requirement":"Seek and STOP/restart never replay stale XY audio; normal BAR and loop boundaries preserve valid live history.","check":["PASS:XYPadEngineTests:transport-state-invalidation-and-history"]},
+    {"id":"AC-13","requirement":"Stereo relationship is preserved; output remains finite; 30 ms source silence fades XY to dry in 8 ms and same-BAR live resume works; correlated peaks are measured.","check":["PASS:XYPadEngineTests:stereo-silence-resume-and-peak"]},
+    {"id":"AC-14","requirement":"Audio processing performs no allocation, lock, ValueTree access, I/O, logging, or blocking and handles supported variable blocks using fixed memory.","check":["PASS:XYPadEngineTests:realtime-safety-and-variable-blocks"]},
+    {"id":"AC-15","requirement":"XY DSP, scratch engine, Runtime Smoke, StateModel, aggregate validations and Windows VST3 CI pass on the same committed source HEAD.","check":["PASS:Windows-CI:all-required-validation-jobs"]},
+    {"id":"AC-16","requirement":"Jev 1.13 individually passes all AC, Sol approves exact diff/evidence, and artifact/source/tree/AMD64 binary hashes match before candidate promotion; FL validation remains NOT TESTED.","check":["PASS:PlanComplianceGate:all-AC-Jev-Sol-and-artifact-provenance"]}
+  ],
+  "deterministicTests": [
+    {"id":"xy-engine","command":["cmake","--build","<build-dir>","--target","ToyotomiHideyoshiXYEngineTests"]},
+    {"id":"scratch-engine","command":["cmake","--build","<build-dir>","--target","ToyotomiHideyoshiScratchEngineTests"]},
+    {"id":"runtime-smoke","command":["cmake","--build","<build-dir>","--target","ToyotomiHideyoshiRuntimeSmoke"]},
+    {"id":"state-model","command":["cmake","--build","<build-dir>","--target","ToyotomiHideyoshiStateTests"]}
+  ]
+}

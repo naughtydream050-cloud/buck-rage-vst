@@ -32,6 +32,7 @@ public:
         double quartersPerBar = 4.0;
         double secondsPerQuarter = 0.5;
         uint32_t timingGeneration = 0;
+        bool resetHistory = false;
     };
 
     XYPadEngine() noexcept;
@@ -54,9 +55,16 @@ public:
                   juce::AudioBuffer<float>& readyMask,
                   const Transport& transport, int frameCount) noexcept;
 
+    // Low-latency live path. Unlike process(), this never waits for a full BAR
+    // capture or the background renderer; it reads only from bounded recent input.
+    void processLive (const juce::AudioBuffer<float>& source,
+                      juce::AudioBuffer<float>& rendered,
+                      juce::AudioBuffer<float>& readyMask,
+                      const Transport& transport, int frameCount) noexcept;
+
     State getState (int bar) const noexcept;
     static float mixLayers (float dry, float presetOutput, float xyWet,
-                            float depth, bool presetActive) noexcept;
+                            float depth, bool presetActive, float xyBlend = 1.0f) noexcept;
     int getMaxFramesPerBar() const noexcept { return maxFramesPerBar; }
     bool isEnabled() const noexcept { return enabled.load (std::memory_order_acquire); }
 
@@ -93,12 +101,30 @@ private:
         uint32_t bar = 0;
         uint32_t generation = 0;
     };
+    struct LiveGrain
+    {
+        double startSerial = 0.0;
+        int direction = 1;
+        int age = 0;
+        int fadeInFrames = 0;
+        int fadeOutRemaining = 0;
+        int snapshotIndex = -1;
+        bool active = false;
+    };
 
     static_assert (std::atomic<uint32_t>::is_always_lock_free,
                    "XY trajectory publication requires lock-free 32-bit atomics");
     static_assert (std::atomic<State>::is_always_lock_free,
                    "XY slot state publication requires lock-free atomics");
     static float interpolate (const float* source, int frames, double position, int stride = 1) noexcept;
+    bool readLiveSample (double serial, int channel, uint64_t oldestSerial,
+                         uint64_t newestSerial, float& value) const noexcept;
+    void launchLiveGrain (float x, int direction, bool transition,
+                          uint64_t oldestSerial, uint64_t newestSerial) noexcept;
+    void processLivePitchSample (float inputLeft, float inputRight, float semitones,
+                                 float wetMask, float& outputLeft, float& outputRight,
+                                 float& outputMask) noexcept;
+    void clearLivePitchState() noexcept;
     static void sampleTimeline (const Transport&, int sample, int totalSamples,
                                 int& bar, double& phase) noexcept;
     static bool readTrajectory (const AtomicTrajectory&, Trajectory&) noexcept;
@@ -132,8 +158,55 @@ private:
     std::unique_ptr<double[]> previousInputPhase, synthesisPhase;
     std::unique_ptr<uint8_t[]> phaseInitialized;
     std::unique_ptr<juce::dsp::FFT> fft;
+    static constexpr double kLiveHistorySeconds = 0.125;
+    static constexpr double kLiveWarmupSeconds = 0.020;
+    static constexpr double kLiveGrainSeconds = 0.020;
+    static constexpr double kLiveHopSeconds = 0.010;
+    static constexpr uint64_t kMaxLiveHistoryFrames = 12002;
+    static constexpr int kLiveGrainCapacity = 8;
+    std::unique_ptr<float[]> liveHistory;
+    std::unique_ptr<float[]> liveGrainSnapshots;
+    std::unique_ptr<float[]> liveHoldSnapshot;
+    std::unique_ptr<uint64_t[]> liveHistorySerials;
+    static constexpr int kLivePitchFftSize = 1024;
+    static constexpr int kLivePitchHopSize = 256;
+    static constexpr int kLivePipelineLatency = 1024;
+    static constexpr int kLivePitchBins = kLivePitchFftSize / 2 + 1;
+    static constexpr int kLivePitchOlaCapacity = 2048;
+    std::unique_ptr<juce::dsp::FFT> livePitchFft;
+    std::unique_ptr<float[]> livePitchFftWork, livePitchFftWork2;
+    std::unique_ptr<float[]> livePitchInputRing, livePitchIdentityDelay;
+    std::unique_ptr<float[]> livePitchSemitoneDelay, livePitchMaskDelay;
+    std::unique_ptr<float[]> livePitchOlaLeft, livePitchOlaRight, livePitchOlaNorm;
+    std::unique_ptr<double[]> livePitchPreviousPhase, livePitchSynthesisPhase;
+    std::unique_ptr<uint8_t[]> livePitchPhaseInitialized;
+    uint64_t livePitchSerial = 0;
+    float liveSmoothedSemitones = 0.0f, livePitchWetMix = 0.0f;
+    float livePitchSmoothingCoefficient = 0.0f;
+    std::array<LiveGrain, kLiveGrainCapacity> liveGrains {};
+    uint64_t liveWriteSerial = 0;
+    uint64_t liveHistoryValidFrames = 0;
+    int liveHistoryCapacityFrames = 0;
+    int liveWarmupFrames = 0;
+    int liveGrainFrames = 0;
+    int liveHopFrames = 0;
+    int liveTransitionFrames = 0;
+    int liveSamplesToLaunch = 0;
+    int liveSilenceFramesCount = 0;
+    int liveStationaryFrames = 0, liveHoldPhase = 0;
+    int liveActiveBar = -1;
+    uint32_t liveActiveRevision = 0;
+    Trajectory liveActiveTrajectory {};
+    float livePreviousX = 0.5f;
+    float liveWetGain = 0.0f;
+    float liveHoldMix = 0.0f;
+    int liveDirection = 1;
+    bool liveHavePreviousX = false, liveHaveSignal = false, livePendingTransition = false;
+    bool liveHoldReady = false;
+    bool liveWasPlaying = false;
     int fftSize = 2048, hopSize = 512;
     std::atomic<bool> enabled { false }, workerExit { false };
     std::thread worker;
     std::mutex nonRealtimeLifecycleMutex;
+
 };

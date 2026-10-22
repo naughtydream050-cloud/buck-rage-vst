@@ -160,6 +160,176 @@ public:
             if (! engine.enqueueRenderJob ({ i % XYPadEngine::kBarCount, i + 1u })) return false;
         return ! engine.enqueueRenderJob ({ 0u, 999u });
     }
+
+    static bool liveGrainDirectionIsCorrect()
+    {
+        XYPadEngine engine;
+        if (! engine.prepare (48000.0, 64)) return false;
+        const auto capacity = static_cast<size_t> (engine.liveHistoryCapacityFrames);
+        if (! engine.liveHistory || ! engine.liveHistorySerials || capacity < 64u)
+        {
+            engine.release();
+            return false;
+        }
+        for (uint64_t serial = 0; serial < 64; ++serial)
+        {
+            const auto index = static_cast<size_t> (serial % capacity);
+            engine.liveHistory[index * 2u] = static_cast<float> (serial);
+            engine.liveHistory[index * 2u + 1u] = -static_cast<float> (serial);
+            engine.liveHistorySerials[index] = serial;
+        }
+        engine.liveGrainFrames = 20;
+        engine.liveTransitionFrames = 3;
+        engine.liveHistoryValidFrames = 64;
+        const auto oldest = uint64_t { 0 };
+        const auto newest = uint64_t { 63 };
+        engine.launchLiveGrain (0.5f, 1, false, oldest, newest);
+        auto forward = engine.liveGrains[0];
+        float first = 0.0f, second = 0.0f;
+        const auto* forwardSnapshot = engine.liveGrainSnapshots.get()
+            + static_cast<size_t> (forward.snapshotIndex) * static_cast<size_t> (engine.liveGrainFrames) * 2u;
+        const auto frozenFirst = forwardSnapshot[0];
+        for (uint64_t serial = 0; serial < 64; ++serial)
+            engine.liveHistory[static_cast<size_t> (serial % capacity) * 2u] = -999.0f;
+        auto valid = forward.active && forward.direction == 1
+            && engine.readLiveSample (forward.startSerial, 0, oldest, newest, first)
+            && engine.readLiveSample (forward.startSerial + 1.0, 0, oldest, newest, second)
+            && second > first && forwardSnapshot[0] == frozenFirst
+            && forwardSnapshot[0] != -999.0f;
+        for (uint64_t serial = 0; serial < 64; ++serial)
+            engine.liveHistory[static_cast<size_t> (serial % capacity) * 2u] = static_cast<float> (serial);
+        engine.liveGrains.fill (XYPadEngine::LiveGrain {});
+        engine.launchLiveGrain (0.5f, -1, true, oldest, newest);
+        const auto reverse = engine.liveGrains[0];
+        valid = valid && reverse.active && reverse.direction == -1
+            && engine.readLiveSample (reverse.startSerial, 0, oldest, newest, first)
+            && engine.readLiveSample (reverse.startSerial - 1.0, 0, oldest, newest, second)
+            && second < first && reverse.fadeInFrames == 3
+            && reverse.startSerial >= static_cast<double> (oldest)
+            && reverse.startSerial <= static_cast<double> (newest)
+            && reverse.startSerial + reverse.direction * 19.0 >= static_cast<double> (oldest)
+            && reverse.startSerial + reverse.direction * 19.0 <= static_cast<double> (newest);
+        engine.release();
+        return valid;
+    }
+
+    static bool stationaryLiveTrajectoryFreezesAndLoops()
+    {
+        XYPadEngine engine;
+        if (! engine.prepare (48000.0, 256)) return false;
+        const std::vector<PluginStateModel::MotionPoint> stationary {
+            { 0.5f, 0.5f, 0.0 }, { 0.5f, 0.5f, 1.0 }
+        };
+        engine.setTrajectory (0, stationary, 91);
+        juce::AudioBuffer<float> input (2, 256), output (2, 256), mask (1, 256);
+        uint64_t processed = 0;
+        const auto processSignal = [&] (float amplitude)
+        {
+            for (int i = 0; i < 256; ++i)
+            {
+                const auto sample = amplitude * std::sin (2.0 * 3.141592653589793 * 440.0
+                                                         * static_cast<double> (processed + i) / 48000.0);
+                input.setSample (0, i, static_cast<float> (sample));
+                input.setSample (1, i, static_cast<float> (sample * 0.5));
+            }
+            XYPadEngine::Transport transport;
+            transport.playing = true;
+            transport.startBar = 0;
+            transport.startPhase = static_cast<double> (processed) / 128000.0;
+            transport.phasePerSample = 1.0 / 128000.0;
+            engine.processLive (input, output, mask, transport, 256);
+            processed += 256;
+        };
+        for (int block = 0; block < 7; ++block) processSignal (0.4f);
+        const auto frozen = engine.liveHoldReady && engine.liveHoldMix >= 0.999f;
+        const auto heldSample = engine.liveHoldSnapshot != nullptr ? engine.liveHoldSnapshot[64] : 0.0f;
+        processSignal (0.1f);
+        const auto remainsFrozen = engine.liveHoldReady && engine.liveHoldMix >= 0.999f
+            && engine.liveHoldSnapshot[64] == heldSample;
+        engine.release();
+        return frozen && remainsFrozen;
+    }
+
+    static bool livePipelineHasExact1024SampleIdentityDelay()
+    {
+        XYPadEngine engine;
+        if (! engine.prepare (48000.0, 256, true)) return false;
+        bool exact = true;
+        float outL = 0.0f, outR = 0.0f, mask = 0.0f;
+        for (int sample = 0; sample <= XYPadEngine::kLivePipelineLatency; ++sample)
+        {
+            const auto inL = sample == 0 ? 0.75f : 0.0f;
+            const auto inR = sample == 0 ? -0.25f : 0.0f;
+            engine.processLivePitchSample (inL, inR, 0.0f, sample == 0 ? 1.0f : 0.0f,
+                                           outL, outR, mask);
+            if (sample < XYPadEngine::kLivePipelineLatency)
+                exact = exact && outL == 0.0f && outR == 0.0f && mask == 0.0f;
+            else
+                exact = exact && outL == 0.75f && outR == -0.25f && mask == 1.0f;
+        }
+        engine.release();
+        return exact;
+    }
+
+    static double renderLivePitchFrequency (double rate, float y, bool reverseX,
+                                            bool& finite, bool& noAllocation,
+                                            int& direction, uint64_t& pitchSerial)
+    {
+        XYPadEngine engine;
+        constexpr int maximumBlock = 1024;
+        if (! engine.prepare (rate, maximumBlock, true)) return 0.0;
+        const std::vector<PluginStateModel::MotionPoint> points = reverseX
+            ? std::vector<PluginStateModel::MotionPoint> {{ 0.8f, y, 0.0 }, { 0.2f, y, 2.0 }}
+            : std::vector<PluginStateModel::MotionPoint> {{ 0.2f, y, 0.0 }, { 0.8f, y, 2.0 }};
+        engine.setTrajectory (0, points, 1);
+        juce::AudioBuffer<float> input (2, maximumBlock), output (2, maximumBlock), mask (1, maximumBlock);
+        std::vector<float> rendered (static_cast<size_t> (rate));
+        constexpr std::array<int, 5> blockPattern {{ 64, 127, 256, 512, 1024 }};
+        uint64_t processed = 0;
+        finite = true;
+        AllocationAudit::count.store (0, std::memory_order_relaxed);
+        AllocationAudit::enabled.store (true, std::memory_order_release);
+        size_t blockIndex = 0;
+        while (processed < rendered.size())
+        {
+            const auto block = juce::jmin (blockPattern[blockIndex++ % blockPattern.size()],
+                static_cast<int> (rendered.size() - static_cast<size_t> (processed)));
+            for (int i = 0; i < block; ++i)
+            {
+                const auto phase = 2.0 * 3.141592653589793 * 440.0 * static_cast<double> (processed + static_cast<uint64_t> (i)) / rate;
+                const auto sample = static_cast<float> (0.5 * std::sin (phase));
+                input.setSample (0, i, sample);
+                input.setSample (1, i, sample * 0.5f);
+            }
+            XYPadEngine::Transport transport;
+            transport.playing = true;
+            transport.startBar = 0;
+            transport.startPhase = static_cast<double> (processed) / (rate * 2.0);
+            transport.phasePerSample = 1.0 / (rate * 2.0);
+            engine.processLive (input, output, mask, transport, block);
+            for (int i = 0; i < block; ++i)
+            {
+                const auto index = static_cast<size_t> (processed + static_cast<uint64_t> (i));
+                rendered[index] = output.getSample (0, i);
+                finite = finite && std::isfinite (output.getSample (0, i))
+                    && std::isfinite (output.getSample (1, i)) && std::isfinite (mask.getSample (0, i));
+            }
+            processed += static_cast<uint64_t> (block);
+        }
+        AllocationAudit::enabled.store (false, std::memory_order_release);
+        noAllocation = AllocationAudit::count.load (std::memory_order_relaxed) == 0;
+        direction = engine.liveDirection;
+        pitchSerial = engine.livePitchSerial;
+        const auto start = static_cast<size_t> (rate * 0.30);
+        const auto end = static_cast<size_t> (rate * 0.80);
+        int crossings = 0;
+        for (size_t i = start + 1; i < end; ++i)
+            if ((rendered[i - 1] <= 0.0f && rendered[i] > 0.0f)
+                || (rendered[i - 1] >= 0.0f && rendered[i] < 0.0f)) ++crossings;
+        const auto frequency = crossings * rate / (2.0 * static_cast<double> (end - start));
+        engine.release();
+        return frequency;
+    }
 };
 
 namespace
@@ -310,6 +480,8 @@ int main()
     const auto zeroDepth = XYPadEngine::mixLayers (dryBits, 0.0f, 1.0f, 0.0f, true);
     check (std::memcmp (&dryBits, &zeroDepth, sizeof (float)) == 0,
            "depth-zero-bit-exact-dry");
+    const auto xyBlendZero = XYPadEngine::mixLayers (0.1f, 0.37f, -0.3f, 0.6f, true, 0.0f);
+    check (xyBlendZero == 0.37f, "xy-warmup-does-not-change-existing-preset-output");
     const auto xyOnly = XYPadEngine::mixLayers (0.25f, 0.25f, -0.5f, 0.4f, false);
     check (std::abs (xyOnly - (-0.05f)) < 1.0e-6f, "xy-only-depth-law");
     const auto presetWet = 0.2f;
@@ -415,6 +587,146 @@ int main()
     };
     check (std::abs (estimateFrequency (dummyOutput, 48000, 72000) - 440.0) / 440.0 < 0.01,
            "pitch-middle-zero-semitones-preserves-frequency");
+
+    check (XYPadEngineTestAccess::liveGrainDirectionIsCorrect(),
+           "live-grains-read-forward-and-reverse-within-valid-serial-range-and-snapshot-source");
+    check (XYPadEngineTestAccess::stationaryLiveTrajectoryFreezesAndLoops(),
+           "live-stationary-xy-freezes-a-bounded-grain-and-holds-it-across-blocks");
+    XYPadEngine liveProbe;
+    const auto livePrepared = liveProbe.prepare (48000.0, 512);
+    std::vector<PluginStateModel::MotionPoint> liveBarFour {{ 0.0f, 0.5f, 0.0 },
+                                                            { 1.0f, 0.5f, 1.0 }};
+    liveProbe.setTrajectory (3, liveBarFour, 44);
+    juce::AudioBuffer<float> liveInput (2, 512), liveOutput (2, 512), liveMask (1, 512);
+    int liveProcessed = 0;
+    int firstFullWet = -1;
+    bool liveFinite = livePrepared;
+    constexpr int liveTestFrames = 4200;
+    AllocationAudit::count.store (0, std::memory_order_relaxed);
+    AllocationAudit::enabled.store (true, std::memory_order_release);
+    while (livePrepared && liveProcessed < liveTestFrames)
+    {
+        const auto blockFrames = juce::jmin (512, liveTestFrames - liveProcessed);
+        for (int i = 0; i < blockFrames; ++i)
+        {
+            liveInput.setSample (0, i, 0.5f);
+            liveInput.setSample (1, i, -0.25f);
+        }
+        XYPadEngine::Transport liveTransport;
+        liveTransport.playing = true;
+        liveTransport.startBar = 3;
+        liveTransport.startPhase = static_cast<double> (liveProcessed) / 128000.0;
+        liveTransport.phasePerSample = 1.0 / 128000.0;
+        liveProbe.processLive (liveInput, liveOutput, liveMask, liveTransport, blockFrames);
+        for (int i = 0; i < blockFrames; ++i)
+        {
+            const auto absolute = liveProcessed + i;
+            const auto maskValue = liveMask.getSample (0, i);
+            liveFinite = liveFinite && std::isfinite (maskValue)
+                && std::isfinite (liveOutput.getSample (0, i))
+                && std::isfinite (liveOutput.getSample (1, i));
+            if (absolute < 960)
+                liveFinite = liveFinite && maskValue == 0.0f;
+            if (firstFullWet < 0 && maskValue >= 0.99f)
+                firstFullWet = absolute;
+        }
+        liveProcessed += blockFrames;
+    }
+    int silentRemaining = 4200;
+    float silenceFinalMask = 1.0f;
+    while (livePrepared && silentRemaining > 0)
+    {
+        const auto blockFrames = juce::jmin (512, silentRemaining);
+        liveInput.clear();
+        XYPadEngine::Transport liveTransport;
+        liveTransport.playing = true;
+        liveTransport.startBar = 3;
+        liveTransport.startPhase = static_cast<double> (liveProcessed) / 128000.0;
+        liveTransport.phasePerSample = 1.0 / 128000.0;
+        liveProbe.processLive (liveInput, liveOutput, liveMask, liveTransport, blockFrames);
+        silenceFinalMask = liveMask.getSample (0, blockFrames - 1);
+        liveProcessed += blockFrames;
+        silentRemaining -= blockFrames;
+    }
+    float resumedMaximumMask = 0.0f;
+    int resumeRemaining = 4200;
+    while (livePrepared && resumeRemaining > 0)
+    {
+        const auto blockFrames = juce::jmin (512, resumeRemaining);
+        for (int i = 0; i < blockFrames; ++i)
+        {
+            liveInput.setSample (0, i, 0.5f);
+            liveInput.setSample (1, i, -0.25f);
+        }
+        XYPadEngine::Transport liveTransport;
+        liveTransport.playing = true;
+        liveTransport.startBar = 3;
+        liveTransport.startPhase = static_cast<double> (liveProcessed) / 128000.0;
+        liveTransport.phasePerSample = 1.0 / 128000.0;
+        liveProbe.processLive (liveInput, liveOutput, liveMask, liveTransport, blockFrames);
+        resumedMaximumMask = juce::jmax (resumedMaximumMask, liveMask.getMagnitude (0, 0, blockFrames));
+        liveProcessed += blockFrames;
+        resumeRemaining -= blockFrames;
+    }
+    AllocationAudit::enabled.store (false, std::memory_order_release);
+    std::cout << "METRIC xy_live first_full_wet_sample=" << firstFullWet
+              << " expected_min=" << 2300 << " expected_max=" << 2800
+              << " silence_final_mask=" << silenceFinalMask
+              << " resumed_max_mask=" << resumedMaximumMask
+              << " allocations=" << AllocationAudit::count.load (std::memory_order_relaxed)
+              << " finite=" << liveFinite << "\n";
+    check (livePrepared && firstFullWet >= 2300 && firstFullWet <= 2800 && liveFinite,
+           "first-visit-bar4-live-wet-after-20ms-history-plus-1024-sample-pipeline-and-8ms-ramp");
+    check (livePrepared && silenceFinalMask == 0.0f && resumedMaximumMask >= 0.99f,
+           "live-xy-source-silence-returns-dry-and-reacquires-within-same-bar");
+    check (AllocationAudit::count.load (std::memory_order_relaxed) == 0,
+           "live-xy-processing-performs-no-heap-allocation");
+    liveProbe.release();
+
+    check (XYPadEngineTestAccess::livePipelineHasExact1024SampleIdentityDelay(),
+           "live-pitch-neutral-identity-has-exact-1024-sample-delay");
+    bool pitchMatrixFinite = true, pitchMatrixNoAllocation = true, pitchDirectionsIndependent = true;
+    std::array<int, 2> directions {};
+    std::array<uint64_t, 2> pitchSerials {};
+    bool pitchRanges = true;
+    for (const auto rate : { 44100.0, 48000.0, 96000.0 })
+    {
+        for (const auto y : { 1.0f, 0.5f, 0.0f })
+        {
+            bool finiteAtRate = true, noAllocationAtRate = true;
+            int directionAtRate = 0;
+            uint64_t serialAtRate = 0;
+            const auto frequency = XYPadEngineTestAccess::renderLivePitchFrequency (
+                rate, y, false, finiteAtRate, noAllocationAtRate, directionAtRate, serialAtRate);
+            const auto expected = y > 0.75f ? 880.0 : (y < 0.25f ? 220.0 : 440.0);
+            pitchRanges &= std::abs (frequency - expected) / expected < 0.01;
+            pitchMatrixFinite &= finiteAtRate;
+            pitchMatrixNoAllocation &= noAllocationAtRate;
+            if (rate == 48000.0)
+            {
+                directions[0] = directionAtRate;
+                pitchSerials[0] = serialAtRate;
+            }
+        }
+        bool reverseFinite = true, reverseNoAllocation = true;
+        int reverseDirection = 0;
+        uint64_t reverseSerial = 0;
+        const auto reverseFrequency = XYPadEngineTestAccess::renderLivePitchFrequency (
+            rate, 1.0f, true, reverseFinite, reverseNoAllocation, reverseDirection, reverseSerial);
+        pitchMatrixFinite &= reverseFinite && std::abs (reverseFrequency - 880.0) / 880.0 < 0.01;
+        pitchMatrixNoAllocation &= reverseNoAllocation;
+        if (rate == 48000.0)
+        {
+            directions[1] = reverseDirection;
+            pitchSerials[1] = reverseSerial;
+            pitchDirectionsIndependent = directions[0] == 1 && directions[1] == -1
+                && pitchSerials[0] == pitchSerials[1];
+        }
+    }
+    check (pitchRanges, "live-pitch-top-center-bottom-map-to-plus12-zero-minus12-st");
+    check (pitchMatrixFinite && pitchMatrixNoAllocation,
+           "live-pitch-is-finite-and-allocation-free-at-44k1-48k-96k-forward-and-reverse");
+    check (pitchDirectionsIndependent, "live-pitch-y-does-not-change-x-direction-or-sample-clock");
 
     juce::File wavFile = juce::File::getCurrentWorkingDirectory().getChildFile ("xy-diagnostic-forward-neutral.wav");
     auto stream = wavFile.createOutputStream();
