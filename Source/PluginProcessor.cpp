@@ -475,11 +475,9 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
             xyReadyMask.getSample (0, i)) : 0.0f;
         const auto readIndex = static_cast<size_t> (outputDelayWriteIndex);
         const auto delayedDepthValue = delayedDepth[readIndex];
-        const auto delayedBlendValue = delayedXyBlend[readIndex];
         const auto delayedPresetValue = delayedPresetActive[readIndex] != 0;
         const auto delayedBypassValue = delayedXyBypass[readIndex] != 0;
         delayedDepth[readIndex] = currentDepth;
-        delayedXyBlend[readIndex] = currentXyBlend;
         delayedPresetActive[readIndex] = currentPresetActive ? 1u : 0u;
         delayedXyBypass[readIndex] = currentXyBypass ? 1u : 0u;
         for (int channel = 0; channel < channels; ++channel)
@@ -491,7 +489,9 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
             const auto xy = hasXyBlock ? xyRenderedBuffer.getSample (channel, i) : 0.0f;
             delayedDry[static_cast<size_t> (channel)][readIndex] = inputDry;
             delayedPreset[static_cast<size_t> (channel)][readIndex] = inputPreset;
-            const auto blend = delayedBypassValue ? 0.0f : delayedBlendValue;
+            // XY's ready mask is already delayed by its 1024-sample pitch
+            // pipeline. Delaying it again here would misalign it with XY PCM.
+            const auto blend = delayedBypassValue ? 0.0f : currentXyBlend;
             buffer.setSample (channel, i, XYPadEngine::mixLayers (dry, preset, xy,
                 delayedDepthValue, delayedPresetValue, blend));
         }

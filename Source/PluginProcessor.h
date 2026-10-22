@@ -85,7 +85,6 @@ private:
     std::array<std::array<float, xyReportedLatencySamples>, 2> delayedDry {};
     std::array<std::array<float, xyReportedLatencySamples>, 2> delayedPreset {};
     std::array<float, xyReportedLatencySamples> delayedDepth {};
-    std::array<float, xyReportedLatencySamples> delayedXyBlend {};
     std::array<uint8_t, xyReportedLatencySamples> delayedPresetActive {}, delayedXyBypass {};
     int outputDelayWriteIndex = 0;
     uint32_t xyTimingGeneration = 1;
