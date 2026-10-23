@@ -6,6 +6,10 @@
 #include <cstring>
 #include <limits>
 #include <new>
+#if defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+ #include <emmintrin.h>
+ #define TOYOTOMI_XY_HAS_SSE2 1
+#endif
 
 namespace
 {
@@ -951,6 +955,63 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                 {
                 const auto age = grain.age + frame;
                 const auto validHannFrame = age > 0 && age < liveGrainFrames - 1;
+#if defined(TOYOTOMI_XY_HAS_SSE2)
+                const auto previousFrame = liveReentryTailPosition + frame;
+                const auto canBlendTwoFrames = previousTail == nullptr
+                    || previousFrame + 1 < liveReentryTailFrames;
+                const auto twoSourceFramesContiguous = grain.direction >= 0
+                    ? lowerIndex + 1u < capacity && upperIndex + 1u < capacity
+                    : lowerIndex > 0u && upperIndex > 0u;
+                if (validHannFrame && age + 1 < liveGrainFrames - 1
+                    && frame + 1 < liveReentryTailFrames && canBlendTwoFrames
+                    && twoSourceFramesContiguous)
+                {
+                    const auto* history = liveHistory;
+                    const auto loadPair = [history, &grain] (size_t index) noexcept
+                    {
+                        if (grain.direction >= 0)
+                            return _mm_loadu_ps (history + index * 2u);
+                        const auto reversed = _mm_loadu_ps (history + (index - 1u) * 2u);
+                        return _mm_shuffle_ps (reversed, reversed, _MM_SHUFFLE (1, 0, 3, 2));
+                    };
+                    auto target = loadPair (lowerIndex);
+                    const auto upper = loadPair (upperIndex);
+                    const auto frac = _mm_set1_ps (fraction);
+                    target = _mm_add_ps (target, _mm_mul_ps (_mm_sub_ps (upper, target), frac));
+                    if (previousTail != nullptr)
+                    {
+                        const auto q0 = static_cast<float> (previousFrame)
+                                      / static_cast<float> (liveReentryTailFrames - 1);
+                        const auto q1 = static_cast<float> (previousFrame + 1)
+                                      / static_cast<float> (liveReentryTailFrames - 1);
+                        const auto q = _mm_setr_ps (q0, q0, q1, q1);
+                        const auto old = _mm_loadu_ps (previousTail
+                            + static_cast<size_t> (previousFrame) * 2u);
+                        target = _mm_add_ps (_mm_mul_ps (old, _mm_sub_ps (_mm_set1_ps (1.0f), q)),
+                                             _mm_mul_ps (target, q));
+                    }
+                    const auto magnitude = _mm_andnot_ps (_mm_set1_ps (-0.0f), target);
+                    const auto finite = _mm_cmple_ps (magnitude,
+                        _mm_set1_ps (std::numeric_limits<float>::max()));
+                    target = _mm_and_ps (target, finite);
+                    _mm_storeu_ps (destination + static_cast<size_t> (frame) * 2u, target);
+                    const auto advance = [&] (size_t& index) noexcept
+                    {
+                        if (grain.direction >= 0)
+                        {
+                            if (++index == capacity) index = 0;
+                        }
+                        else
+                            --index;
+                    };
+                    advance (lowerIndex);
+                    advance (upperIndex);
+                    advance (lowerIndex);
+                    advance (upperIndex);
+                    ++frame;
+                    continue;
+                }
+#endif
                 float left = 0.0f, right = 0.0f;
                 if (validHannFrame)
                 {
