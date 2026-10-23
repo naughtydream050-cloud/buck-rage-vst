@@ -6,7 +6,7 @@ const modes = [64, 128, 256, 512, 1024, -1];
 const rows = rates.flatMap(rate => modes.map(mode => {
   const samples = 100000;
   const events = 99609;
-  return `METRIC reentrant_benchmark rate=${rate} mode=${mode} p99_deadline_ratio=0.25 max_deadline_ratio=0.75 p99_thread_cpu_ratio=0.10 max_thread_cpu_ratio=0.20 events=${events} samples=${samples} event_rate=${(events / samples).toFixed(6)} callback_shape=one_host_block status=PASS`;
+  return `METRIC reentrant_benchmark rate=${rate} mode=${mode} p99_deadline_ratio=0.25 max_deadline_ratio=0.75 avg_thread_cpu_to_callback_wall=0.10 events=${events} samples=${samples} event_rate=${(events / samples).toFixed(6)} callback_shape=one_host_block status=PASS`;
 }));
 const valid = `METRIC benchmark_schedule class=MMCSS-Pro-Audio process_priority=Normal\n${rows.join('\n')}\nMETRIC reentrant_benchmark_complete conditions=18 status=PASS`;
 assert.deepEqual(validateReentrantBenchmarkEvidence(valid), { pass: true, reason: null, rows: 18 });

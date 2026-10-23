@@ -7,20 +7,20 @@ export function validateReentrantBenchmarkEvidence(text) {
     return { pass: false, reason: 'MMCSS_PRO_AUDIO_NOT_RECORDED' };
 
   const rows = [];
-  const pattern = /^METRIC reentrant_benchmark rate=(\d+) mode=(-?\d+) p99_deadline_ratio=([0-9.eE+-]+) max_deadline_ratio=([0-9.eE+-]+) p99_thread_cpu_ratio=([0-9.eE+-]+) max_thread_cpu_ratio=([0-9.eE+-]+) events=(\d+) samples=(\d+) event_rate=([0-9.eE+-]+) callback_shape=one_host_block status=(PASS|FAIL)$/;
+  const pattern = /^METRIC reentrant_benchmark rate=(\d+) mode=(-?\d+) p99_deadline_ratio=([0-9.eE+-]+) max_deadline_ratio=([0-9.eE+-]+) avg_thread_cpu_to_callback_wall=([0-9.eE+-]+) events=(\d+) samples=(\d+) event_rate=([0-9.eE+-]+) callback_shape=one_host_block status=(PASS|FAIL)$/;
   for (const line of text.split(/\r?\n/)) {
     if (!line.startsWith('METRIC reentrant_benchmark rate=')) continue;
     const match = line.match(pattern);
     if (!match) return { pass: false, reason: 'MALFORMED_BENCHMARK_ROW' };
-    const [, rateText, modeText, p99Text, maxText, cpuP99Text, cpuMaxText, eventsText, samplesText, eventRateText, status] = match;
+    const [, rateText, modeText, p99Text, maxText, cpuAverageText, eventsText, samplesText, eventRateText, status] = match;
     const row = {
       rate: Number(rateText), mode: Number(modeText), p99: Number(p99Text), max: Number(maxText),
-      cpuP99: Number(cpuP99Text), cpuMax: Number(cpuMaxText),
+      cpuAverage: Number(cpuAverageText),
       events: Number(eventsText), samples: Number(samplesText), eventRate: Number(eventRateText), status
     };
-    if (![row.rate, row.mode, row.p99, row.max, row.cpuP99, row.cpuMax,
+    if (![row.rate, row.mode, row.p99, row.max, row.cpuAverage,
           row.events, row.samples, row.eventRate].every(Number.isFinite)
-        || row.cpuP99 < 0 || row.cpuMax < 0
+        || row.cpuAverage < 0
         || row.samples <= 0 || row.events < 0 || row.events > row.samples
         || Math.abs(row.eventRate - row.events / row.samples) > 1e-6)
       return { pass: false, reason: 'INVALID_BENCHMARK_METRICS' };

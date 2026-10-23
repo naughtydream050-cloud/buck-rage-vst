@@ -916,10 +916,10 @@ public:
                 }
                 std::vector<double> deadlineRatios;
                 deadlineRatios.reserve (static_cast<size_t> (rate / 64.0 * 30.0 + 64.0));
-                std::vector<double> threadCpuRatios;
-                threadCpuRatios.reserve (deadlineRatios.capacity());
                 uint64_t measuredSamples = 0, events = 0;
-                double peakRatio = 0.0, peakThreadCpuRatio = 0.0;
+                double peakRatio = 0.0, callbackWallSeconds = 0.0;
+                uint64_t conditionCpuStart = 0, conditionCpuEnd = 0;
+                if (! readCurrentThreadCpuTicks (conditionCpuStart)) return false;
                 while (measuredSamples < static_cast<uint64_t> (rate * 30.0))
                 {
                     const auto block = blockAt (sequence);
@@ -930,40 +930,37 @@ public:
                         % static_cast<uint64_t> (XYPadEngine::kBarCount));
                     eventTransport.startPhase = static_cast<double> (timelineSample % 256u) / 256.0;
                     eventTransport.phasePerSample = 1.0 / 256.0;
-                    uint64_t cpuBefore = 0, cpuAfter = 0;
-                    if (! readCurrentThreadCpuTicks (cpuBefore)) return false;
                     const auto start = std::chrono::steady_clock::now();
                     // Process one real host-sized callback. The 256-point
                     // trajectory alternates X every sample within each BAR.
                     engine.processLive (input, output, mask, eventTransport, block);
                     const auto stop = std::chrono::steady_clock::now();
-                    if (! readCurrentThreadCpuTicks (cpuAfter) || cpuAfter < cpuBefore) return false;
                     const auto elapsed = std::chrono::duration<double, std::micro> (stop - start).count();
                     const auto ratio = elapsed / (1.0e6 * block / rate);
-                    const auto cpuRatio = (static_cast<double> (cpuAfter - cpuBefore) * 1.0e-7)
-                                        / (static_cast<double> (block) / rate);
                     deadlineRatios.push_back (ratio);
-                    threadCpuRatios.push_back (cpuRatio);
                     peakRatio = std::max (peakRatio, ratio);
-                    peakThreadCpuRatio = std::max (peakThreadCpuRatio, cpuRatio);
+                    callbackWallSeconds += elapsed * 1.0e-6;
                     for (int frame = 0; frame < block; ++frame)
                         if ((timelineSample + static_cast<uint64_t> (frame)) % 256u != 0u)
                             ++events;
                     measuredSamples += static_cast<uint64_t> (block);
                     ++sequence;
                 }
+                if (! readCurrentThreadCpuTicks (conditionCpuEnd) || conditionCpuEnd < conditionCpuStart)
+                    return false;
+                const auto averageThreadCpuToCallbackWall = callbackWallSeconds > 0.0
+                    ? (static_cast<double> (conditionCpuEnd - conditionCpuStart) * 1.0e-7)
+                        / callbackWallSeconds : std::numeric_limits<double>::infinity();
                 std::sort (deadlineRatios.begin(), deadlineRatios.end());
-                std::sort (threadCpuRatios.begin(), threadCpuRatios.end());
                 const auto p99Ratio = deadlineRatios[static_cast<size_t> (std::ceil (0.99 * deadlineRatios.size())) - 1u];
-                const auto p99ThreadCpuRatio = threadCpuRatios[static_cast<size_t> (std::ceil (0.99 * threadCpuRatios.size())) - 1u];
                 const auto within = p99Ratio <= 0.50 && peakRatio <= 0.80;
                 allWithinDeadline = allWithinDeadline && within;
                 ++conditionCount;
                 std::cout << "METRIC reentrant_benchmark rate=" << rate << " mode="
                           << (mode < 5 ? fixedBlocks[mode] : -1) << " p99_deadline_ratio=" << p99Ratio
                           << " max_deadline_ratio=" << peakRatio
-                          << " p99_thread_cpu_ratio=" << p99ThreadCpuRatio
-                          << " max_thread_cpu_ratio=" << peakThreadCpuRatio << " events=" << events
+                          << " avg_thread_cpu_to_callback_wall=" << averageThreadCpuToCallbackWall
+                          << " events=" << events
                           << " samples=" << measuredSamples << " event_rate="
                           << static_cast<double> (events) / static_cast<double> (measuredSamples)
                           << " callback_shape=one_host_block status="
