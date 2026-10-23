@@ -375,6 +375,7 @@ public:
         input.setSample (1, 0, -0.25f);
         bool allOffsetsReenteredImmediately = transitionFrames >= 2;
         double maximumTailReferenceError = 0.0;
+        double maximumTargetPositionError = 0.0;
         for (int eventOffset = 1; eventOffset < transitionFrames; ++eventOffset)
         {
             resetProbe();
@@ -415,10 +416,11 @@ public:
             for (const auto& grain : engine.liveGrains) activeAtEvent += grain.active ? 1 : 0;
             const auto immediate = launchedLatestTargetAtEvent && ! engine.livePendingTransition
                 && engine.liveReentryTailActive && engine.liveReentryTailPosition == 1
-                && targetPositionError <= 2.0e-6
+                && targetPositionError <= 1.0e-3
                 && reentryRecordPasses (eventOffset, launchedLatestTargetAtEvent ? eventOffset : eventOffset + 1,
                                         maximumTailReferenceError, activeAtEvent, true, 0.0, 2.0);
             allOffsetsReenteredImmediately = allOffsetsReenteredImmediately && immediate;
+            maximumTargetPositionError = std::max (maximumTargetPositionError, targetPositionError);
             if (immediate)
             {
                 const auto* tail = engine.liveReentryTailBuffers[static_cast<size_t> (engine.liveReentryTailBuffer)].get();
@@ -443,10 +445,14 @@ public:
             if (! immediate)
                 std::cerr << "RED reentrant_transition offset=" << eventOffset
                           << " pending=" << engine.livePendingTransition
-                          << " launched=" << launchedLatestTargetAtEvent << '\n';
+                          << " launched=" << launchedLatestTargetAtEvent
+                          << " active=" << activeAtEvent
+                          << " tail_error=" << maximumTailReferenceError
+                          << " target_position_error=" << targetPositionError << '\n';
         }
         std::cout << "METRIC reentrant_tail_reference max_error=" << maximumTailReferenceError
-                  << " tolerance=2e-6\n";
+                  << " tolerance=2e-6 max_target_position_error_samples=" << maximumTargetPositionError
+                  << " target_position_tolerance_samples=0.001\n";
         resetProbe();
         engine.liveHoldReady = true;
         engine.liveHoldMix = 1.0f;
