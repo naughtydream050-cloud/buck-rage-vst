@@ -897,14 +897,48 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
         if (grain.fadeInFrames <= 0 && grain.fadeOutRemaining <= 0 && ! liveHoldReady)
         {
             bool referenceValid = true;
+            const auto capacity = static_cast<uint64_t> (liveHistoryCapacityFrames);
+            const auto firstSerial = grain.startSerial + static_cast<double> (grain.direction * grain.age);
+            const auto firstPositionValid = std::isfinite (firstSerial)
+                && firstSerial >= static_cast<double> (oldestSerial)
+                && firstSerial <= static_cast<double> (newestSerial);
+            auto lowerSerial = std::isfinite (firstSerial) && firstSerial >= 0.0
+                ? static_cast<uint64_t> (std::floor (firstSerial)) : uint64_t (0);
+            auto lowerIndex = static_cast<size_t> (lowerSerial % capacity);
+            const auto fraction = std::isfinite (firstSerial)
+                ? static_cast<float> (firstSerial - static_cast<double> (lowerSerial)) : 0.0f;
             for (int frame = 0; frame < liveReentryTailFrames; ++frame)
             {
                 const auto age = grain.age + frame;
                 const auto validHannFrame = age > 0 && age < liveGrainFrames - 1;
-                const auto serial = grain.startSerial + static_cast<double> (grain.direction * age);
                 float left = 0.0f, right = 0.0f;
                 if (validHannFrame)
-                    referenceValid = readLiveStereoSample (serial, oldestSerial, newestSerial, left, right);
+                {
+                    const auto serialInRange = firstPositionValid
+                        && lowerSerial >= oldestSerial && lowerSerial <= newestSerial
+                        && (fraction <= 0.0f || lowerSerial < newestSerial);
+                    auto upperIndex = lowerIndex;
+                    auto upperSerial = lowerSerial;
+                    if (fraction > 0.0f && lowerSerial < newestSerial)
+                    {
+                        ++upperSerial;
+                        upperIndex = lowerIndex + 1u;
+                        if (upperIndex == capacity) upperIndex = 0;
+                    }
+                    referenceValid = serialInRange
+                        && liveHistorySerials[lowerIndex] == lowerSerial
+                        && liveHistorySerials[upperIndex] == upperSerial;
+                    if (referenceValid)
+                    {
+                        const auto lowerOffset = lowerIndex * 2u;
+                        const auto upperOffset = upperIndex * 2u;
+                        left = liveHistory[lowerOffset]
+                             + (liveHistory[upperOffset] - liveHistory[lowerOffset]) * fraction;
+                        right = liveHistory[lowerOffset + 1u]
+                              + (liveHistory[upperOffset + 1u] - liveHistory[lowerOffset + 1u]) * fraction;
+                        referenceValid = std::isfinite (left) && std::isfinite (right);
+                    }
+                }
                 if (! referenceValid) break;
                 if (previousTail != nullptr)
                 {
@@ -920,6 +954,19 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                 }
                 destination[static_cast<size_t> (frame) * 2u] = std::isfinite (left) ? left : 0.0f;
                 destination[static_cast<size_t> (frame) * 2u + 1u] = std::isfinite (right) ? right : 0.0f;
+                if (frame + 1 < liveReentryTailFrames && age + 1 > 0 && age + 1 < liveGrainFrames - 1)
+                {
+                    if (grain.direction >= 0)
+                    {
+                        ++lowerSerial;
+                        if (++lowerIndex == capacity) lowerIndex = 0;
+                    }
+                    else
+                    {
+                        --lowerSerial;
+                        lowerIndex = lowerIndex == 0 ? static_cast<size_t> (capacity - 1u) : lowerIndex - 1u;
+                    }
+                }
             }
             if (referenceValid)
             {
