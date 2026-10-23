@@ -944,6 +944,14 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                     || (ringSerialMatches (minReadLower + 1u)
                         && ringSerialMatches (maxReadLower + 1u)));
             referenceValid = firstPositionValid && endpointsValid;
+#if defined(TOYOTOMI_XY_HAS_SSE2)
+            const auto tailFrames = static_cast<size_t> (liveReentryTailFrames);
+            const auto noRingWrapForTail = grain.direction >= 0
+                ? lowerIndex + tailFrames < capacity && upperIndex + tailFrames < capacity
+                : lowerIndex >= tailFrames && upperIndex >= tailFrames;
+            const auto blendableFrameCount = previousTail == nullptr ? tailFrames
+                : static_cast<size_t> (juce::jmax (0, liveReentryTailFrames - liveReentryTailPosition - 1));
+#endif
             if (referenceValid)
             {
                 auto upperIndex = lowerIndex;
@@ -958,14 +966,9 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                 const auto validHannFrame = age > 0 && age < liveGrainFrames - 1;
 #if defined(TOYOTOMI_XY_HAS_SSE2)
                 const auto previousFrame = liveReentryTailPosition + frame;
-                const auto canBlendTwoFrames = previousTail == nullptr
-                    || previousFrame + 1 < liveReentryTailFrames;
-                const auto twoSourceFramesContiguous = grain.direction >= 0
-                    ? lowerIndex + 1u < capacity && upperIndex + 1u < capacity
-                    : lowerIndex > 0u && upperIndex > 0u;
                 if (validHannFrame && age + 1 < liveGrainFrames - 1
-                    && frame + 1 < liveReentryTailFrames && canBlendTwoFrames
-                    && twoSourceFramesContiguous)
+                    && static_cast<size_t> (frame + 1) < blendableFrameCount
+                    && noRingWrapForTail)
                 {
                     const auto* history = liveHistory.get();
                     const auto loadPair = [history, &grain] (size_t index) noexcept
