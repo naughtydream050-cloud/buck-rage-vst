@@ -66,7 +66,7 @@ XYPadEngine::XYPadEngine() noexcept
 {
 }
 
-bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank) noexcept
+bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank, bool liveOnly) noexcept
 {
     const std::lock_guard<std::mutex> lifecycleLock (nonRealtimeLifecycleMutex);
     stopWorker();
@@ -105,6 +105,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank)
     liveActiveTrajectory = {};
     liveWetGain = 0.0f;
     liveHavePreviousX = liveHaveSignal = livePendingTransition = liveWasPlaying = false;
+    liveSourceFadeActive = false;
     activeRevision = 0;
     renderQueueHead.store (0, std::memory_order_relaxed);
     renderQueueTail.store (0, std::memory_order_relaxed);
@@ -132,7 +133,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank)
     const auto requestedFrames = std::ceil (rate * kMaxBarSeconds);
     if (requestedFrames > static_cast<double> (std::numeric_limits<int>::max() / 2))
         return false;
-    maxFramesPerBar = static_cast<int> (requestedFrames);
+    maxFramesPerBar = liveOnly ? 0 : static_cast<int> (requestedFrames);
     const auto floatCount = static_cast<size_t> (maxFramesPerBar) * 2u;
     liveHistoryCapacityFrames = juce::jmin (static_cast<int> (kMaxLiveHistoryFrames),
                                              juce::jmax (1, juce::roundToInt (rate * kLiveHistorySeconds) + 2));
@@ -142,6 +143,8 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank)
     liveTransitionFrames = juce::jmax (1, juce::roundToInt (rate * 0.003));
     try
     {
+        if (! liveOnly)
+        {
         for (int i = 0; i < kBarCount; ++i)
         {
             auto& slot = slots[static_cast<size_t> (i)];
@@ -163,6 +166,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank)
         synthesisPhase.reset (new (std::nothrow) double[phaseCount]);
         phaseInitialized.reset (new (std::nothrow) uint8_t[phaseCount]);
         fft = std::make_unique<juce::dsp::FFT> (11);
+        }
         liveHistory.reset (new (std::nothrow) float[static_cast<size_t> (liveHistoryCapacityFrames) * 2u]);
         liveHistorySerials.reset (new (std::nothrow) uint64_t[static_cast<size_t> (liveHistoryCapacityFrames)]);
         liveGrainSnapshots.reset (new (std::nothrow) float[static_cast<size_t> (kLiveGrainCapacity)
@@ -182,8 +186,8 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank)
         livePitchSynthesisPhase.reset (new (std::nothrow) double[static_cast<size_t> (kLivePitchBins)]);
         livePitchPhaseInitialized.reset (new (std::nothrow) uint8_t[static_cast<size_t> (kLivePitchBins)]);
         livePitchSmoothingCoefficient = static_cast<float> (1.0 - std::exp (-1.0 / (rate * 0.005)));
-        if (! scratch || ! fftWork || ! fftWork2 || ! overlapNorm || ! previousInputPhase
-            || ! synthesisPhase || ! phaseInitialized || ! fft || ! liveHistory || ! liveHistorySerials
+        if ((! liveOnly && (! scratch || ! fftWork || ! fftWork2 || ! overlapNorm || ! previousInputPhase
+            || ! synthesisPhase || ! phaseInitialized || ! fft)) || ! liveHistory || ! liveHistorySerials
             || ! liveGrainSnapshots || ! liveHoldSnapshot || ! livePitchFft || ! livePitchFftWork
             || ! livePitchFftWork2 || ! livePitchInputRing || ! livePitchIdentityDelay
             || ! livePitchSemitoneDelay || ! livePitchMaskDelay || ! livePitchOlaLeft
@@ -205,8 +209,11 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank)
         std::fill_n (liveHistorySerials.get(), static_cast<size_t> (liveHistoryCapacityFrames),
                      std::numeric_limits<uint64_t>::max());
         clearLivePitchState();
-        workerExit.store (false, std::memory_order_release);
-        worker = std::thread ([this] { workerLoop(); });
+        if (! liveOnly)
+        {
+            workerExit.store (false, std::memory_order_release);
+            worker = std::thread ([this] { workerLoop(); });
+        }
     }
     catch (...)
     {
@@ -264,6 +271,7 @@ void XYPadEngine::release() noexcept
     liveWetGain = 0.0f;
     liveDirection = 1;
     liveHavePreviousX = liveHaveSignal = livePendingTransition = liveWasPlaying = false;
+    liveSourceFadeActive = false;
     livePitchSerial = 0;
     liveSmoothedSemitones = livePitchWetMix = 0.0f;
     livePitchSmoothingCoefficient = 0.0f;
@@ -860,6 +868,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         liveHoldMix = 0.0f;
         liveHoldReady = false;
         liveWasPlaying = false;
+        liveSourceFadeActive = false;
         return;
     }
 
@@ -885,6 +894,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         liveStationaryFrames = liveHoldPhase = 0;
         liveHoldMix = 0.0f;
         liveHoldReady = false;
+        liveSourceFadeActive = false;
         clearLivePitchState();
     }
     const auto sourceChannels = source.getNumChannels();
@@ -991,6 +1001,9 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                 liveHoldPhase = 0;
             }
         }
+        // A direction fold or abrupt jump starts its transition immediately;
+        // waiting for the next 10ms launch would exceed the 3ms contract.
+        if (livePendingTransition && hasHistory) liveSamplesToLaunch = 0;
         if (liveActiveTrajectory.count > 0 && hasHistory && liveSamplesToLaunch <= 0)
         {
             launchLiveGrain (x, direction, livePendingTransition, oldestSerial, newestSerial);
@@ -1031,6 +1044,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                 transitionGain *= juce::jlimit (0.0, 1.0,
                     static_cast<double> (grain.fadeOutRemaining) / liveTransitionFrames);
                 --grain.fadeOutRemaining;
+                if (grain.fadeOutRemaining == 0) grain.active = false;
             }
             if (grain.fadeInFrames > 0 && grain.age >= grain.fadeInFrames)
                 grain.fadeInFrames = 0;
@@ -1072,7 +1086,8 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             wetRight = normalizedRight * std::cos (liveHoldMix * kPi * 0.5)
                      + static_cast<double> (loopRight) * std::sin (liveHoldMix * kPi * 0.5);
             windowTotal = 1.0;
-            liveHoldPhase = (liveHoldPhase + 1) % liveGrainFrames;
+            ++liveHoldPhase;
+            if (liveHoldPhase >= liveGrainFrames) liveHoldPhase = seamFrames;
             if (holdTarget == 0.0f && liveHoldMix == 0.0f)
                 liveHoldReady = false;
         }
@@ -1084,18 +1099,23 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         {
             // Do not let the rolling history replay a stale pre-silence grain
             // after the live input resumes.
-            liveGrains.fill (LiveGrain {});
             liveSamplesToLaunch = 0;
             liveHistoryValidFrames = 0;
             liveHaveSignal = false;
-            liveHoldReady = false;
-            liveHoldMix = 0.0f;
-            liveStationaryFrames = liveHoldPhase = 0;
+            liveSourceFadeActive = true;
         }
         const auto targetGain = hasWet && liveHaveSignal && ! sourceEnded ? 1.0f : 0.0f;
         const auto step = 1.0f / static_cast<float> (rampFrames);
         if (liveWetGain < targetGain) liveWetGain = juce::jmin (targetGain, liveWetGain + step);
         else if (liveWetGain > targetGain) liveWetGain = juce::jmax (targetGain, liveWetGain - step);
+        if (liveSourceFadeActive && liveWetGain <= 0.0f)
+        {
+            liveGrains.fill (LiveGrain {});
+            liveHoldReady = false;
+            liveHoldMix = 0.0f;
+            liveStationaryFrames = liveHoldPhase = 0;
+            liveSourceFadeActive = false;
+        }
 
         auto xStageLeft = 0.0f, xStageRight = 0.0f;
         if (hasWet || liveWetGain > 0.0f)

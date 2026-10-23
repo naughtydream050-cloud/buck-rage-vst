@@ -23,6 +23,11 @@ public:
         return processor.xyEngine.getState (0);
     }
 
+    static int getOfflineXyFrames (const ToyotomiHideyoshiAudioProcessor& processor) noexcept
+    {
+        return processor.xyEngine.getMaxFramesPerBar();
+    }
+
     static XYPadEngine::Transport getXyTransport (const ToyotomiHideyoshiAudioProcessor& processor) noexcept
     {
         return processor.xyTransport;
@@ -502,6 +507,8 @@ bool testUnavailableLiveXyPreservesPresetPerSample()
     state.appendSlotXYMotion (0, 1.0f, 0.5f, 2.0);
     preset->setPlayHead (&presetHead);
     combined->setPlayHead (&combinedHead);
+    const bool boundedLivePreparation = RuntimeSmokeTestAccess::getOfflineXyFrames (*preset) == 0
+        && RuntimeSmokeTestAccess::getOfflineXyFrames (*combined) == 0;
     juce::MidiBuffer midi;
     juce::AudioBuffer<float> input (2, total), baseline (2, total), actual (2, total);
     juce::AudioBuffer<float> presetBlock (2, 512), combinedBlock (2, 512);
@@ -589,7 +596,8 @@ bool testUnavailableLiveXyPreservesPresetPerSample()
               << " active_windows=" << activeWindows << " active_errors=" << activeErrors
               << " resumed_windows=" << resumedWindows << " resumed_errors=" << resumedErrors
               << " finite=" << finite << "\n";
-    bool pass = check (warmupSamples == history + latency && warmupErrors == 0 && presetEffectSamples > 0,
+    bool pass = check (boundedLivePreparation, "live-processor-does-not-allocate-legacy-full-bar-pcm-bank");
+    pass &= check (warmupSamples == history + latency && warmupErrors == 0 && presetEffectSamples > 0,
                        "ac10-cold-history-unavailable-xy-preserves-active-preset-bit-exact-per-sample");
     pass &= check (silentSamples > window && silentErrors == 0 && presetTailSamples > 0,
                    "ac10-source-silence-unavailable-xy-preserves-nonzero-preset-tail-per-sample");
@@ -603,8 +611,8 @@ bool testUnavailableLiveXyPreservesPresetPerSample()
         if (stream != nullptr) writer.reset (format.createWriterFor (stream.release(), rate, 2, 24, {}, 0));
         return writer != nullptr && writer->writeFromAudioSampleBuffer (audio, 0, total);
     };
-    pass &= check (save ("xy-live-ac10-input.wav", input) && save ("xy-live-ac10-preset-only.wav", baseline)
-                   && save ("xy-live-ac10-combined.wav", actual), "ac10-live-layer-comparison-diagnostic-wavs-written");
+    pass &= check (save ("xy-diagnostic-live-ac10-input.wav", input) && save ("xy-diagnostic-live-ac10-preset-only.wav", baseline)
+                   && save ("xy-diagnostic-live-ac10-combined.wav", actual), "ac10-live-layer-comparison-diagnostic-wavs-written");
     preset->setPlayHead (nullptr); combined->setPlayHead (nullptr);
     return pass;
 }

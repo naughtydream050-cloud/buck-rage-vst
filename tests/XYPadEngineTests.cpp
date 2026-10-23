@@ -190,6 +190,15 @@ public:
             + static_cast<size_t> (forward.snapshotIndex) * static_cast<size_t> (engine.liveGrainFrames) * 2u;
         const auto frozenFirst = forwardSnapshot[0];
         const auto frozenSecond = forwardSnapshot[2];
+        double maximumReferenceError = 0.0;
+        for (int age = 0; age < engine.liveGrainFrames; ++age)
+        {
+            const auto expected = forward.startSerial + age;
+            maximumReferenceError = std::max (maximumReferenceError,
+                std::abs (static_cast<double> (forwardSnapshot[static_cast<size_t> (age) * 2u]) - expected));
+            maximumReferenceError = std::max (maximumReferenceError,
+                std::abs (static_cast<double> (forwardSnapshot[static_cast<size_t> (age) * 2u + 1u]) + expected));
+        }
         const auto sourceReadable = engine.readLiveSample (forward.startSerial, 0, oldest, newest, first)
             && engine.readLiveSample (forward.startSerial + 1.0, 0, oldest, newest, second);
         for (uint64_t serial = 0; serial < 64; ++serial)
@@ -203,6 +212,16 @@ public:
         engine.liveGrains.fill (XYPadEngine::LiveGrain {});
         engine.launchLiveGrain (0.5f, -1, true, oldest, newest);
         const auto reverse = engine.liveGrains[0];
+        const auto* reverseSnapshot = engine.liveGrainSnapshots.get()
+            + static_cast<size_t> (reverse.snapshotIndex) * static_cast<size_t> (engine.liveGrainFrames) * 2u;
+        for (int age = 0; age < engine.liveGrainFrames; ++age)
+        {
+            const auto expected = reverse.startSerial - age;
+            maximumReferenceError = std::max (maximumReferenceError,
+                std::abs (static_cast<double> (reverseSnapshot[static_cast<size_t> (age) * 2u]) - expected));
+            maximumReferenceError = std::max (maximumReferenceError,
+                std::abs (static_cast<double> (reverseSnapshot[static_cast<size_t> (age) * 2u + 1u]) + expected));
+        }
         valid = valid && reverse.active && reverse.direction == -1
             && engine.readLiveSample (reverse.startSerial, 0, oldest, newest, first)
             && engine.readLiveSample (reverse.startSerial - 1.0, 0, oldest, newest, second)
@@ -211,8 +230,9 @@ public:
             && reverse.startSerial <= static_cast<double> (newest)
             && reverse.startSerial + reverse.direction * 19.0 >= static_cast<double> (oldest)
             && reverse.startSerial + reverse.direction * 19.0 <= static_cast<double> (newest);
+        std::cout << "METRIC live_linear_reference max_error=" << maximumReferenceError << " tolerance=2e-6\n";
         engine.release();
-        return valid;
+        return valid && maximumReferenceError <= 2.0e-6;
     }
 
     static bool stationaryLiveTrajectoryFreezesAndLoops()
@@ -339,6 +359,32 @@ public:
         engine.processLive (input, output, mask, transport, 1);
         std::cout << "METRIC live_transition post_seam_phase=" << engine.liveHoldPhase << " expected=96\n";
         return engine.liveHoldPhase == 96;
+    }
+
+    static bool liveSourceEndedFadesAudioWithoutHardCut()
+    {
+        XYPadEngine engine;
+        if (! engine.prepare (48000.0, 1)) return false;
+        const std::vector<PluginStateModel::MotionPoint> hold {{ 0.5f, 0.5f, 0.0 }};
+        engine.setTrajectory (0, hold, 101);
+        juce::AudioBuffer<float> input (2, 1), output (2, 1), mask (1, 1);
+        float previous = 0.0f, maximumStep = 0.0f;
+        bool finite = true;
+        for (int sample = 0; sample < 8192; ++sample)
+        {
+            const float value = sample < 4096 ? 0.25f : 0.0f;
+            input.setSample (0, 0, value); input.setSample (1, 0, value * 0.5f);
+            XYPadEngine::Transport transport; transport.playing = true; transport.startBar = 0;
+            transport.startPhase = sample / 96000.0; transport.phasePerSample = 1.0 / 96000.0;
+            engine.processLive (input, output, mask, transport, 1);
+            const float contribution = output.getSample (0, 0) * mask.getSample (0, 0);
+            finite &= std::isfinite (contribution);
+            if (sample >= 4096 + 1024) maximumStep = juce::jmax (maximumStep, std::abs (contribution - previous));
+            previous = contribution;
+        }
+        std::cout << "METRIC live_source_ended max_contribution_step=" << maximumStep
+                  << " limit=0.02 final_mask=" << mask.getSample (0, 0) << "\n";
+        return finite && maximumStep < 0.02f && mask.getSample (0, 0) == 0.0f;
     }
 
     static bool livePipelineHasExact1024SampleIdentityDelay()
@@ -714,6 +760,8 @@ int main()
            "live-old-grain-is-retired-at-three-ms-fade-end-and-cannot-reappear");
     check (XYPadEngineTestAccess::liveHoldSeamContinuesAfterCrossfadedHead(),
            "live-hold-seam-continues-at-the-next-head-sample-without-two-ms-back-jump");
+    check (XYPadEngineTestAccess::liveSourceEndedFadesAudioWithoutHardCut(),
+           "live-source-ended-fades-actual-xy-contribution-without-a-hard-audio-cut");
     XYPadEngine liveProbe;
     const auto livePrepared = liveProbe.prepare (48000.0, 512);
     std::vector<PluginStateModel::MotionPoint> liveBarFour {{ 0.0f, 0.5f, 0.0 },

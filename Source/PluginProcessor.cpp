@@ -49,7 +49,7 @@ void ToyotomiHideyoshiAudioProcessor::prepareToPlay(double sampleRate, int maxim
     xyReadyMask.setSize (1, maximumExpectedSamplesPerBlock, false, true, true);
     // Reserve the bounded XY bank before processBlock can run. A later UI
     // recording only publishes atomic trajectory data and never reallocates.
-    xyEngine.prepare (preparedSampleRate, maximumExpectedSamplesPerBlock, true);
+    xyEngine.prepare (preparedSampleRate, maximumExpectedSamplesPerBlock, true, true);
     hostDiagnostic.configureFromMarker (preparedSampleRate);
     if (hostDiagnostic.isEnabled())
         scratchEngine.setSampleTraceObserver (RealHostDiagnostic::observe, &hostDiagnostic);

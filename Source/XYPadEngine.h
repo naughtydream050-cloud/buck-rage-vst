@@ -40,7 +40,8 @@ public:
     XYPadEngine (const XYPadEngine&) = delete;
     XYPadEngine& operator= (const XYPadEngine&) = delete;
 
-    bool prepare (double sampleRate, int maximumBlockSize, bool allocateBank = true) noexcept;
+    bool prepare (double sampleRate, int maximumBlockSize, bool allocateBank = true,
+                  bool liveOnly = false) noexcept;
     void release() noexcept;
 
     // Non-audio-thread publisher. The saved PluginStateModel schema is not
@@ -204,6 +205,7 @@ private:
     bool liveHavePreviousX = false, liveHaveSignal = false, livePendingTransition = false;
     bool liveHoldReady = false;
     bool liveWasPlaying = false;
+    bool liveSourceFadeActive = false;
     int fftSize = 2048, hopSize = 512;
     std::atomic<bool> enabled { false }, workerExit { false };
     std::thread worker;
