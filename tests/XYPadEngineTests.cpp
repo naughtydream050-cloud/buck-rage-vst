@@ -577,8 +577,17 @@ public:
                             expectedR = XYPadEngine::blendLiveReentrySample (previous[previousIndex + 1u], expectedR, q);
                         }
                         const auto index = static_cast<size_t> (frame) * 2u;
-                        maximumError = std::max (maximumError, static_cast<double> (std::abs (result[index] - expectedL)));
-                        maximumError = std::max (maximumError, static_cast<double> (std::abs (result[index + 1u] - expectedR)));
+                        const auto errorL = static_cast<double> (std::abs (result[index] - expectedL));
+                        const auto errorR = static_cast<double> (std::abs (result[index + 1u] - expectedR));
+                        if (errorL > 2.0e-6 || errorR > 2.0e-6)
+                            std::cerr << "FAIL stable_single_grain_case rate=" << rate
+                                      << " age=" << age << " prior_tail=" << priorTailPosition
+                                      << " frame=" << frame << " snapshot=" << grain.snapshotIndex
+                                      << " result_l=" << result[index] << " expected_l=" << expectedL
+                                      << " result_r=" << result[index + 1u] << " expected_r=" << expectedR
+                                      << " window=" << window << "\n";
+                        maximumError = std::max (maximumError, errorL);
+                        maximumError = std::max (maximumError, errorR);
                     }
                     passed = passed && maximumError <= 2.0e-6;
                 }
