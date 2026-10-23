@@ -87,6 +87,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
     previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
     liveHistory.reset(); liveHistorySerials.reset(); liveGrainSnapshots.reset(); liveHoldSnapshot.reset();
+    for (auto& tail : liveReentryTailBuffers) tail.reset();
     livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
     livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
     livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
@@ -96,6 +97,8 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     activeBar = -1;
     liveHistoryCapacityFrames = liveWarmupFrames = liveGrainFrames = liveHopFrames = 0;
     liveTransitionFrames = 0;
+    liveReentryTailFrames = liveReentryTailPosition = liveReentryTailBuffer = 0;
+    liveReentryTailActive = false;
     liveWriteSerial = liveHistoryValidFrames = 0;
     liveGrains.fill (LiveGrain {});
     liveStationaryFrames = liveHoldPhase = 0;
@@ -172,6 +175,9 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         liveGrainSnapshots.reset (new (std::nothrow) float[static_cast<size_t> (kLiveGrainCapacity)
                                                            * static_cast<size_t> (liveGrainFrames) * 2u]);
         liveHoldSnapshot.reset (new (std::nothrow) float[static_cast<size_t> (liveGrainFrames) * 2u]);
+        liveReentryTailFrames = liveTransitionFrames;
+        for (auto& tail : liveReentryTailBuffers)
+            tail.reset (new (std::nothrow) float[static_cast<size_t> (liveReentryTailFrames) * 2u]);
         livePitchFft = std::make_unique<juce::dsp::FFT> (10);
         livePitchFftWork.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchFftSize) * 2u]);
         livePitchFftWork2.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchFftSize) * 2u]);
@@ -188,7 +194,8 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         livePitchSmoothingCoefficient = static_cast<float> (1.0 - std::exp (-1.0 / (rate * 0.005)));
         if ((! liveOnly && (! scratch || ! fftWork || ! fftWork2 || ! overlapNorm || ! previousInputPhase
             || ! synthesisPhase || ! phaseInitialized || ! fft)) || ! liveHistory || ! liveHistorySerials
-            || ! liveGrainSnapshots || ! liveHoldSnapshot || ! livePitchFft || ! livePitchFftWork
+            || ! liveGrainSnapshots || ! liveHoldSnapshot || ! liveReentryTailBuffers[0]
+            || ! liveReentryTailBuffers[1] || ! livePitchFft || ! livePitchFftWork
             || ! livePitchFftWork2 || ! livePitchInputRing || ! livePitchIdentityDelay
             || ! livePitchSemitoneDelay || ! livePitchMaskDelay || ! livePitchOlaLeft
             || ! livePitchOlaRight || ! livePitchOlaNorm || ! livePitchPreviousPhase
@@ -198,6 +205,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
             scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
             previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset();
             liveHistory.reset(); liveHistorySerials.reset(); liveGrainSnapshots.reset(); liveHoldSnapshot.reset();
+            for (auto& tail : liveReentryTailBuffers) tail.reset();
             livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
             livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
             livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
@@ -222,6 +230,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
         previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
         liveHistory.reset(); liveHistorySerials.reset(); liveGrainSnapshots.reset(); liveHoldSnapshot.reset();
+        for (auto& tail : liveReentryTailBuffers) tail.reset();
         livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
         livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
         livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
@@ -248,6 +257,7 @@ void XYPadEngine::release() noexcept
     scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
     previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
     liveHistory.reset(); liveHistorySerials.reset(); liveGrainSnapshots.reset(); liveHoldSnapshot.reset();
+    for (auto& tail : liveReentryTailBuffers) tail.reset();
     livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
     livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
     livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
@@ -257,6 +267,8 @@ void XYPadEngine::release() noexcept
     activeBar = -1;
     liveHistoryCapacityFrames = liveWarmupFrames = liveGrainFrames = liveHopFrames = 0;
     liveTransitionFrames = 0;
+    liveReentryTailFrames = liveReentryTailPosition = liveReentryTailBuffer = 0;
+    liveReentryTailActive = false;
     liveWriteSerial = liveHistoryValidFrames = 0;
     liveSamplesToLaunch = 0;
     liveSilenceFramesCount = 0;
@@ -835,6 +847,149 @@ void XYPadEngine::launchLiveGrain (float x, int direction, bool transition,
                 grain.fadeOutRemaining = liveTransitionFrames;
 }
 
+void XYPadEngine::captureLiveContinuationTail() noexcept
+{
+    if (liveReentryTailFrames < 2 || ! liveReentryTailBuffers[0]
+        || ! liveReentryTailBuffers[1] || liveGrainSnapshots == nullptr)
+        return;
+
+    const auto destinationIndex = 1 - liveReentryTailBuffer;
+    auto* destination = liveReentryTailBuffers[static_cast<size_t> (destinationIndex)].get();
+    const auto* previousTail = liveReentryTailActive
+        ? liveReentryTailBuffers[static_cast<size_t> (liveReentryTailBuffer)].get() : nullptr;
+    auto simulatedGrains = liveGrains;
+    auto simulatedHoldMix = liveHoldMix;
+    auto simulatedHoldPhase = liveHoldPhase;
+    auto simulatedHoldReady = liveHoldReady;
+    const auto stationaryFramesRequired = juce::jmax (1, static_cast<int> (std::ceil (sampleRate * 0.002)));
+    const auto holdTarget = simulatedHoldReady && liveStationaryFrames >= stationaryFramesRequired ? 1.0f : 0.0f;
+    const auto holdStep = 1.0f / static_cast<float> (juce::jmax (1, liveTransitionFrames));
+
+    for (int frame = 0; frame < liveReentryTailFrames; ++frame)
+    {
+        double oldLeft = 0.0, oldRight = 0.0, oldWeight = 0.0;
+        double newLeft = 0.0, newRight = 0.0, newWeight = 0.0;
+        double stableLeft = 0.0, stableRight = 0.0, stableWeight = 0.0;
+        double phase = 0.0;
+        bool hasOld = false, hasNew = false;
+        for (auto& grain : simulatedGrains)
+        {
+            if (! grain.active) continue;
+            if (grain.age >= liveGrainFrames || grain.snapshotIndex < 0
+                || grain.snapshotIndex >= kLiveGrainCapacity)
+            {
+                grain.active = false;
+                continue;
+            }
+            const auto* snapshot = liveGrainSnapshots.get()
+                + static_cast<size_t> (grain.snapshotIndex) * static_cast<size_t> (liveGrainFrames) * 2u;
+            const auto index = static_cast<size_t> (grain.age) * 2u;
+            const auto windowPhase = static_cast<double> (grain.age)
+                                   / static_cast<double> (juce::jmax (1, liveGrainFrames - 1));
+            const auto window = 0.5 - 0.5 * std::cos (2.0 * kPi * windowPhase);
+            if (grain.fadeOutRemaining > 0 || grain.fadeInFrames > 0)
+            {
+                phase = grain.fadeOutRemaining > 0
+                    ? static_cast<double> (liveTransitionFrames - grain.fadeOutRemaining)
+                        / static_cast<double> (liveTransitionFrames - 1)
+                    : static_cast<double> (grain.age)
+                        / static_cast<double> (juce::jmax (1, grain.fadeInFrames - 1));
+            }
+            if (grain.fadeInFrames > 0)
+            {
+                newLeft += static_cast<double> (snapshot[index]) * window;
+                newRight += static_cast<double> (snapshot[index + 1u]) * window;
+                newWeight += window;
+                hasNew = true;
+            }
+            else if (grain.fadeOutRemaining > 0)
+            {
+                oldLeft += static_cast<double> (snapshot[index]) * window;
+                oldRight += static_cast<double> (snapshot[index + 1u]) * window;
+                oldWeight += window;
+                hasOld = true;
+            }
+            else
+            {
+                stableLeft += static_cast<double> (snapshot[index]) * window;
+                stableRight += static_cast<double> (snapshot[index + 1u]) * window;
+                stableWeight += window;
+            }
+            if (grain.fadeOutRemaining > 0 && --grain.fadeOutRemaining == 0)
+                grain.active = false;
+            if (grain.fadeInFrames > 0 && grain.age + 1 >= grain.fadeInFrames)
+                grain.fadeInFrames = 0;
+            ++grain.age;
+        }
+
+        double wetLeft = stableLeft, wetRight = stableRight, totalWeight = stableWeight;
+        if (hasOld || hasNew)
+        {
+            oldLeft += stableLeft; oldRight += stableRight; oldWeight += stableWeight;
+            const auto aLeft = oldWeight > 1.0e-9 ? oldLeft / oldWeight : 0.0;
+            const auto aRight = oldWeight > 1.0e-9 ? oldRight / oldWeight : 0.0;
+            const auto bLeft = newWeight > 1.0e-9 ? newLeft / newWeight : 0.0;
+            const auto bRight = newWeight > 1.0e-9 ? newRight / newWeight : 0.0;
+            const auto angle = juce::jlimit (0.0, 1.0, phase) * kPi * 0.5;
+            wetLeft = aLeft * std::cos (angle) + bLeft * std::sin (angle);
+            wetRight = aRight * std::cos (angle) + bRight * std::sin (angle);
+            totalWeight = 1.0;
+        }
+
+        if (simulatedHoldMix < holdTarget) simulatedHoldMix = juce::jmin (holdTarget, simulatedHoldMix + holdStep);
+        else if (simulatedHoldMix > holdTarget) simulatedHoldMix = juce::jmax (holdTarget, simulatedHoldMix - holdStep);
+        if (simulatedHoldReady && liveHoldSnapshot != nullptr && liveGrainFrames > 1)
+        {
+            const auto seamFrames = juce::jlimit (1, liveGrainFrames / 2,
+                                                   juce::roundToInt (sampleRate * kHoldSeamSeconds));
+            const auto seamStart = liveGrainFrames - seamFrames;
+            const auto hp = juce::jlimit (0, liveGrainFrames - 1, simulatedHoldPhase);
+            auto holdLeft = liveHoldSnapshot[static_cast<size_t> (hp) * 2u];
+            auto holdRight = liveHoldSnapshot[static_cast<size_t> (hp) * 2u + 1u];
+            if (hp >= seamStart)
+            {
+                const auto blend = static_cast<double> (hp - seamStart)
+                    / static_cast<double> (juce::jmax (1, seamFrames - 1));
+                const auto head = hp - seamStart;
+                holdLeft = static_cast<float> (holdLeft * std::cos (blend * kPi * 0.5)
+                    + liveHoldSnapshot[static_cast<size_t> (head) * 2u] * std::sin (blend * kPi * 0.5));
+                holdRight = static_cast<float> (holdRight * std::cos (blend * kPi * 0.5)
+                    + liveHoldSnapshot[static_cast<size_t> (head) * 2u + 1u] * std::sin (blend * kPi * 0.5));
+            }
+            const auto normalizedLeft = totalWeight > 1.0e-9 ? wetLeft / totalWeight : 0.0;
+            const auto normalizedRight = totalWeight > 1.0e-9 ? wetRight / totalWeight : 0.0;
+            wetLeft = normalizedLeft * std::cos (simulatedHoldMix * kPi * 0.5)
+                    + static_cast<double> (holdLeft) * std::sin (simulatedHoldMix * kPi * 0.5);
+            wetRight = normalizedRight * std::cos (simulatedHoldMix * kPi * 0.5)
+                     + static_cast<double> (holdRight) * std::sin (simulatedHoldMix * kPi * 0.5);
+            totalWeight = 1.0;
+            ++simulatedHoldPhase;
+            if (simulatedHoldPhase >= liveGrainFrames) simulatedHoldPhase = seamFrames;
+            if (holdTarget == 0.0f && simulatedHoldMix == 0.0f) simulatedHoldReady = false;
+        }
+
+        auto left = totalWeight > 1.0e-9 ? static_cast<float> (wetLeft / totalWeight) : 0.0f;
+        auto right = totalWeight > 1.0e-9 ? static_cast<float> (wetRight / totalWeight) : 0.0f;
+        if (previousTail != nullptr)
+        {
+            const auto previousFrame = liveReentryTailPosition + frame;
+            if (previousFrame < liveReentryTailFrames)
+            {
+                const auto q = static_cast<float> (previousFrame)
+                            / static_cast<float> (liveReentryTailFrames - 1);
+                const auto index = static_cast<size_t> (previousFrame) * 2u;
+                left = previousTail[index] * (1.0f - q) + left * q;
+                right = previousTail[index + 1u] * (1.0f - q) + right * q;
+            }
+        }
+        destination[static_cast<size_t> (frame) * 2u] = std::isfinite (left) ? left : 0.0f;
+        destination[static_cast<size_t> (frame) * 2u + 1u] = std::isfinite (right) ? right : 0.0f;
+    }
+    liveReentryTailBuffer = destinationIndex;
+    liveReentryTailPosition = 0;
+    liveReentryTailActive = true;
+}
+
 void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                                juce::AudioBuffer<float>& rendered,
                                juce::AudioBuffer<float>& readyMask,
@@ -872,6 +1027,8 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         liveStationaryFrames = liveHoldPhase = 0;
         liveHoldMix = 0.0f;
         liveHoldReady = false;
+        liveReentryTailActive = false;
+        liveReentryTailPosition = 0;
         liveWasPlaying = false;
         liveSourceFadeActive = false;
         return;
@@ -899,6 +1056,8 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         liveStationaryFrames = liveHoldPhase = 0;
         liveHoldMix = 0.0f;
         liveHoldReady = false;
+        liveReentryTailActive = false;
+        liveReentryTailPosition = 0;
         liveSourceFadeActive = false;
         clearLivePitchState();
     }
@@ -946,6 +1105,8 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             liveStationaryFrames = liveHoldPhase = 0;
             liveHoldMix = 0.0f;
             liveHoldReady = false;
+            liveReentryTailActive = false;
+            liveReentryTailPosition = 0;
             Trajectory candidate;
             if (publishedTrajectories != nullptr
                 && readTrajectory (publishedTrajectories[static_cast<size_t> (bar)], candidate))
@@ -994,7 +1155,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         }
         else
             liveStationaryFrames = 0;
-        livePendingTransition = livePendingTransition || targetJump;
+        livePendingTransition = false;
         livePreviousX = x;
         liveHavePreviousX = true;
         liveDirection = direction;
@@ -1024,20 +1185,33 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                 liveHoldPhase = 0;
             }
         }
-        // A direction fold or abrupt jump starts its transition immediately.
-        // Coalesce re-entrant targets while a transition is active; one fixed
-        // pending target is enough and prevents unbounded overlapping voices.
         bool transitionInProgress = false;
         for (const auto& grain : liveGrains)
             transitionInProgress = transitionInProgress
                 || (grain.active && (grain.fadeInFrames > 0 || grain.fadeOutRemaining > 0));
-        if (livePendingTransition && hasHistory && ! transitionInProgress)
-            liveSamplesToLaunch = 0;
-        if (liveActiveTrajectory.count > 0 && hasHistory && liveSamplesToLaunch <= 0
-            && ! transitionInProgress)
+        transitionInProgress = transitionInProgress || liveReentryTailActive;
+        const auto reenterNow = targetJump && transitionInProgress && hasHistory
+                             && liveActiveTrajectory.count > 0;
+        if (reenterNow)
         {
-            launchLiveGrain (x, direction, livePendingTransition, oldestSerial, newestSerial);
-            livePendingTransition = false;
+            // Preserve the pre-pitch audible continuation before any grain
+            // snapshot slot can be recycled, then launch the newest target on
+            // this same sample. Both tail buffers were allocated in prepare().
+            captureLiveContinuationTail();
+            liveGrains.fill (LiveGrain {});
+            launchLiveGrain (x, direction, false, oldestSerial, newestSerial);
+            liveSamplesToLaunch = liveHopFrames;
+        }
+        else if (targetJump && hasHistory && liveActiveTrajectory.count > 0)
+        {
+            liveSamplesToLaunch = 0;
+            launchLiveGrain (x, direction, true, oldestSerial, newestSerial);
+            liveSamplesToLaunch = liveHopFrames;
+        }
+        else if (liveActiveTrajectory.count > 0 && hasHistory && liveSamplesToLaunch <= 0
+                 && ! transitionInProgress)
+        {
+            launchLiveGrain (x, direction, false, oldestSerial, newestSerial);
             liveSamplesToLaunch = liveHopFrames;
         }
         if (liveSamplesToLaunch > 0) --liveSamplesToLaunch;
@@ -1187,6 +1361,8 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         if (liveSourceFadeActive && liveWetGain <= 0.0f)
         {
             liveGrains.fill (LiveGrain {});
+            liveReentryTailActive = false;
+            liveReentryTailPosition = 0;
             liveHoldReady = false;
             liveHoldMix = 0.0f;
             liveStationaryFrames = liveHoldPhase = 0;
@@ -1199,9 +1375,26 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             xStageLeft = windowTotal > 1.0e-9 ? static_cast<float> (wetLeft / windowTotal) : 0.0f;
             xStageRight = windowTotal > 1.0e-9 ? static_cast<float> (wetRight / windowTotal) : 0.0f;
         }
+        if (liveReentryTailActive && liveReentryTailBuffers[static_cast<size_t> (liveReentryTailBuffer)])
+        {
+            const auto q = static_cast<float> (juce::jlimit (0, liveReentryTailFrames - 1,
+                                                              liveReentryTailPosition))
+                         / static_cast<float> (liveReentryTailFrames - 1);
+            const auto tailIndex = static_cast<size_t> (liveReentryTailPosition) * 2u;
+            const auto* tail = liveReentryTailBuffers[static_cast<size_t> (liveReentryTailBuffer)].get();
+            xStageLeft = tail[tailIndex] * (1.0f - q) + xStageLeft * q;
+            xStageRight = tail[tailIndex + 1u] * (1.0f - q) + xStageRight * q;
+            if (++liveReentryTailPosition >= liveReentryTailFrames)
+            {
+                liveReentryTailActive = false;
+                liveReentryTailPosition = 0;
+            }
+        }
         if (readFailure)
         {
             liveGrains.fill (LiveGrain {});
+            liveReentryTailActive = false;
+            liveReentryTailPosition = 0;
             liveWetGain = 0.0f;
             liveSamplesToLaunch = 0;
         }

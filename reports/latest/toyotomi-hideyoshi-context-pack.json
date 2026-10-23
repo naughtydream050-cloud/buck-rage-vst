@@ -10,6 +10,8 @@
   "baseAcSha256": "42F874D962B75400BC8AE8F0CBE737E13AD05753D60E51ED7999AAE50C8C9195",
   "amendmentSha256": "CF00BC6FF342D8734E0CCCAB1C82711242AC45E2401093D1EDC0E3A47FDBB640",
   "supplementalAcSha256": "2027553FAF44913586E76AD4036AEF724A01AEBB81EC9CFA4E75D52461B91BF2",
+  "combined21AcManifest": "docs/XY_PAD_LIVE_R2_21AC_MANIFEST.json",
+  "combined21AcManifestSha256": "7036A48897F9885C1608CE91433A65ED5CCE10958B505307FEEA9237F8061CD8",
   "candidateStatus": "previous XY build retained as rollback; not the re-entrant correction",
   "worker": "Codex direct implementation selected because fresh GLM state is LOCAL_BUDGET_BLOCKED; DeepSeek not invoked",
   "ci": "base CI only; new CI required for this implementation",

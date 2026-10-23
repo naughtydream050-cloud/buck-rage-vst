@@ -122,6 +122,7 @@ private:
                          uint64_t newestSerial, float& value) const noexcept;
     void launchLiveGrain (float x, int direction, bool transition,
                           uint64_t oldestSerial, uint64_t newestSerial) noexcept;
+    void captureLiveContinuationTail() noexcept;
     void processLivePitchSample (float inputLeft, float inputRight, float semitones,
                                  float wetMask, float& outputLeft, float& outputRight,
                                  float& outputMask) noexcept;
@@ -169,6 +170,7 @@ private:
     std::unique_ptr<float[]> liveHistory;
     std::unique_ptr<float[]> liveGrainSnapshots;
     std::unique_ptr<float[]> liveHoldSnapshot;
+    std::array<std::unique_ptr<float[]>, 2> liveReentryTailBuffers;
     std::unique_ptr<uint64_t[]> liveHistorySerials;
     static constexpr int kLivePitchFftSize = 1024;
     static constexpr int kLivePitchHopSize = 256;
@@ -193,6 +195,7 @@ private:
     int liveGrainFrames = 0;
     int liveHopFrames = 0;
     int liveTransitionFrames = 0;
+    int liveReentryTailFrames = 0, liveReentryTailPosition = 0, liveReentryTailBuffer = 0;
     int liveSamplesToLaunch = 0;
     int liveSilenceFramesCount = 0;
     int liveStationaryFrames = 0, liveHoldPhase = 0;
@@ -205,6 +208,7 @@ private:
     int liveDirection = 1;
     bool liveHavePreviousX = false, liveHaveSignal = false, livePendingTransition = false;
     bool liveHoldReady = false;
+    bool liveReentryTailActive = false;
     bool liveWasPlaying = false;
     bool liveSourceFadeActive = false;
     int fftSize = 2048, hopSize = 512;

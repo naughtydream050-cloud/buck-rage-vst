@@ -223,6 +223,7 @@ jobs:
             toyotomi-runtime-smoke.log
             toyotomi-scratch-engine-tests.log
             toyotomi-xy-engine-tests.log
+            build-toyotomi-hideyoshi/ToyotomiHideyoshiXYEngineTests_artefacts/Release/ToyotomiHideyoshiXYEngineTests.exe
             xy-diagnostic-*.wav
             phase1-render-*.wav
             phase2-render-*.wav

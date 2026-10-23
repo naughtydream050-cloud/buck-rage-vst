@@ -354,6 +354,8 @@ public:
             engine.livePreviousX = 0.1f;
             engine.liveDirection = 1;
             engine.livePendingTransition = false;
+            engine.liveReentryTailActive = false;
+            engine.liveReentryTailPosition = 0;
             engine.liveSamplesToLaunch = 100000;
             engine.liveWetGain = 1.0f;
             engine.liveWasPlaying = true;
@@ -371,6 +373,7 @@ public:
         input.setSample (0, 0, 0.25f);
         input.setSample (1, 0, -0.25f);
         bool allOffsetsReenteredImmediately = transitionFrames >= 2;
+        double maximumTailReferenceError = 0.0;
         for (int eventOffset = 1; eventOffset < transitionFrames; ++eventOffset)
         {
             resetProbe();
@@ -394,17 +397,39 @@ public:
             bool launchedLatestTargetAtEvent = false;
             for (const auto& grain : engine.liveGrains)
                 launchedLatestTargetAtEvent = launchedLatestTargetAtEvent
-                    || (grain.active && grain.direction == 1 && grain.age == 1
-                        && grain.fadeInFrames == transitionFrames);
-            const auto immediate = launchedLatestTargetAtEvent && ! engine.livePendingTransition;
+                    || (grain.active && grain.direction == 1 && grain.age == 1);
+            const auto immediate = launchedLatestTargetAtEvent && ! engine.livePendingTransition
+                                && engine.liveReentryTailActive && engine.liveReentryTailPosition == 1;
             allOffsetsReenteredImmediately = allOffsetsReenteredImmediately && immediate;
+            if (immediate)
+            {
+                const auto* tail = engine.liveReentryTailBuffers[static_cast<size_t> (engine.liveReentryTailBuffer)].get();
+                const auto prior = eventOffset - 1;
+                for (int frame = 0; frame < transitionFrames; ++frame)
+                {
+                    const auto transitionSample = prior + frame;
+                    const auto expected = transitionSample < transitionFrames
+                        ? static_cast<float> (0.25 * std::cos (transitionSample * 1.5707963267948966
+                                                               / (transitionFrames - 1))
+                                              + 0.25 * std::sin (transitionSample * 1.5707963267948966
+                                                               / (transitionFrames - 1)))
+                        : 0.25f;
+                    const auto index = static_cast<size_t> (frame) * 2u;
+                    maximumTailReferenceError = juce::jmax (maximumTailReferenceError,
+                        static_cast<double> (std::abs (tail[index] - expected)));
+                    maximumTailReferenceError = juce::jmax (maximumTailReferenceError,
+                        static_cast<double> (std::abs (tail[index + 1u] + expected)));
+                }
+            }
             if (! immediate)
                 std::cerr << "RED reentrant_transition offset=" << eventOffset
                           << " pending=" << engine.livePendingTransition
                           << " launched=" << launchedLatestTargetAtEvent << '\n';
         }
+        std::cout << "METRIC reentrant_tail_reference max_error=" << maximumTailReferenceError
+                  << " tolerance=2e-6\n";
         engine.release();
-        return allOffsetsReenteredImmediately;
+        return allOffsetsReenteredImmediately && maximumTailReferenceError <= 2.0e-6;
     }
 
     static bool liveFadedGrainNeverReturnsToFullGain()
