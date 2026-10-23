@@ -17,7 +17,7 @@ bool xyPadRenderTailAvx2 (const float* history, const float* previousTail,
                           float* destination, size_t lowerIndex, size_t upperIndex,
                           uint64_t capacity, int direction, float fraction,
                           int startFrame, int frameCount, int previousTailPosition,
-                          float blendScale) noexcept
+                          float blendScale, bool useFma) noexcept
 {
     if (history == nullptr || destination == nullptr || capacity < 4
         || frameCount < 4 || (frameCount % 4) != 0
@@ -59,8 +59,9 @@ bool xyPadRenderTailAvx2 (const float* history, const float* previousTail,
             upperIndex -= 4u;
         }
 
-        auto target = _mm256_add_ps (lower,
-            _mm256_mul_ps (_mm256_sub_ps (upper, lower), fractionVector));
+        auto target = useFma
+            ? _mm256_fmadd_ps (_mm256_sub_ps (upper, lower), fractionVector, lower)
+            : _mm256_add_ps (lower, _mm256_mul_ps (_mm256_sub_ps (upper, lower), fractionVector));
         if (previousTail != nullptr)
         {
             const auto firstTailFrame = previousTailPosition + startFrame + offset;
@@ -68,8 +69,9 @@ bool xyPadRenderTailAvx2 (const float* history, const float* previousTail,
             const auto q = _mm256_add_ps (qBase, blendOffsets);
             const auto old = _mm256_loadu_ps (previousTail
                 + static_cast<size_t> (firstTailFrame) * 2u);
-            target = _mm256_add_ps (old,
-                _mm256_mul_ps (_mm256_sub_ps (target, old), q));
+            target = useFma
+                ? _mm256_fmadd_ps (_mm256_sub_ps (target, old), q, old)
+                : _mm256_add_ps (old, _mm256_mul_ps (_mm256_sub_ps (target, old), q));
         }
 
         const auto magnitude = _mm256_andnot_ps (signMask, target);
@@ -81,7 +83,7 @@ bool xyPadRenderTailAvx2 (const float* history, const float* previousTail,
 }
 #else
 bool xyPadRenderTailAvx2 (const float*, const float*, float*, size_t, size_t,
-                          uint64_t, int, float, int, int, int, float) noexcept
+                          uint64_t, int, float, int, int, int, float, bool) noexcept
 {
     return false;
 }

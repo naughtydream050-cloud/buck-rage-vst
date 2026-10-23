@@ -151,6 +151,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     liveHopFrames = juce::jmax (1, juce::roundToInt (rate * kLiveHopSeconds));
     liveTransitionFrames = juce::jmax (2, juce::roundToInt (rate * 0.003));
     liveTailAvx2Available = xyPadTailAvx2Available();
+    liveTailFmaAvailable = liveTailAvx2Available && xyPadTailFmaAvailable();
     try
     {
         if (! liveOnly)
@@ -287,6 +288,7 @@ void XYPadEngine::release() noexcept
     liveReentryTailFrames = liveReentryTailPosition = liveReentryTailBuffer = 0;
     liveReentryTailActive = false;
     liveTailAvx2Available = false;
+    liveTailFmaAvailable = false;
     liveWriteSerial = liveHistoryValidFrames = 0;
     liveSamplesToLaunch = 0;
     liveSilenceFramesCount = 0;
@@ -1000,7 +1002,8 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
 
                 if (avxCount > 0 && ! xyPadRenderTailAvx2 (liveHistory.get(), previousTail,
                         destination, avxLower, avxUpper, capacity, grain.direction, fraction,
-                        avxStart, avxCount, liveReentryTailPosition, tailBlendScale))
+                        avxStart, avxCount, liveReentryTailPosition, tailBlendScale,
+                        liveTailFmaAvailable))
                     avxCount = 0;
             }
             if (referenceValid)
