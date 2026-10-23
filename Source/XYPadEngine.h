@@ -193,6 +193,8 @@ private:
     uint64_t liveWriteSerial = 0;
     uint64_t liveHistoryValidFrames = 0;
     int liveHistoryCapacityFrames = 0;
+    int liveHistoryRetentionFrames = 0;
+    uint64_t liveHistoryIndexMask = 0;
     int liveWarmupFrames = 0;
     int liveGrainFrames = 0;
     int liveHopFrames = 0;

@@ -268,8 +268,12 @@ public:
             const auto intendedSelection = static_cast<uint64_t> (
                 juce::roundToInt (rate * XYPadEngine::kLiveHistorySeconds) + 2);
             const auto selectedOldest = initialNewest + 1u - intendedSelection;
+            const auto retentionFrames = intendedSelection
+                + static_cast<uint64_t> (engine.liveGrainFrames);
             passed = passed && grain.active && grain.startSerial == static_cast<double> (selectedOldest)
-                && capacity >= intendedSelection + static_cast<uint64_t> (engine.liveGrainFrames);
+                && (capacity & (capacity - 1u)) == 0u
+                && capacity >= retentionFrames
+                && static_cast<uint64_t> (engine.liveHistoryRetentionFrames) == retentionFrames;
 
             auto newest = initialNewest;
             for (int frame = 0; frame < engine.liveGrainFrames; ++frame)

@@ -101,7 +101,8 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     sampleRate = rate;
     maxBlock = maximumBlockSize;
     activeBar = -1;
-    liveHistoryCapacityFrames = liveWarmupFrames = liveGrainFrames = liveHopFrames = 0;
+    liveHistoryCapacityFrames = liveHistoryRetentionFrames = liveWarmupFrames = liveGrainFrames = liveHopFrames = 0;
+    liveHistoryIndexMask = 0;
     liveTransitionFrames = 0;
     liveReentryTailFrames = liveReentryTailPosition = liveReentryTailBuffer = 0;
     liveReentryTailActive = false;
@@ -144,8 +145,12 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         return false;
     maxFramesPerBar = liveOnly ? 0 : static_cast<int> (requestedFrames);
     const auto floatCount = static_cast<size_t> (maxFramesPerBar) * 2u;
-    liveHistoryCapacityFrames = juce::jmin (static_cast<int> (kMaxLiveHistoryFrames),
+    liveHistoryRetentionFrames = juce::jmin (static_cast<int> (kMaxLiveHistoryFrames),
         juce::jmax (1, juce::roundToInt (rate * (kLiveHistorySeconds + kLiveGrainSeconds)) + 2));
+    liveHistoryCapacityFrames = 1;
+    while (liveHistoryCapacityFrames < liveHistoryRetentionFrames)
+        liveHistoryCapacityFrames <<= 1;
+    liveHistoryIndexMask = static_cast<uint64_t> (liveHistoryCapacityFrames - 1);
     liveWarmupFrames = juce::jmax (1, juce::roundToInt (rate * kLiveWarmupSeconds));
     liveGrainFrames = juce::jmax (1, juce::roundToInt (rate * kLiveGrainSeconds));
     liveHopFrames = juce::jmax (1, juce::roundToInt (rate * kLiveHopSeconds));
@@ -283,7 +288,8 @@ void XYPadEngine::release() noexcept
     maxFramesPerBar = maxBlock = 0;
     sampleRate = 0.0;
     activeBar = -1;
-    liveHistoryCapacityFrames = liveWarmupFrames = liveGrainFrames = liveHopFrames = 0;
+    liveHistoryCapacityFrames = liveHistoryRetentionFrames = liveWarmupFrames = liveGrainFrames = liveHopFrames = 0;
+    liveHistoryIndexMask = 0;
     liveTransitionFrames = 0;
     liveReentryTailFrames = liveReentryTailPosition = liveReentryTailBuffer = 0;
     liveReentryTailActive = false;
@@ -803,8 +809,8 @@ bool XYPadEngine::readLiveSample (double serial, int channel, uint64_t oldestSer
 
     const auto lower = static_cast<uint64_t> (std::floor (serial));
     const auto upper = juce::jmin (newestSerial, lower + 1u);
-    const auto lowerIndex = static_cast<size_t> (lower % static_cast<uint64_t> (liveHistoryCapacityFrames));
-    const auto upperIndex = static_cast<size_t> (upper % static_cast<uint64_t> (liveHistoryCapacityFrames));
+    const auto lowerIndex = static_cast<size_t> (lower & liveHistoryIndexMask);
+    const auto upperIndex = static_cast<size_t> (upper & liveHistoryIndexMask);
     if (liveHistorySerials[lowerIndex] != lower || liveHistorySerials[upperIndex] != upper)
         return false;
     const auto fraction = static_cast<float> (serial - static_cast<double> (lower));
@@ -824,9 +830,8 @@ bool XYPadEngine::readLiveStereoSample (double serial, uint64_t oldestSerial,
 
     const auto lower = static_cast<uint64_t> (std::floor (serial));
     const auto upper = juce::jmin (newestSerial, lower + 1u);
-    const auto capacity = static_cast<uint64_t> (liveHistoryCapacityFrames);
-    const auto lowerIndex = static_cast<size_t> (lower % capacity);
-    const auto upperIndex = static_cast<size_t> (upper % capacity);
+    const auto lowerIndex = static_cast<size_t> (lower & liveHistoryIndexMask);
+    const auto upperIndex = static_cast<size_t> (upper & liveHistoryIndexMask);
     if (liveHistorySerials[lowerIndex] != lower || liveHistorySerials[upperIndex] != upper)
         return false;
 
@@ -914,7 +919,7 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                 && firstSerial <= static_cast<double> (newestSerial);
             const auto lowerSerial = std::isfinite (firstSerial) && firstSerial >= 0.0
                 ? static_cast<uint64_t> (std::floor (firstSerial)) : uint64_t (0);
-            auto lowerIndex = static_cast<size_t> (lowerSerial % capacity);
+            auto lowerIndex = static_cast<size_t> (lowerSerial & liveHistoryIndexMask);
             auto upperIndex = lowerIndex;
             const auto fraction = std::isfinite (firstSerial)
                 ? static_cast<float> (firstSerial - static_cast<double> (lowerSerial)) : 0.0f;
@@ -946,7 +951,7 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                 && (fraction <= 0.0f || maxReadLower < newestSerial);
             const auto ringSerialMatches = [&] (uint64_t serial) noexcept
             {
-                const auto index = static_cast<size_t> (serial % capacity);
+                const auto index = static_cast<size_t> (serial & liveHistoryIndexMask);
                 return liveHistorySerials[index] == serial;
             };
             const auto endpointsValid = rangeValid
@@ -1364,13 +1369,12 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
     {
         const auto dryLeft = sourceLeft != nullptr && std::isfinite (sourceLeft[i]) ? sourceLeft[i] : 0.0f;
         const auto dryRight = sourceRight != nullptr && std::isfinite (sourceRight[i]) ? sourceRight[i] : dryLeft;
-        const auto writeIndex = static_cast<size_t> (liveWriteSerial
-            % static_cast<uint64_t> (liveHistoryCapacityFrames));
+        const auto writeIndex = static_cast<size_t> (liveWriteSerial & liveHistoryIndexMask);
         liveHistory[writeIndex * 2u] = dryLeft;
         liveHistory[writeIndex * 2u + 1u] = dryRight;
         liveHistorySerials[writeIndex] = liveWriteSerial;
         ++liveWriteSerial;
-        liveHistoryValidFrames = juce::jmin (static_cast<uint64_t> (liveHistoryCapacityFrames),
+        liveHistoryValidFrames = juce::jmin (static_cast<uint64_t> (liveHistoryRetentionFrames),
                                               liveHistoryValidFrames + 1u);
         const auto newestSerial = liveWriteSerial - 1u;
         const auto oldestSerial = newestSerial + 1u - liveHistoryValidFrames;
