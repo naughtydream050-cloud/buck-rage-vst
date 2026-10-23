@@ -1024,10 +1024,17 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                 liveHoldPhase = 0;
             }
         }
-        // A direction fold or abrupt jump starts its transition immediately;
-        // waiting for the next 10ms launch would exceed the 3ms contract.
-        if (livePendingTransition && hasHistory) liveSamplesToLaunch = 0;
-        if (liveActiveTrajectory.count > 0 && hasHistory && liveSamplesToLaunch <= 0)
+        // A direction fold or abrupt jump starts its transition immediately.
+        // Coalesce re-entrant targets while a transition is active; one fixed
+        // pending target is enough and prevents unbounded overlapping voices.
+        bool transitionInProgress = false;
+        for (const auto& grain : liveGrains)
+            transitionInProgress = transitionInProgress
+                || (grain.active && (grain.fadeInFrames > 0 || grain.fadeOutRemaining > 0));
+        if (livePendingTransition && hasHistory && ! transitionInProgress)
+            liveSamplesToLaunch = 0;
+        if (liveActiveTrajectory.count > 0 && hasHistory && liveSamplesToLaunch <= 0
+            && ! transitionInProgress)
         {
             launchLiveGrain (x, direction, livePendingTransition, oldestSerial, newestSerial);
             livePendingTransition = false;
