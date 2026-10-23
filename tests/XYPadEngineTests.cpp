@@ -492,6 +492,142 @@ public:
             && forwardTop.pitchSerial == forwardBottom.pitchSerial
             && reverseTop.pitchSerial == reverseBottom.pitchSerial;
     }
+
+    struct LiveVelocityObservation
+    {
+        int direction = 0;
+        int stationaryFrames = 0;
+        int requiredHoldFrames = 0;
+        bool holdReady = false;
+    };
+
+    static LiveVelocityObservation observeLiveVelocity (double rate, double velocity)
+    {
+        LiveVelocityObservation result;
+        XYPadEngine engine;
+        constexpr int blockSize = 256;
+        if (! engine.prepare (rate, blockSize, true, true)) return result;
+
+        const auto startX = velocity >= 0.0 ? 0.25f : 0.75f;
+        const auto endX = static_cast<float> (static_cast<double> (startX) + velocity);
+        const std::vector<PluginStateModel::MotionPoint> points {
+            { startX, 0.5f, 0.0 }, { endX, 0.5f, 1.0 }
+        };
+        engine.setTrajectory (0, points, 1);
+
+        juce::AudioBuffer<float> input (2, blockSize), output (2, blockSize), mask (1, blockSize);
+        input.clear();
+        for (int i = 0; i < blockSize; ++i)
+        {
+            input.setSample (0, i, 0.25f);
+            input.setSample (1, i, -0.125f);
+        }
+
+        const auto targetSamples = static_cast<int> (rate * 0.05);
+        int processed = 0;
+        while (processed < targetSamples)
+        {
+            const auto count = juce::jmin (blockSize, targetSamples - processed);
+            XYPadEngine::Transport transport;
+            transport.playing = true;
+            transport.startBar = 0;
+            transport.startPhase = static_cast<double> (processed) / rate;
+            transport.phasePerSample = 1.0 / rate;
+            engine.processLive (input, output, mask, transport, count);
+            processed += count;
+        }
+
+        result.direction = engine.liveDirection;
+        result.stationaryFrames = engine.liveStationaryFrames;
+        result.requiredHoldFrames = juce::jmax (1, juce::roundToInt (rate * 0.002));
+        result.holdReady = engine.liveHoldReady;
+        engine.release();
+        return result;
+    }
+
+    static bool liveEqualPowerTransitionAudio (double rate, double& measuredRatio,
+                                               bool& mutationOracleRejects)
+    {
+        XYPadEngine engine;
+        constexpr int blockSize = 1;
+        if (! engine.prepare (rate, blockSize, true, true)) return false;
+        const auto transitionFrames = engine.liveTransitionFrames;
+        const auto pipelineDelay = XYPadEngine::kLivePipelineLatency;
+        const auto targetSampleCount = static_cast<int> (rate * 0.10);
+        std::vector<PluginStateModel::MotionPoint> points {
+            { 0.2f, 0.5f, 0.0 }, { 0.2f, 0.5f, 0.05 },
+            { 0.8f, 0.5f, 0.05001 }, { 0.8f, 0.5f, 1.0 }
+        };
+        engine.setTrajectory (0, points, 1);
+
+        juce::AudioBuffer<float> input (2, 1), output (2, 1), mask (1, 1);
+        input.setSample (0, 0, 0.25f);
+        input.setSample (1, 0, 0.25f);
+        std::vector<float> rendered (static_cast<size_t> (targetSampleCount), 0.0f);
+        std::vector<float> renderedMask (static_cast<size_t> (targetSampleCount), 0.0f);
+        int transitionStart = -1;
+
+        for (int sample = 0; sample < targetSampleCount; ++sample)
+        {
+            XYPadEngine::Transport transport;
+            transport.playing = true;
+            transport.startBar = 0;
+            transport.startPhase = static_cast<double> (sample) / rate;
+            transport.phasePerSample = 1.0 / rate;
+            engine.processLive (input, output, mask, transport, 1);
+            rendered[static_cast<size_t> (sample)] = output.getSample (0, 0);
+            renderedMask[static_cast<size_t> (sample)] = mask.getSample (0, 0);
+
+            if (transitionStart < 0)
+                for (const auto& grain : engine.liveGrains)
+                    if (grain.active && grain.fadeOutRemaining == transitionFrames - 1)
+                    {
+                        transitionStart = sample;
+                        break;
+                    }
+        }
+
+        bool valid = transitionFrames >= 2 && transitionStart >= 0;
+        const auto midpointOffset = juce::jmax (0, (transitionFrames - 1) / 2);
+        const auto midpointIndex = transitionStart + pipelineDelay + midpointOffset;
+        const auto baselineEnd = transitionStart + pipelineDelay - 16;
+        const auto baselineStart = baselineEnd - 64;
+        double baseline = 0.0;
+        int baselineCount = 0;
+        if (baselineStart < 0 || midpointIndex >= targetSampleCount)
+            valid = false;
+        else
+            for (int i = baselineStart; i < baselineEnd; ++i)
+                if (renderedMask[static_cast<size_t> (i)] > 0.5f)
+                {
+                    baseline += rendered[static_cast<size_t> (i)];
+                    ++baselineCount;
+                }
+        valid = valid && baselineCount > 0;
+        if (baselineCount > 0)
+        {
+            baseline /= baselineCount;
+            measuredRatio = baseline != 0.0
+                ? rendered[static_cast<size_t> (midpointIndex)] / baseline : 0.0;
+        }
+
+        constexpr double equalPowerMidpoint = 1.4142135623730951;
+        constexpr double tolerance = 0.08;
+        const auto accepts = [tolerance] (double actual, double expected)
+        {
+            return std::abs (actual - expected) <= tolerance;
+        };
+        mutationOracleRejects = ! accepts (equalPowerMidpoint, 1.0);
+        const auto audioMatchesEqualPower = accepts (measuredRatio, equalPowerMidpoint);
+        std::cout << "METRIC xy_live_r2 live_transition rate=" << rate
+                  << " start=" << transitionStart << " frames=" << transitionFrames
+                  << " baseline=" << baseline << " measured_ratio=" << measuredRatio
+                  << " expected_ratio=" << equalPowerMidpoint
+                  << " expected_peak_db=" << 20.0 * std::log10 (equalPowerMidpoint)
+                  << " mutation_rejected=" << mutationOracleRejects << '\n';
+        engine.release();
+        return valid && mutationOracleRejects && audioMatchesEqualPower;
+    }
 };
 
 namespace
@@ -566,6 +702,28 @@ int main()
            "render-job-spsc-queue-bounded-fifo-and-overflow-rejected");
     check (XYPadEngineTestAccess::sampleTimelineAndInterpolationAreBounded(),
            "sample-exact-bar-loop-mapping-and-time-normalized-trajectory-interpolation");
+    for (const auto rate : { 44100.0, 48000.0, 96000.0 })
+        for (const auto velocity : { 0.01, 0.1, 0.5, -0.01, -0.1, -0.5 })
+        {
+            const auto observation = XYPadEngineTestAccess::observeLiveVelocity (rate, velocity);
+            const auto requiredDirection = velocity > 0.0 ? 1 : -1;
+            const auto pass = observation.direction == requiredDirection
+                && observation.stationaryFrames < observation.requiredHoldFrames
+                && ! observation.holdReady;
+            std::cout << "METRIC xy_live_r2 velocity rate=" << rate << " v=" << velocity
+                      << " direction=" << observation.direction
+                      << " stationary=" << observation.stationaryFrames
+                      << " required=" << observation.requiredHoldFrames
+                      << " hold_ready=" << observation.holdReady << '\n';
+            check (pass, "xy-live-r2-normalized-velocity-remains-moving-across-sample-rates");
+        }
+    double liveTransitionRatio = 0.0;
+    bool transitionMutationRejected = false;
+    check (XYPadEngineTestAccess::liveEqualPowerTransitionAudio (
+               48000.0, liveTransitionRatio, transitionMutationRejected),
+           "xy-live-r2-rendered-transition-matches-equal-power-reference");
+    check (transitionMutationRejected,
+           "xy-live-r2-equal-power-reference-mutation-is-rejected");
     const float interpolationFixture[] { -1.0f, -0.25f, 0.5f, 1.0f };
     bool scalarInterpolationMatches = true;
     for (const auto x : { 0.0, 0.125, 0.5, 0.875, 1.0 })
