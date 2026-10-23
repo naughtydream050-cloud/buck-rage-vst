@@ -80,7 +80,7 @@ const acMap = {
   'AC-08': [['xy-engine', 'live-pitch-neutral-identity-has-exact-1024-sample-delay']],
   'AC-09': [['xy-engine', 'depth-zero-bit-exact-dry'], ['runtime-smoke', 'xy-ready-bypass-excludes-xy-and-matches-preset-only'], ['runtime-smoke', 'xy-depth-zero-is-bit-exact-dry-before-and-after-ready']],
   'AC-10': [['runtime-smoke', 'ac10-cold-history-unavailable-xy-preserves-active-preset-bit-exact-per-sample'], ['runtime-smoke', 'ac10-source-silence-unavailable-xy-preserves-nonzero-preset-tail-per-sample'], ['runtime-smoke', 'ac10-active-and-same-bar-resumed-xy-contribute-in-every-ten-ms-window']],
-  'AC-11': [['runtime-smoke', 'confirmed-loop-reuses-ready-bar-at-loop-origin'], ['runtime-smoke', 'v2-host-sync-off-keeps-internal-timeline-origin'], ['xy-engine', 'all-64-bars-replay-their-own-stereo-capture']],
+  'AC-11': [['xy-engine', 'confirmed-loop-reuses-ready-bar-at-loop-origin'], ['runtime-smoke', 'v2-host-sync-off-keeps-internal-timeline-origin'], ['xy-engine', 'all-64-bars-replay-their-own-stereo-capture']],
   'AC-12': [['xy-engine', 'stop-keeps-ready-bar-but-does-not-play-stale-xy'], ['xy-engine', 'seek-away-and-return-preserves-completed-bar-capture'], ['xy-engine', 'timing-generation-invalidates-old-render-before-recapture']],
   'AC-13': [['xy-engine', 'stereo-phase-offset-preserved-through-linked-reverse-read'], ['xy-engine', 'live-source-ended-fades-actual-xy-contribution-without-a-hard-audio-cut'], ['xy-engine', 'correlated-layer-peak-measured-no-limiter']],
   'AC-14': [['xy-engine', 'live-xy-processing-performs-no-heap-allocation'], ['xy-engine', 'audio-process-path-performs-no-global-heap-allocation'], ['xy-engine', 'fixed-64-bar-tables-do-not-consume-windows-thread-stack']],
