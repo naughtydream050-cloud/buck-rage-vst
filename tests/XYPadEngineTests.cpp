@@ -249,6 +249,37 @@ public:
             && reverse.startSerial <= static_cast<double> (newest)
             && reverse.startSerial + reverse.direction * 19.0 >= static_cast<double> (oldest)
             && reverse.startSerial + reverse.direction * 19.0 <= static_cast<double> (newest);
+        const auto wrappedOldest = static_cast<uint64_t> (capacity - 32u);
+        const auto wrappedNewest = wrappedOldest + 63u;
+        for (uint64_t serial = wrappedOldest; serial <= wrappedNewest; ++serial)
+        {
+            const auto index = static_cast<size_t> (serial % capacity);
+            const auto value = static_cast<float> (serial - wrappedOldest) * 0.125f;
+            engine.liveHistory[index * 2u] = value;
+            engine.liveHistory[index * 2u + 1u] = -value;
+            engine.liveHistorySerials[index] = serial;
+        }
+        for (const auto x : { 0.0f, 0.12345f, 0.5f, 0.9999f, 1.0f })
+            for (const auto direction : { -1, 1 })
+            {
+                engine.liveGrains.fill (XYPadEngine::LiveGrain {});
+                engine.launchLiveGrain (x, direction, false, wrappedOldest, wrappedNewest);
+                const auto& grain = engine.liveGrains[0];
+                const auto* snapshot = engine.liveGrainSnapshots.get()
+                    + static_cast<size_t> (grain.snapshotIndex) * static_cast<size_t> (engine.liveGrainFrames) * 2u;
+                for (int age = 0; age < engine.liveGrainFrames; ++age)
+                {
+                    float expectedLeft = 0.0f, expectedRight = 0.0f;
+                    const auto sourceSerial = grain.startSerial + static_cast<double> (direction * age);
+                    const auto readable = engine.readLiveSample (sourceSerial, 0, wrappedOldest, wrappedNewest, expectedLeft)
+                        && engine.readLiveSample (sourceSerial, 1, wrappedOldest, wrappedNewest, expectedRight);
+                    const auto snapshotOffset = static_cast<size_t> (age) * 2u;
+                    const auto errorLeft = std::abs (static_cast<double> (snapshot[snapshotOffset] - expectedLeft));
+                    const auto errorRight = std::abs (static_cast<double> (snapshot[snapshotOffset + 1u] - expectedRight));
+                    maximumReferenceError = std::max (maximumReferenceError, std::max (errorLeft, errorRight));
+                    valid = valid && grain.active && readable && errorLeft <= 2.0e-6 && errorRight <= 2.0e-6;
+                }
+            }
         std::cout << "METRIC live_linear_reference max_error=" << maximumReferenceError << " tolerance=2e-6\n";
         engine.release();
         return valid && maximumReferenceError <= 2.0e-6;

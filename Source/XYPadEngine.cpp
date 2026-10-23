@@ -837,15 +837,46 @@ void XYPadEngine::launchLiveGrain (float x, int direction, bool transition,
     const auto snapshotIndex = static_cast<int> (destination - liveGrains.data());
     auto* snapshot = liveGrainSnapshots.get()
                    + static_cast<size_t> (snapshotIndex) * static_cast<size_t> (liveGrainFrames) * 2u;
+    auto lowerSerial = static_cast<uint64_t> (std::floor (start));
+    auto lowerIndex = static_cast<size_t> (lowerSerial % static_cast<uint64_t> (liveHistoryCapacityFrames));
+    const auto fraction = static_cast<float> (start - static_cast<double> (lowerSerial));
+    const auto capacityFrames = static_cast<size_t> (liveHistoryCapacityFrames);
     for (int age = 0; age < liveGrainFrames; ++age)
     {
-        const auto serial = start + static_cast<double> ((direction >= 0 ? 1 : -1) * age);
-        float left = 0.0f, right = 0.0f;
-        if (! readLiveSample (serial, 0, oldestSerial, newestSerial, left)
-            || ! readLiveSample (serial, 1, oldestSerial, newestSerial, right))
+        if (lowerSerial < oldestSerial || lowerSerial > newestSerial)
             return;
-        snapshot[static_cast<size_t> (age) * 2u] = left;
-        snapshot[static_cast<size_t> (age) * 2u + 1u] = right;
+        const auto upperSerial = lowerSerial < newestSerial ? lowerSerial + 1u : lowerSerial;
+        const auto upperIndex = upperSerial == lowerSerial
+            ? lowerIndex : (lowerIndex + 1u == capacityFrames ? 0u : lowerIndex + 1u);
+        if (liveHistorySerials[lowerIndex] != lowerSerial
+            || liveHistorySerials[upperIndex] != upperSerial)
+            return;
+
+        const auto lowerOffset = lowerIndex * 2u;
+        const auto upperOffset = upperIndex * 2u;
+        const auto left = liveHistory[lowerOffset]
+                        + (liveHistory[upperOffset] - liveHistory[lowerOffset]) * fraction;
+        const auto right = liveHistory[lowerOffset + 1u]
+                         + (liveHistory[upperOffset + 1u] - liveHistory[lowerOffset + 1u]) * fraction;
+        if (! std::isfinite (left) || ! std::isfinite (right))
+            return;
+        const auto snapshotOffset = static_cast<size_t> (age) * 2u;
+        snapshot[snapshotOffset] = left;
+        snapshot[snapshotOffset + 1u] = right;
+
+        if (age + 1 < liveGrainFrames)
+        {
+            if (direction >= 0)
+            {
+                ++lowerSerial;
+                lowerIndex = lowerIndex + 1u == capacityFrames ? 0u : lowerIndex + 1u;
+            }
+            else
+            {
+                --lowerSerial;
+                lowerIndex = lowerIndex == 0u ? capacityFrames - 1u : lowerIndex - 1u;
+            }
+        }
     }
     destination->startSerial = start;
     destination->direction = direction >= 0 ? 1 : -1;
