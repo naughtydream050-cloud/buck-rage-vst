@@ -103,6 +103,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     activeBar = -1;
     liveHistoryCapacityFrames = liveHistoryRetentionFrames = liveWarmupFrames = liveGrainFrames = liveHopFrames = 0;
     liveHistoryIndexMask = 0;
+    liveHistoryHasUnsafeMagnitude = false;
     liveTransitionFrames = 0;
     liveReentryTailFrames = liveReentryTailPosition = liveReentryTailBuffer = 0;
     liveReentryTailActive = false;
@@ -157,6 +158,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     liveTransitionFrames = juce::jmax (2, juce::roundToInt (rate * 0.003));
     liveTailAvx2Available = xyPadTailAvx2Available();
     liveTailFmaAvailable = liveTailAvx2Available && xyPadTailFmaAvailable();
+    liveHistoryHasUnsafeMagnitude = false;
     try
     {
         if (! liveOnly)
@@ -290,6 +292,7 @@ void XYPadEngine::release() noexcept
     activeBar = -1;
     liveHistoryCapacityFrames = liveHistoryRetentionFrames = liveWarmupFrames = liveGrainFrames = liveHopFrames = 0;
     liveHistoryIndexMask = 0;
+    liveHistoryHasUnsafeMagnitude = false;
     liveTransitionFrames = 0;
     liveReentryTailFrames = liveReentryTailPosition = liveReentryTailBuffer = 0;
     liveReentryTailActive = false;
@@ -1008,7 +1011,7 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                 if (avxCount > 0 && ! xyPadRenderTailAvx2 (liveHistory.get(), previousTail,
                         destination, avxLower, avxUpper, capacity, grain.direction, fraction,
                         avxStart, avxCount, liveReentryTailPosition, tailBlendScale,
-                        liveTailFmaAvailable))
+                        liveTailFmaAvailable, liveHistoryHasUnsafeMagnitude))
                     avxCount = 0;
             }
             if (referenceValid)
@@ -1306,6 +1309,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         if (liveWasPlaying) clearLivePitchState();
         liveGrains.fill (LiveGrain {});
         liveHistoryValidFrames = 0;
+        liveHistoryHasUnsafeMagnitude = false;
         liveWriteSerial = 0;
         liveSamplesToLaunch = 0;
         liveSilenceFramesCount = 0;
@@ -1336,6 +1340,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         // can reference the ring again. Loop wraps deliberately retain it.
         liveGrains.fill (LiveGrain {});
         liveHistoryValidFrames = 0;
+        liveHistoryHasUnsafeMagnitude = false;
         liveSamplesToLaunch = 0;
         liveSilenceFramesCount = 0;
         liveActiveBar = -1;
@@ -1369,6 +1374,10 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
     {
         const auto dryLeft = sourceLeft != nullptr && std::isfinite (sourceLeft[i]) ? sourceLeft[i] : 0.0f;
         const auto dryRight = sourceRight != nullptr && std::isfinite (sourceRight[i]) ? sourceRight[i] : dryLeft;
+        constexpr auto safeTailMagnitude = std::numeric_limits<float>::max() * 0.25f;
+        const auto currentSampleUnsafe = std::abs (dryLeft) > safeTailMagnitude
+                                      || std::abs (dryRight) > safeTailMagnitude;
+        liveHistoryHasUnsafeMagnitude = liveHistoryHasUnsafeMagnitude || currentSampleUnsafe;
         const auto writeIndex = static_cast<size_t> (liveWriteSerial & liveHistoryIndexMask);
         liveHistory[writeIndex * 2u] = dryLeft;
         liveHistory[writeIndex * 2u + 1u] = dryRight;
@@ -1389,6 +1398,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                 // the ended segment readable through its fade, then invalidate it
                 // here before any stale grain can be relaunched.
                 liveHistoryValidFrames = 1;
+                liveHistoryHasUnsafeMagnitude = currentSampleUnsafe;
                 liveGrains.fill (LiveGrain {});
                 liveSamplesToLaunch = 0;
                 liveWetGain = 0.0f;

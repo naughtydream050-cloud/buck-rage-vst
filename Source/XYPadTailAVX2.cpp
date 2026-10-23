@@ -17,7 +17,7 @@ bool xyPadRenderTailAvx2 (const float* history, const float* previousTail,
                           float* destination, size_t lowerIndex, size_t upperIndex,
                           uint64_t capacity, int direction, float fraction,
                           int startFrame, int frameCount, int previousTailPosition,
-                          float blendScale, bool useFma) noexcept
+                          float blendScale, bool useFma, bool sanitizeOutput) noexcept
 {
     if (history == nullptr || destination == nullptr || capacity < 4
         || frameCount < 4 || (frameCount % 4) != 0
@@ -74,16 +74,19 @@ bool xyPadRenderTailAvx2 (const float* history, const float* previousTail,
                 : _mm256_add_ps (old, _mm256_mul_ps (_mm256_sub_ps (target, old), q));
         }
 
-        const auto magnitude = _mm256_andnot_ps (signMask, target);
-        const auto finite = _mm256_cmp_ps (magnitude, maximumFinite, _CMP_LE_OQ);
-        target = _mm256_and_ps (target, finite);
+        if (sanitizeOutput)
+        {
+            const auto magnitude = _mm256_andnot_ps (signMask, target);
+            const auto finite = _mm256_cmp_ps (magnitude, maximumFinite, _CMP_LE_OQ);
+            target = _mm256_and_ps (target, finite);
+        }
         _mm256_storeu_ps (output + static_cast<size_t> (offset) * 2u, target);
     }
     return true;
 }
 #else
 bool xyPadRenderTailAvx2 (const float*, const float*, float*, size_t, size_t,
-                          uint64_t, int, float, int, int, int, float, bool) noexcept
+                          uint64_t, int, float, int, int, int, float, bool, bool) noexcept
 {
     return false;
 }

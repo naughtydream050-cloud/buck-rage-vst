@@ -215,6 +215,7 @@ private:
     bool liveReentryTailActive = false;
     bool liveTailAvx2Available = false;
     bool liveTailFmaAvailable = false;
+    bool liveHistoryHasUnsafeMagnitude = false;
     bool liveWasPlaying = false;
     bool liveSourceFadeActive = false;
     int fftSize = 2048, hopSize = 512;

@@ -648,6 +648,39 @@ public:
         return passed && maximumError <= 2.0e-6;
     }
 
+    static bool unsafeMagnitudeTailStillSanitizesNonFiniteResults()
+    {
+        XYPadEngine engine;
+        if (! engine.prepare (96000.0, 64, true, true)) return false;
+        const auto capacity = static_cast<uint64_t> (engine.liveHistoryCapacityFrames);
+        const auto newest = capacity - 1u;
+        for (uint64_t serial = 0; serial < capacity; ++serial)
+        {
+            const auto index = static_cast<size_t> (serial & engine.liveHistoryIndexMask);
+            const auto value = (serial & 1u) == 0u ? std::numeric_limits<float>::max()
+                                                   : -std::numeric_limits<float>::max();
+            engine.liveHistory[index * 2u] = value;
+            engine.liveHistory[index * 2u + 1u] = value;
+            engine.liveHistorySerials[index] = serial;
+        }
+        engine.liveWriteSerial = capacity;
+        engine.liveHistoryValidFrames = engine.liveHistoryRetentionFrames;
+        engine.liveHistoryHasUnsafeMagnitude = true;
+        auto& grain = engine.liveGrains[0];
+        grain.startSerial = static_cast<double> (capacity / 2u) + 0.5;
+        grain.direction = 1;
+        grain.age = 1;
+        grain.active = true;
+        engine.captureLiveContinuationTail();
+        const auto* tail = engine.liveReentryTailBuffers[
+            static_cast<size_t> (engine.liveReentryTailBuffer)].get();
+        bool allFinite = engine.liveReentryTailActive && tail != nullptr;
+        for (int frame = 0; allFinite && frame < engine.liveReentryTailFrames * 2; ++frame)
+            allFinite = std::isfinite (tail[frame]);
+        engine.release();
+        return allFinite;
+    }
+
     static bool reentryRecordPasses (int eventSample, int targetStartSample, double tailError,
                                      int activeGrains, bool finite, double outputPeak,
                                      double peakBound) noexcept
@@ -1486,6 +1519,8 @@ int main (int argc, char** argv)
            "reentrant-target-restarts-on-event-sample-at-every-active-transition-offset");
     check (XYPadEngineTestAccess::stableSingleGrainTailFastPathMatchesReference(),
            "ac20-stable-single-grain-tail-fast-path-matches-reference-renderer");
+    check (XYPadEngineTestAccess::unsafeMagnitudeTailStillSanitizesNonFiniteResults(),
+           "ac20-extreme-finite-history-keeps-reentry-tail-finite-safety-guard-enabled");
     check (XYPadEngineTestAccess::liveGrainWindowLutMatchesAnalytic(),
            "live-grain-window-lut-matches-analytic-hann");
     check (XYPadEngineTestAccess::repeatedReentryBlendIsFiniteAndPeakBounded(),
