@@ -601,15 +601,11 @@ public:
                     { 0.1f, 0.5f, 0.0 }, { 0.9f, 0.5f, 1.0 }
                 };
                 engine.setTrajectory (0, points, 701);
-                juce::AudioBuffer<float> input (2, 1024), output (2, 1024), mask (1, 1024);
-                for (int i = 0; i < 1024; ++i)
-                {
-                    const auto sample = static_cast<float> (0.5 * std::sin (2.0 * 3.141592653589793
-                        * 440.0 * i / rate));
-                    input.setSample (0, i, sample);
-                    input.setSample (1, i, static_cast<float> (0.5 * std::sin (2.0 * 3.141592653589793
-                        * 440.0 * i / rate + 0.37)));
-                }
+                juce::AudioBuffer<float> input (2, 1), output (2, 1), mask (1, 1);
+                const auto sample = static_cast<float> (0.5 * std::sin (2.0 * 3.141592653589793 * 440.0 / rate));
+                input.setSample (0, 0, sample);
+                input.setSample (1, 0, static_cast<float> (0.5 * std::sin (
+                    2.0 * 3.141592653589793 * 440.0 / rate + 0.37)));
                 const auto blockAt = [&] (uint64_t index)
                 {
                     if (mode < 5) return fixedBlocks[mode];
@@ -621,10 +617,15 @@ public:
                 while (warmSamples < static_cast<uint64_t> (rate * 2.0))
                 {
                     const auto block = blockAt (sequence);
-                    XYPadEngine::Transport t;
-                    t.playing = true; t.startBar = 0;
-                    t.startPhase = (sequence & 1u) == 0 ? 0.25 : 0.75;
-                    engine.processLive (input, output, mask, t, block);
+                    for (int frame = 0; frame < block; ++frame)
+                    {
+                        XYPadEngine::Transport eventTransport;
+                        eventTransport.playing = true;
+                        eventTransport.startBar = 0;
+                        eventTransport.startPhase = (warmSamples + static_cast<uint64_t> (frame)) % 2u == 0u
+                            ? 0.25 : 0.75;
+                        engine.processLive (input, output, mask, eventTransport, 1);
+                    }
                     warmSamples += static_cast<uint64_t> (block);
                     ++sequence;
                 }
@@ -635,18 +636,25 @@ public:
                 while (measuredSamples < static_cast<uint64_t> (rate * 30.0))
                 {
                     const auto block = blockAt (sequence);
-                    XYPadEngine::Transport t;
-                    t.playing = true; t.startBar = 0;
-                    t.startPhase = (sequence & 1u) == 0 ? 0.25 : 0.75;
                     const auto start = std::chrono::steady_clock::now();
-                    engine.processLive (input, output, mask, t, block);
+                    // Stress the actual per-sample re-entry path at the maximum
+                    // requested event rate while measuring one nominal host block.
+                    for (int frame = 0; frame < block; ++frame)
+                    {
+                        XYPadEngine::Transport eventTransport;
+                        eventTransport.playing = true;
+                        eventTransport.startBar = 0;
+                        eventTransport.startPhase = (measuredSamples + static_cast<uint64_t> (frame)) % 2u == 0u
+                            ? 0.25 : 0.75;
+                        engine.processLive (input, output, mask, eventTransport, 1);
+                    }
                     const auto stop = std::chrono::steady_clock::now();
                     const auto elapsed = std::chrono::duration<double, std::micro> (stop - start).count();
                     const auto ratio = elapsed / (1.0e6 * block / rate);
                     deadlineRatios.push_back (ratio);
                     peakRatio = std::max (peakRatio, ratio);
                     measuredSamples += static_cast<uint64_t> (block);
-                    ++events;
+                    events += static_cast<uint64_t> (block);
                     ++sequence;
                 }
                 std::sort (deadlineRatios.begin(), deadlineRatios.end());
@@ -657,7 +665,8 @@ public:
                 std::cout << "METRIC reentrant_benchmark rate=" << rate << " mode="
                           << (mode < 5 ? fixedBlocks[mode] : -1) << " p99_deadline_ratio=" << p99Ratio
                           << " max_deadline_ratio=" << peakRatio << " events=" << events
-                          << " samples=" << measuredSamples << " status=" << (within ? "PASS" : "FAIL") << "\n";
+                          << " samples=" << measuredSamples << " event_rate=1_per_sample status="
+                          << (within ? "PASS" : "FAIL") << "\n";
                 engine.release();
             }
         }
