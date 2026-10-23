@@ -426,12 +426,13 @@ public:
                 for (int frame = 0; frame < transitionFrames; ++frame)
                 {
                     const auto transitionSample = prior + frame;
-                    const auto expected = transitionSample < transitionFrames
-                        ? static_cast<float> (0.25 * std::cos (transitionSample * 1.5707963267948966
-                                                               / (transitionFrames - 1))
-                                              + 0.25 * std::sin (transitionSample * 1.5707963267948966
-                                                               / (transitionFrames - 1)))
-                        : 0.25f;
+                    const auto expected = transitionSample == 0 ? 0.0f
+                        : transitionSample < transitionFrames
+                            ? static_cast<float> (0.25 * std::cos (transitionSample * 1.5707963267948966
+                                                                   / (transitionFrames - 1))
+                                                  + 0.25 * std::sin (transitionSample * 1.5707963267948966
+                                                                   / (transitionFrames - 1)))
+                            : 0.25f;
                     const auto index = static_cast<size_t> (frame) * 2u;
                     maximumTailReferenceError = juce::jmax (maximumTailReferenceError,
                         static_cast<double> (std::abs (tail[index] - expected)));
