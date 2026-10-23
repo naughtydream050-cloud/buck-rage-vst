@@ -555,7 +555,7 @@ public:
         const auto pipelineDelay = XYPadEngine::kLivePipelineLatency;
         const auto targetSampleCount = static_cast<int> (rate * 0.10);
         std::vector<PluginStateModel::MotionPoint> points {
-            { 0.2f, 0.5f, 0.0 }, { 0.2f, 0.5f, 0.05 },
+            { 0.2f, 0.5f, 0.0 }, { 0.21f, 0.5f, 0.05 },
             { 0.8f, 0.5f, 0.05001 }, { 0.8f, 0.5f, 1.0 }
         };
         engine.setTrajectory (0, points, 1);
@@ -566,6 +566,7 @@ public:
         std::vector<float> rendered (static_cast<size_t> (targetSampleCount), 0.0f);
         std::vector<float> renderedMask (static_cast<size_t> (targetSampleCount), 0.0f);
         int transitionStart = -1;
+        bool holdWasInactiveAtTransition = true;
 
         for (int sample = 0; sample < targetSampleCount; ++sample)
         {
@@ -583,6 +584,8 @@ public:
                     if (grain.active && grain.fadeOutRemaining == transitionFrames - 1)
                     {
                         transitionStart = sample;
+                        holdWasInactiveAtTransition = ! engine.liveHoldReady
+                            && engine.liveHoldMix <= 1.0e-6f;
                         break;
                     }
         }
@@ -624,9 +627,11 @@ public:
                   << " baseline=" << baseline << " measured_ratio=" << measuredRatio
                   << " expected_ratio=" << equalPowerMidpoint
                   << " expected_peak_db=" << 20.0 * std::log10 (equalPowerMidpoint)
-                  << " mutation_rejected=" << mutationOracleRejects << '\n';
+                  << " mutation_rejected=" << mutationOracleRejects
+                  << " hold_inactive=" << holdWasInactiveAtTransition << '\n';
         engine.release();
-        return valid && mutationOracleRejects && audioMatchesEqualPower;
+        return valid && holdWasInactiveAtTransition && mutationOracleRejects
+            && audioMatchesEqualPower;
     }
 };
 
