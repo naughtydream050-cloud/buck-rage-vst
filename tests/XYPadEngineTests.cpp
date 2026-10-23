@@ -493,6 +493,92 @@ public:
         return allOffsetsReenteredImmediately && maximumTailReferenceError <= 2.0e-6 && finiteTail;
     }
 
+    static bool stableSingleGrainTailFastPathMatchesReference()
+    {
+        double maximumError = 0.0;
+        bool passed = true;
+        for (const auto rate : { 44100.0, 48000.0, 96000.0 })
+        {
+            XYPadEngine engine;
+            if (! engine.prepare (rate, 64, true, true)) return false;
+            engine.liveGrains.fill (XYPadEngine::LiveGrain {});
+            engine.liveHoldReady = false;
+            engine.liveReentryTailActive = false;
+            engine.liveReentryTailPosition = 0;
+            const auto snapshotFrames = static_cast<size_t> (engine.liveGrainFrames);
+            for (size_t frame = 0; frame < snapshotFrames; ++frame)
+            {
+                const auto phase = static_cast<double> (frame) / static_cast<double> (snapshotFrames);
+                engine.liveGrainSnapshots[frame * 2u] = static_cast<float> (0.6 * std::sin (phase * 19.0));
+                engine.liveGrainSnapshots[frame * 2u + 1u] = static_cast<float> (0.4 * std::cos (phase * 23.0));
+            }
+
+            const auto capacity = static_cast<uint64_t> (engine.liveHistoryCapacityFrames);
+            const auto newest = capacity > 0 ? capacity - 1u : 0u;
+            for (const auto age : { 1, engine.liveGrainFrames / 3, engine.liveGrainFrames / 2,
+                                    engine.liveGrainFrames - 2 })
+                for (const auto priorTailPosition : { -1, 0, engine.liveReentryTailFrames / 2 })
+                {
+                    engine.liveGrains.fill (XYPadEngine::LiveGrain {});
+                    engine.liveReentryTailActive = priorTailPosition >= 0;
+                    engine.liveReentryTailBuffer = 0;
+                    engine.liveReentryTailPosition = priorTailPosition >= 0 ? priorTailPosition : 0;
+                    if (engine.liveReentryTailActive)
+                        for (int frame = 0; frame < engine.liveReentryTailFrames; ++frame)
+                        {
+                            const auto index = static_cast<size_t> (frame) * 2u;
+                            engine.liveReentryTailBuffers[0][index] = 0.2f + 0.0001f * static_cast<float> (frame);
+                            engine.liveReentryTailBuffers[0][index + 1u] = -0.3f - 0.0001f * static_cast<float> (frame);
+                        }
+
+                    engine.launchLiveGrain (0.5f, 1, false, 0, newest);
+                    auto& grain = engine.liveGrains[0];
+                    grain.age = age;
+                    grain.fadeInFrames = 0;
+                    grain.fadeOutRemaining = 0;
+                    grain.snapshotIndex = 0;
+                    engine.liveHoldReady = false;
+                    engine.captureLiveContinuationTail();
+                    passed = passed && engine.liveReentryTailActive;
+
+                    const auto* result = engine.liveReentryTailBuffers[
+                        static_cast<size_t> (engine.liveReentryTailBuffer)].get();
+                    const auto* previous = engine.liveReentryTailActive && priorTailPosition >= 0
+                        ? engine.liveReentryTailBuffers[0].get() : nullptr;
+                    for (int frame = 0; frame < engine.liveReentryTailFrames; ++frame)
+                    {
+                        const auto sourceAge = age + frame;
+                        const auto window = sourceAge >= 0 && sourceAge < engine.liveGrainFrames
+                            ? engine.liveGrainWindow[static_cast<size_t> (sourceAge)] : 0.0f;
+                        const auto sampleL = sourceAge >= 0 && sourceAge < engine.liveGrainFrames
+                            ? engine.liveGrainSnapshots[static_cast<size_t> (sourceAge) * 2u] : 0.0f;
+                        const auto sampleR = sourceAge >= 0 && sourceAge < engine.liveGrainFrames
+                            ? engine.liveGrainSnapshots[static_cast<size_t> (sourceAge) * 2u + 1u] : 0.0f;
+                        auto expectedL = window > 1.0e-9f ? sampleL * window / window : 0.0f;
+                        auto expectedR = window > 1.0e-9f ? sampleR * window / window : 0.0f;
+                        const auto previousFrame = priorTailPosition >= 0 ? priorTailPosition + frame : -1;
+                        if (previous != nullptr && previousFrame >= 0
+                            && previousFrame < engine.liveReentryTailFrames)
+                        {
+                            const auto q = static_cast<float> (previousFrame)
+                                / static_cast<float> (engine.liveReentryTailFrames - 1);
+                            const auto previousIndex = static_cast<size_t> (previousFrame) * 2u;
+                            expectedL = XYPadEngine::blendLiveReentrySample (previous[previousIndex], expectedL, q);
+                            expectedR = XYPadEngine::blendLiveReentrySample (previous[previousIndex + 1u], expectedR, q);
+                        }
+                        const auto index = static_cast<size_t> (frame) * 2u;
+                        maximumError = std::max (maximumError, static_cast<double> (std::abs (result[index] - expectedL)));
+                        maximumError = std::max (maximumError, static_cast<double> (std::abs (result[index + 1u] - expectedR)));
+                    }
+                    passed = passed && maximumError <= 2.0e-6;
+                }
+            engine.release();
+        }
+        std::cout << "METRIC stable_single_grain_fast_path max_error=" << maximumError
+                  << " tolerance=2e-6 rates=44100,48000,96000\n";
+        return passed && maximumError <= 2.0e-6;
+    }
+
     static bool reentryRecordPasses (int eventSample, int targetStartSample, double tailError,
                                      int activeGrains, bool finite, double outputPeak,
                                      double peakBound) noexcept
@@ -1304,6 +1390,8 @@ int main (int argc, char** argv)
            "live-fold-jump-starts-transition-on-the-next-sample-without-hop-delay");
     check (XYPadEngineTestAccess::interruptedTargetsRestartAtEveryOffset(),
            "reentrant-target-restarts-on-event-sample-at-every-active-transition-offset");
+    check (XYPadEngineTestAccess::stableSingleGrainTailFastPathMatchesReference(),
+           "ac20-stable-single-grain-tail-fast-path-matches-reference-renderer");
     check (XYPadEngineTestAccess::liveGrainWindowLutMatchesAnalytic(),
            "live-grain-window-lut-matches-analytic-hann");
     check (XYPadEngineTestAccess::repeatedReentryBlendIsFiniteAndPeakBounded(),

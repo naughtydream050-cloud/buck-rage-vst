@@ -870,6 +870,49 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
     auto* destination = liveReentryTailBuffers[static_cast<size_t> (destinationIndex)].get();
     const auto* previousTail = liveReentryTailActive
         ? liveReentryTailBuffers[static_cast<size_t> (liveReentryTailBuffer)].get() : nullptr;
+    int onlyActiveGrain = -1;
+    int activeCount = 0;
+    for (int index = 0; index < kLiveGrainCapacity; ++index)
+        if (liveGrains[static_cast<size_t> (index)].active)
+        {
+            onlyActiveGrain = index;
+            ++activeCount;
+        }
+    if (activeCount == 1)
+    {
+        const auto& grain = liveGrains[static_cast<size_t> (onlyActiveGrain)];
+        if (grain.fadeInFrames <= 0 && grain.fadeOutRemaining <= 0 && ! liveHoldReady
+            && grain.snapshotIndex >= 0 && grain.snapshotIndex < kLiveGrainCapacity)
+        {
+            const auto* snapshot = liveGrainSnapshots.get()
+                + static_cast<size_t> (grain.snapshotIndex) * static_cast<size_t> (liveGrainFrames) * 2u;
+            for (int frame = 0; frame < liveReentryTailFrames; ++frame)
+            {
+                const auto age = grain.age + frame;
+                const auto validHannFrame = age > 0 && age < liveGrainFrames - 1;
+                auto left = validHannFrame ? snapshot[static_cast<size_t> (age) * 2u] : 0.0f;
+                auto right = validHannFrame ? snapshot[static_cast<size_t> (age) * 2u + 1u] : 0.0f;
+                if (previousTail != nullptr)
+                {
+                    const auto previousFrame = liveReentryTailPosition + frame;
+                    if (previousFrame < liveReentryTailFrames)
+                    {
+                        const auto q = static_cast<float> (previousFrame)
+                                     / static_cast<float> (liveReentryTailFrames - 1);
+                        const auto index = static_cast<size_t> (previousFrame) * 2u;
+                        left = blendLiveReentrySample (previousTail[index], left, q);
+                        right = blendLiveReentrySample (previousTail[index + 1u], right, q);
+                    }
+                }
+                destination[static_cast<size_t> (frame) * 2u] = std::isfinite (left) ? left : 0.0f;
+                destination[static_cast<size_t> (frame) * 2u + 1u] = std::isfinite (right) ? right : 0.0f;
+            }
+            liveReentryTailBuffer = destinationIndex;
+            liveReentryTailPosition = 0;
+            liveReentryTailActive = true;
+            return;
+        }
+    }
     auto simulatedGrains = liveGrains;
     std::array<int, kLiveGrainCapacity> activeGrainIndices {};
     int activeGrainCount = 0;
