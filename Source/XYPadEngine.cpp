@@ -887,6 +887,7 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
         ? liveReentryTailBuffers[static_cast<size_t> (liveReentryTailBuffer)].get() : nullptr;
     const auto newestSerial = liveWriteSerial - 1u;
     const auto oldestSerial = newestSerial + 1u - liveHistoryValidFrames;
+    const auto tailBlendScale = 1.0f / static_cast<float> (juce::jmax (1, liveReentryTailFrames - 1));
     int onlyActiveGrain = -1;
     int activeCount = 0;
     for (int index = 0; index < kLiveGrainCapacity; ++index)
@@ -980,10 +981,8 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                     target = _mm_add_ps (target, _mm_mul_ps (_mm_sub_ps (upper, target), frac));
                     if (previousTail != nullptr)
                     {
-                        const auto q0 = static_cast<float> (previousFrame)
-                                      / static_cast<float> (liveReentryTailFrames - 1);
-                        const auto q1 = static_cast<float> (previousFrame + 1)
-                                      / static_cast<float> (liveReentryTailFrames - 1);
+                        const auto q0 = static_cast<float> (previousFrame) * tailBlendScale;
+                        const auto q1 = static_cast<float> (previousFrame + 1) * tailBlendScale;
                         const auto q = _mm_setr_ps (q0, q0, q1, q1);
                         const auto old = _mm_loadu_ps (previousTail
                             + static_cast<size_t> (previousFrame) * 2u);
@@ -1029,11 +1028,10 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                     const auto previousFrame = liveReentryTailPosition + frame;
                     if (previousFrame < liveReentryTailFrames)
                     {
-                        const auto q = static_cast<float> (previousFrame)
-                                     / static_cast<float> (liveReentryTailFrames - 1);
+                        const auto q = static_cast<float> (previousFrame) * tailBlendScale;
                         const auto index = static_cast<size_t> (previousFrame) * 2u;
-                        left = blendLiveReentrySample (previousTail[index], left, q);
-                        right = blendLiveReentrySample (previousTail[index + 1u], right, q);
+                        left = previousTail[index] * (1.0f - q) + left * q;
+                        right = previousTail[index + 1u] * (1.0f - q) + right * q;
                     }
                 }
                 destination[static_cast<size_t> (frame) * 2u] = std::isfinite (left) ? left : 0.0f;
