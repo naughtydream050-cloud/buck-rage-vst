@@ -198,6 +198,11 @@ jobs:
           "exit_code=$testExit" >> $env:GITHUB_OUTPUT
           exit 0
 
+      - name: Verify reentrant benchmark evidence parser rejects mutations
+        if: always()
+        shell: pwsh
+        run: node tests/reentrant-benchmark-evidence.test.mjs
+
       - name: Verify V2 renderer exclusivity
         if: always()
         shell: pwsh

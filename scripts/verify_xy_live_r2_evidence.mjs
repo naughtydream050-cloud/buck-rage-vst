@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { validateReentrantBenchmarkEvidence } from './reentrant-benchmark-evidence.mjs';
 
 const fail = code => { throw new Error(code); };
 const sha = data => createHash('sha256').update(data).digest('hex');
@@ -101,6 +102,11 @@ const [kind, id] = process.argv.slice(2);
 if (kind === '--ac') {
   const required = acMap[id];
   if (!required) fail('UNKNOWN_AC');
+  if (id === 'R2-AC-20') {
+    const benchmark = logs.benchmark?.text;
+    const verdict = validateReentrantBenchmarkEvidence(benchmark);
+    if (!verdict.pass) fail(`BENCHMARK_EVIDENCE_REJECTED_${verdict.reason}`);
+  }
   for (const [suite, assertion] of required) {
     const text = suite === 'gate-tests' ? readFileSync(evidence.gateTestLogPath, 'utf8') : logs[suite]?.text;
     if (!text || !text.split(/\r?\n/).some(line => line.includes(assertion))) fail(`AC_ASSERTION_NOT_EXECUTED_${id}_${suite}`);

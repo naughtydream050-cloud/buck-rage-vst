@@ -845,12 +845,12 @@ public:
     {
 #if defined(_WIN32)
         ScopedProAudioMmcssRegistration scheduling;
-        if (! scheduling.isRegistered())
+        if (! scheduling.isRegistered() || GetPriorityClass (GetCurrentProcess()) != NORMAL_PRIORITY_CLASS)
         {
-            std::cerr << "FAIL benchmark-scheduling-mmcss-pro-audio-registration\n";
+            std::cerr << "FAIL benchmark-scheduling-requires-mmcss-and-normal-process-priority\n";
             return false;
         }
-        std::cout << "METRIC benchmark_schedule class=MMCSS-Pro-Audio\n";
+        std::cout << "METRIC benchmark_schedule class=MMCSS-Pro-Audio process_priority=Normal\n";
 #else
         std::cerr << "FAIL benchmark-scheduling-requires-windows-mmcss\n";
         return false;
