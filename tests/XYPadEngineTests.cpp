@@ -252,6 +252,95 @@ public:
         return frozen && remainsFrozen;
     }
 
+    static bool primeLiveTransitionProbe (XYPadEngine& engine, float x)
+    {
+        if (! engine.prepare (48000.0, 1)) return false;
+        const auto capacity = static_cast<uint64_t> (engine.liveHistoryCapacityFrames);
+        for (uint64_t serial = 0; serial < capacity; ++serial)
+        {
+            engine.liveHistory[static_cast<size_t> (serial) * 2u] = 0.25f;
+            engine.liveHistory[static_cast<size_t> (serial) * 2u + 1u] = -0.25f;
+            engine.liveHistorySerials[static_cast<size_t> (serial)] = serial;
+        }
+        engine.liveWriteSerial = capacity;
+        engine.liveHistoryValidFrames = capacity;
+        engine.liveActiveBar = 0;
+        engine.liveActiveTrajectory.count = 1;
+        engine.liveActiveTrajectory.x[0] = x;
+        engine.liveActiveTrajectory.y[0] = 0.5f;
+        engine.liveActiveTrajectory.time[0] = 0.0;
+        engine.liveHaveSignal = engine.liveHavePreviousX = true;
+        engine.livePreviousX = x;
+        return true;
+    }
+
+    static bool liveJumpStartsWithoutWaitingForNextHop()
+    {
+        XYPadEngine engine;
+        if (! primeLiveTransitionProbe (engine, 0.25f)) return false;
+        const auto newest = engine.liveWriteSerial - 1u;
+        engine.launchLiveGrain (0.75f, 1, false, 0, newest);
+        engine.liveSamplesToLaunch = engine.liveHopFrames - 1;
+        engine.livePreviousX = 0.75f;
+        engine.liveDirection = 1;
+        juce::AudioBuffer<float> input (2, 1), output (2, 1), mask (1, 1);
+        input.setSample (0, 0, 0.25f); input.setSample (1, 0, -0.25f);
+        XYPadEngine::Transport transport; transport.playing = true; transport.startBar = 0;
+        engine.processLive (input, output, mask, transport, 1);
+        int newGrains = 0;
+        for (const auto& grain : engine.liveGrains)
+            if (grain.active && grain.direction == -1 && grain.fadeInFrames == engine.liveTransitionFrames)
+                ++newGrains;
+        std::cout << "METRIC live_transition immediate_reverse_grains=" << newGrains << "\n";
+        return newGrains == 1;
+    }
+
+    static bool liveFadedGrainNeverReturnsToFullGain()
+    {
+        XYPadEngine engine;
+        if (! primeLiveTransitionProbe (engine, 1.0f)) return false;
+        const auto newest = engine.liveWriteSerial - 1u;
+        engine.launchLiveGrain (0.75f, 1, false, 0, newest);
+        engine.launchLiveGrain (0.25f, -1, true, 0, newest);
+        engine.liveSamplesToLaunch = 100000;
+        engine.liveDirection = -1;
+        engine.liveActiveTrajectory.count = 2;
+        engine.liveActiveTrajectory.x[1] = 0.0f;
+        engine.liveActiveTrajectory.y[1] = 0.5f;
+        engine.liveActiveTrajectory.time[1] = 1.0;
+        juce::AudioBuffer<float> input (2, 1), output (2, 1), mask (1, 1);
+        input.setSample (0, 0, 0.25f); input.setSample (1, 0, -0.25f);
+        for (int sample = 0; sample <= engine.liveTransitionFrames; ++sample)
+        {
+            XYPadEngine::Transport transport; transport.playing = true; transport.startBar = 0;
+            transport.startPhase = sample / 48000.0; transport.phasePerSample = 1.0 / 48000.0;
+            engine.processLive (input, output, mask, transport, 1);
+        }
+        std::cout << "METRIC live_transition old_grain_active_after_fade=" << engine.liveGrains[0].active << "\n";
+        return ! engine.liveGrains[0].active;
+    }
+
+    static bool liveHoldSeamContinuesAfterCrossfadedHead()
+    {
+        XYPadEngine engine;
+        if (! primeLiveTransitionProbe (engine, 0.5f)) return false;
+        engine.liveSamplesToLaunch = 100000;
+        engine.liveStationaryFrames = 96;
+        engine.liveHoldReady = true; engine.liveHoldMix = 1.0f;
+        engine.liveHoldPhase = engine.liveGrainFrames - 1;
+        for (int sample = 0; sample < engine.liveGrainFrames; ++sample)
+        {
+            engine.liveHoldSnapshot[static_cast<size_t> (sample) * 2u] = sample / 960.0f;
+            engine.liveHoldSnapshot[static_cast<size_t> (sample) * 2u + 1u] = -sample / 960.0f;
+        }
+        juce::AudioBuffer<float> input (2, 1), output (2, 1), mask (1, 1);
+        input.setSample (0, 0, 0.25f); input.setSample (1, 0, -0.25f);
+        XYPadEngine::Transport transport; transport.playing = true; transport.startBar = 0;
+        engine.processLive (input, output, mask, transport, 1);
+        std::cout << "METRIC live_transition post_seam_phase=" << engine.liveHoldPhase << " expected=96\n";
+        return engine.liveHoldPhase == 96;
+    }
+
     static bool livePipelineHasExact1024SampleIdentityDelay()
     {
         XYPadEngine engine;
@@ -619,6 +708,12 @@ int main()
            "live-grains-read-forward-and-reverse-within-valid-serial-range-and-snapshot-source");
     check (XYPadEngineTestAccess::stationaryLiveTrajectoryFreezesAndLoops(),
            "live-stationary-xy-freezes-a-bounded-grain-and-holds-it-across-blocks");
+    check (XYPadEngineTestAccess::liveJumpStartsWithoutWaitingForNextHop(),
+           "live-fold-jump-starts-transition-on-the-next-sample-without-hop-delay");
+    check (XYPadEngineTestAccess::liveFadedGrainNeverReturnsToFullGain(),
+           "live-old-grain-is-retired-at-three-ms-fade-end-and-cannot-reappear");
+    check (XYPadEngineTestAccess::liveHoldSeamContinuesAfterCrossfadedHead(),
+           "live-hold-seam-continues-at-the-next-head-sample-without-two-ms-back-jump");
     XYPadEngine liveProbe;
     const auto livePrepared = liveProbe.prepare (48000.0, 512);
     std::vector<PluginStateModel::MotionPoint> liveBarFour {{ 0.0f, 0.5f, 0.0 },
