@@ -466,11 +466,14 @@ public:
                     || (grain.active && grain.direction == 1 && grain.age == 1);
                 if (grain.active && grain.direction == 1 && grain.age == 1)
                 {
-                    const auto available = engine.liveHistoryValidFrames;
-                    const auto span = static_cast<double> (available - static_cast<uint64_t> (engine.liveGrainFrames));
+                    const auto selectionFrames = static_cast<uint64_t> (
+                        juce::roundToInt (engine.sampleRate * XYPadEngine::kLiveHistorySeconds) + 2);
+                    const auto selectionOldest = engine.liveWriteSerial - selectionFrames;
+                    const auto span = static_cast<double> (selectionFrames
+                        - static_cast<uint64_t> (engine.liveGrainFrames));
                     const auto eventPhase = 0.5 + static_cast<double> (eventOffset - 1) * 1.0e-6;
                     const auto targetX = 0.9 - (eventPhase - 0.5) * 1.6;
-                    const auto expected = static_cast<double> (engine.liveWriteSerial - available) + targetX * span;
+                    const auto expected = static_cast<double> (selectionOldest) + targetX * span;
                     targetPositionError = std::abs (grain.startSerial - expected);
                 }
             }
@@ -888,6 +891,7 @@ public:
         engine.setTrajectory (0, hold, 101);
         juce::AudioBuffer<float> input (2, 1), output (2, 1), mask (1, 1);
         float previous = 0.0f, maximumStep = 0.0f;
+        int maximumStepSample = -1;
         bool finite = true;
         for (int sample = 0; sample < 8192; ++sample)
         {
@@ -898,11 +902,27 @@ public:
             engine.processLive (input, output, mask, transport, 1);
             const float contribution = output.getSample (0, 0) * mask.getSample (0, 0);
             finite &= std::isfinite (contribution);
-            if (sample >= 4096 + 1024) maximumStep = juce::jmax (maximumStep, std::abs (contribution - previous));
+            const auto step = std::abs (contribution - previous);
+            if (sample >= 4096 + 1024 && step > maximumStep)
+            {
+                maximumStep = step;
+                maximumStepSample = sample;
+            }
+            if (step > 0.02f)
+            {
+                int active = 0;
+                for (const auto& grain : engine.liveGrains) active += grain.active ? 1 : 0;
+                std::cerr << "DIAG source_end_step sample=" << sample << " previous=" << previous
+                          << " contribution=" << contribution << " mask=" << mask.getSample (0, 0)
+                          << " wet_gain=" << engine.liveWetGain
+                          << " history=" << engine.liveHistoryValidFrames
+                          << " have_signal=" << engine.liveHaveSignal << " hold=" << engine.liveHoldReady
+                          << " active_grains=" << active << " tail_active=" << engine.liveReentryTailActive << '\n';
+            }
             previous = contribution;
         }
         std::cout << "METRIC live_source_ended max_contribution_step=" << maximumStep
-                  << " limit=0.02 final_mask=" << mask.getSample (0, 0) << "\n";
+                  << " sample=" << maximumStepSample << " limit=0.02 final_mask=" << mask.getSample (0, 0) << "\n";
         return finite && maximumStep < 0.02f && mask.getSample (0, 0) == 0.0f;
     }
 
