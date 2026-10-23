@@ -123,6 +123,7 @@ private:
     void launchLiveGrain (float x, int direction, bool transition,
                           uint64_t oldestSerial, uint64_t newestSerial) noexcept;
     void captureLiveContinuationTail() noexcept;
+    static float blendLiveReentrySample (float tail, float target, float q) noexcept;
     void processLivePitchSample (float inputLeft, float inputRight, float semitones,
                                  float wetMask, float& outputLeft, float& outputRight,
                                  float& outputMask) noexcept;

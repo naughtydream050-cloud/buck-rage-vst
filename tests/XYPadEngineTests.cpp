@@ -11,6 +11,7 @@
 #include <thread>
 #include <memory>
 #include <new>
+#include <vector>
 
 namespace AllocationAudit
 {
@@ -398,8 +399,12 @@ public:
             for (const auto& grain : engine.liveGrains)
                 launchedLatestTargetAtEvent = launchedLatestTargetAtEvent
                     || (grain.active && grain.direction == 1 && grain.age == 1);
+            int activeAtEvent = 0;
+            for (const auto& grain : engine.liveGrains) activeAtEvent += grain.active ? 1 : 0;
             const auto immediate = launchedLatestTargetAtEvent && ! engine.livePendingTransition
-                                && engine.liveReentryTailActive && engine.liveReentryTailPosition == 1;
+                && engine.liveReentryTailActive && engine.liveReentryTailPosition == 1
+                && reentryRecordPasses (eventOffset, launchedLatestTargetAtEvent ? eventOffset : eventOffset + 1,
+                                        maximumTailReferenceError, activeAtEvent, true, 0.0, 2.0);
             allOffsetsReenteredImmediately = allOffsetsReenteredImmediately && immediate;
             if (immediate)
             {
@@ -428,8 +433,217 @@ public:
         }
         std::cout << "METRIC reentrant_tail_reference max_error=" << maximumTailReferenceError
                   << " tolerance=2e-6\n";
+        resetProbe();
+        engine.liveHoldReady = true;
+        engine.liveHoldMix = 1.0f;
+        engine.liveHoldPhase = engine.liveGrainFrames - 1;
+        XYPadEngine::Transport holdFold;
+        holdFold.playing = true;
+        holdFold.startBar = 0;
+        holdFold.startPhase = 0.5;
+        holdFold.phasePerSample = 0.0;
+        engine.processLive (input, output, mask, holdFold, 1);
+        int activeAfterHoldFold = 0;
+        for (const auto& grain : engine.liveGrains) activeAfterHoldFold += grain.active ? 1 : 0;
+        bool finiteTail = engine.liveReentryTailActive && activeAfterHoldFold == 1;
+        const auto* holdTail = engine.liveReentryTailBuffers[static_cast<size_t> (engine.liveReentryTailBuffer)].get();
+        for (int i = 0; i < transitionFrames * 2; ++i)
+            finiteTail = finiteTail && std::isfinite (holdTail[i]);
+        std::cout << "METRIC hold_fold_reentry active_grains=" << activeAfterHoldFold
+                  << " tail_finite=" << finiteTail << "\n";
         engine.release();
-        return allOffsetsReenteredImmediately && maximumTailReferenceError <= 2.0e-6;
+        return allOffsetsReenteredImmediately && maximumTailReferenceError <= 2.0e-6 && finiteTail;
+    }
+
+    static bool reentryRecordPasses (int eventSample, int targetStartSample, double tailError,
+                                     int activeGrains, bool finite, double outputPeak,
+                                     double peakBound) noexcept
+    {
+        return targetStartSample == eventSample && tailError <= 2.0e-6
+            && activeGrains == 1 && finite && outputPeak <= peakBound + 2.0e-6;
+    }
+
+    static bool repeatedReentryBlendIsFiniteAndPeakBounded()
+    {
+        XYPadEngine engine;
+        if (! engine.prepare (48000.0, 64, true, true)) return false;
+        const auto total = 10 * engine.liveTransitionFrames;
+        double maxError = 0.0, peak = 0.0, energy = 0.0;
+        bool finite = true;
+        for (int fixture = 0; fixture < 5; ++fixture)
+            for (int i = 0; i < total; ++i)
+            {
+                float tailL = 0.0f, tailR = 0.0f, targetL = 0.0f, targetR = 0.0f;
+                const auto t = static_cast<double> (i + fixture * total) / 37.0;
+                if (fixture == 0) { tailL = targetL = 0.75f; tailR = targetR = -0.75f; }
+                else if (fixture == 1) { tailL = 0.7f; tailR = -0.7f; targetL = -0.6f; targetR = 0.6f; }
+                else if (fixture == 2) { tailL = i == 0 ? 1.0f : 0.0f; targetR = i == 1 ? 1.0f : 0.0f; }
+                else if (fixture == 3) { tailL = static_cast<float> (0.8 * std::sin (t)); tailR = static_cast<float> (0.7 * std::sin (t + 0.6)); targetL = static_cast<float> (0.8 * std::sin (t + 0.4)); targetR = static_cast<float> (0.7 * std::sin (t - 0.2)); }
+                else { tailL = static_cast<float> (0.8 * std::sin (t)); tailR = static_cast<float> (0.6 * std::cos (t)); targetL = static_cast<float> (0.7 * std::sin (t + 1.1)); targetR = static_cast<float> (0.9 * std::cos (t - 0.3)); }
+                const auto q = static_cast<float> (i % engine.liveTransitionFrames)
+                             / static_cast<float> (engine.liveTransitionFrames - 1);
+                const auto outL = XYPadEngine::blendLiveReentrySample (tailL, targetL, q);
+                const auto outR = XYPadEngine::blendLiveReentrySample (tailR, targetR, q);
+                finite = finite && std::isfinite (outL) && std::isfinite (outR);
+                maxError = std::max (maxError, static_cast<double> (std::abs (outL
+                    - (tailL * (1.0f - q) + targetL * q))));
+                maxError = std::max (maxError, static_cast<double> (std::abs (outR
+                    - (tailR * (1.0f - q) + targetR * q))));
+                const auto envelopeL = std::max (std::abs (tailL), std::abs (targetL)) + 2.0e-6f;
+                const auto envelopeR = std::max (std::abs (tailR), std::abs (targetR)) + 2.0e-6f;
+                finite = finite && std::abs (outL) <= envelopeL && std::abs (outR) <= envelopeR;
+                peak = std::max (peak, static_cast<double> (std::max (std::abs (outL), std::abs (outR))));
+                energy += static_cast<double> (outL) * outL + static_cast<double> (outR) * outR;
+            }
+        const auto capacity = static_cast<uint64_t> (engine.liveHistoryCapacityFrames);
+        for (uint64_t serial = 0; serial < capacity; ++serial)
+        {
+            const auto index = static_cast<size_t> (serial);
+            engine.liveHistory[index * 2u] = 0.75f;
+            engine.liveHistory[index * 2u + 1u] = -0.75f;
+            engine.liveHistorySerials[index] = serial;
+        }
+        engine.liveWriteSerial = capacity;
+        engine.liveHistoryValidFrames = capacity;
+        engine.liveActiveBar = 0;
+        engine.liveActiveTrajectory.count = 2;
+        engine.liveActiveTrajectory.time[0] = 0.0;
+        engine.liveActiveTrajectory.time[1] = 1.0;
+        engine.liveActiveTrajectory.x[0] = 0.1f;
+        engine.liveActiveTrajectory.x[1] = 0.9f;
+        engine.liveActiveTrajectory.y[0] = engine.liveActiveTrajectory.y[1] = 0.5f;
+        engine.liveHaveSignal = engine.liveHavePreviousX = true;
+        engine.livePreviousX = 0.7f;
+        engine.liveDirection = 1;
+        engine.liveSamplesToLaunch = std::numeric_limits<int>::max() / 2;
+        engine.liveWetGain = 1.0f;
+        engine.liveWasPlaying = true;
+        juce::AudioBuffer<float> input (2, 1), output (2, 1), mask (1, 1);
+        input.setSample (0, 0, 0.75f); input.setSample (1, 0, -0.75f);
+        bool processFinite = true;
+        int reentries = 0;
+        double processPeak = 0.0;
+        for (int i = 0; i < total; ++i)
+        {
+            XYPadEngine::Transport transport;
+            transport.playing = true;
+            transport.startBar = 0;
+            transport.startPhase = (i & 1) == 0 ? 0.25 : 0.75;
+            engine.processLive (input, output, mask, transport, 1);
+            processFinite = processFinite && std::isfinite (output.getSample (0, 0))
+                                          && std::isfinite (output.getSample (1, 0));
+            processPeak = std::max (processPeak, static_cast<double> (std::max (
+                std::abs (output.getSample (0, 0)), std::abs (output.getSample (1, 0)))));
+            if (engine.liveReentryTailActive && engine.liveReentryTailPosition == 1) ++reentries;
+        }
+        std::cout << "METRIC reentry_blend frames=" << total * 5 << " peak=" << peak
+                  << " rms=" << std::sqrt (energy / (total * 10.0))
+                  << " scalar_error=" << maxError << "\n"
+                  << "METRIC repeated_reentry events=" << reentries << " frames=" << total
+                  << " process_peak=" << processPeak << " finite=" << processFinite << "\n";
+        engine.release();
+        return finite && maxError <= 2.0e-6 && processFinite && processPeak < 1.1
+            && reentries >= total - 1;
+    }
+
+    static bool reentryMutationGuardsRejectUnsafeChanges()
+    {
+        const auto delayedLaunchRejected = ! reentryRecordPasses (100, 101, 0.0, 1, true, 0.5, 1.0);
+        const auto overwrittenTailRejected = ! reentryRecordPasses (100, 100, 0.5, 1, true, 0.5, 1.0);
+        const auto correlatedEqualPower = 0.75f * std::cos (0.25f * 3.14159265358979323846f)
+                                        + 0.75f * std::sin (0.25f * 3.14159265358979323846f);
+        const auto wrongBlendRejected = ! reentryRecordPasses (100, 100, 0.0, 1, true,
+                                                                std::abs (correlatedEqualPower), 0.75);
+        const auto staleGrainRejected = ! reentryRecordPasses (100, 100, 0.0, 2, true, 0.5, 1.0);
+        const auto peakViolationRejected = ! reentryRecordPasses (100, 100, 0.0, 1, true, 1.0001, 1.0);
+        std::cout << "METRIC reentry_mutation_guards delayed=" << delayedLaunchRejected
+                  << " overwritten_tail=" << overwrittenTailRejected
+                  << " wrong_blend=" << wrongBlendRejected
+                  << " stale_grain=" << staleGrainRejected
+                  << " peak_violation=" << peakViolationRejected << "\n";
+        return delayedLaunchRejected && overwrittenTailRejected && wrongBlendRejected
+            && staleGrainRejected && peakViolationRejected;
+    }
+
+    static bool runControlledHostBenchmark()
+    {
+        const double rates[] { 44100.0, 48000.0, 96000.0 };
+        const int fixedBlocks[] { 64, 128, 256, 512, 1024 };
+        bool allWithinDeadline = true;
+        int conditionCount = 0;
+        for (const auto rate : rates)
+        {
+            for (int mode = 0; mode < 6; ++mode)
+            {
+                XYPadEngine engine;
+                if (! engine.prepare (rate, 1024, true, true)) return false;
+                const auto points = std::vector<PluginStateModel::MotionPoint> {
+                    { 0.1f, 0.5f, 0.0 }, { 0.9f, 0.5f, 1.0 }
+                };
+                engine.setTrajectory (0, points, 701);
+                juce::AudioBuffer<float> input (2, 1024), output (2, 1024), mask (1, 1024);
+                for (int i = 0; i < 1024; ++i)
+                {
+                    const auto sample = static_cast<float> (0.5 * std::sin (2.0 * 3.141592653589793
+                        * 440.0 * i / rate));
+                    input.setSample (0, i, sample);
+                    input.setSample (1, i, static_cast<float> (0.5 * std::sin (2.0 * 3.141592653589793
+                        * 440.0 * i / rate + 0.37)));
+                }
+                const auto blockAt = [&] (uint64_t index)
+                {
+                    if (mode < 5) return fixedBlocks[mode];
+                    const int pattern[] { 64, 127, 256, 511, 1024 };
+                    return pattern[index % 5u];
+                };
+                uint64_t sequence = 0;
+                uint64_t warmSamples = 0;
+                while (warmSamples < static_cast<uint64_t> (rate * 2.0))
+                {
+                    const auto block = blockAt (sequence);
+                    XYPadEngine::Transport t;
+                    t.playing = true; t.startBar = 0;
+                    t.startPhase = (sequence & 1u) == 0 ? 0.25 : 0.75;
+                    engine.processLive (input, output, mask, t, block);
+                    warmSamples += static_cast<uint64_t> (block);
+                    ++sequence;
+                }
+                std::vector<double> deadlineRatios;
+                deadlineRatios.reserve (static_cast<size_t> (rate / 64.0 * 30.0 + 64.0));
+                uint64_t measuredSamples = 0, events = 0;
+                double peakRatio = 0.0;
+                while (measuredSamples < static_cast<uint64_t> (rate * 30.0))
+                {
+                    const auto block = blockAt (sequence);
+                    XYPadEngine::Transport t;
+                    t.playing = true; t.startBar = 0;
+                    t.startPhase = (sequence & 1u) == 0 ? 0.25 : 0.75;
+                    const auto start = std::chrono::steady_clock::now();
+                    engine.processLive (input, output, mask, t, block);
+                    const auto stop = std::chrono::steady_clock::now();
+                    const auto elapsed = std::chrono::duration<double, std::micro> (stop - start).count();
+                    const auto ratio = elapsed / (1.0e6 * block / rate);
+                    deadlineRatios.push_back (ratio);
+                    peakRatio = std::max (peakRatio, ratio);
+                    measuredSamples += static_cast<uint64_t> (block);
+                    ++events;
+                    ++sequence;
+                }
+                std::sort (deadlineRatios.begin(), deadlineRatios.end());
+                const auto p99Ratio = deadlineRatios[static_cast<size_t> (std::ceil (0.99 * deadlineRatios.size())) - 1u];
+                const auto within = p99Ratio <= 0.50 && peakRatio <= 0.80;
+                allWithinDeadline = allWithinDeadline && within;
+                ++conditionCount;
+                std::cout << "METRIC reentrant_benchmark rate=" << rate << " mode="
+                          << (mode < 5 ? fixedBlocks[mode] : -1) << " p99_deadline_ratio=" << p99Ratio
+                          << " max_deadline_ratio=" << peakRatio << " events=" << events
+                          << " samples=" << measuredSamples << " status=" << (within ? "PASS" : "FAIL") << "\n";
+                engine.release();
+            }
+        }
+        std::cout << "METRIC reentrant_benchmark_complete conditions=" << conditionCount
+                  << " status=" << (allWithinDeadline ? "PASS" : "FAIL") << "\n";
+        return conditionCount == 18 && allWithinDeadline;
     }
 
     static bool liveFadedGrainNeverReturnsToFullGain()
@@ -815,8 +1029,10 @@ bool renderOneBar (XYPadEngine& engine, bool playback, double phaseStart,
 
 }
 
-int main()
+int main (int argc, char** argv)
 {
+    if (argc == 2 && std::strcmp (argv[1], "--benchmark-reentrant") == 0)
+        return XYPadEngineTestAccess::runControlledHostBenchmark() ? 0 : 1;
     check (sizeof (XYPadEngine) < 64u * 1024u,
            "fixed-64-bar-tables-do-not-consume-windows-thread-stack");
     XYPadEngine queueProbe;
@@ -1041,6 +1257,10 @@ int main()
            "live-fold-jump-starts-transition-on-the-next-sample-without-hop-delay");
     check (XYPadEngineTestAccess::interruptedTargetsRestartAtEveryOffset(),
            "reentrant-target-restarts-on-event-sample-at-every-active-transition-offset");
+    check (XYPadEngineTestAccess::repeatedReentryBlendIsFiniteAndPeakBounded(),
+           "reentrant-linear-blend-is-finite-and-per-channel-peak-bounded-for-ten-transition-lengths");
+    check (XYPadEngineTestAccess::reentryMutationGuardsRejectUnsafeChanges(),
+           "reentrant-mutation-guards-reject-delay-tail-overwrite-wrong-blend-stale-grain-and-peak-overflow");
     check (XYPadEngineTestAccess::liveFadedGrainNeverReturnsToFullGain(),
            "live-old-grain-is-retired-at-three-ms-fade-end-and-cannot-reappear");
     check (XYPadEngineTestAccess::liveHoldSeamContinuesAfterCrossfadedHead(),

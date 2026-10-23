@@ -978,8 +978,8 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                 const auto q = static_cast<float> (previousFrame)
                             / static_cast<float> (liveReentryTailFrames - 1);
                 const auto index = static_cast<size_t> (previousFrame) * 2u;
-                left = previousTail[index] * (1.0f - q) + left * q;
-                right = previousTail[index + 1u] * (1.0f - q) + right * q;
+                left = blendLiveReentrySample (previousTail[index], left, q);
+                right = blendLiveReentrySample (previousTail[index + 1u], right, q);
             }
         }
         destination[static_cast<size_t> (frame) * 2u] = std::isfinite (left) ? left : 0.0f;
@@ -988,6 +988,12 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
     liveReentryTailBuffer = destinationIndex;
     liveReentryTailPosition = 0;
     liveReentryTailActive = true;
+}
+
+float XYPadEngine::blendLiveReentrySample (float tail, float target, float q) noexcept
+{
+    const auto amount = juce::jlimit (0.0f, 1.0f, q);
+    return tail * (1.0f - amount) + target * amount;
 }
 
 void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
@@ -1382,8 +1388,8 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                          / static_cast<float> (liveReentryTailFrames - 1);
             const auto tailIndex = static_cast<size_t> (liveReentryTailPosition) * 2u;
             const auto* tail = liveReentryTailBuffers[static_cast<size_t> (liveReentryTailBuffer)].get();
-            xStageLeft = tail[tailIndex] * (1.0f - q) + xStageLeft * q;
-            xStageRight = tail[tailIndex + 1u] * (1.0f - q) + xStageRight * q;
+            xStageLeft = blendLiveReentrySample (tail[tailIndex], xStageLeft, q);
+            xStageRight = blendLiveReentrySample (tail[tailIndex + 1u], xStageRight, q);
             if (++liveReentryTailPosition >= liveReentryTailFrames)
             {
                 liveReentryTailActive = false;

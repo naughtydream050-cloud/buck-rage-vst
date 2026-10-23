@@ -19,8 +19,12 @@ if (evidence.ci?.aggregateValidation !== 'success') fail('CI_AGGREGATE_NOT_PASS'
 
 const planPath = join(root, 'docs', 'XY_PAD_LIVE_R2_PLAN.md');
 const criteriaPath = join(root, 'docs', 'XY_PAD_LIVE_R2_AC.json');
+const supplementalCriteriaPath = join(root, 'docs', 'XY_PAD_LIVE_R2_REENTRANT_AC.json');
+const manifestPath = join(root, 'docs', 'XY_PAD_LIVE_R2_21AC_MANIFEST.json');
 if (fileSha(planPath).toLowerCase() !== evidence.planSha256?.toLowerCase()) fail('PLAN_HASH_MISMATCH');
 if (fileSha(criteriaPath).toLowerCase() !== evidence.criteriaSha256?.toLowerCase()) fail('CRITERIA_HASH_MISMATCH');
+if (fileSha(supplementalCriteriaPath).toLowerCase() !== evidence.supplementalCriteriaSha256?.toLowerCase()) fail('SUPPLEMENTAL_CRITERIA_HASH_MISMATCH');
+if (fileSha(manifestPath).toLowerCase() !== evidence.manifestSha256?.toLowerCase()) fail('TWENTY_ONE_AC_MANIFEST_HASH_MISMATCH');
 
 function treeSha(path) {
   if (!statSync(path).isDirectory()) return fileSha(path);
@@ -85,7 +89,12 @@ const acMap = {
   'AC-13': [['xy-engine', 'stereo-phase-offset-preserved-through-linked-reverse-read'], ['xy-engine', 'live-source-ended-fades-actual-xy-contribution-without-a-hard-audio-cut'], ['xy-engine', 'correlated-layer-peak-measured-no-limiter']],
   'AC-14': [['xy-engine', 'live-xy-processing-performs-no-heap-allocation'], ['xy-engine', 'audio-process-path-performs-no-global-heap-allocation'], ['xy-engine', 'fixed-64-bar-tables-do-not-consume-windows-thread-stack']],
   'AC-15': [['xy-engine', 'XY_BUILD_EXIT=0 XY_TEST_EXIT=0'], ['scratch-engine', 'SCRATCH_BUILD_EXIT=0 SCRATCH_TEST_EXIT=0'], ['runtime-smoke', 'SMOKE_BUILD_EXIT=0 SMOKE_TEST_EXIT=0'], ['state-model', 'STATE_BUILD_EXIT=0 STATE_TEST_EXIT=0']],
-  'AC-16': [['gate-tests', 'tests 10'], ['gate-tests', 'pass 10'], ['gate-tests', 'fail 0']]
+  'AC-16': [['gate-tests', 'tests 10'], ['gate-tests', 'pass 10'], ['gate-tests', 'fail 0']],
+  'R2-AC-17': [['xy-engine', 'reentrant-target-restarts-on-event-sample-at-every-active-transition-offset'], ['xy-engine', 'METRIC reentrant_tail_reference max_error=']],
+  'R2-AC-18': [['xy-engine', 'reentrant-linear-blend-is-finite-and-per-channel-peak-bounded-for-ten-transition-lengths'], ['xy-engine', 'METRIC repeated_reentry events=']],
+  'R2-AC-19': [['xy-engine', 'METRIC hold_fold_reentry active_grains=1 tail_finite=1'], ['xy-engine', 'live-hold-seam-continues-at-the-next-head-sample-without-two-ms-back-jump']],
+  'R2-AC-20': [['benchmark', 'METRIC reentrant_benchmark_complete']],
+  'R2-AC-21': [['xy-engine', 'reentrant-mutation-guards-reject-delay-tail-overwrite-wrong-blend-stale-grain-and-peak-overflow'], ['xy-engine', 'METRIC reentry_mutation_guards delayed=1 overwritten_tail=1 wrong_blend=1 stale_grain=1 peak_violation=1']]
 };
 
 const [kind, id] = process.argv.slice(2);
@@ -96,7 +105,8 @@ if (kind === '--ac') {
     const text = suite === 'gate-tests' ? readFileSync(evidence.gateTestLogPath, 'utf8') : logs[suite]?.text;
     if (!text || !text.split(/\r?\n/).some(line => line.includes(assertion))) fail(`AC_ASSERTION_NOT_EXECUTED_${id}_${suite}`);
   }
-  const criterion = JSON.parse(readFileSync(criteriaPath, 'utf8')).criteria.find(item => item.id === id);
+  const sourceCriteria = id.startsWith('R2-AC-') ? supplementalCriteriaPath : criteriaPath;
+  const criterion = JSON.parse(readFileSync(sourceCriteria, 'utf8')).criteria.find(item => item.id === id);
   if (!criterion || !Array.isArray(criterion.check)) fail(`AC_NOT_IN_FIXED_MANIFEST_${id}`);
   console.log(`PASS ${id} source=${sourceHead} run=${evidence.ci.runId} artifact=${evidence.artifact.treeSha256}`);
   process.exit(0);
