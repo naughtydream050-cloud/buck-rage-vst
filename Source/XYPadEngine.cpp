@@ -375,6 +375,12 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
             % static_cast<uint64_t> (kLivePipelineLatency));
         const auto frameSemitones = juce::jlimit (-12.0, 12.0,
             static_cast<double> (livePitchSemitoneDelay[ratioDelayIndex]));
+        // At neutral pitch the contract is the delayed identity path. Avoid
+        // running a full stereo phase-vocoder frame until pitch is audible or
+        // has been requested for this frame. This changes no latency or output
+        // sample at 0 st, but keeps the common center-Y path inexpensive.
+        if (std::abs (frameSemitones) >= 0.01 || livePitchWetMix > 0.0f)
+        {
         const auto ratio = std::pow (2.0, frameSemitones / 12.0);
         std::array<double, static_cast<size_t> (kLivePitchBins)> leftPhase {};
         const auto readBin = [] (const float* data, int bin, bool imaginary) noexcept
@@ -483,6 +489,7 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
                 ola[targetIndex] += transformed[static_cast<size_t> (frame)] * hann;
                 if (channel == 0) livePitchOlaNorm[targetIndex] += hann * hann;
             }
+        }
         }
     }
 
