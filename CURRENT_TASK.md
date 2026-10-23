@@ -2,25 +2,24 @@
 
 ## Phase
 
-Phase 1 Windows VST3 — FL Studio candidate review.
+Approved XY Pad Phase 2 live processing — re-entrant transition repair and candidate verification.
 
 ## Canonical working location
 
-`D:\Development\RAZOR_FACE_COMPANY\01_PLUGINS\projects\ToyotomiHideyoshi`
+`D:\Development\_CODEX_TOOLS\worktrees\toyotomi-xy-ac10-verification` (branch `codex/xy-live-ac10-verification`)
 
 ## Current artifact
 
-`output\fl-candidate\Toyotomi Hideyoshi.vst3`
-
-Internal binary SHA-256:
-`F591F0207B58D2B0080CDC9421F530225C41AD950FBEDF11350952C9683F2B2F`
+Base source commit: `2322502e7946e46b85c74d061452861fd76d4efc`.
+Criteria: original AC-01..16 plus approved R2-AC-17..21.
 
 ## Validation truth
 
-- GitHub Actions run `31250870603`: all build and smoke/state checks passed.
-- User FL Studio host validation: pending.
-- `output\final` must remain untouched until user approval.
+- The D candidate is the previous XY build and is not the re-entrant correction. Preserve it until the new source and CI artifact pass every gate.
+- GLM task-start state: `LOCAL_BUDGET_BLOCKED`, no HTTP probe. Per user-selected route, Codex implements this bounded scope; DeepSeek is not invoked based on a local budget block.
+- A new CI run is required. Jev has not reviewed this implementation.
+- FL Studio validation: `NOT TESTED`.
 
 ## Next action
 
-Copy the whole candidate bundle into an FL Studio VST3 scan folder, rescan, load it once, and capture any visual or load error.
+Add and run re-entrant RED tests against unchanged DSP first, then implement the approved amendment and complete all 21 AC before candidate promotion.

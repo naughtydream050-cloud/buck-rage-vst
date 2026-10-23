@@ -1,13 +1,19 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "project": "ToyotomiHideyoshi",
-  "phase": "Phase 1 Windows VST3 candidate review",
+  "phase": "Approved XY Pad Phase 2 live processing — re-entrant transition repair",
   "ssot": "D:/Development/RAZOR_FACE_COMPANY/01_PLUGINS/projects/ToyotomiHideyoshi",
-  "candidate": "output/fl-candidate/Toyotomi Hideyoshi.vst3",
-  "sourceHead": "a49df568f72da9f63af9f08df666f0b24690703c",
-  "candidateInternalSha256": "F591F0207B58D2B0080CDC9421F530225C41AD950FBEDF11350952C9683F2B2F",
-  "ciRun": 31250870603,
-  "ci": { "configure": "passed", "compileLink": "passed", "stateModelTests": "passed", "runtimeSmoke": "passed" },
-  "hostValidation": "pending user FL Studio test",
-  "nextAction": "User rescans and loads the candidate; final output remains untouched until approval."
+  "worktree": "D:/Development/_CODEX_TOOLS/worktrees/toyotomi-xy-ac10-verification",
+  "branch": "codex/xy-live-ac10-verification",
+  "baseSourceHead": "2322502e7946e46b85c74d061452861fd76d4efc",
+  "basePlanSha256": "C873F27A6AA107AE87C5A4686820B1CB3D9A9D02F2C2C0E5FEEB9396895BB5F0",
+  "baseAcSha256": "42F874D962B75400BC8AE8F0CBE737E13AD05753D60E51ED7999AAE50C8C9195",
+  "amendmentSha256": "CF00BC6FF342D8734E0CCCAB1C82711242AC45E2401093D1EDC0E3A47FDBB640",
+  "supplementalAcSha256": "2027553FAF44913586E76AD4036AEF724A01AEBB81EC9CFA4E75D52461B91BF2",
+  "candidateStatus": "previous XY build retained as rollback; not the re-entrant correction",
+  "worker": "Codex direct implementation selected because fresh GLM state is LOCAL_BUDGET_BLOCKED; DeepSeek not invoked",
+  "ci": "base CI only; new CI required for this implementation",
+  "jev": "not yet run",
+  "hostValidation": "NOT TESTED",
+  "nextAction": "Add and run test-only re-entrant RED evidence before changing XY DSP."
 }

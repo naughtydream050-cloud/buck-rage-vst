@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "approvedBy": "Sol",
+  "status": "APPROVED_SUPPLEMENT",
+  "basePlanSha256": "C873F27A6AA107AE87C5A4686820B1CB3D9A9D02F2C2C0E5FEEB9396895BB5F0",
+  "baseCriteriaSha256": "42F874D962B75400BC8AE8F0CBE737E13AD05753D60E51ED7999AAE50C8C9195",
+  "amendment": "docs/XY_PAD_LIVE_R2_REENTRANT_AMENDMENT.md",
+  "amendmentSha256": "CF00BC6FF342D8734E0CCCAB1C82711242AC45E2401093D1EDC0E3A47FDBB640",
+  "criteria": [
+    {"id":"R2-AC-17","requirement":"Inject target events at every offset 1..T-1 during an active transition. Restart on the event sample from the independently rendered pre-pitch continuation, target the latest bounded target, and match an independent scalar reference within 2e-6.","test":"XYPadEngineTests reentrant-offset scalar reference"},
+    {"id":"R2-AC-18","requirement":"For at least 10*T samples of per-sample retargets with DC, correlated, anti-correlated, impulse, and phase-offset stereo inputs, output remains finite and each channel is bounded by max(abs(tail),abs(target))+2e-6; report peak and RMS.","test":"XYPadEngineTests repeated-retarget bounded peak"},
+    {"id":"R2-AC-19","requirement":"Interrupt hold entry/exit, seam, fold, and source-ended reacquisition. Tail starts from audible pre-pitch continuation, retired grains do not revive, reads stay in valid serial bounds, and 2 ms seam is not restarted or doubled.","test":"XYPadEngineTests hold/fold/reacquisition interruption"},
+    {"id":"R2-AC-20","requirement":"Across supported rates and fixed/variable blocks at maximum event rate, audio processing has no allocation, lock, ValueTree, I/O, logging, or blocking. On the Ryzen 3 2200U host, p99 block time <=50% and worst <=80% of audio deadline; record power mode, rate, block, event count, build mode, and executable SHA256.","test":"XYPadEngineTests controlled-host reentrant benchmark"},
+    {"id":"R2-AC-21","requirement":"Mutation probes for delayed handling, overwritten tail, wrong blend law, stale grain revival, and peak-bound violation each fail the corresponding assertion.","test":"XYPadEngineTests mutation sensitivity"}
+  ]
+}

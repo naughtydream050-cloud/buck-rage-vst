@@ -315,6 +315,98 @@ public:
         return newGrains == 1;
     }
 
+    static bool interruptedTargetsRestartAtEveryOffset()
+    {
+        XYPadEngine engine;
+        if (! engine.prepare (48000.0, 1, true, true)) return false;
+        const auto capacity = static_cast<uint64_t> (engine.liveHistoryCapacityFrames);
+        if (capacity < static_cast<uint64_t> (engine.liveGrainFrames))
+        {
+            engine.release();
+            return false;
+        }
+
+        const auto resetProbe = [&]()
+        {
+            engine.liveGrains.fill (XYPadEngine::LiveGrain {});
+            for (uint64_t serial = 0; serial < capacity; ++serial)
+            {
+                const auto index = static_cast<size_t> (serial);
+                engine.liveHistory[index * 2u] = 0.25f;
+                engine.liveHistory[index * 2u + 1u] = -0.25f;
+                engine.liveHistorySerials[index] = serial;
+            }
+            engine.liveWriteSerial = capacity;
+            engine.liveHistoryValidFrames = capacity;
+            engine.liveActiveBar = 0;
+            engine.liveActiveTrajectory = {};
+            engine.liveActiveTrajectory.count = 3;
+            engine.liveActiveTrajectory.time[0] = 0.0;
+            engine.liveActiveTrajectory.time[1] = 0.5;
+            engine.liveActiveTrajectory.time[2] = 1.0;
+            engine.liveActiveTrajectory.x[0] = 0.1f;
+            engine.liveActiveTrajectory.x[1] = 0.9f;
+            engine.liveActiveTrajectory.x[2] = 0.1f;
+            engine.liveActiveTrajectory.y[0] = 0.5f;
+            engine.liveActiveTrajectory.y[1] = 0.5f;
+            engine.liveActiveTrajectory.y[2] = 0.5f;
+            engine.liveHaveSignal = engine.liveHavePreviousX = true;
+            engine.livePreviousX = 0.1f;
+            engine.liveDirection = 1;
+            engine.livePendingTransition = false;
+            engine.liveSamplesToLaunch = 100000;
+            engine.liveWetGain = 1.0f;
+            engine.liveWasPlaying = true;
+            engine.liveHoldReady = false;
+            engine.liveHoldMix = 0.0f;
+            engine.liveSourceFadeActive = false;
+            const auto newest = capacity - 1u;
+            engine.launchLiveGrain (0.1f, 1, false, 0, newest);
+            engine.launchLiveGrain (0.1f, 1, true, 0, newest);
+            engine.liveSamplesToLaunch = 100000;
+        };
+
+        const auto transitionFrames = engine.liveTransitionFrames;
+        juce::AudioBuffer<float> input (2, 1), output (2, 1), mask (1, 1);
+        input.setSample (0, 0, 0.25f);
+        input.setSample (1, 0, -0.25f);
+        bool allOffsetsReenteredImmediately = transitionFrames >= 2;
+        for (int eventOffset = 1; eventOffset < transitionFrames; ++eventOffset)
+        {
+            resetProbe();
+            for (int prior = 0; prior < eventOffset - 1; ++prior)
+            {
+                XYPadEngine::Transport beforeEvent;
+                beforeEvent.playing = true;
+                beforeEvent.startBar = 0;
+                beforeEvent.startPhase = static_cast<double> (prior) * 1.0e-6;
+                beforeEvent.phasePerSample = 1.0e-6;
+                engine.processLive (input, output, mask, beforeEvent, 1);
+            }
+
+            XYPadEngine::Transport event;
+            event.playing = true;
+            event.startBar = 0;
+            event.startPhase = 0.5 + static_cast<double> (eventOffset - 1) * 1.0e-6;
+            event.phasePerSample = 1.0e-6;
+            engine.processLive (input, output, mask, event, 1);
+
+            bool launchedLatestTargetAtEvent = false;
+            for (const auto& grain : engine.liveGrains)
+                launchedLatestTargetAtEvent = launchedLatestTargetAtEvent
+                    || (grain.active && grain.direction == 1 && grain.age == 1
+                        && grain.fadeInFrames == transitionFrames);
+            const auto immediate = launchedLatestTargetAtEvent && ! engine.livePendingTransition;
+            allOffsetsReenteredImmediately = allOffsetsReenteredImmediately && immediate;
+            if (! immediate)
+                std::cerr << "RED reentrant_transition offset=" << eventOffset
+                          << " pending=" << engine.livePendingTransition
+                          << " launched=" << launchedLatestTargetAtEvent << '\n';
+        }
+        engine.release();
+        return allOffsetsReenteredImmediately;
+    }
+
     static bool liveFadedGrainNeverReturnsToFullGain()
     {
         XYPadEngine engine;
@@ -922,6 +1014,8 @@ int main()
            "live-stationary-xy-freezes-a-bounded-grain-and-holds-it-across-blocks");
     check (XYPadEngineTestAccess::liveJumpStartsWithoutWaitingForNextHop(),
            "live-fold-jump-starts-transition-on-the-next-sample-without-hop-delay");
+    check (XYPadEngineTestAccess::interruptedTargetsRestartAtEveryOffset(),
+           "reentrant-target-restarts-on-event-sample-at-every-active-transition-offset");
     check (XYPadEngineTestAccess::liveFadedGrainNeverReturnsToFullGain(),
            "live-old-grain-is-retired-at-three-ms-fade-end-and-cannot-reappear");
     check (XYPadEngineTestAccess::liveHoldSeamContinuesAfterCrossfadedHead(),

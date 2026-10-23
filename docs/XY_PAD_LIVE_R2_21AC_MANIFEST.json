@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "status": "APPROVED_CRITICAL_DSP_CRITERIA_SET",
+  "source_base": "2322502e7946e46b85c74d061452861fd76d4efc",
+  "base_plan": {
+    "path": "docs/XY_PAD_LIVE_R2_PLAN.md",
+    "sha256": "C873F27A6AA107AE87C5A4686820B1CB3D9A9D02F2C2C0E5FEEB9396895BB5F0"
+  },
+  "base_acceptance_criteria": {
+    "path": "docs/XY_PAD_LIVE_R2_AC.json",
+    "sha256": "42F874D962B75400BC8AE8F0CBE737E13AD05753D60E51ED7999AAE50C8C9195"
+  },
+  "approved_amendment": {
+    "path": "docs/XY_PAD_LIVE_R2_REENTRANT_AMENDMENT.md",
+    "sha256": "CF00BC6FF342D8734E0CCCAB1C82711242AC45E2401093D1EDC0E3A47FDBB640"
+  },
+  "supplemental_acceptance_criteria": {
+    "path": "docs/XY_PAD_LIVE_R2_REENTRANT_AC.json",
+    "sha256": "2027553FAF44913586E76AD4036AEF724A01AEBB81EC9CFA4E75D52461B91BF2"
+  },
+  "required_ids": [
+    "AC-01", "AC-02", "AC-03", "AC-04", "AC-05", "AC-06", "AC-07", "AC-08",
+    "AC-09", "AC-10", "AC-11", "AC-12", "AC-13", "AC-14", "AC-15", "AC-16",
+    "R2-AC-17", "R2-AC-18", "R2-AC-19", "R2-AC-20", "R2-AC-21"
+  ],
+  "decision_route": {
+    "worker_at_start": "Codex selected by user for LOCAL_BUDGET_BLOCKED",
+    "deepseek": "only on actual GLM transport/provider failure and passing current guard",
+    "jev": "post-implementation evidence judge; required for all 21 AC before promotion"
+  }
+}
