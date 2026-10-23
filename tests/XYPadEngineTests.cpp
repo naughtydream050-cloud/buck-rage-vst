@@ -14,6 +14,56 @@
 #include <new>
 #include <vector>
 
+#if defined(_WIN32)
+ #ifndef NOMINMAX
+  #define NOMINMAX
+ #endif
+ #include <windows.h>
+#endif
+
+#if defined(_WIN32)
+class ScopedProAudioMmcssRegistration
+{
+public:
+    ScopedProAudioMmcssRegistration() noexcept
+    {
+        avrtModule = LoadLibraryW (L"avrt.dll");
+        if (avrtModule == nullptr) return;
+
+        const auto setTask = reinterpret_cast<SetMmThreadCharacteristics> (
+            GetProcAddress (avrtModule, "AvSetMmThreadCharacteristicsW"));
+        revertTask = reinterpret_cast<RevertMmThreadCharacteristics> (
+            GetProcAddress (avrtModule, "AvRevertMmThreadCharacteristics"));
+        if (setTask == nullptr || revertTask == nullptr)
+        {
+            FreeLibrary (avrtModule);
+            avrtModule = nullptr;
+            revertTask = nullptr;
+            return;
+        }
+        taskHandle = setTask (L"Pro Audio", &taskIndex);
+    }
+
+    ~ScopedProAudioMmcssRegistration()
+    {
+        if (taskHandle != nullptr && revertTask != nullptr)
+            revertTask (taskHandle);
+        if (avrtModule != nullptr)
+            FreeLibrary (avrtModule);
+    }
+
+    bool isRegistered() const noexcept { return taskHandle != nullptr; }
+
+private:
+    using SetMmThreadCharacteristics = HANDLE (WINAPI*) (LPCWSTR, LPDWORD);
+    using RevertMmThreadCharacteristics = BOOL (WINAPI*) (HANDLE);
+    HMODULE avrtModule = nullptr;
+    HANDLE taskHandle = nullptr;
+    DWORD taskIndex = 0;
+    RevertMmThreadCharacteristics revertTask = nullptr;
+};
+#endif
+
 namespace AllocationAudit
 {
 std::atomic<bool> enabled { false };
@@ -793,6 +843,18 @@ public:
 
     static bool runControlledHostBenchmark()
     {
+#if defined(_WIN32)
+        ScopedProAudioMmcssRegistration scheduling;
+        if (! scheduling.isRegistered())
+        {
+            std::cerr << "FAIL benchmark-scheduling-mmcss-pro-audio-registration\n";
+            return false;
+        }
+        std::cout << "METRIC benchmark_schedule class=MMCSS-Pro-Audio\n";
+#else
+        std::cerr << "FAIL benchmark-scheduling-requires-windows-mmcss\n";
+        return false;
+#endif
         const double rates[] { 44100.0, 48000.0, 96000.0 };
         const int fixedBlocks[] { 64, 128, 256, 512, 1024 };
         bool allWithinDeadline = true;
