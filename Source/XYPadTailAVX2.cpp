@@ -30,6 +30,10 @@ bool xyPadRenderTailAvx2 (const float* history, const float* previousTail,
         return false;
 
     const auto fractionVector = _mm256_set1_ps (fraction);
+    const auto blendStep = blendScale;
+    const auto blendOffsets = _mm256_setr_ps (0.0f, 0.0f, blendStep, blendStep,
+                                               2.0f * blendStep, 2.0f * blendStep,
+                                               3.0f * blendStep, 3.0f * blendStep);
     const auto reorderReverse = _mm256_setr_epi32 (6, 7, 4, 5, 2, 3, 0, 1);
     const auto maximumFinite = _mm256_set1_ps (std::numeric_limits<float>::max());
     const auto signMask = _mm256_set1_ps (-0.0f);
@@ -60,20 +64,12 @@ bool xyPadRenderTailAvx2 (const float* history, const float* previousTail,
         if (previousTail != nullptr)
         {
             const auto firstTailFrame = previousTailPosition + startFrame + offset;
-            const auto q = _mm256_setr_ps (
-                static_cast<float> (firstTailFrame) * blendScale,
-                static_cast<float> (firstTailFrame) * blendScale,
-                static_cast<float> (firstTailFrame + 1) * blendScale,
-                static_cast<float> (firstTailFrame + 1) * blendScale,
-                static_cast<float> (firstTailFrame + 2) * blendScale,
-                static_cast<float> (firstTailFrame + 2) * blendScale,
-                static_cast<float> (firstTailFrame + 3) * blendScale,
-                static_cast<float> (firstTailFrame + 3) * blendScale);
+            const auto qBase = _mm256_set1_ps (static_cast<float> (firstTailFrame) * blendScale);
+            const auto q = _mm256_add_ps (qBase, blendOffsets);
             const auto old = _mm256_loadu_ps (previousTail
                 + static_cast<size_t> (firstTailFrame) * 2u);
-            target = _mm256_add_ps (
-                _mm256_mul_ps (old, _mm256_sub_ps (_mm256_set1_ps (1.0f), q)),
-                _mm256_mul_ps (target, q));
+            target = _mm256_add_ps (old,
+                _mm256_mul_ps (_mm256_sub_ps (target, old), q));
         }
 
         const auto magnitude = _mm256_andnot_ps (signMask, target);
