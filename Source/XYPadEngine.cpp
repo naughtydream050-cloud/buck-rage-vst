@@ -902,44 +902,67 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
             const auto firstPositionValid = std::isfinite (firstSerial)
                 && firstSerial >= static_cast<double> (oldestSerial)
                 && firstSerial <= static_cast<double> (newestSerial);
-            auto lowerSerial = std::isfinite (firstSerial) && firstSerial >= 0.0
+            const auto lowerSerial = std::isfinite (firstSerial) && firstSerial >= 0.0
                 ? static_cast<uint64_t> (std::floor (firstSerial)) : uint64_t (0);
             auto lowerIndex = static_cast<size_t> (lowerSerial % capacity);
             const auto fraction = std::isfinite (firstSerial)
                 ? static_cast<float> (firstSerial - static_cast<double> (lowerSerial)) : 0.0f;
-            for (int frame = 0; frame < liveReentryTailFrames; ++frame)
+            const auto firstReadAge = juce::jmax (grain.age, 1);
+            const auto lastReadAge = juce::jmin (grain.age + liveReentryTailFrames - 1,
+                                                  liveGrainFrames - 2);
+            const auto firstReadSerial = grain.startSerial
+                + static_cast<double> (grain.direction * firstReadAge);
+            const auto lastReadSerial = grain.startSerial
+                + static_cast<double> (grain.direction * lastReadAge);
+            const auto firstReadLower = std::isfinite (firstReadSerial) && firstReadSerial >= 0.0
+                ? static_cast<uint64_t> (std::floor (firstReadSerial)) : uint64_t (0);
+            const auto lastReadLower = std::isfinite (lastReadSerial) && lastReadSerial >= 0.0
+                ? static_cast<uint64_t> (std::floor (lastReadSerial)) : uint64_t (0);
+            const auto minReadLower = juce::jmin (firstReadLower, lastReadLower);
+            const auto maxReadLower = juce::jmax (firstReadLower, lastReadLower);
+            const auto rangeValid = firstReadAge <= lastReadAge
+                && std::isfinite (firstReadSerial) && std::isfinite (lastReadSerial)
+                && firstReadSerial >= static_cast<double> (oldestSerial)
+                && firstReadSerial <= static_cast<double> (newestSerial)
+                && lastReadSerial >= static_cast<double> (oldestSerial)
+                && lastReadSerial <= static_cast<double> (newestSerial)
+                && minReadLower >= oldestSerial && maxReadLower <= newestSerial
+                && (fraction <= 0.0f || maxReadLower < newestSerial);
+            const auto ringSerialMatches = [&] (uint64_t serial) noexcept
             {
+                const auto index = static_cast<size_t> (serial % capacity);
+                return liveHistorySerials[index] == serial;
+            };
+            const auto endpointsValid = rangeValid
+                && ringSerialMatches (minReadLower) && ringSerialMatches (maxReadLower)
+                && (fraction <= 0.0f
+                    || (ringSerialMatches (minReadLower + 1u)
+                        && ringSerialMatches (maxReadLower + 1u)));
+            referenceValid = firstPositionValid && endpointsValid;
+            if (referenceValid)
+            {
+                auto upperIndex = lowerIndex;
+                if (fraction > 0.0f)
+                {
+                    ++upperIndex;
+                    if (upperIndex == capacity) upperIndex = 0;
+                }
+                for (int frame = 0; frame < liveReentryTailFrames; ++frame)
+                {
                 const auto age = grain.age + frame;
                 const auto validHannFrame = age > 0 && age < liveGrainFrames - 1;
                 float left = 0.0f, right = 0.0f;
                 if (validHannFrame)
                 {
-                    const auto serialInRange = firstPositionValid
-                        && lowerSerial >= oldestSerial && lowerSerial <= newestSerial
-                        && (fraction <= 0.0f || lowerSerial < newestSerial);
-                    auto upperIndex = lowerIndex;
-                    auto upperSerial = lowerSerial;
-                    if (fraction > 0.0f && lowerSerial < newestSerial)
-                    {
-                        ++upperSerial;
-                        upperIndex = lowerIndex + 1u;
-                        if (upperIndex == capacity) upperIndex = 0;
-                    }
-                    referenceValid = serialInRange
-                        && liveHistorySerials[lowerIndex] == lowerSerial
-                        && liveHistorySerials[upperIndex] == upperSerial;
-                    if (referenceValid)
-                    {
-                        const auto lowerOffset = lowerIndex * 2u;
-                        const auto upperOffset = upperIndex * 2u;
-                        left = liveHistory[lowerOffset]
-                             + (liveHistory[upperOffset] - liveHistory[lowerOffset]) * fraction;
-                        right = liveHistory[lowerOffset + 1u]
-                              + (liveHistory[upperOffset + 1u] - liveHistory[lowerOffset + 1u]) * fraction;
-                        referenceValid = std::isfinite (left) && std::isfinite (right);
-                    }
+                    const auto lowerOffset = lowerIndex * 2u;
+                    const auto upperOffset = upperIndex * 2u;
+                    left = liveHistory[lowerOffset]
+                         + (liveHistory[upperOffset] - liveHistory[lowerOffset]) * fraction;
+                    right = liveHistory[lowerOffset + 1u]
+                          + (liveHistory[upperOffset + 1u] - liveHistory[lowerOffset + 1u]) * fraction;
+                    referenceValid = std::isfinite (left) && std::isfinite (right);
+                    if (! referenceValid) break;
                 }
-                if (! referenceValid) break;
                 if (previousTail != nullptr)
                 {
                     const auto previousFrame = liveReentryTailPosition + frame;
@@ -958,14 +981,16 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                 {
                     if (grain.direction >= 0)
                     {
-                        ++lowerSerial;
                         if (++lowerIndex == capacity) lowerIndex = 0;
+                        if (fraction > 0.0f && ++upperIndex == capacity) upperIndex = 0;
                     }
                     else
                     {
-                        --lowerSerial;
                         lowerIndex = lowerIndex == 0 ? static_cast<size_t> (capacity - 1u) : lowerIndex - 1u;
+                        if (fraction > 0.0f)
+                            upperIndex = upperIndex == 0 ? static_cast<size_t> (capacity - 1u) : upperIndex - 1u;
                     }
+                }
                 }
             }
             if (referenceValid)
