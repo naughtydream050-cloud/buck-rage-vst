@@ -966,7 +966,7 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                     && frame + 1 < liveReentryTailFrames && canBlendTwoFrames
                     && twoSourceFramesContiguous)
                 {
-                    const auto* history = liveHistory;
+                    const auto* history = liveHistory.get();
                     const auto loadPair = [history, &grain] (size_t index) noexcept
                     {
                         if (grain.direction >= 0)
