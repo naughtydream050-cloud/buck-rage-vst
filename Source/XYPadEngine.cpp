@@ -871,6 +871,11 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
     const auto* previousTail = liveReentryTailActive
         ? liveReentryTailBuffers[static_cast<size_t> (liveReentryTailBuffer)].get() : nullptr;
     auto simulatedGrains = liveGrains;
+    std::array<int, kLiveGrainCapacity> activeGrainIndices {};
+    int activeGrainCount = 0;
+    for (int index = 0; index < kLiveGrainCapacity; ++index)
+        if (simulatedGrains[static_cast<size_t> (index)].active)
+            activeGrainIndices[static_cast<size_t> (activeGrainCount++)] = index;
     auto simulatedHoldMix = liveHoldMix;
     auto simulatedHoldPhase = liveHoldPhase;
     auto simulatedHoldReady = liveHoldReady;
@@ -885,8 +890,9 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
         double stableLeft = 0.0, stableRight = 0.0, stableWeight = 0.0;
         double phase = 0.0;
         bool hasOld = false, hasNew = false;
-        for (auto& grain : simulatedGrains)
+        for (int active = 0; active < activeGrainCount; ++active)
         {
+            auto& grain = simulatedGrains[static_cast<size_t> (activeGrainIndices[static_cast<size_t> (active)])];
             if (! grain.active) continue;
             if (grain.age >= liveGrainFrames || grain.snapshotIndex < 0
                 || grain.snapshotIndex >= kLiveGrainCapacity)
