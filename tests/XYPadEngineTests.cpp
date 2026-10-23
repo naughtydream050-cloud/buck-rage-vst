@@ -41,6 +41,24 @@ void operator delete[] (void* memory, std::size_t) noexcept { std::free (memory)
 class XYPadEngineTestAccess
 {
 public:
+    static bool liveGrainWindowLutMatchesAnalytic()
+    {
+        XYPadEngine engine;
+        if (! engine.prepare (96000.0, 64, true, true)) return false;
+        double maxError = 0.0;
+        for (int frame = 0; frame < engine.liveGrainFrames; ++frame)
+        {
+            const auto phase = static_cast<double> (frame)
+                             / static_cast<double> (juce::jmax (1, engine.liveGrainFrames - 1));
+            const auto reference = static_cast<float> (0.5 - 0.5 * std::cos (2.0 * 3.14159265358979323846 * phase));
+            maxError = std::max (maxError, static_cast<double> (std::abs (
+                engine.liveGrainWindow[static_cast<size_t> (frame)] - reference)));
+        }
+        engine.release();
+        std::cout << "METRIC live_grain_window_lut max_error=" << maxError << " tolerance=1e-7\n";
+        return maxError <= 1.0e-7;
+    }
+
     static bool queueIsBoundedAndFifo (XYPadEngine& engine)
     {
         for (uint32_t i = 0; i < XYPadEngine::kRenderQueueCapacity; ++i)
@@ -1286,6 +1304,8 @@ int main (int argc, char** argv)
            "live-fold-jump-starts-transition-on-the-next-sample-without-hop-delay");
     check (XYPadEngineTestAccess::interruptedTargetsRestartAtEveryOffset(),
            "reentrant-target-restarts-on-event-sample-at-every-active-transition-offset");
+    check (XYPadEngineTestAccess::liveGrainWindowLutMatchesAnalytic(),
+           "live-grain-window-lut-matches-analytic-hann");
     check (XYPadEngineTestAccess::repeatedReentryBlendIsFiniteAndPeakBounded(),
            "reentrant-linear-blend-is-finite-and-per-channel-peak-bounded-for-ten-transition-lengths");
     check (XYPadEngineTestAccess::reentryMutationGuardsRejectUnsafeChanges(),

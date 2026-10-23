@@ -171,6 +171,7 @@ private:
     std::unique_ptr<float[]> liveHistory;
     std::unique_ptr<float[]> liveGrainSnapshots;
     std::unique_ptr<float[]> liveHoldSnapshot;
+    std::unique_ptr<float[]> liveGrainWindow;
     std::array<std::unique_ptr<float[]>, 2> liveReentryTailBuffers;
     std::unique_ptr<uint64_t[]> liveHistorySerials;
     static constexpr int kLivePitchFftSize = 1024;

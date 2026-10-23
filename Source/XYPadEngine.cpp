@@ -87,6 +87,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
     previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
     liveHistory.reset(); liveHistorySerials.reset(); liveGrainSnapshots.reset(); liveHoldSnapshot.reset();
+    liveGrainWindow.reset();
     for (auto& tail : liveReentryTailBuffers) tail.reset();
     livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
     livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
@@ -175,6 +176,15 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         liveGrainSnapshots.reset (new (std::nothrow) float[static_cast<size_t> (kLiveGrainCapacity)
                                                            * static_cast<size_t> (liveGrainFrames) * 2u]);
         liveHoldSnapshot.reset (new (std::nothrow) float[static_cast<size_t> (liveGrainFrames) * 2u]);
+        liveGrainWindow.reset (new (std::nothrow) float[static_cast<size_t> (liveGrainFrames)]);
+        if (liveGrainWindow)
+            for (int frame = 0; frame < liveGrainFrames; ++frame)
+            {
+                const auto phase = static_cast<double> (frame)
+                                 / static_cast<double> (juce::jmax (1, liveGrainFrames - 1));
+                liveGrainWindow[static_cast<size_t> (frame)]
+                    = static_cast<float> (0.5 - 0.5 * std::cos (2.0 * kPi * phase));
+            }
         liveReentryTailFrames = liveTransitionFrames;
         for (auto& tail : liveReentryTailBuffers)
             tail.reset (new (std::nothrow) float[static_cast<size_t> (liveReentryTailFrames) * 2u]);
@@ -194,7 +204,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         livePitchSmoothingCoefficient = static_cast<float> (1.0 - std::exp (-1.0 / (rate * 0.005)));
         if ((! liveOnly && (! scratch || ! fftWork || ! fftWork2 || ! overlapNorm || ! previousInputPhase
             || ! synthesisPhase || ! phaseInitialized || ! fft)) || ! liveHistory || ! liveHistorySerials
-            || ! liveGrainSnapshots || ! liveHoldSnapshot || ! liveReentryTailBuffers[0]
+            || ! liveGrainSnapshots || ! liveHoldSnapshot || ! liveGrainWindow || ! liveReentryTailBuffers[0]
             || ! liveReentryTailBuffers[1] || ! livePitchFft || ! livePitchFftWork
             || ! livePitchFftWork2 || ! livePitchInputRing || ! livePitchIdentityDelay
             || ! livePitchSemitoneDelay || ! livePitchMaskDelay || ! livePitchOlaLeft
@@ -205,6 +215,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
             scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
             previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset();
             liveHistory.reset(); liveHistorySerials.reset(); liveGrainSnapshots.reset(); liveHoldSnapshot.reset();
+            liveGrainWindow.reset();
             for (auto& tail : liveReentryTailBuffers) tail.reset();
             livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
             livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
@@ -230,6 +241,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
         previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
         liveHistory.reset(); liveHistorySerials.reset(); liveGrainSnapshots.reset(); liveHoldSnapshot.reset();
+        liveGrainWindow.reset();
         for (auto& tail : liveReentryTailBuffers) tail.reset();
         livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
         livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
@@ -257,6 +269,7 @@ void XYPadEngine::release() noexcept
     scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
     previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
     liveHistory.reset(); liveHistorySerials.reset(); liveGrainSnapshots.reset(); liveHoldSnapshot.reset();
+    liveGrainWindow.reset();
     for (auto& tail : liveReentryTailBuffers) tail.reset();
     livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
     livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
@@ -884,9 +897,7 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
             const auto* snapshot = liveGrainSnapshots.get()
                 + static_cast<size_t> (grain.snapshotIndex) * static_cast<size_t> (liveGrainFrames) * 2u;
             const auto index = static_cast<size_t> (grain.age) * 2u;
-            const auto windowPhase = static_cast<double> (grain.age)
-                                   / static_cast<double> (juce::jmax (1, liveGrainFrames - 1));
-            const auto window = 0.5 - 0.5 * std::cos (2.0 * kPi * windowPhase);
+            const auto window = liveGrainWindow[static_cast<size_t> (grain.age)];
             if (grain.fadeOutRemaining > 0 || grain.fadeInFrames > 0)
             {
                 phase = grain.fadeOutRemaining > 0
@@ -1246,9 +1257,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                 + static_cast<size_t> (grain.snapshotIndex) * static_cast<size_t> (liveGrainFrames) * 2u;
             const auto left = snapshot[static_cast<size_t> (grain.age) * 2u];
             const auto right = snapshot[static_cast<size_t> (grain.age) * 2u + 1u];
-            const auto windowPhase = static_cast<double> (grain.age)
-                                   / static_cast<double> (juce::jmax (1, liveGrainFrames - 1));
-            const auto window = 0.5 - 0.5 * std::cos (2.0 * kPi * windowPhase);
+            const auto window = liveGrainWindow[static_cast<size_t> (grain.age)];
             const auto isNewBranch = grain.fadeInFrames > 0;
             const auto isOldBranch = grain.fadeOutRemaining > 0;
             if (isOldBranch || isNewBranch)
