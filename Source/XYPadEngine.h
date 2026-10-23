@@ -211,6 +211,7 @@ private:
     bool liveHavePreviousX = false, liveHaveSignal = false, livePendingTransition = false;
     bool liveHoldReady = false;
     bool liveReentryTailActive = false;
+    bool liveTailAvx2Available = false;
     bool liveWasPlaying = false;
     bool liveSourceFadeActive = false;
     int fftSize = 2048, hopSize = 512;

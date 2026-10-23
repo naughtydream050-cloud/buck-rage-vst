@@ -1,4 +1,5 @@
 #include "XYPadEngine.h"
+#include "XYPadTailAVX2.h"
 
 #include <algorithm>
 #include <chrono>
@@ -564,8 +565,10 @@ public:
             engine.liveWriteSerial = capacity;
             engine.liveHistoryValidFrames = capacity;
             const auto newest = capacity > 0 ? capacity - 1u : 0u;
-            for (const auto age : { 1, engine.liveGrainFrames / 3, engine.liveGrainFrames / 2,
-                                    engine.liveGrainFrames - 2 })
+            for (const auto direction : { 1, -1 })
+                for (const auto fraction : { 0.0, 0.375 })
+                    for (const auto age : { 1, engine.liveGrainFrames / 3, engine.liveGrainFrames / 2,
+                                            engine.liveGrainFrames - 2 })
                 for (const auto priorTailPosition : { -1, 0, engine.liveReentryTailFrames / 2 })
                 {
                     engine.liveGrains.fill (XYPadEngine::LiveGrain {});
@@ -580,9 +583,11 @@ public:
                             engine.liveReentryTailBuffers[0][index + 1u] = -0.3f - 0.0001f * static_cast<float> (frame);
                         }
 
-                    engine.launchLiveGrain (0.5f, 1, false, 0, newest);
+                    engine.launchLiveGrain (0.5f, direction, false, 0, newest);
                     auto& grain = engine.liveGrains[0];
                     grain.age = age;
+                    const auto currentSerial = static_cast<double> (capacity / 2u) + fraction;
+                    grain.startSerial = currentSerial - static_cast<double> (direction * age);
                     grain.fadeInFrames = 0;
                     grain.fadeOutRemaining = 0;
                     engine.liveHoldReady = false;
@@ -598,7 +603,8 @@ public:
                         const auto sourceAge = age + frame;
                         const auto window = sourceAge >= 0 && sourceAge < engine.liveGrainFrames
                             ? engine.liveGrainWindow[static_cast<size_t> (sourceAge)] : 0.0f;
-                        const auto serial = grain.startSerial + static_cast<double> (sourceAge);
+                        const auto serial = grain.startSerial
+                            + static_cast<double> (direction * sourceAge);
                         float sampleL = 0.0f, sampleR = 0.0f;
                         const auto read = sourceAge < engine.liveGrainFrames
                             && engine.readLiveSample (serial, 0, 0, newest, sampleL)
@@ -633,7 +639,8 @@ public:
             engine.release();
         }
         std::cout << "METRIC stable_single_grain_tail_reference max_error=" << maximumError
-                  << " tolerance=2e-6 rates=44100,48000,96000\n";
+                  << " tolerance=2e-6 rates=44100,48000,96000 avx2="
+                  << (xyPadTailAvx2Available() ? "AVAILABLE" : "UNAVAILABLE") << "\n";
         return passed && maximumError <= 2.0e-6;
     }
 

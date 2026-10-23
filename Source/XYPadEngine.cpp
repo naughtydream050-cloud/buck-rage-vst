@@ -1,4 +1,5 @@
 #include "XYPadEngine.h"
+#include "XYPadTailAVX2.h"
 
 #include <algorithm>
 #include <chrono>
@@ -149,6 +150,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     liveGrainFrames = juce::jmax (1, juce::roundToInt (rate * kLiveGrainSeconds));
     liveHopFrames = juce::jmax (1, juce::roundToInt (rate * kLiveHopSeconds));
     liveTransitionFrames = juce::jmax (2, juce::roundToInt (rate * 0.003));
+    liveTailAvx2Available = xyPadTailAvx2Available();
     try
     {
         if (! liveOnly)
@@ -284,6 +286,7 @@ void XYPadEngine::release() noexcept
     liveTransitionFrames = 0;
     liveReentryTailFrames = liveReentryTailPosition = liveReentryTailBuffer = 0;
     liveReentryTailActive = false;
+    liveTailAvx2Available = false;
     liveWriteSerial = liveHistoryValidFrames = 0;
     liveSamplesToLaunch = 0;
     liveSilenceFramesCount = 0;
@@ -958,11 +961,74 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
             const auto blendableFrameCount = previousTail == nullptr ? tailFrames
                 : static_cast<size_t> (juce::jmax (0, liveReentryTailFrames - liveReentryTailPosition - 1));
 #endif
+            int avxStart = 0, avxCount = 0;
+            if (referenceValid && liveTailAvx2Available)
+            {
+                avxStart = juce::jmax (0, 1 - grain.age);
+                auto avxEnd = juce::jmin (liveReentryTailFrames,
+                    liveGrainFrames - 2 - grain.age);
+                if (previousTail != nullptr)
+                    avxEnd = juce::jmin (avxEnd,
+                        liveReentryTailFrames - liveReentryTailPosition - 2);
+                if (avxEnd > avxStart)
+                    avxCount = ((avxEnd - avxStart) / 4) * 4;
+
+                auto avxLower = lowerIndex;
+                auto avxUpper = upperIndex;
+                if (grain.direction >= 0)
+                {
+                    avxLower += static_cast<size_t> (avxStart);
+                    avxUpper += static_cast<size_t> (avxStart);
+                    const auto noWrap = avxCount > 0
+                        && avxLower <= capacity - static_cast<uint64_t> (avxCount)
+                        && avxUpper <= capacity - static_cast<uint64_t> (avxCount);
+                    if (! noWrap) avxCount = 0;
+                }
+                else
+                {
+                    const auto back = static_cast<size_t> (avxStart);
+                    const auto noWrap = avxCount > 0 && avxLower >= back
+                        && avxUpper >= back;
+                    if (noWrap)
+                    {
+                        avxLower -= back;
+                        avxUpper -= back;
+                    }
+                    else avxCount = 0;
+                }
+                if (fraction <= 0.0f) avxUpper = avxLower;
+
+                if (avxCount > 0 && ! xyPadRenderTailAvx2 (liveHistory.get(), previousTail,
+                        destination, avxLower, avxUpper, capacity, grain.direction, fraction,
+                        avxStart, avxCount, liveReentryTailPosition, tailBlendScale))
+                    avxCount = 0;
+            }
             if (referenceValid)
             {
                 for (int frame = 0; frame < liveReentryTailFrames; ++frame)
                 {
                 const auto age = grain.age + frame;
+                if (avxCount > 0 && frame == avxStart)
+                {
+                    if (grain.direction >= 0)
+                    {
+                        lowerIndex += static_cast<size_t> (avxCount);
+                        upperIndex += static_cast<size_t> (avxCount);
+                        if (lowerIndex == capacity) lowerIndex = 0;
+                        if (upperIndex == capacity) upperIndex = 0;
+                    }
+                    else
+                    {
+                        const auto back = static_cast<size_t> (avxCount);
+                        lowerIndex = lowerIndex < back ? lowerIndex + static_cast<size_t> (capacity) - back
+                                                       : lowerIndex - back;
+                        upperIndex = upperIndex < back ? upperIndex + static_cast<size_t> (capacity) - back
+                                                       : upperIndex - back;
+                    }
+                    if (fraction <= 0.0f) upperIndex = lowerIndex;
+                    frame += avxCount - 1;
+                    continue;
+                }
                 const auto validHannFrame = age > 0 && age < liveGrainFrames - 1;
 #if defined(TOYOTOMI_XY_HAS_SSE2)
                 const auto previousFrame = liveReentryTailPosition + frame;

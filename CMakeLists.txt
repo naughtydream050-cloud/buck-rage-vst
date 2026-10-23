@@ -54,6 +54,8 @@ target_sources(ToyotomiHideyoshi PRIVATE
     Source/PluginProcessor.cpp
     Source/TimelineScratchEngine.cpp
     Source/XYPadEngine.cpp
+    Source/XYPadCpuFeatures.cpp
+    Source/XYPadTailAVX2.cpp
     Source/PluginEditorV2.cpp
     Source/PluginStateModel.cpp
 )
@@ -72,6 +74,8 @@ if (TOYOTOMI_BUILD_STATE_TESTS)
         Source/PluginProcessor.cpp
         Source/TimelineScratchEngine.cpp
         Source/XYPadEngine.cpp
+        Source/XYPadCpuFeatures.cpp
+        Source/XYPadTailAVX2.cpp
         Source/PluginEditorV2.cpp
         Source/PluginStateModel.cpp
         tests/RuntimeSmokeTests.cpp)
@@ -88,6 +92,8 @@ if (TOYOTOMI_BUILD_STATE_TESTS)
     juce_generate_juce_header(ToyotomiHideyoshiXYEngineTests)
     target_sources(ToyotomiHideyoshiXYEngineTests PRIVATE
         Source/XYPadEngine.cpp
+        Source/XYPadCpuFeatures.cpp
+        Source/XYPadTailAVX2.cpp
         Source/PluginStateModel.cpp
         tests/XYPadEngineTests.cpp)
     target_include_directories(ToyotomiHideyoshiXYEngineTests PRIVATE Source)
@@ -102,6 +108,10 @@ if (TOYOTOMI_BUILD_STATE_TESTS)
         tests/TimelineScratchEngineTests.cpp)
     target_include_directories(ToyotomiHideyoshiScratchEngineTests PRIVATE Source)
     target_link_libraries(ToyotomiHideyoshiScratchEngineTests PRIVATE juce::juce_audio_basics)
+endif()
+
+if (MSVC)
+    set_source_files_properties(Source/XYPadTailAVX2.cpp PROPERTIES COMPILE_OPTIONS "/arch:AVX2")
 endif()
 
 target_compile_definitions(ToyotomiHideyoshi PUBLIC

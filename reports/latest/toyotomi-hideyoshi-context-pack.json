@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "project": "ToyotomiHideyoshi",
-  "phase": "Approved XY Pad Phase 2 live processing — re-entrant transition repair",
+  "phase": "Approved XY Pad Phase 2 live processing — re-entrant transition repair and AC-20 performance qualification",
   "ssot": "D:/Development/RAZOR_FACE_COMPANY/01_PLUGINS/projects/ToyotomiHideyoshi",
   "worktree": "D:/Development/_CODEX_TOOLS/worktrees/toyotomi-xy-ac10-verification",
   "branch": "codex/xy-live-ac10-verification",
@@ -14,8 +14,20 @@
   "combined21AcManifestSha256": "7036A48897F9885C1608CE91433A65ED5CCE10958B505307FEEA9237F8061CD8",
   "candidateStatus": "previous XY build retained as rollback; not the re-entrant correction",
   "worker": "Codex direct implementation selected because fresh GLM state is LOCAL_BUDGET_BLOCKED; DeepSeek not invoked",
-  "ci": "base CI only; new CI required for this implementation",
+  "currentSourceHead": "baad7660e5679d68338912edd2e5066b95077d1d",
+  "ci": {
+    "runId": "39982014270",
+    "status": "SUCCESS",
+    "scope": "Windows VST3 build and deterministic checks for current committed source"
+  },
+  "ac20": {
+    "status": "FAIL",
+    "device": "Ryzen 3 2200U",
+    "conditions": 18,
+    "reason": "Multiple sample-rate/block-size cases exceed approved p99 or maximum deadline ratios; thresholds unchanged",
+    "optimizationInProgress": "Isolated AVX2 live-tail renderer; not yet built or verified"
+  },
   "jev": "not yet run",
   "hostValidation": "NOT TESTED",
-  "nextAction": "Add and run test-only re-entrant RED evidence before changing XY DSP."
+  "nextAction": "Finish correctness tests for the bounded AVX2 tail renderer, run Windows CI and the exact 18-condition AC-20 benchmark; do not promote unless all 21 AC pass."
 }
