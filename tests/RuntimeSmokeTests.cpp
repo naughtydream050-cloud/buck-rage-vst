@@ -34,6 +34,11 @@ public:
         return processor.xyReadyMask.getNumSamples() >= frames
             ? processor.xyReadyMask.getMagnitude (0, 0, frames) : 0.0f;
     }
+
+    static float getXyBlendAt (const ToyotomiHideyoshiAudioProcessor& processor, int sample) noexcept
+    {
+        return processor.xyReadyMask.getSample (0, sample);
+    }
 };
 
 class XYPadEngineTestAccess
@@ -471,6 +476,136 @@ bool testXyLayerIndependenceAtProcessorBoundary()
     std::cout << "METRIC ac09 preset_control_xy_delta_max_error=" << maxXyDeltaDifference << "\n";
     pass &= check (xyIndependentOfPresetControls && maxXyDeltaDifference < 2.0e-6,
                    "xy-render-is-independent-of-preset-length-speed-and-pitch");
+    return pass;
+}
+
+bool testUnavailableLiveXyPreservesPresetPerSample()
+{
+    constexpr double rate = 48000.0, bpm = 120.0;
+    constexpr int latency = 1024, history = 960, ramp = 384, hold = 1440;
+    constexpr int silenceStart = 7200, resumeStart = 14400, total = 24000, window = 480;
+    auto preset = std::make_unique<ToyotomiHideyoshiAudioProcessor>();
+    auto combined = std::make_unique<ToyotomiHideyoshiAudioProcessor>();
+    TestPlayHead presetHead, combinedHead;
+    for (auto* processor : { preset.get(), combined.get() })
+    {
+        processor->prepareToPlay (rate, 512);
+        processor->setHostSyncEnabled (true);
+        auto& state = processor->getStateModel();
+        state.setSlotPreset (0, PluginStateModel::ScratchPreset::drag);
+        state.setSlotLength (0, PluginStateModel::NoteLength::oneBar);
+        state.setSlotSpeed (0, 1.0f);
+        state.setSlotDepth (0, 0.8f);
+    }
+    auto& state = combined->getStateModel();
+    state.beginSlotXYMotion (0, 0.0f, 0.5f);
+    state.appendSlotXYMotion (0, 1.0f, 0.5f, 2.0);
+    preset->setPlayHead (&presetHead);
+    combined->setPlayHead (&combinedHead);
+    juce::MidiBuffer midi;
+    juce::AudioBuffer<float> input (2, total), baseline (2, total), actual (2, total);
+    juce::AudioBuffer<float> presetBlock (2, 512), combinedBlock (2, 512);
+    std::vector<float> masks (total, 0.0f);
+    for (int sample = 0; sample < total; ++sample)
+    {
+        const float left = sample >= silenceStart && sample < resumeStart ? 0.0f
+            : 0.2f * std::sin (2.0 * 3.141592653589793 * 220.0 * sample / rate);
+        input.setSample (0, sample, left);
+        input.setSample (1, sample, left * 0.5f);
+    }
+    const std::array<int, 5> blocks {{ 64, 127, 256, 512, 128 }};
+    int cursor = 0, blockNumber = 0;
+    while (cursor < total)
+    {
+        const int frames = juce::jmin (blocks[static_cast<size_t> (blockNumber++ % blocks.size())], total - cursor);
+        presetBlock.setSize (2, frames, false, false, true);
+        combinedBlock.setSize (2, frames, false, false, true);
+        for (int channel = 0; channel < 2; ++channel)
+        {
+            presetBlock.copyFrom (channel, 0, input, channel, cursor, frames);
+            combinedBlock.copyFrom (channel, 0, input, channel, cursor, frames);
+        }
+        const double ppq = cursor * bpm / (60.0 * rate);
+        presetHead.set (true, ppq, bpm, 4, 4, cursor);
+        combinedHead.set (true, ppq, bpm, 4, 4, cursor);
+        preset->processBlock (presetBlock, midi);
+        combined->processBlock (combinedBlock, midi);
+        for (int channel = 0; channel < 2; ++channel)
+        {
+            baseline.copyFrom (channel, cursor, presetBlock, channel, 0, frames);
+            actual.copyFrom (channel, cursor, combinedBlock, channel, 0, frames);
+        }
+        for (int i = 0; i < frames; ++i)
+            masks[static_cast<size_t> (cursor + i)] = RuntimeSmokeTestAccess::getXyBlendAt (*combined, i);
+        cursor += frames;
+    }
+    int warmupSamples = 0, warmupErrors = 0, silentSamples = 0, silentErrors = 0;
+    int presetEffectSamples = 0, presetTailSamples = 0;
+    bool finite = true;
+    for (int sample = 0; sample < total; ++sample)
+    {
+        const float mask = masks[static_cast<size_t> (sample)];
+        const bool warmup = sample < history + latency;
+        const bool silentUnavailable = sample >= silenceStart + hold + ramp + latency + 2
+                                      && sample < resumeStart;
+        if (warmup) { ++warmupSamples; warmupErrors += mask != 0.0f ? 1 : 0; }
+        if (silentUnavailable) { ++silentSamples; silentErrors += mask != 0.0f ? 1 : 0; }
+        for (int channel = 0; channel < 2; ++channel)
+        {
+            const float output = actual.getSample (channel, sample);
+            const float expected = baseline.getSample (channel, sample);
+            const float dry = sample >= latency ? input.getSample (channel, sample - latency) : 0.0f;
+            finite &= std::isfinite (output) && std::isfinite (expected) && std::isfinite (mask);
+            const bool equal = std::memcmp (&output, &expected, sizeof (float)) == 0;
+            if (warmup) warmupErrors += equal ? 0 : 1;
+            if (silentUnavailable) silentErrors += equal ? 0 : 1;
+            if (warmup && std::abs (expected - dry) > 1.0e-5f) ++presetEffectSamples;
+            if (silentUnavailable && std::abs (expected) > 1.0e-5f) ++presetTailSamples;
+        }
+    }
+    const auto verifyActiveWindows = [&] (int first, int last, int& count, int& errors)
+    {
+        count = errors = 0;
+        for (int start = first; start + window <= last; start += window)
+        {
+            ++count;
+            double difference = 0.0;
+            bool ready = true;
+            for (int sample = start; sample < start + window; ++sample)
+            {
+                ready &= masks[static_cast<size_t> (sample)] >= 0.99f;
+                for (int channel = 0; channel < 2; ++channel)
+                    difference += std::abs (actual.getSample (channel, sample) - baseline.getSample (channel, sample));
+            }
+            if (! ready || difference <= 1.0e-5) ++errors;
+        }
+    };
+    int activeWindows = 0, activeErrors = 0, resumedWindows = 0, resumedErrors = 0;
+    verifyActiveWindows (history + ramp + latency + 64, silenceStart, activeWindows, activeErrors);
+    verifyActiveWindows (resumeStart + history + ramp + latency + 64, total, resumedWindows, resumedErrors);
+    std::cout << "METRIC ac10 warmup_samples=" << warmupSamples << " warmup_errors=" << warmupErrors
+              << " preset_effect_samples=" << presetEffectSamples << " silent_samples=" << silentSamples
+              << " silent_errors=" << silentErrors << " preset_tail_samples=" << presetTailSamples
+              << " active_windows=" << activeWindows << " active_errors=" << activeErrors
+              << " resumed_windows=" << resumedWindows << " resumed_errors=" << resumedErrors
+              << " finite=" << finite << "\n";
+    bool pass = check (warmupSamples == history + latency && warmupErrors == 0 && presetEffectSamples > 0,
+                       "ac10-cold-history-unavailable-xy-preserves-active-preset-bit-exact-per-sample");
+    pass &= check (silentSamples > window && silentErrors == 0 && presetTailSamples > 0,
+                   "ac10-source-silence-unavailable-xy-preserves-nonzero-preset-tail-per-sample");
+    pass &= check (activeWindows > 0 && activeErrors == 0 && resumedWindows > 0 && resumedErrors == 0 && finite,
+                   "ac10-active-and-same-bar-resumed-xy-contribute-in-every-ten-ms-window");
+    juce::WavAudioFormat format;
+    const auto save = [&] (const char* name, const juce::AudioBuffer<float>& audio)
+    {
+        auto stream = juce::File::getCurrentWorkingDirectory().getChildFile (name).createOutputStream();
+        std::unique_ptr<juce::AudioFormatWriter> writer;
+        if (stream != nullptr) writer.reset (format.createWriterFor (stream.release(), rate, 2, 24, {}, 0));
+        return writer != nullptr && writer->writeFromAudioSampleBuffer (audio, 0, total);
+    };
+    pass &= check (save ("xy-live-ac10-input.wav", input) && save ("xy-live-ac10-preset-only.wav", baseline)
+                   && save ("xy-live-ac10-combined.wav", actual), "ac10-live-layer-comparison-diagnostic-wavs-written");
+    preset->setPlayHead (nullptr); combined->setPlayHead (nullptr);
     return pass;
 }
 
@@ -1622,6 +1757,7 @@ int main()
     pass &= testPredictedMotionLoopConfirmation();
     pass &= testMotionWetSurvivesThreeHostLoops();
     pass &= testXyLayerIndependenceAtProcessorBoundary();
+    pass &= testUnavailableLiveXyPreservesPresetPerSample();
     pass &= testProcessorDeclaresAndImplementsFixed1024SampleLatency();
     pass &= testXyTransportUsesProcessorClock();
     pass &= testAbsoluteHostBarSync();
