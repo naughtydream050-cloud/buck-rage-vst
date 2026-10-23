@@ -910,8 +910,14 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
             const auto lowerSerial = std::isfinite (firstSerial) && firstSerial >= 0.0
                 ? static_cast<uint64_t> (std::floor (firstSerial)) : uint64_t (0);
             auto lowerIndex = static_cast<size_t> (lowerSerial % capacity);
+            auto upperIndex = lowerIndex;
             const auto fraction = std::isfinite (firstSerial)
                 ? static_cast<float> (firstSerial - static_cast<double> (lowerSerial)) : 0.0f;
+            if (fraction > 0.0f)
+            {
+                ++upperIndex;
+                if (upperIndex == capacity) upperIndex = 0;
+            }
             const auto firstReadAge = juce::jmax (grain.age, 1);
             const auto lastReadAge = juce::jmin (grain.age + liveReentryTailFrames - 1,
                                                   liveGrainFrames - 2);
@@ -954,12 +960,6 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
 #endif
             if (referenceValid)
             {
-                auto upperIndex = lowerIndex;
-                if (fraction > 0.0f)
-                {
-                    ++upperIndex;
-                    if (upperIndex == capacity) upperIndex = 0;
-                }
                 for (int frame = 0; frame < liveReentryTailFrames; ++frame)
                 {
                 const auto age = grain.age + frame;
