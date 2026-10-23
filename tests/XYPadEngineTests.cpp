@@ -396,13 +396,26 @@ public:
             engine.processLive (input, output, mask, event, 1);
 
             bool launchedLatestTargetAtEvent = false;
+            double targetPositionError = std::numeric_limits<double>::infinity();
             for (const auto& grain : engine.liveGrains)
+            {
                 launchedLatestTargetAtEvent = launchedLatestTargetAtEvent
                     || (grain.active && grain.direction == 1 && grain.age == 1);
+                if (grain.active && grain.direction == 1 && grain.age == 1)
+                {
+                    const auto available = engine.liveHistoryValidFrames;
+                    const auto span = static_cast<double> (available - static_cast<uint64_t> (engine.liveGrainFrames));
+                    const auto eventPhase = 0.5 + static_cast<double> (eventOffset - 1) * 1.0e-6;
+                    const auto targetX = 0.9 - (eventPhase - 0.5) * 1.6;
+                    const auto expected = static_cast<double> (engine.liveWriteSerial - available) + targetX * span;
+                    targetPositionError = std::abs (grain.startSerial - expected);
+                }
+            }
             int activeAtEvent = 0;
             for (const auto& grain : engine.liveGrains) activeAtEvent += grain.active ? 1 : 0;
             const auto immediate = launchedLatestTargetAtEvent && ! engine.livePendingTransition
                 && engine.liveReentryTailActive && engine.liveReentryTailPosition == 1
+                && targetPositionError <= 2.0e-6
                 && reentryRecordPasses (eventOffset, launchedLatestTargetAtEvent ? eventOffset : eventOffset + 1,
                                         maximumTailReferenceError, activeAtEvent, true, 0.0, 2.0);
             allOffsetsReenteredImmediately = allOffsetsReenteredImmediately && immediate;
