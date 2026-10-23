@@ -505,6 +505,17 @@ public:
             engine.liveHoldReady = false;
             engine.liveReentryTailActive = false;
             engine.liveReentryTailPosition = 0;
+            const auto capacity = static_cast<uint64_t> (engine.liveHistoryCapacityFrames);
+            for (uint64_t serial = 0; serial < capacity; ++serial)
+            {
+                const auto index = static_cast<size_t> (serial);
+                const auto value = static_cast<float> (serial % 997u) / 997.0f;
+                engine.liveHistory[index * 2u] = value;
+                engine.liveHistory[index * 2u + 1u] = -0.5f * value;
+                engine.liveHistorySerials[index] = serial;
+            }
+            engine.liveWriteSerial = capacity;
+            engine.liveHistoryValidFrames = capacity;
             const auto snapshotFrames = static_cast<size_t> (engine.liveGrainFrames);
             for (size_t frame = 0; frame < snapshotFrames; ++frame)
             {
@@ -513,7 +524,6 @@ public:
                 engine.liveGrainSnapshots[frame * 2u + 1u] = static_cast<float> (0.4 * std::cos (phase * 23.0));
             }
 
-            const auto capacity = static_cast<uint64_t> (engine.liveHistoryCapacityFrames);
             const auto newest = capacity > 0 ? capacity - 1u : 0u;
             for (const auto age : { 1, engine.liveGrainFrames / 3, engine.liveGrainFrames / 2,
                                     engine.liveGrainFrames - 2 })
