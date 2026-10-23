@@ -15,6 +15,11 @@ The source serial tags remain checked on every render read. A missing or overwri
 serial rejects the read; no stale slot is treated as valid. Hold material and the
 3 ms re-entry tail remain separately preallocated buffers.
 
+When source silence ends a segment, the active ring references remain readable
+until the existing wet fade completes. New grains are suppressed while the source
+is ended. The first resumed non-silent input starts a fresh valid-history segment,
+so old grain data cannot be relaunched after the fade.
+
 ## Memory bound
 
 At 96 kHz the stereo float history is approximately 13920 frames, plus two frame

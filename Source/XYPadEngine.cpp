@@ -1174,8 +1174,34 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
 
         const auto isSilent = std::abs (dryLeft) < 1.0e-4f && std::abs (dryRight) < 1.0e-4f;
         silentFrames = isSilent ? juce::jmin (silenceFrames, silentFrames + 1) : 0;
-        if (! isSilent) liveHaveSignal = true;
+        if (! isSilent)
+        {
+            if (! liveHaveSignal)
+            {
+                // A new source segment starts a fresh serial-valid history. Keep
+                // the ended segment readable through its fade, then invalidate it
+                // here before any stale grain can be relaunched.
+                liveHistoryValidFrames = 1;
+                liveGrains.fill (LiveGrain {});
+                liveSamplesToLaunch = 0;
+                liveWetGain = 0.0f;
+                liveReentryTailActive = false;
+                liveReentryTailPosition = 0;
+                liveHoldReady = false;
+                liveHoldMix = 0.0f;
+                liveStationaryFrames = liveHoldPhase = 0;
+                liveSourceFadeActive = false;
+            }
+            liveHaveSignal = true;
+        }
         liveSilenceFramesCount = silentFrames;
+        const auto sourceEnded = silentFrames >= silenceFrames;
+        if (sourceEnded)
+        {
+            liveSamplesToLaunch = 0;
+            liveHaveSignal = false;
+            liveSourceFadeActive = true;
+        }
 
         int bar = -1;
         double phase = 0.0;
@@ -1249,7 +1275,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         const auto hasHistory = liveHistoryValidFrames >= static_cast<uint64_t> (liveWarmupFrames)
                              && liveHistoryValidFrames >= static_cast<uint64_t> (liveGrainFrames);
         const auto stationaryFramesRequired = juce::jmax (1, static_cast<int> (std::ceil (sampleRate * 0.002)));
-        if (! liveHoldReady && liveActiveTrajectory.count > 0 && hasHistory
+        if (liveHaveSignal && ! liveHoldReady && liveActiveTrajectory.count > 0 && hasHistory
             && liveStationaryFrames >= stationaryFramesRequired && liveHoldSnapshot != nullptr)
         {
             const auto holdStart = newestSerial + 1u - static_cast<uint64_t> (liveGrainFrames);
@@ -1275,7 +1301,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             transitionInProgress = transitionInProgress
                 || (grain.active && (grain.fadeInFrames > 0 || grain.fadeOutRemaining > 0));
         transitionInProgress = transitionInProgress || liveReentryTailActive;
-        const auto reenterNow = targetJump && transitionInProgress && hasHistory
+        const auto reenterNow = liveHaveSignal && targetJump && transitionInProgress && hasHistory
                              && liveActiveTrajectory.count > 0;
         if (reenterNow)
         {
@@ -1287,13 +1313,13 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             launchLiveGrain (x, direction, false, oldestSerial, newestSerial);
             liveSamplesToLaunch = liveHopFrames;
         }
-        else if (targetJump && hasHistory && liveActiveTrajectory.count > 0)
+        else if (liveHaveSignal && targetJump && hasHistory && liveActiveTrajectory.count > 0)
         {
             liveSamplesToLaunch = 0;
             launchLiveGrain (x, direction, true, oldestSerial, newestSerial);
             liveSamplesToLaunch = liveHopFrames;
         }
-        else if (liveActiveTrajectory.count > 0 && hasHistory && liveSamplesToLaunch <= 0
+        else if (liveHaveSignal && liveActiveTrajectory.count > 0 && hasHistory && liveSamplesToLaunch <= 0
                  && ! transitionInProgress)
         {
             launchLiveGrain (x, direction, false, oldestSerial, newestSerial);
@@ -1425,16 +1451,6 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
 
         const auto hasWet = liveActiveTrajectory.count > 0 && hasHistory
                          && windowTotal > 1.0e-9 && ! readFailure;
-        const auto sourceEnded = silentFrames >= silenceFrames;
-        if (sourceEnded)
-        {
-            // Do not let the rolling history replay a stale pre-silence grain
-            // after the live input resumes.
-            liveSamplesToLaunch = 0;
-            liveHistoryValidFrames = 0;
-            liveHaveSignal = false;
-            liveSourceFadeActive = true;
-        }
         const auto targetGain = hasWet && liveHaveSignal && ! sourceEnded ? 1.0f : 0.0f;
         const auto step = 1.0f / static_cast<float> (rampFrames);
         if (liveWetGain < targetGain) liveWetGain = juce::jmin (targetGain, liveWetGain + step);
