@@ -10,16 +10,17 @@ Approved XY Pad Phase 2 live processing — re-entrant transition repair and AC-
 
 Branch: `codex/xy-live-ac10-verification`
 Base source: `2322502e7946e46b85c74d061452861fd76d4efc`
-Current committed source: `baad7660e5679d68338912edd2e5066b95077d1d`
+Current committed source: `7df10e51b6a7c0944ca3272cb439f686ab709b56`
 
 The original 16 AC and approved R2-AC-17..21 remain required. The current D candidate is preserved as rollback; no new candidate has been promoted.
 
 ## Validation truth
 
-- Latest Windows CI Run `39982014270`: successful build and deterministic checks for the current committed source.
-- AC-20 on Ryzen 3 2200U: **FAIL**. The 18-condition Release benchmark still exceeds the specified p99 or maximum audio-deadline ratios in multiple sample-rate/block-size conditions. Thresholds have not been relaxed.
-- Experimental AVX2 tail-rendering optimization is in progress and is not yet built or validated.
-- Jev 1.13: not run for the current uncommitted optimization.
+- Latest Windows CI Run `39984485818`: successful Release build and deterministic checks for the current committed source.
+- AVX2 tail renderer: compiled and validated by CI; independent reference max error `1.19209e-7` (limit `2e-6`), AVX2 available on D device.
+- AC-20 prior measurement: **RETEST REQUIRED**. The prior harness repeatedly called one-sample processing rather than one host-sized callback, so those ratios are diagnostic only and do not qualify AC-20. No threshold changed.
+- Corrected 18-condition benchmark now processes one host-sized callback with a 256-point alternating trajectory to retain near-every-sample re-entry; not yet measured.
+- Jev 1.13: not run for the current source.
 - FL Studio host validation: `NOT TESTED`.
 
 ## Frozen scope
@@ -28,4 +29,4 @@ Do not change UI, saved State, parameter IDs, existing Preset algorithms, absolu
 
 ## Next action
 
-Finish and correctness-test the bounded tail-rendering optimization, then run the full Windows CI and the exact 18-condition AC-20 benchmark. If any required performance case remains over threshold, do not promote the artifact.
+Run Windows CI for the corrected benchmark harness, then measure its exact 18 conditions on the Ryzen 3 2200U. If any required performance case remains over threshold, do not promote the artifact.

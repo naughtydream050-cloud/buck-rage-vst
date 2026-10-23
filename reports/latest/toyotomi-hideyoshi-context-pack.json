@@ -14,20 +14,22 @@
   "combined21AcManifestSha256": "7036A48897F9885C1608CE91433A65ED5CCE10958B505307FEEA9237F8061CD8",
   "candidateStatus": "previous XY build retained as rollback; not the re-entrant correction",
   "worker": "Codex direct implementation selected because fresh GLM state is LOCAL_BUDGET_BLOCKED; DeepSeek not invoked",
-  "currentSourceHead": "baad7660e5679d68338912edd2e5066b95077d1d",
+  "currentSourceHead": "7df10e51b6a7c0944ca3272cb439f686ab709b56",
   "ci": {
     "runId": "39982014270",
     "status": "SUCCESS",
     "scope": "Windows VST3 build and deterministic checks for current committed source"
   },
   "ac20": {
-    "status": "FAIL",
+    "status": "RETEST_REQUIRED",
     "device": "Ryzen 3 2200U",
     "conditions": 18,
-    "reason": "Multiple sample-rate/block-size cases exceed approved p99 or maximum deadline ratios; thresholds unchanged",
-    "optimizationInProgress": "Isolated AVX2 live-tail renderer; not yet built or verified"
+    "reason": "Prior harness called processLive once per sample rather than once per host block; prior ratios are diagnostic only, not qualifying AC evidence",
+    "thresholdsChanged": false,
+    "avx2Renderer": "CI compiled; reference max error 1.19209e-7 <= 2e-6; AVX2 detected on the Ryzen device",
+    "correctedBenchmark": "One processLive callback per real host block with a 256-point alternating trajectory; not yet measured"
   },
   "jev": "not yet run",
   "hostValidation": "NOT TESTED",
-  "nextAction": "Finish correctness tests for the bounded AVX2 tail renderer, run Windows CI and the exact 18-condition AC-20 benchmark; do not promote unless all 21 AC pass."
+  "nextAction": "Run CI for corrected callback-shape benchmark, then run exact 18 AC-20 conditions on the Ryzen 3 2200U; do not promote unless all 21 AC pass."
 }

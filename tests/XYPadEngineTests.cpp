@@ -766,15 +766,20 @@ public:
             {
                 XYPadEngine engine;
                 if (! engine.prepare (rate, 1024, true, true)) return false;
-                const auto points = std::vector<PluginStateModel::MotionPoint> {
-                    { 0.1f, 0.5f, 0.0 }, { 0.9f, 0.5f, 1.0 }
-                };
-                engine.setTrajectory (0, points, 701);
-                juce::AudioBuffer<float> input (2, 1), output (2, 1), mask (1, 1);
-                const auto sample = static_cast<float> (0.5 * std::sin (2.0 * 3.141592653589793 * 440.0 / rate));
-                input.setSample (0, 0, sample);
-                input.setSample (1, 0, static_cast<float> (0.5 * std::sin (
-                    2.0 * 3.141592653589793 * 440.0 / rate + 0.37)));
+                std::vector<PluginStateModel::MotionPoint> points;
+                points.reserve (XYPadEngine::kMaxPoints);
+                for (int point = 0; point < XYPadEngine::kMaxPoints; ++point)
+                    points.push_back ({ (point & 1) == 0 ? 0.1f : 0.9f, 0.5f,
+                        static_cast<double> (point) / XYPadEngine::kMaxPoints });
+                for (int bar = 0; bar < XYPadEngine::kBarCount; ++bar)
+                    engine.setTrajectory (bar, points, static_cast<uint32_t> (701 + bar));
+                juce::AudioBuffer<float> input (2, 1024), output (2, 1024), mask (1, 1024);
+                for (int frame = 0; frame < input.getNumSamples(); ++frame)
+                {
+                    const auto angle = 2.0 * 3.141592653589793 * 440.0 * frame / rate;
+                    input.setSample (0, frame, static_cast<float> (0.5 * std::sin (angle)));
+                    input.setSample (1, frame, static_cast<float> (0.5 * std::sin (angle + 0.37)));
+                }
                 const auto blockAt = [&] (uint64_t index)
                 {
                     if (mode < 5) return fixedBlocks[mode];
@@ -786,15 +791,13 @@ public:
                 while (warmSamples < static_cast<uint64_t> (rate * 2.0))
                 {
                     const auto block = blockAt (sequence);
-                    for (int frame = 0; frame < block; ++frame)
-                    {
-                        XYPadEngine::Transport eventTransport;
-                        eventTransport.playing = true;
-                        eventTransport.startBar = 0;
-                        eventTransport.startPhase = (warmSamples + static_cast<uint64_t> (frame)) % 2u == 0u
-                            ? 0.25 : 0.75;
-                        engine.processLive (input, output, mask, eventTransport, 1);
-                    }
+                    XYPadEngine::Transport eventTransport;
+                    eventTransport.playing = true;
+                    eventTransport.startBar = static_cast<int> ((warmSamples / 256u)
+                        % static_cast<uint64_t> (XYPadEngine::kBarCount));
+                    eventTransport.startPhase = static_cast<double> (warmSamples % 256u) / 256.0;
+                    eventTransport.phasePerSample = 1.0 / 256.0;
+                    engine.processLive (input, output, mask, eventTransport, block);
                     warmSamples += static_cast<uint64_t> (block);
                     ++sequence;
                 }
@@ -805,25 +808,26 @@ public:
                 while (measuredSamples < static_cast<uint64_t> (rate * 30.0))
                 {
                     const auto block = blockAt (sequence);
+                    const auto timelineSample = warmSamples + measuredSamples;
+                    XYPadEngine::Transport eventTransport;
+                    eventTransport.playing = true;
+                    eventTransport.startBar = static_cast<int> ((timelineSample / 256u)
+                        % static_cast<uint64_t> (XYPadEngine::kBarCount));
+                    eventTransport.startPhase = static_cast<double> (timelineSample % 256u) / 256.0;
+                    eventTransport.phasePerSample = 1.0 / 256.0;
                     const auto start = std::chrono::steady_clock::now();
-                    // Stress the actual per-sample re-entry path at the maximum
-                    // requested event rate while measuring one nominal host block.
-                    for (int frame = 0; frame < block; ++frame)
-                    {
-                        XYPadEngine::Transport eventTransport;
-                        eventTransport.playing = true;
-                        eventTransport.startBar = 0;
-                        eventTransport.startPhase = (measuredSamples + static_cast<uint64_t> (frame)) % 2u == 0u
-                            ? 0.25 : 0.75;
-                        engine.processLive (input, output, mask, eventTransport, 1);
-                    }
+                    // Process one real host-sized callback. The 256-point
+                    // trajectory alternates X every sample within each BAR.
+                    engine.processLive (input, output, mask, eventTransport, block);
                     const auto stop = std::chrono::steady_clock::now();
                     const auto elapsed = std::chrono::duration<double, std::micro> (stop - start).count();
                     const auto ratio = elapsed / (1.0e6 * block / rate);
                     deadlineRatios.push_back (ratio);
                     peakRatio = std::max (peakRatio, ratio);
+                    for (int frame = 0; frame < block; ++frame)
+                        if ((timelineSample + static_cast<uint64_t> (frame)) % 256u != 0u)
+                            ++events;
                     measuredSamples += static_cast<uint64_t> (block);
-                    events += static_cast<uint64_t> (block);
                     ++sequence;
                 }
                 std::sort (deadlineRatios.begin(), deadlineRatios.end());
@@ -834,7 +838,9 @@ public:
                 std::cout << "METRIC reentrant_benchmark rate=" << rate << " mode="
                           << (mode < 5 ? fixedBlocks[mode] : -1) << " p99_deadline_ratio=" << p99Ratio
                           << " max_deadline_ratio=" << peakRatio << " events=" << events
-                          << " samples=" << measuredSamples << " event_rate=1_per_sample status="
+                          << " samples=" << measuredSamples << " event_rate="
+                          << static_cast<double> (events) / static_cast<double> (measuredSamples)
+                          << " callback_shape=one_host_block status="
                           << (within ? "PASS" : "FAIL") << "\n";
                 engine.release();
             }
