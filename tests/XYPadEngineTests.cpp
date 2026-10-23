@@ -539,7 +539,7 @@ public:
 
         result.direction = engine.liveDirection;
         result.stationaryFrames = engine.liveStationaryFrames;
-        result.requiredHoldFrames = juce::jmax (1, juce::roundToInt (rate * 0.002));
+        result.requiredHoldFrames = juce::jmax (1, static_cast<int> (std::ceil (rate * 0.002)));
         result.holdReady = engine.liveHoldReady;
         engine.release();
         return result;
@@ -722,13 +722,16 @@ int main()
                       << " hold_ready=" << observation.holdReady << '\n';
             check (pass, "xy-live-r2-normalized-velocity-remains-moving-across-sample-rates");
         }
-    double liveTransitionRatio = 0.0;
-    bool transitionMutationRejected = false;
-    check (XYPadEngineTestAccess::liveEqualPowerTransitionAudio (
-               48000.0, liveTransitionRatio, transitionMutationRejected),
-           "xy-live-r2-rendered-transition-matches-equal-power-reference");
-    check (transitionMutationRejected,
-           "xy-live-r2-equal-power-reference-mutation-is-rejected");
+    for (const auto rate : { 44100.0, 48000.0, 96000.0 })
+    {
+        double liveTransitionRatio = 0.0;
+        bool transitionMutationRejected = false;
+        check (XYPadEngineTestAccess::liveEqualPowerTransitionAudio (
+                   rate, liveTransitionRatio, transitionMutationRejected),
+               "xy-live-r2-rendered-transition-matches-equal-power-reference");
+        check (transitionMutationRejected,
+               "xy-live-r2-equal-power-reference-mutation-is-rejected");
+    }
     const float interpolationFixture[] { -1.0f, -0.25f, 0.5f, 1.0f };
     bool scalarInterpolationMatches = true;
     for (const auto x : { 0.0, 0.125, 0.5, 0.875, 1.0 })

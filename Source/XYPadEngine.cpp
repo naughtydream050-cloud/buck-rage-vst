@@ -140,7 +140,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     liveWarmupFrames = juce::jmax (1, juce::roundToInt (rate * kLiveWarmupSeconds));
     liveGrainFrames = juce::jmax (1, juce::roundToInt (rate * kLiveGrainSeconds));
     liveHopFrames = juce::jmax (1, juce::roundToInt (rate * kLiveHopSeconds));
-    liveTransitionFrames = juce::jmax (1, juce::roundToInt (rate * 0.003));
+    liveTransitionFrames = juce::jmax (2, juce::roundToInt (rate * 0.003));
     try
     {
         if (! liveOnly)
@@ -549,8 +549,9 @@ void XYPadEngine::sampleTimeline (const Transport& transport, int sample, int to
 }
 
 void XYPadEngine::interpolateTrajectory (const Trajectory& trajectory, double phase,
-                                         float& x, float& y) noexcept
+                                         float& x, float& y, double* xSlopePerPhase) noexcept
 {
+    if (xSlopePerPhase != nullptr) *xSlopePerPhase = 0.0;
     if (trajectory.count <= 0)
     {
         x = y = 0.5f;
@@ -576,6 +577,10 @@ void XYPadEngine::interpolateTrajectory (const Trajectory& trajectory, double ph
         + (trajectory.x[static_cast<size_t> (hi)] - trajectory.x[static_cast<size_t> (lo)]) * mix;
     y = trajectory.y[static_cast<size_t> (lo)]
         + (trajectory.y[static_cast<size_t> (hi)] - trajectory.y[static_cast<size_t> (lo)]) * mix;
+    if (xSlopePerPhase != nullptr && t1 > t0 && phase > 0.0 && phase < 1.0)
+        *xSlopePerPhase = (static_cast<double> (trajectory.x[static_cast<size_t> (hi)])
+                         - static_cast<double> (trajectory.x[static_cast<size_t> (lo)]))
+                        / (t1 - t0) * span;
 }
 
 float XYPadEngine::interpolate (const float* source, int frames, double position, int stride) noexcept
@@ -951,23 +956,41 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         }
 
         float x = 0.5f, y = 0.5f;
-        interpolateTrajectory (liveActiveTrajectory, phase, x, y);
+        double xSlopePerPhase = 0.0;
+        interpolateTrajectory (liveActiveTrajectory, phase, x, y, &xSlopePerPhase);
         const auto pitchTargetSemitones = liveActiveTrajectory.count > 0
             ? juce::jlimit (-12.0f, 12.0f, 24.0f * (y - 0.5f)) : 0.0f;
         liveSmoothedSemitones += (pitchTargetSemitones - liveSmoothedSemitones)
                                * livePitchSmoothingCoefficient;
         x = juce::jlimit (0.0f, 1.0f, x);
+        const auto velocityX = std::isfinite (transport.phasePerSample)
+                            && transport.phasePerSample > 0.0
+            ? xSlopePerPhase * transport.phasePerSample * sampleRate : 0.0;
         auto direction = liveDirection;
         auto targetJump = false;
         if (liveHavePreviousX)
         {
             const auto delta = x - livePreviousX;
-            if (delta > 1.0e-6f) direction = 1;
-            else if (delta < -1.0e-6f) direction = -1;
-            targetJump = direction != liveDirection || std::abs (delta) > 0.05f;
-            liveStationaryFrames = std::abs (delta) <= 1.0e-6f
-                ? juce::jmin (juce::jmax (1, juce::roundToInt (sampleRate * 0.002)), liveStationaryFrames + 1)
-                : 0;
+            const auto magnitude = std::abs (velocityX);
+            const auto isDiscreteJump = std::abs (delta) > 0.05f;
+            if (isDiscreteJump)
+            {
+                direction = delta > 0.0f ? 1 : -1;
+                liveStationaryFrames = 0;
+            }
+            else if (magnitude >= 0.002)
+            {
+                direction = velocityX > 0.0 ? 1 : -1;
+                liveStationaryFrames = 0;
+            }
+            else if (magnitude <= 0.001)
+            {
+                const auto stationaryFramesRequired = juce::jmax (1, static_cast<int> (std::ceil (sampleRate * 0.002)));
+                liveStationaryFrames = juce::jmin (stationaryFramesRequired, liveStationaryFrames + 1);
+            }
+            else if (! liveHoldReady)
+                liveStationaryFrames = 0;
+            targetJump = direction != liveDirection || isDiscreteJump;
         }
         else
             liveStationaryFrames = 0;
@@ -978,7 +1001,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
 
         const auto hasHistory = liveHistoryValidFrames >= static_cast<uint64_t> (liveWarmupFrames)
                              && liveHistoryValidFrames >= static_cast<uint64_t> (liveGrainFrames);
-        const auto stationaryFramesRequired = juce::jmax (1, juce::roundToInt (sampleRate * 0.002));
+        const auto stationaryFramesRequired = juce::jmax (1, static_cast<int> (std::ceil (sampleRate * 0.002)));
         if (! liveHoldReady && liveActiveTrajectory.count > 0 && hasHistory
             && liveStationaryFrames >= stationaryFramesRequired && liveHoldSnapshot != nullptr)
         {
@@ -1012,7 +1035,11 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         }
         if (liveSamplesToLaunch > 0) --liveSamplesToLaunch;
 
-        double wetLeft = 0.0, wetRight = 0.0, windowTotal = 0.0;
+        double oldLeft = 0.0, oldRight = 0.0, oldWindowTotal = 0.0;
+        double newLeft = 0.0, newRight = 0.0, newWindowTotal = 0.0;
+        double stableLeft = 0.0, stableRight = 0.0, stableWindowTotal = 0.0;
+        double transitionPhase = 0.0;
+        bool hasOldBranch = false, hasNewBranch = false;
         bool readFailure = false;
         for (auto& grain : liveGrains)
         {
@@ -1035,24 +1062,66 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             const auto windowPhase = static_cast<double> (grain.age)
                                    / static_cast<double> (juce::jmax (1, liveGrainFrames - 1));
             const auto window = 0.5 - 0.5 * std::cos (2.0 * kPi * windowPhase);
-            auto transitionGain = 1.0;
-            if (grain.fadeInFrames > 0)
-                transitionGain *= juce::jlimit (0.0, 1.0,
-                    static_cast<double> (grain.age) / grain.fadeInFrames);
+            const auto isNewBranch = grain.fadeInFrames > 0;
+            const auto isOldBranch = grain.fadeOutRemaining > 0;
+            if (isOldBranch || isNewBranch)
+            {
+                const auto phase = isOldBranch
+                    ? static_cast<double> (liveTransitionFrames - grain.fadeOutRemaining)
+                        / static_cast<double> (liveTransitionFrames - 1)
+                    : static_cast<double> (grain.age)
+                        / static_cast<double> (juce::jmax (1, grain.fadeInFrames - 1));
+                transitionPhase = juce::jlimit (0.0, 1.0, phase);
+            }
+            if (isNewBranch)
+            {
+                newLeft += static_cast<double> (left) * window;
+                newRight += static_cast<double> (right) * window;
+                newWindowTotal += window;
+                hasNewBranch = true;
+            }
+            else if (isOldBranch)
+            {
+                oldLeft += static_cast<double> (left) * window;
+                oldRight += static_cast<double> (right) * window;
+                oldWindowTotal += window;
+                hasOldBranch = true;
+            }
+            else
+            {
+                stableLeft += static_cast<double> (left) * window;
+                stableRight += static_cast<double> (right) * window;
+                stableWindowTotal += window;
+            }
             if (grain.fadeOutRemaining > 0)
             {
-                transitionGain *= juce::jlimit (0.0, 1.0,
-                    static_cast<double> (grain.fadeOutRemaining) / liveTransitionFrames);
                 --grain.fadeOutRemaining;
                 if (grain.fadeOutRemaining == 0) grain.active = false;
             }
-            if (grain.fadeInFrames > 0 && grain.age >= grain.fadeInFrames)
+            if (grain.fadeInFrames > 0 && grain.age + 1 >= grain.fadeInFrames)
                 grain.fadeInFrames = 0;
-            const auto weightedWindow = window * transitionGain;
-            wetLeft += static_cast<double> (left) * weightedWindow;
-            wetRight += static_cast<double> (right) * weightedWindow;
-            windowTotal += weightedWindow;
             ++grain.age;
+        }
+
+        double wetLeft = stableLeft, wetRight = stableRight, windowTotal = stableWindowTotal;
+        if (hasOldBranch || hasNewBranch)
+        {
+            // Stable overlaps, if any, belong to the outgoing side. Normalize
+            // each side independently before equal-power combination; a shared
+            // normalization would cancel the intended +3.01 dB midpoint.
+            oldLeft += stableLeft;
+            oldRight += stableRight;
+            oldWindowTotal += stableWindowTotal;
+            const auto oldNormLeft = oldWindowTotal > 1.0e-9 ? oldLeft / oldWindowTotal : 0.0;
+            const auto oldNormRight = oldWindowTotal > 1.0e-9 ? oldRight / oldWindowTotal : 0.0;
+            const auto newNormLeft = newWindowTotal > 1.0e-9 ? newLeft / newWindowTotal : 0.0;
+            const auto newNormRight = newWindowTotal > 1.0e-9 ? newRight / newWindowTotal : 0.0;
+            const auto angle = transitionPhase * kPi * 0.5;
+            wetLeft = oldNormLeft * std::cos (angle) + newNormLeft * std::sin (angle);
+            wetRight = oldNormRight * std::cos (angle) + newNormRight * std::sin (angle);
+            // The branches are already normalized. A unit denominator keeps
+            // the existing hold/readiness path from normalizing them again.
+            windowTotal = 1.0;
         }
 
         const auto holdTarget = liveHoldReady && liveStationaryFrames >= stationaryFramesRequired ? 1.0f : 0.0f;

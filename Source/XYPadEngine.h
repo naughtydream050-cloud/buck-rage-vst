@@ -130,7 +130,8 @@ private:
                                 int& bar, double& phase) noexcept;
     static bool readTrajectory (const AtomicTrajectory&, Trajectory&) noexcept;
     static void interpolateTrajectory (const Trajectory&, double phase,
-                                       float& x, float& y) noexcept;
+                                       float& x, float& y,
+                                       double* xSlopePerPhase = nullptr) noexcept;
     void workerLoop() noexcept;
     bool enqueueRenderJob (RenderJob) noexcept;
     bool dequeueRenderJob (RenderJob&) noexcept;
