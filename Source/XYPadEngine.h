@@ -109,7 +109,6 @@ private:
         int age = 0;
         int fadeInFrames = 0;
         int fadeOutRemaining = 0;
-        int snapshotIndex = -1;
         bool active = false;
     };
 
@@ -120,6 +119,8 @@ private:
     static float interpolate (const float* source, int frames, double position, int stride = 1) noexcept;
     bool readLiveSample (double serial, int channel, uint64_t oldestSerial,
                          uint64_t newestSerial, float& value) const noexcept;
+    bool readLiveStereoSample (double serial, uint64_t oldestSerial, uint64_t newestSerial,
+                               float& left, float& right) const noexcept;
     void launchLiveGrain (float x, int direction, bool transition,
                           uint64_t oldestSerial, uint64_t newestSerial) noexcept;
     void captureLiveContinuationTail() noexcept;
@@ -166,10 +167,9 @@ private:
     static constexpr double kLiveWarmupSeconds = 0.020;
     static constexpr double kLiveGrainSeconds = 0.020;
     static constexpr double kLiveHopSeconds = 0.010;
-    static constexpr uint64_t kMaxLiveHistoryFrames = 12002;
+    static constexpr uint64_t kMaxLiveHistoryFrames = 13922;
     static constexpr int kLiveGrainCapacity = 8;
     std::unique_ptr<float[]> liveHistory;
-    std::unique_ptr<float[]> liveGrainSnapshots;
     std::unique_ptr<float[]> liveHoldSnapshot;
     std::unique_ptr<float[]> liveGrainWindow;
     std::array<std::unique_ptr<float[]>, 2> liveReentryTailBuffers;

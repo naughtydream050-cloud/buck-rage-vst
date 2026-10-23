@@ -86,7 +86,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     }
     scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
     previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
-    liveHistory.reset(); liveHistorySerials.reset(); liveGrainSnapshots.reset(); liveHoldSnapshot.reset();
+    liveHistory.reset(); liveHistorySerials.reset(); liveHoldSnapshot.reset();
     liveGrainWindow.reset();
     for (auto& tail : liveReentryTailBuffers) tail.reset();
     livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
@@ -140,7 +140,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     maxFramesPerBar = liveOnly ? 0 : static_cast<int> (requestedFrames);
     const auto floatCount = static_cast<size_t> (maxFramesPerBar) * 2u;
     liveHistoryCapacityFrames = juce::jmin (static_cast<int> (kMaxLiveHistoryFrames),
-                                             juce::jmax (1, juce::roundToInt (rate * kLiveHistorySeconds) + 2));
+        juce::jmax (1, juce::roundToInt (rate * (kLiveHistorySeconds + kLiveGrainSeconds)) + 2));
     liveWarmupFrames = juce::jmax (1, juce::roundToInt (rate * kLiveWarmupSeconds));
     liveGrainFrames = juce::jmax (1, juce::roundToInt (rate * kLiveGrainSeconds));
     liveHopFrames = juce::jmax (1, juce::roundToInt (rate * kLiveHopSeconds));
@@ -173,8 +173,6 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         }
         liveHistory.reset (new (std::nothrow) float[static_cast<size_t> (liveHistoryCapacityFrames) * 2u]);
         liveHistorySerials.reset (new (std::nothrow) uint64_t[static_cast<size_t> (liveHistoryCapacityFrames)]);
-        liveGrainSnapshots.reset (new (std::nothrow) float[static_cast<size_t> (kLiveGrainCapacity)
-                                                           * static_cast<size_t> (liveGrainFrames) * 2u]);
         liveHoldSnapshot.reset (new (std::nothrow) float[static_cast<size_t> (liveGrainFrames) * 2u]);
         liveGrainWindow.reset (new (std::nothrow) float[static_cast<size_t> (liveGrainFrames)]);
         if (liveGrainWindow)
@@ -204,7 +202,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         livePitchSmoothingCoefficient = static_cast<float> (1.0 - std::exp (-1.0 / (rate * 0.005)));
         if ((! liveOnly && (! scratch || ! fftWork || ! fftWork2 || ! overlapNorm || ! previousInputPhase
             || ! synthesisPhase || ! phaseInitialized || ! fft)) || ! liveHistory || ! liveHistorySerials
-            || ! liveGrainSnapshots || ! liveHoldSnapshot || ! liveGrainWindow || ! liveReentryTailBuffers[0]
+            || ! liveHoldSnapshot || ! liveGrainWindow || ! liveReentryTailBuffers[0]
             || ! liveReentryTailBuffers[1] || ! livePitchFft || ! livePitchFftWork
             || ! livePitchFftWork2 || ! livePitchInputRing || ! livePitchIdentityDelay
             || ! livePitchSemitoneDelay || ! livePitchMaskDelay || ! livePitchOlaLeft
@@ -214,7 +212,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
             for (int i = 0; i < kBarCount; ++i) slots[static_cast<size_t> (i)].pcm.reset();
             scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
             previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset();
-            liveHistory.reset(); liveHistorySerials.reset(); liveGrainSnapshots.reset(); liveHoldSnapshot.reset();
+            liveHistory.reset(); liveHistorySerials.reset(); liveHoldSnapshot.reset();
             liveGrainWindow.reset();
             for (auto& tail : liveReentryTailBuffers) tail.reset();
             livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
@@ -240,7 +238,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         for (int i = 0; i < kBarCount; ++i) slots[static_cast<size_t> (i)].pcm.reset();
         scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
         previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
-        liveHistory.reset(); liveHistorySerials.reset(); liveGrainSnapshots.reset(); liveHoldSnapshot.reset();
+        liveHistory.reset(); liveHistorySerials.reset(); liveHoldSnapshot.reset();
         liveGrainWindow.reset();
         for (auto& tail : liveReentryTailBuffers) tail.reset();
         livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
@@ -268,7 +266,7 @@ void XYPadEngine::release() noexcept
     }
     scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
     previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
-    liveHistory.reset(); liveHistorySerials.reset(); liveGrainSnapshots.reset(); liveHoldSnapshot.reset();
+    liveHistory.reset(); liveHistorySerials.reset(); liveHoldSnapshot.reset();
     liveGrainWindow.reset();
     for (auto& tail : liveReentryTailBuffers) tail.reset();
     livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
@@ -807,21 +805,49 @@ bool XYPadEngine::readLiveSample (double serial, int channel, uint64_t oldestSer
     return std::isfinite (value);
 }
 
+bool XYPadEngine::readLiveStereoSample (double serial, uint64_t oldestSerial,
+                                        uint64_t newestSerial, float& left, float& right) const noexcept
+{
+    if (liveHistory == nullptr || liveHistorySerials == nullptr || liveHistoryCapacityFrames <= 1
+        || ! std::isfinite (serial) || serial < static_cast<double> (oldestSerial)
+        || serial > static_cast<double> (newestSerial))
+        return false;
+
+    const auto lower = static_cast<uint64_t> (std::floor (serial));
+    const auto upper = juce::jmin (newestSerial, lower + 1u);
+    const auto capacity = static_cast<uint64_t> (liveHistoryCapacityFrames);
+    const auto lowerIndex = static_cast<size_t> (lower % capacity);
+    const auto upperIndex = static_cast<size_t> (upper % capacity);
+    if (liveHistorySerials[lowerIndex] != lower || liveHistorySerials[upperIndex] != upper)
+        return false;
+
+    const auto fraction = static_cast<float> (serial - static_cast<double> (lower));
+    const auto lowerOffset = lowerIndex * 2u;
+    const auto upperOffset = upperIndex * 2u;
+    left = liveHistory[lowerOffset] + (liveHistory[upperOffset] - liveHistory[lowerOffset]) * fraction;
+    right = liveHistory[lowerOffset + 1u]
+          + (liveHistory[upperOffset + 1u] - liveHistory[lowerOffset + 1u]) * fraction;
+    return std::isfinite (left) && std::isfinite (right);
+}
+
 void XYPadEngine::launchLiveGrain (float x, int direction, bool transition,
                                    uint64_t oldestSerial, uint64_t newestSerial) noexcept
 {
     if (liveGrainFrames <= 1 || liveGrainFrames > liveHistoryCapacityFrames
         || newestSerial < oldestSerial)
         return;
-    const auto available = newestSerial - oldestSerial + 1u;
-    if (available < static_cast<uint64_t> (liveGrainFrames))
+    const auto retainedFrames = newestSerial - oldestSerial + 1u;
+    const auto selectionFrames = juce::jmin (retainedFrames,
+        static_cast<uint64_t> (juce::jmax (1, juce::roundToInt (sampleRate * kLiveHistorySeconds) + 2)));
+    if (selectionFrames < static_cast<uint64_t> (liveGrainFrames))
         return;
 
-    const auto span = static_cast<double> (available - static_cast<uint64_t> (liveGrainFrames));
+    const auto selectionOldestSerial = newestSerial + 1u - selectionFrames;
+    const auto span = static_cast<double> (selectionFrames - static_cast<uint64_t> (liveGrainFrames));
     const auto offset = static_cast<double> (juce::jlimit (0.0f, 1.0f, x)) * span;
     const auto start = direction >= 0
-        ? static_cast<double> (oldestSerial) + offset
-        : static_cast<double> (oldestSerial) + offset + static_cast<double> (liveGrainFrames - 1);
+        ? static_cast<double> (selectionOldestSerial) + offset
+        : static_cast<double> (selectionOldestSerial) + offset + static_cast<double> (liveGrainFrames - 1);
 
     LiveGrain* destination = nullptr;
     for (auto& grain : liveGrains)
@@ -832,58 +858,11 @@ void XYPadEngine::launchLiveGrain (float x, int direction, bool transition,
         for (auto& grain : liveGrains)
             if (grain.age > destination->age) destination = &grain;
     }
-    if (liveGrainSnapshots == nullptr)
-        return;
-    const auto snapshotIndex = static_cast<int> (destination - liveGrains.data());
-    auto* snapshot = liveGrainSnapshots.get()
-                   + static_cast<size_t> (snapshotIndex) * static_cast<size_t> (liveGrainFrames) * 2u;
-    auto lowerSerial = static_cast<uint64_t> (std::floor (start));
-    auto lowerIndex = static_cast<size_t> (lowerSerial % static_cast<uint64_t> (liveHistoryCapacityFrames));
-    const auto fraction = static_cast<float> (start - static_cast<double> (lowerSerial));
-    const auto capacityFrames = static_cast<size_t> (liveHistoryCapacityFrames);
-    for (int age = 0; age < liveGrainFrames; ++age)
-    {
-        if (lowerSerial < oldestSerial || lowerSerial > newestSerial)
-            return;
-        const auto upperSerial = lowerSerial < newestSerial ? lowerSerial + 1u : lowerSerial;
-        const auto upperIndex = upperSerial == lowerSerial
-            ? lowerIndex : (lowerIndex + 1u == capacityFrames ? 0u : lowerIndex + 1u);
-        if (liveHistorySerials[lowerIndex] != lowerSerial
-            || liveHistorySerials[upperIndex] != upperSerial)
-            return;
-
-        const auto lowerOffset = lowerIndex * 2u;
-        const auto upperOffset = upperIndex * 2u;
-        const auto left = liveHistory[lowerOffset]
-                        + (liveHistory[upperOffset] - liveHistory[lowerOffset]) * fraction;
-        const auto right = liveHistory[lowerOffset + 1u]
-                         + (liveHistory[upperOffset + 1u] - liveHistory[lowerOffset + 1u]) * fraction;
-        if (! std::isfinite (left) || ! std::isfinite (right))
-            return;
-        const auto snapshotOffset = static_cast<size_t> (age) * 2u;
-        snapshot[snapshotOffset] = left;
-        snapshot[snapshotOffset + 1u] = right;
-
-        if (age + 1 < liveGrainFrames)
-        {
-            if (direction >= 0)
-            {
-                ++lowerSerial;
-                lowerIndex = lowerIndex + 1u == capacityFrames ? 0u : lowerIndex + 1u;
-            }
-            else
-            {
-                --lowerSerial;
-                lowerIndex = lowerIndex == 0u ? capacityFrames - 1u : lowerIndex - 1u;
-            }
-        }
-    }
     destination->startSerial = start;
     destination->direction = direction >= 0 ? 1 : -1;
     destination->age = 0;
     destination->fadeInFrames = transition ? liveTransitionFrames : 0;
     destination->fadeOutRemaining = 0;
-    destination->snapshotIndex = snapshotIndex;
     destination->active = true;
     if (transition)
         for (auto& grain : liveGrains)
@@ -894,13 +873,16 @@ void XYPadEngine::launchLiveGrain (float x, int direction, bool transition,
 void XYPadEngine::captureLiveContinuationTail() noexcept
 {
     if (liveReentryTailFrames < 2 || ! liveReentryTailBuffers[0]
-        || ! liveReentryTailBuffers[1] || liveGrainSnapshots == nullptr)
+        || ! liveReentryTailBuffers[1] || liveHistory == nullptr || liveHistorySerials == nullptr
+        || liveHistoryValidFrames == 0 || liveWriteSerial == 0)
         return;
 
     const auto destinationIndex = 1 - liveReentryTailBuffer;
     auto* destination = liveReentryTailBuffers[static_cast<size_t> (destinationIndex)].get();
     const auto* previousTail = liveReentryTailActive
         ? liveReentryTailBuffers[static_cast<size_t> (liveReentryTailBuffer)].get() : nullptr;
+    const auto newestSerial = liveWriteSerial - 1u;
+    const auto oldestSerial = newestSerial + 1u - liveHistoryValidFrames;
     int onlyActiveGrain = -1;
     int activeCount = 0;
     for (int index = 0; index < kLiveGrainCapacity; ++index)
@@ -912,17 +894,18 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
     if (activeCount == 1)
     {
         const auto& grain = liveGrains[static_cast<size_t> (onlyActiveGrain)];
-        if (grain.fadeInFrames <= 0 && grain.fadeOutRemaining <= 0 && ! liveHoldReady
-            && grain.snapshotIndex >= 0 && grain.snapshotIndex < kLiveGrainCapacity)
+        if (grain.fadeInFrames <= 0 && grain.fadeOutRemaining <= 0 && ! liveHoldReady)
         {
-            const auto* snapshot = liveGrainSnapshots.get()
-                + static_cast<size_t> (grain.snapshotIndex) * static_cast<size_t> (liveGrainFrames) * 2u;
+            bool referenceValid = true;
             for (int frame = 0; frame < liveReentryTailFrames; ++frame)
             {
                 const auto age = grain.age + frame;
                 const auto validHannFrame = age > 0 && age < liveGrainFrames - 1;
-                auto left = validHannFrame ? snapshot[static_cast<size_t> (age) * 2u] : 0.0f;
-                auto right = validHannFrame ? snapshot[static_cast<size_t> (age) * 2u + 1u] : 0.0f;
+                const auto serial = grain.startSerial + static_cast<double> (grain.direction * age);
+                float left = 0.0f, right = 0.0f;
+                if (validHannFrame)
+                    referenceValid = readLiveStereoSample (serial, oldestSerial, newestSerial, left, right);
+                if (! referenceValid) break;
                 if (previousTail != nullptr)
                 {
                     const auto previousFrame = liveReentryTailPosition + frame;
@@ -938,10 +921,13 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                 destination[static_cast<size_t> (frame) * 2u] = std::isfinite (left) ? left : 0.0f;
                 destination[static_cast<size_t> (frame) * 2u + 1u] = std::isfinite (right) ? right : 0.0f;
             }
-            liveReentryTailBuffer = destinationIndex;
-            liveReentryTailPosition = 0;
-            liveReentryTailActive = true;
-            return;
+            if (referenceValid)
+            {
+                liveReentryTailBuffer = destinationIndex;
+                liveReentryTailPosition = 0;
+                liveReentryTailActive = true;
+                return;
+            }
         }
     }
     auto simulatedGrains = liveGrains;
@@ -968,15 +954,18 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
         {
             auto& grain = simulatedGrains[static_cast<size_t> (activeGrainIndices[static_cast<size_t> (active)])];
             if (! grain.active) continue;
-            if (grain.age >= liveGrainFrames || grain.snapshotIndex < 0
-                || grain.snapshotIndex >= kLiveGrainCapacity)
+            if (grain.age >= liveGrainFrames)
             {
                 grain.active = false;
                 continue;
             }
-            const auto* snapshot = liveGrainSnapshots.get()
-                + static_cast<size_t> (grain.snapshotIndex) * static_cast<size_t> (liveGrainFrames) * 2u;
-            const auto index = static_cast<size_t> (grain.age) * 2u;
+            const auto serial = grain.startSerial + static_cast<double> (grain.direction * grain.age);
+            float grainLeft = 0.0f, grainRight = 0.0f;
+            if (! readLiveStereoSample (serial, oldestSerial, newestSerial, grainLeft, grainRight))
+            {
+                grain.active = false;
+                continue;
+            }
             const auto window = liveGrainWindow[static_cast<size_t> (grain.age)];
             if (grain.fadeOutRemaining > 0 || grain.fadeInFrames > 0)
             {
@@ -988,22 +977,22 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
             }
             if (grain.fadeInFrames > 0)
             {
-                newLeft += static_cast<double> (snapshot[index]) * window;
-                newRight += static_cast<double> (snapshot[index + 1u]) * window;
+                newLeft += static_cast<double> (grainLeft) * window;
+                newRight += static_cast<double> (grainRight) * window;
                 newWeight += window;
                 hasNew = true;
             }
             else if (grain.fadeOutRemaining > 0)
             {
-                oldLeft += static_cast<double> (snapshot[index]) * window;
-                oldRight += static_cast<double> (snapshot[index + 1u]) * window;
+                oldLeft += static_cast<double> (grainLeft) * window;
+                oldRight += static_cast<double> (grainRight) * window;
                 oldWeight += window;
                 hasOld = true;
             }
             else
             {
-                stableLeft += static_cast<double> (snapshot[index]) * window;
-                stableRight += static_cast<double> (snapshot[index + 1u]) * window;
+                stableLeft += static_cast<double> (grainLeft) * window;
+                stableRight += static_cast<double> (grainRight) * window;
                 stableWeight += window;
             }
             if (grain.fadeOutRemaining > 0 && --grain.fadeOutRemaining == 0)
@@ -1100,7 +1089,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         readyMask.clear (0, 0, juce::jmin (frames, readyMask.getNumSamples()));
 
     if (! enabled.load (std::memory_order_acquire) || liveHistory == nullptr
-        || liveHistorySerials == nullptr || liveGrainSnapshots == nullptr
+        || liveHistorySerials == nullptr
         || livePitchInputRing == nullptr || livePitchIdentityDelay == nullptr
         || ! transport.playing || transport.startBar < 0
         || frames <= 0 || frames > maxBlock || rendered.getNumSamples() < frames
@@ -1270,8 +1259,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                 float left = 0.0f, right = 0.0f;
                 const auto serial = static_cast<double> (holdStart + static_cast<uint64_t> (holdFrame));
                 holdCopyValid = holdCopyValid
-                    && readLiveSample (serial, 0, oldestSerial, newestSerial, left)
-                    && readLiveSample (serial, 1, oldestSerial, newestSerial, right);
+                    && readLiveStereoSample (serial, oldestSerial, newestSerial, left, right);
                 if (! holdCopyValid) break;
                 liveHoldSnapshot[static_cast<size_t> (holdFrame) * 2u] = left;
                 liveHoldSnapshot[static_cast<size_t> (holdFrame) * 2u + 1u] = right;
@@ -1327,16 +1315,14 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                 grain.active = false;
                 continue;
             }
-            if (grain.snapshotIndex < 0 || grain.snapshotIndex >= kLiveGrainCapacity)
+            const auto serial = grain.startSerial + static_cast<double> (grain.direction * grain.age);
+            float left = 0.0f, right = 0.0f;
+            if (! readLiveStereoSample (serial, oldestSerial, newestSerial, left, right))
             {
                 readFailure = true;
                 grain.active = false;
                 continue;
             }
-            const auto* snapshot = liveGrainSnapshots.get()
-                + static_cast<size_t> (grain.snapshotIndex) * static_cast<size_t> (liveGrainFrames) * 2u;
-            const auto left = snapshot[static_cast<size_t> (grain.age) * 2u];
-            const auto right = snapshot[static_cast<size_t> (grain.age) * 2u + 1u];
             const auto window = liveGrainWindow[static_cast<size_t> (grain.age)];
             const auto isNewBranch = grain.fadeInFrames > 0;
             const auto isOldBranch = grain.fadeOutRemaining > 0;

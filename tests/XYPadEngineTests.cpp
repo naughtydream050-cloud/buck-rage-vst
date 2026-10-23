@@ -190,99 +190,112 @@ public:
             engine.release();
             return false;
         }
-        for (uint64_t serial = 0; serial < 64; ++serial)
-        {
-            const auto index = static_cast<size_t> (serial % capacity);
-            engine.liveHistory[index * 2u] = static_cast<float> (serial);
-            engine.liveHistory[index * 2u + 1u] = -static_cast<float> (serial);
-            engine.liveHistorySerials[index] = serial;
-        }
         engine.liveGrainFrames = 20;
         engine.liveTransitionFrames = 3;
         engine.liveHistoryValidFrames = 64;
-        const auto oldest = uint64_t { 0 };
-        const auto newest = uint64_t { 63 };
-        engine.launchLiveGrain (0.5f, 1, false, oldest, newest);
-        auto forward = engine.liveGrains[0];
-        float first = 0.0f, second = 0.0f;
-        const auto* forwardSnapshot = engine.liveGrainSnapshots.get()
-            + static_cast<size_t> (forward.snapshotIndex) * static_cast<size_t> (engine.liveGrainFrames) * 2u;
-        const auto frozenFirst = forwardSnapshot[0];
-        const auto frozenSecond = forwardSnapshot[2];
         double maximumReferenceError = 0.0;
-        for (int age = 0; age < engine.liveGrainFrames; ++age)
+        bool valid = true;
+        const auto verifyRange = [&] (uint64_t oldest, uint64_t newest, float scale, uint64_t origin)
         {
-            const auto expected = forward.startSerial + age;
-            maximumReferenceError = std::max (maximumReferenceError,
-                std::abs (static_cast<double> (forwardSnapshot[static_cast<size_t> (age) * 2u]) - expected));
-            maximumReferenceError = std::max (maximumReferenceError,
-                std::abs (static_cast<double> (forwardSnapshot[static_cast<size_t> (age) * 2u + 1u]) + expected));
-        }
-        const auto sourceReadable = engine.readLiveSample (forward.startSerial, 0, oldest, newest, first)
-            && engine.readLiveSample (forward.startSerial + 1.0, 0, oldest, newest, second);
-        for (uint64_t serial = 0; serial < 64; ++serial)
-            engine.liveHistory[static_cast<size_t> (serial % capacity) * 2u] = -999.0f;
-        auto valid = forward.active && forward.direction == 1
-            && sourceReadable && second > first && frozenSecond > frozenFirst
-            && forwardSnapshot[0] == frozenFirst
-            && forwardSnapshot[0] != -999.0f;
-        for (uint64_t serial = 0; serial < 64; ++serial)
-            engine.liveHistory[static_cast<size_t> (serial % capacity) * 2u] = static_cast<float> (serial);
-        engine.liveGrains.fill (XYPadEngine::LiveGrain {});
-        engine.launchLiveGrain (0.5f, -1, true, oldest, newest);
-        const auto reverse = engine.liveGrains[0];
-        const auto* reverseSnapshot = engine.liveGrainSnapshots.get()
-            + static_cast<size_t> (reverse.snapshotIndex) * static_cast<size_t> (engine.liveGrainFrames) * 2u;
-        for (int age = 0; age < engine.liveGrainFrames; ++age)
-        {
-            const auto expected = reverse.startSerial - age;
-            maximumReferenceError = std::max (maximumReferenceError,
-                std::abs (static_cast<double> (reverseSnapshot[static_cast<size_t> (age) * 2u]) - expected));
-            maximumReferenceError = std::max (maximumReferenceError,
-                std::abs (static_cast<double> (reverseSnapshot[static_cast<size_t> (age) * 2u + 1u]) + expected));
-        }
-        valid = valid && reverse.active && reverse.direction == -1
-            && engine.readLiveSample (reverse.startSerial, 0, oldest, newest, first)
-            && engine.readLiveSample (reverse.startSerial - 1.0, 0, oldest, newest, second)
-            && second < first && reverse.fadeInFrames == 3
-            && reverse.startSerial >= static_cast<double> (oldest)
-            && reverse.startSerial <= static_cast<double> (newest)
-            && reverse.startSerial + reverse.direction * 19.0 >= static_cast<double> (oldest)
-            && reverse.startSerial + reverse.direction * 19.0 <= static_cast<double> (newest);
+            for (uint64_t serial = oldest; serial <= newest; ++serial)
+            {
+                const auto index = static_cast<size_t> (serial % capacity);
+                const auto value = static_cast<float> (serial - origin) * scale;
+                engine.liveHistory[index * 2u] = value;
+                engine.liveHistory[index * 2u + 1u] = -value;
+                engine.liveHistorySerials[index] = serial;
+            }
+            for (const auto x : { 0.0f, 0.12345f, 0.5f, 0.9999f, 1.0f })
+                for (const auto direction : { -1, 1 })
+                {
+                    engine.liveGrains.fill (XYPadEngine::LiveGrain {});
+                    engine.launchLiveGrain (x, direction, true, oldest, newest);
+                    const auto& grain = engine.liveGrains[0];
+                    const auto endpoint = grain.startSerial
+                        + static_cast<double> (direction * (engine.liveGrainFrames - 1));
+                    valid = valid && grain.active && grain.direction == direction
+                        && grain.fadeInFrames == engine.liveTransitionFrames
+                        && grain.startSerial >= static_cast<double> (oldest)
+                        && grain.startSerial <= static_cast<double> (newest)
+                        && endpoint >= static_cast<double> (oldest)
+                        && endpoint <= static_cast<double> (newest);
+                    for (int age = 0; age < engine.liveGrainFrames; ++age)
+                    {
+                        const auto serial = grain.startSerial + static_cast<double> (direction * age);
+                        float left = 0.0f, right = 0.0f;
+                        const auto readable = engine.readLiveSample (serial, 0, oldest, newest, left)
+                            && engine.readLiveSample (serial, 1, oldest, newest, right);
+                        const auto expected = static_cast<float> (
+                            serial - static_cast<double> (origin)) * scale;
+                        const auto error = std::max (std::abs (static_cast<double> (left - expected)),
+                                                     std::abs (static_cast<double> (right + expected)));
+                        maximumReferenceError = std::max (maximumReferenceError, error);
+                        valid = valid && readable && error <= 2.0e-6;
+                    }
+                }
+        };
+        verifyRange (0, 63, 1.0f, 0);
         const auto wrappedOldest = static_cast<uint64_t> (capacity - 32u);
         const auto wrappedNewest = wrappedOldest + 63u;
-        for (uint64_t serial = wrappedOldest; serial <= wrappedNewest; ++serial)
-        {
-            const auto index = static_cast<size_t> (serial % capacity);
-            const auto value = static_cast<float> (serial - wrappedOldest) * 0.125f;
-            engine.liveHistory[index * 2u] = value;
-            engine.liveHistory[index * 2u + 1u] = -value;
-            engine.liveHistorySerials[index] = serial;
-        }
-        for (const auto x : { 0.0f, 0.12345f, 0.5f, 0.9999f, 1.0f })
-            for (const auto direction : { -1, 1 })
-            {
-                engine.liveGrains.fill (XYPadEngine::LiveGrain {});
-                engine.launchLiveGrain (x, direction, false, wrappedOldest, wrappedNewest);
-                const auto& grain = engine.liveGrains[0];
-                const auto* snapshot = engine.liveGrainSnapshots.get()
-                    + static_cast<size_t> (grain.snapshotIndex) * static_cast<size_t> (engine.liveGrainFrames) * 2u;
-                for (int age = 0; age < engine.liveGrainFrames; ++age)
-                {
-                    float expectedLeft = 0.0f, expectedRight = 0.0f;
-                    const auto sourceSerial = grain.startSerial + static_cast<double> (direction * age);
-                    const auto readable = engine.readLiveSample (sourceSerial, 0, wrappedOldest, wrappedNewest, expectedLeft)
-                        && engine.readLiveSample (sourceSerial, 1, wrappedOldest, wrappedNewest, expectedRight);
-                    const auto snapshotOffset = static_cast<size_t> (age) * 2u;
-                    const auto errorLeft = std::abs (static_cast<double> (snapshot[snapshotOffset] - expectedLeft));
-                    const auto errorRight = std::abs (static_cast<double> (snapshot[snapshotOffset + 1u] - expectedRight));
-                    maximumReferenceError = std::max (maximumReferenceError, std::max (errorLeft, errorRight));
-                    valid = valid && grain.active && readable && errorLeft <= 2.0e-6 && errorRight <= 2.0e-6;
-                }
-            }
+        verifyRange (wrappedOldest, wrappedNewest, 0.125f, wrappedOldest);
         std::cout << "METRIC live_linear_reference max_error=" << maximumReferenceError << " tolerance=2e-6\n";
         engine.release();
         return valid && maximumReferenceError <= 2.0e-6;
+    }
+
+    static bool liveGrainReferenceSurvivesFullLifetimeAndWrap()
+    {
+        bool passed = true;
+        for (const auto rate : { 44100.0, 48000.0, 96000.0 })
+        {
+            XYPadEngine engine;
+            if (! engine.prepare (rate, 64, true, true)) return false;
+            const auto capacity = static_cast<uint64_t> (engine.liveHistoryCapacityFrames);
+            const auto initialNewest = capacity - 1u;
+            for (uint64_t serial = 0; serial < capacity; ++serial)
+            {
+                const auto index = static_cast<size_t> (serial % capacity);
+                const auto value = static_cast<float> (serial % 4093u) * 0.0001f;
+                engine.liveHistory[index * 2u] = value;
+                engine.liveHistory[index * 2u + 1u] = -value;
+                engine.liveHistorySerials[index] = serial;
+            }
+            engine.liveWriteSerial = capacity;
+            engine.liveHistoryValidFrames = capacity;
+            engine.launchLiveGrain (0.0f, 1, false, 0, initialNewest);
+            const auto grain = engine.liveGrains[0];
+            const auto intendedSelection = static_cast<uint64_t> (
+                juce::roundToInt (rate * XYPadEngine::kLiveHistorySeconds) + 2);
+            const auto selectedOldest = initialNewest + 1u - intendedSelection;
+            passed = passed && grain.active && grain.startSerial == static_cast<double> (selectedOldest)
+                && capacity >= intendedSelection + static_cast<uint64_t> (engine.liveGrainFrames);
+
+            auto newest = initialNewest;
+            for (int frame = 0; frame < engine.liveGrainFrames; ++frame)
+            {
+                const auto serial = ++newest;
+                const auto index = static_cast<size_t> (serial % capacity);
+                const auto value = static_cast<float> (serial % 4093u) * 0.0001f;
+                engine.liveHistory[index * 2u] = value;
+                engine.liveHistory[index * 2u + 1u] = -value;
+                engine.liveHistorySerials[index] = serial;
+            }
+            const auto oldest = newest + 1u - capacity;
+            for (int age = 0; age < engine.liveGrainFrames; ++age)
+            {
+                const auto serial = grain.startSerial + static_cast<double> (age);
+                float left = 0.0f, right = 0.0f;
+                const auto readable = engine.readLiveSample (serial, 0, oldest, newest, left)
+                    && engine.readLiveSample (serial, 1, oldest, newest, right);
+                const auto expected = static_cast<float> (static_cast<uint64_t> (serial) % 4093u) * 0.0001f;
+                passed = passed && readable && left == expected && right == -expected;
+            }
+            std::cout << "METRIC grain_reference_lifetime rate=" << rate
+                      << " capacity=" << capacity << " grain_frames=" << engine.liveGrainFrames
+                      << " selection_frames=" << intendedSelection << " wrap=1\n";
+            engine.release();
+        }
+        return passed;
     }
 
     static bool stationaryLiveTrajectoryFreezesAndLoops()
@@ -547,14 +560,6 @@ public:
             }
             engine.liveWriteSerial = capacity;
             engine.liveHistoryValidFrames = capacity;
-            const auto snapshotFrames = static_cast<size_t> (engine.liveGrainFrames);
-            for (size_t frame = 0; frame < snapshotFrames; ++frame)
-            {
-                const auto phase = static_cast<double> (frame) / static_cast<double> (snapshotFrames);
-                engine.liveGrainSnapshots[frame * 2u] = static_cast<float> (0.6 * std::sin (phase * 19.0));
-                engine.liveGrainSnapshots[frame * 2u + 1u] = static_cast<float> (0.4 * std::cos (phase * 23.0));
-            }
-
             const auto newest = capacity > 0 ? capacity - 1u : 0u;
             for (const auto age : { 1, engine.liveGrainFrames / 3, engine.liveGrainFrames / 2,
                                     engine.liveGrainFrames - 2 })
@@ -577,7 +582,6 @@ public:
                     grain.age = age;
                     grain.fadeInFrames = 0;
                     grain.fadeOutRemaining = 0;
-                    grain.snapshotIndex = 0;
                     engine.liveHoldReady = false;
                     engine.captureLiveContinuationTail();
                     passed = passed && engine.liveReentryTailActive;
@@ -591,12 +595,13 @@ public:
                         const auto sourceAge = age + frame;
                         const auto window = sourceAge >= 0 && sourceAge < engine.liveGrainFrames
                             ? engine.liveGrainWindow[static_cast<size_t> (sourceAge)] : 0.0f;
-                        const auto sampleL = sourceAge >= 0 && sourceAge < engine.liveGrainFrames
-                            ? engine.liveGrainSnapshots[static_cast<size_t> (sourceAge) * 2u] : 0.0f;
-                        const auto sampleR = sourceAge >= 0 && sourceAge < engine.liveGrainFrames
-                            ? engine.liveGrainSnapshots[static_cast<size_t> (sourceAge) * 2u + 1u] : 0.0f;
-                        auto expectedL = window > 1.0e-9f ? sampleL * window / window : 0.0f;
-                        auto expectedR = window > 1.0e-9f ? sampleR * window / window : 0.0f;
+                        const auto serial = grain.startSerial + static_cast<double> (sourceAge);
+                        float sampleL = 0.0f, sampleR = 0.0f;
+                        const auto read = sourceAge < engine.liveGrainFrames
+                            && engine.readLiveSample (serial, 0, 0, newest, sampleL)
+                            && engine.readLiveSample (serial, 1, 0, newest, sampleR);
+                        auto expectedL = read && window > 1.0e-9f ? sampleL * window / window : 0.0f;
+                        auto expectedR = read && window > 1.0e-9f ? sampleR * window / window : 0.0f;
                         const auto previousFrame = priorTailPosition >= 0 ? priorTailPosition + frame : -1;
                         if (previous != nullptr && previousFrame >= 0
                             && previousFrame < engine.liveReentryTailFrames)
@@ -613,7 +618,7 @@ public:
                         if (errorL > 2.0e-6 || errorR > 2.0e-6)
                             std::cerr << "FAIL stable_single_grain_case rate=" << rate
                                       << " age=" << age << " prior_tail=" << priorTailPosition
-                                      << " frame=" << frame << " snapshot=" << grain.snapshotIndex
+                                      << " frame=" << frame
                                       << " result_l=" << result[index] << " expected_l=" << expectedL
                                       << " result_r=" << result[index + 1u] << " expected_r=" << expectedR
                                       << " window=" << window << "\n";
@@ -624,7 +629,7 @@ public:
                 }
             engine.release();
         }
-        std::cout << "METRIC stable_single_grain_fast_path max_error=" << maximumError
+        std::cout << "METRIC stable_single_grain_tail_reference max_error=" << maximumError
                   << " tolerance=2e-6 rates=44100,48000,96000\n";
         return passed && maximumError <= 2.0e-6;
     }
@@ -1433,7 +1438,9 @@ int main (int argc, char** argv)
            "pitch-middle-zero-semitones-preserves-frequency");
 
     check (XYPadEngineTestAccess::liveGrainDirectionIsCorrect(),
-           "live-grains-read-forward-and-reverse-within-valid-serial-range-and-snapshot-source");
+           "live-grains-read-forward-and-reverse-within-valid-serial-range");
+    check (XYPadEngineTestAccess::liveGrainReferenceSurvivesFullLifetimeAndWrap(),
+           "live-grain-reference-remains-valid-for-full-lifetime-through-history-ring-wrap");
     check (XYPadEngineTestAccess::stationaryLiveTrajectoryFreezesAndLoops(),
            "live-stationary-xy-freezes-a-bounded-grain-and-holds-it-across-blocks");
     check (XYPadEngineTestAccess::liveJumpStartsWithoutWaitingForNextHop(),
