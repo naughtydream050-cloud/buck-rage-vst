@@ -113,7 +113,13 @@ if (kind === '--ac') {
   }
   const sourceCriteria = id.startsWith('R2-AC-') ? supplementalCriteriaPath : criteriaPath;
   const criterion = JSON.parse(readFileSync(sourceCriteria, 'utf8')).criteria.find(item => item.id === id);
-  if (!criterion || !Array.isArray(criterion.check)) fail(`AC_NOT_IN_FIXED_MANIFEST_${id}`);
+  // The unchanged supplemental manifest records its binding as `test`, whereas
+  // the original 16-AC manifest records executable `check` arrays. The actual
+  // assertions above are still mandatory for either manifest schema.
+  if (!criterion || (id.startsWith('R2-AC-')
+      ? typeof criterion.test !== 'string' || !criterion.test.length
+      : !Array.isArray(criterion.check) || !criterion.check.length))
+    fail(`AC_NOT_IN_FIXED_MANIFEST_${id}`);
   console.log(`PASS ${id} source=${sourceHead} run=${evidence.ci.runId} artifact=${evidence.artifact.treeSha256}`);
   process.exit(0);
 }

@@ -31,6 +31,11 @@ The existing parser also predates the three max-wall diagnostic fields in the
 current executable. Update its strict allowlisted row grammar and mutation
 fixtures; do not accept unrecognized fields or relax deadline rejection.
 
+The supplemental manifest binds tests with `test`, while the original manifest
+uses `check`. The verifier now recognizes each existing schema after requiring
+its mapped executed assertions. The approved manifests and their hashes remain
+unchanged; this does not remove any supplemental requirement.
+
 Qualification still requires the exact CI executable and source hashes, local
 Ryzen 3 2200U results, all 21 deterministic AC, Jev and Sol approval. A remaining
 deadline failure blocks promotion.
