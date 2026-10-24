@@ -21,6 +21,12 @@ synthesis stages read these values instead of recomputing the same cosine four
 times per stereo FFT hop. Keep all bin math, phase processing, FFT size/hop,
 pitch control, stereo linking, output timing and the 1024-sample delay unchanged.
 
+Store the window in one fixed heap allocation during prepare, not inline in the
+processor object. The initial inline-array build passed the new XY checks but
+Runtime Smoke exited with 0xC00000FD (stack overflow) in CI 40074989967. Preserve
+the processor's stack footprint and reset/check the allocation on all prepare,
+failure and release paths. Process-time allocation remains prohibited.
+
 Verification: compare every cached value to the prior expression with exact float
 equality at 44.1/48/96 kHz, rerun all pitch/delay/stereo tests and ring-offset
 tests, preserve RED/GREEN source/run IDs, compare diagnostic PCM, then measure

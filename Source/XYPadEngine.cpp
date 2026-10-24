@@ -94,7 +94,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     liveHistory.reset(); liveHistorySerials.reset(); liveHoldSnapshot.reset();
     liveGrainWindow.reset();
     for (auto& tail : liveReentryTailBuffers) tail.reset();
-    livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
+    livePitchFft.reset(); livePitchWindow.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
     livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
     livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
     livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
@@ -201,7 +201,8 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         for (auto& tail : liveReentryTailBuffers)
             tail.reset (new (std::nothrow) float[static_cast<size_t> (liveReentryTailFrames) * 2u]);
         livePitchFft = std::make_unique<juce::dsp::FFT> (10);
-        for (int frame = 0; frame < kLivePitchFftSize; ++frame)
+        livePitchWindow.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchFftSize)]);
+        for (int frame = 0; livePitchWindow && frame < kLivePitchFftSize; ++frame)
             livePitchWindow[static_cast<size_t> (frame)] = static_cast<float> (
                 0.5 - 0.5 * std::cos (2.0 * kPi * frame / (kLivePitchFftSize - 1)));
         livePitchFftWork.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchFftSize) * 2u]);
@@ -220,7 +221,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         if ((! liveOnly && (! scratch || ! fftWork || ! fftWork2 || ! overlapNorm || ! previousInputPhase
             || ! synthesisPhase || ! phaseInitialized || ! fft)) || ! liveHistory || ! liveHistorySerials
             || ! liveHoldSnapshot || ! liveGrainWindow || ! liveReentryTailBuffers[0]
-            || ! liveReentryTailBuffers[1] || ! livePitchFft || ! livePitchFftWork
+            || ! liveReentryTailBuffers[1] || ! livePitchFft || ! livePitchWindow || ! livePitchFftWork
             || ! livePitchFftWork2 || ! livePitchInputRing || ! livePitchIdentityDelay
             || ! livePitchSemitoneDelay || ! livePitchMaskDelay || ! livePitchOlaLeft
             || ! livePitchOlaRight || ! livePitchOlaNorm || ! livePitchPreviousPhase
@@ -232,7 +233,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
             liveHistory.reset(); liveHistorySerials.reset(); liveHoldSnapshot.reset();
             liveGrainWindow.reset();
             for (auto& tail : liveReentryTailBuffers) tail.reset();
-            livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
+            livePitchFft.reset(); livePitchWindow.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
             livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
             livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
             livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
@@ -258,7 +259,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         liveHistory.reset(); liveHistorySerials.reset(); liveHoldSnapshot.reset();
         liveGrainWindow.reset();
         for (auto& tail : liveReentryTailBuffers) tail.reset();
-        livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
+        livePitchFft.reset(); livePitchWindow.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
         livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
         livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
         livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
@@ -286,7 +287,7 @@ void XYPadEngine::release() noexcept
     liveHistory.reset(); liveHistorySerials.reset(); liveHoldSnapshot.reset();
     liveGrainWindow.reset();
     for (auto& tail : liveReentryTailBuffers) tail.reset();
-    livePitchFft.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
+    livePitchFft.reset(); livePitchWindow.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
     livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
     livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
     livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
@@ -343,7 +344,7 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
                                           float wetMask, float& outputLeft,
                                           float& outputRight, float& outputMask) noexcept
 {
-    if (! livePitchFft || ! livePitchFftWork || ! livePitchFftWork2 || ! livePitchInputRing
+    if (! livePitchFft || ! livePitchWindow || ! livePitchFftWork || ! livePitchFftWork2 || ! livePitchInputRing
         || ! livePitchIdentityDelay || ! livePitchSemitoneDelay || ! livePitchMaskDelay
         || ! livePitchOlaLeft || ! livePitchOlaRight || ! livePitchOlaNorm
         || ! livePitchPreviousPhase || ! livePitchSynthesisPhase || ! livePitchPhaseInitialized)

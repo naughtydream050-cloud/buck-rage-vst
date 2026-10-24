@@ -179,7 +179,7 @@ private:
     static constexpr int kLivePipelineLatency = 1024;
     static constexpr int kLivePitchBins = kLivePitchFftSize / 2 + 1;
     static constexpr int kLivePitchOlaCapacity = 2048;
-    std::array<float, static_cast<size_t> (kLivePitchFftSize)> livePitchWindow {};
+    std::unique_ptr<float[]> livePitchWindow;
     std::unique_ptr<juce::dsp::FFT> livePitchFft;
     std::unique_ptr<float[]> livePitchFftWork, livePitchFftWork2;
     std::unique_ptr<float[]> livePitchInputRing, livePitchIdentityDelay;
