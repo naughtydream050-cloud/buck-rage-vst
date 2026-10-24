@@ -195,6 +195,82 @@ void operator delete[] (void* memory, std::size_t) noexcept { std::free (memory)
 class XYPadEngineTestAccess
 {
 public:
+    static bool writeActualLiveDiagnosticWavs()
+    {
+        constexpr double rate = 48000.0;
+        constexpr int frames = 192000, blockSize = 256, latency = 1024;
+        constexpr double samplesPerBar = rate * 240.0 / 130.0;
+        const char* names[] { "forward-neutral", "reverse-pitch-up", "hold", "fold-jump", "pitch-down" };
+        for (int scenario = 0; scenario < 5; ++scenario)
+        {
+            XYPadEngine engine;
+            if (! engine.prepare (rate, blockSize, true, true)) return false;
+            const auto y = scenario == 1 ? 1.0f : scenario == 4 ? 0.0f : 0.5f;
+            std::vector<PluginStateModel::MotionPoint> points;
+            if (scenario == 2) points = {{ 0.5f, y, 0.0 }, { 0.5f, y, 1.0 }};
+            else if (scenario == 3) points = {{ 0.1f, y, 0.0 }, { 0.9f, y, 0.25 },
+                { 0.1f, y, 0.5 }, { 0.9f, y, 0.501 }, { 0.2f, y, 1.0 }};
+            else points = {{ scenario == 1 ? 0.9f : 0.1f, y, 0.0 },
+                           { scenario == 1 ? 0.1f : 0.9f, y, 1.0 }};
+            for (int bar = 0; bar < 64; ++bar) engine.setTrajectory (bar, points, 2000u + static_cast<uint32_t> (bar));
+            juce::AudioBuffer<float> input (2, blockSize), wet (2, blockSize), mask (1, blockSize);
+            juce::AudioBuffer<float> dryDelay (2, latency), audio (2, frames);
+            dryDelay.clear(); audio.clear();
+            int delayIndex = 0, firstWet = -1;
+            bool finite = true;
+            double peak = 0.0, energy = 0.0;
+            for (int start = 0; start < frames; start += blockSize)
+            {
+                const auto count = juce::jmin (blockSize, frames - start);
+                for (int i = 0; i < count; ++i)
+                {
+                    const auto at = start + i;
+                    const auto muted = at >= 96000 && at < 98400;
+                    const auto angle = 2.0 * 3.141592653589793 * at / rate;
+                    input.setSample (0, i, muted ? 0.0f : static_cast<float> (0.3 * std::sin (440.0 * angle) + 0.1 * std::sin (110.0 * angle)));
+                    input.setSample (1, i, muted ? 0.0f : static_cast<float> (0.3 * std::sin (440.0 * angle + 0.37) + 0.1 * std::sin (110.0 * angle + 0.2)));
+                }
+                const auto barPosition = static_cast<double> (start) / samplesPerBar;
+                XYPadEngine::Transport transport;
+                transport.playing = true;
+                transport.startBar = (3 + static_cast<int> (std::floor (barPosition))) % 64;
+                transport.startPhase = barPosition - std::floor (barPosition);
+                transport.phasePerSample = 1.0 / samplesPerBar;
+                engine.processLive (input, wet, mask, transport, count);
+                for (int i = 0; i < count; ++i)
+                {
+                    const auto blend = mask.getSample (0, i);
+                    if (firstWet < 0 && blend > 0.0f) firstWet = start + i;
+                    for (int ch = 0; ch < 2; ++ch)
+                    {
+                        const auto dry = dryDelay.getSample (ch, delayIndex);
+                        dryDelay.setSample (ch, delayIndex, input.getSample (ch, i));
+                        const auto value = XYPadEngine::mixLayers (dry, dry, wet.getSample (ch, i), 1.0f, false, blend);
+                        audio.setSample (ch, start + i, value);
+                        finite = finite && std::isfinite (value);
+                        peak = std::max (peak, std::abs (static_cast<double> (value)));
+                        energy += static_cast<double> (value) * value;
+                    }
+                    delayIndex = (delayIndex + 1) % latency;
+                }
+            }
+            juce::WavAudioFormat format;
+            const auto file = juce::File::getCurrentWorkingDirectory().getChildFile (
+                juce::String ("xy-diagnostic-live-") + names[scenario] + ".wav");
+            auto stream = file.createOutputStream();
+            std::unique_ptr<juce::AudioFormatWriter> writer;
+            if (stream) writer.reset (format.createWriterFor (stream.release(), rate, 2, 24, {}, 0));
+            const auto written = writer && writer->writeFromAudioSampleBuffer (audio, 0, frames);
+            writer.reset(); engine.release();
+            std::cout << "METRIC actual_live_wav scenario=" << names[scenario] << " first_bar=4"
+                      << " frames=" << frames << " first_wet=" << firstWet << " peak=" << peak
+                      << " rms=" << std::sqrt (energy / (frames * 2.0))
+                      << " finite=" << finite << " written=" << written
+                      << " path=processLive+mixLayers preset=OFF depth=1\n";
+            if (! written || ! finite || firstWet < 0 || firstWet > 3000) return false;
+        }
+        return true;
+    }
     static bool liveSinCosMatchesStandardReference()
     {
         double maximumError = 0.0;
@@ -1972,6 +2048,8 @@ int main (int argc, char** argv)
            "live-pitch-is-finite-and-allocation-free-at-44k1-48k-96k-forward-and-reverse");
     check (XYPadEngineTestAccess::livePitchDoesNotChangeXDirectionOrSampleClock(),
            "live-pitch-y-does-not-change-x-direction-or-sample-clock");
+    check (XYPadEngineTestAccess::writeActualLiveDiagnosticWavs(),
+           "five-actual-live-diagnostic-wavs-use-processLive-and-final-xy-only-mix");
 
     juce::File wavFile = juce::File::getCurrentWorkingDirectory().getChildFile ("xy-diagnostic-forward-neutral.wav");
     auto stream = wavFile.createOutputStream();
