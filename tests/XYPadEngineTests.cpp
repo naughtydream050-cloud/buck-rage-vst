@@ -927,12 +927,15 @@ public:
                 callbackThreadCycles.reserve (deadlineRatios.capacity());
                 uint64_t measuredSamples = 0, events = 0;
                 double peakRatio = 0.0, callbackWallSeconds = 0.0;
+                uint64_t largestCallbackCycles = 0, maxCyclesAtSample = 0, maxCyclesWriteSerial = 0;
+                uint64_t maxWallAtSample = 0, maxWallWriteSerial = 0;
                 uint64_t conditionCpuStart = 0, conditionCpuEnd = 0;
                 if (! readCurrentThreadCpuTicks (conditionCpuStart)) return false;
                 while (measuredSamples < static_cast<uint64_t> (rate * 30.0))
                 {
                     const auto block = blockAt (sequence);
                     const auto timelineSample = warmSamples + measuredSamples;
+                    const auto writeSerialBefore = engine.liveWriteSerial;
                     XYPadEngine::Transport eventTransport;
                     eventTransport.playing = true;
                     eventTransport.startBar = static_cast<int> ((timelineSample / 256u)
@@ -951,8 +954,20 @@ public:
                     const auto elapsed = std::chrono::duration<double, std::micro> (stop - start).count();
                     const auto ratio = elapsed / (1.0e6 * block / rate);
                     deadlineRatios.push_back (ratio);
-                    callbackThreadCycles.push_back (static_cast<uint64_t> (cyclesAfter - cyclesBefore));
-                    peakRatio = std::max (peakRatio, ratio);
+                    const auto callbackCycles = static_cast<uint64_t> (cyclesAfter - cyclesBefore);
+                    callbackThreadCycles.push_back (callbackCycles);
+                    if (ratio > peakRatio)
+                    {
+                        peakRatio = ratio;
+                        maxWallAtSample = timelineSample;
+                        maxWallWriteSerial = writeSerialBefore;
+                    }
+                    if (callbackCycles > largestCallbackCycles)
+                    {
+                        largestCallbackCycles = callbackCycles;
+                        maxCyclesAtSample = timelineSample;
+                        maxCyclesWriteSerial = writeSerialBefore;
+                    }
                     callbackWallSeconds += elapsed * 1.0e-6;
                     for (int frame = 0; frame < block; ++frame)
                         if ((timelineSample + static_cast<uint64_t> (frame)) % 256u != 0u)
@@ -986,10 +1001,17 @@ public:
                           << (mode < 5 ? fixedBlocks[mode] : -1)
                           << " p50=" << p50Cycles << " p99=" << p99Cycles << " max=" << maxCycles
                           << " p99_to_p50=" << p99CyclesToMedian
-                          << " max_to_p50=" << maxCyclesToMedian << "\n";
+                          << " max_to_p50=" << maxCyclesToMedian
+                          << " max_sample=" << maxCyclesAtSample
+                          << " max_writer_index=" << (maxCyclesWriteSerial & engine.liveHistoryIndexMask)
+                          << " max_frames_to_ring_wrap="
+                          << (engine.liveHistoryCapacityFrames
+                              - static_cast<int> (maxCyclesWriteSerial & engine.liveHistoryIndexMask)) << "\n";
                 std::cout << "METRIC reentrant_benchmark rate=" << rate << " mode="
                           << (mode < 5 ? fixedBlocks[mode] : -1) << " p99_deadline_ratio=" << p99Ratio
                           << " max_deadline_ratio=" << peakRatio
+                          << " max_wall_sample=" << maxWallAtSample
+                          << " max_wall_writer_index=" << (maxWallWriteSerial & engine.liveHistoryIndexMask)
                           << " avg_thread_cpu_to_callback_wall=" << averageThreadCpuToCallbackWall
                           << " events=" << events
                           << " samples=" << measuredSamples << " event_rate="
