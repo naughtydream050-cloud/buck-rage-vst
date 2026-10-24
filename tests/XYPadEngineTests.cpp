@@ -681,7 +681,10 @@ public:
                     for (const auto age : { 1, engine.liveGrainFrames / 3, engine.liveGrainFrames / 2,
                                             engine.liveGrainFrames - 2 })
                 for (const auto priorTailPosition : { -1, 0, engine.liveReentryTailFrames / 2 })
+                for (const auto enableAvx : { false, true })
+                for (const auto seamOffset : { 1, 2, 3, 4 })
                 {
+                    engine.liveTailAvx2Available = enableAvx && xyPadTailAvx2Available();
                     engine.liveGrains.fill (XYPadEngine::LiveGrain {});
                     engine.liveReentryTailActive = priorTailPosition >= 0;
                     engine.liveReentryTailBuffer = 0;
@@ -699,8 +702,8 @@ public:
                     grain.age = age;
                     // Exercise the AVX2/SSE tail renderer on both sides of
                     // the physical ring seam while the serial range remains valid.
-                    const auto seamBase = direction > 0 ? 2.0 * static_cast<double> (capacity) - 2.0
-                                                         : 2.0 * static_cast<double> (capacity) + 2.0;
+                    const auto seamBase = 2.0 * static_cast<double> (capacity)
+                        + static_cast<double> ((direction > 0 ? -1 : 1) * seamOffset);
                     const auto currentSerial = seamBase + fraction;
                     grain.startSerial = currentSerial - static_cast<double> (direction * age);
                     grain.fadeInFrames = 0;
@@ -739,13 +742,19 @@ public:
                         const auto index = static_cast<size_t> (frame) * 2u;
                         const auto errorL = static_cast<double> (std::abs (result[index] - expectedL));
                         const auto errorR = static_cast<double> (std::abs (result[index + 1u] - expectedR));
-                        if (errorL > 2.0e-6 || errorR > 2.0e-6)
+                        if (! std::isfinite (errorL) || ! std::isfinite (errorR)
+                            || errorL > 2.0e-6 || errorR > 2.0e-6)
+                        {
                             std::cerr << "FAIL stable_single_grain_case rate=" << rate
+                                      << " direction=" << direction << " seam_offset=" << seamOffset
+                                      << " avx=" << engine.liveTailAvx2Available
                                       << " age=" << age << " prior_tail=" << priorTailPosition
                                       << " frame=" << frame
                                       << " result_l=" << result[index] << " expected_l=" << expectedL
                                       << " result_r=" << result[index + 1u] << " expected_r=" << expectedR
                                       << " window=" << window << "\n";
+                            return false;
+                        }
                         maximumError = std::max (maximumError, errorL);
                         maximumError = std::max (maximumError, errorR);
                     }
