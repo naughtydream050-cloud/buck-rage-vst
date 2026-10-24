@@ -1,4 +1,6 @@
 #include "XYPadLiveFFT1024.h"
+#include "XYPadLiveFFT1024AVX2.h"
+#include "XYPadTailAVX2.h"
 #include <cmath>
 #if defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
  #include <emmintrin.h>
@@ -28,6 +30,11 @@ XYPadLiveFFT1024::XYPadLiveFFT1024() noexcept
 
 void XYPadLiveFFT1024::transform (bool inverse) noexcept
 {
+    if (xyPadTailAvx2Available()
+        && xyPadLiveFftTransformAvx2 (real.data(), imag.data(), twiddleReal.data(),
+                                       twiddleImag.data(), inverse))
+        return;
+
     int offset = 0;
     for (int half = 1; half < size; half *= 2)
     {

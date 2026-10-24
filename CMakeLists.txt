@@ -55,6 +55,7 @@ target_sources(ToyotomiHideyoshi PRIVATE
     Source/TimelineScratchEngine.cpp
     Source/XYPadEngine.cpp
     Source/XYPadLiveFFT1024.cpp
+    Source/XYPadLiveFFT1024AVX2.cpp
     Source/XYPadCpuFeatures.cpp
     Source/XYPadTailAVX2.cpp
     Source/PluginEditorV2.cpp
@@ -76,6 +77,7 @@ if (TOYOTOMI_BUILD_STATE_TESTS)
         Source/TimelineScratchEngine.cpp
         Source/XYPadEngine.cpp
         Source/XYPadLiveFFT1024.cpp
+        Source/XYPadLiveFFT1024AVX2.cpp
         Source/XYPadCpuFeatures.cpp
         Source/XYPadTailAVX2.cpp
         Source/PluginEditorV2.cpp
@@ -95,6 +97,7 @@ if (TOYOTOMI_BUILD_STATE_TESTS)
     target_sources(ToyotomiHideyoshiXYEngineTests PRIVATE
         Source/XYPadEngine.cpp
         Source/XYPadLiveFFT1024.cpp
+        Source/XYPadLiveFFT1024AVX2.cpp
         Source/XYPadCpuFeatures.cpp
         Source/XYPadTailAVX2.cpp
         Source/PluginStateModel.cpp
@@ -114,7 +117,8 @@ if (TOYOTOMI_BUILD_STATE_TESTS)
 endif()
 
 if (MSVC)
-    set_source_files_properties(Source/XYPadTailAVX2.cpp PROPERTIES COMPILE_OPTIONS "/arch:AVX2")
+    set_source_files_properties(Source/XYPadTailAVX2.cpp Source/XYPadLiveFFT1024AVX2.cpp
+        PROPERTIES COMPILE_OPTIONS "/arch:AVX2")
 endif()
 
 target_compile_definitions(ToyotomiHideyoshi PUBLIC
