@@ -77,6 +77,46 @@ bool readCurrentThreadCpuTicks (uint64_t& ticks) noexcept
     ticks = toTicks (kernel) + toTicks (user);
     return true;
 }
+
+// Test-host scheduling only. Sleeping is outside every measured audio callback.
+// A free-running MMCSS benchmark consumes the scheduler's CPU quota and gets
+// demoted, unlike a host that dispatches one block per audio deadline.
+class ScopedHostCallbackPacer
+{
+public:
+    ScopedHostCallbackPacer() noexcept
+        : timer (CreateWaitableTimerExW (nullptr, nullptr, 0x00000002,
+                                        TIMER_MODIFY_STATE | SYNCHRONIZE)) {}
+    ~ScopedHostCallbackPacer() { if (timer != nullptr) CloseHandle (timer); }
+    bool valid() const noexcept { return timer != nullptr; }
+    void reset() noexcept { nextStart = Clock::now(); }
+    void advance (int frames, double rate) noexcept
+    {
+        nextStart += std::chrono::duration_cast<Clock::duration> (
+            std::chrono::duration<double> (static_cast<double> (frames) / rate));
+    }
+    bool wait (double& latenessUs) noexcept
+    {
+        for (;;)
+        {
+            const auto now = Clock::now();
+            if (now >= nextStart)
+            {
+                latenessUs = std::chrono::duration<double, std::micro> (now - nextStart).count();
+                return true;
+            }
+            const auto ns = std::chrono::duration_cast<std::chrono::nanoseconds> (nextStart - now).count();
+            LARGE_INTEGER due {};
+            due.QuadPart = -((ns + 99) / 100);
+            if (! SetWaitableTimer (timer, &due, 0, nullptr, nullptr, FALSE)
+                || WaitForSingleObject (timer, INFINITE) != WAIT_OBJECT_0) return false;
+        }
+    }
+private:
+    using Clock = std::chrono::steady_clock;
+    HANDLE timer = nullptr;
+    Clock::time_point nextStart {};
+};
 #endif
 
 namespace AllocationAudit
@@ -871,7 +911,9 @@ public:
             std::cerr << "FAIL benchmark-scheduling-requires-mmcss-and-normal-process-priority\n";
             return false;
         }
-        std::cout << "METRIC benchmark_schedule class=MMCSS-Pro-Audio process_priority=Normal\n";
+        ScopedHostCallbackPacer pacer;
+        if (! pacer.valid()) return false;
+        std::cout << "METRIC benchmark_schedule class=MMCSS-Pro-Audio process_priority=Normal host_cadence=sample_clock\n";
 #else
         std::cerr << "FAIL benchmark-scheduling-requires-windows-mmcss\n";
         return false;
@@ -908,9 +950,12 @@ public:
                 };
                 uint64_t sequence = 0;
                 uint64_t warmSamples = 0;
+                pacer.reset();
                 while (warmSamples < static_cast<uint64_t> (rate * 2.0))
                 {
                     const auto block = blockAt (sequence);
+                    double ignoredLateness = 0.0;
+                    if (! pacer.wait (ignoredLateness)) return false;
                     XYPadEngine::Transport eventTransport;
                     eventTransport.playing = true;
                     eventTransport.startBar = static_cast<int> ((warmSamples / 256u)
@@ -918,6 +963,7 @@ public:
                     eventTransport.startPhase = static_cast<double> (warmSamples % 256u) / 256.0;
                     eventTransport.phasePerSample = 1.0 / 256.0;
                     engine.processLive (input, output, mask, eventTransport, block);
+                    pacer.advance (block, rate);
                     warmSamples += static_cast<uint64_t> (block);
                     ++sequence;
                 }
@@ -933,9 +979,15 @@ public:
                 uint64_t maxWallAtSample = 0, maxWallWriteSerial = 0;
                 uint64_t conditionCpuStart = 0, conditionCpuEnd = 0;
                 if (! readCurrentThreadCpuTicks (conditionCpuStart)) return false;
+                double maxDispatchLatenessUs = 0.0;
+                const auto conditionWallStart = std::chrono::steady_clock::now();
+                pacer.reset();
                 while (measuredSamples < static_cast<uint64_t> (rate * 30.0))
                 {
                     const auto block = blockAt (sequence);
+                    double dispatchLatenessUs = 0.0;
+                    if (! pacer.wait (dispatchLatenessUs)) return false;
+                    maxDispatchLatenessUs = std::max (maxDispatchLatenessUs, dispatchLatenessUs);
                     const auto timelineSample = warmSamples + measuredSamples;
                     const auto writeSerialBefore = engine.liveWriteSerial;
                     XYPadEngine::Transport eventTransport;
@@ -978,6 +1030,7 @@ public:
                             ++events;
                     measuredSamples += static_cast<uint64_t> (block);
                     ++sequence;
+                    pacer.advance (block, rate);
                 }
                 if (! readCurrentThreadCpuTicks (conditionCpuEnd) || conditionCpuEnd < conditionCpuStart)
                     return false;
@@ -1001,6 +1054,12 @@ public:
                 const auto within = p99Ratio <= 0.50 && peakRatio <= 0.80;
                 allWithinDeadline = allWithinDeadline && within;
                 ++conditionCount;
+                std::cout << "METRIC benchmark_pacing rate=" << rate << " mode="
+                          << (mode < 5 ? fixedBlocks[mode] : -1)
+                          << " wall_seconds=" << std::chrono::duration<double> (
+                              std::chrono::steady_clock::now() - conditionWallStart).count()
+                          << " max_dispatch_lateness_us=" << maxDispatchLatenessUs
+                          << " callback_count=" << deadlineRatios.size() << " schedule=sample_clock\n";
                 std::cout << "METRIC reentrant_cycle_diagnostic rate=" << rate << " mode="
                           << (mode < 5 ? fixedBlocks[mode] : -1)
                           << " p50=" << p50Cycles << " p99=" << p99Cycles << " max=" << maxCycles
@@ -1023,7 +1082,7 @@ public:
                           << " samples=" << measuredSamples << " event_rate="
                           << static_cast<double> (events) / static_cast<double> (measuredSamples)
                           << " callback_shape=one_host_block status="
-                          << (within ? "PASS" : "FAIL") << "\n";
+                          << (within ? "PASS" : "FAIL") << std::endl;
                 engine.release();
             }
         }
