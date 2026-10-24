@@ -23,11 +23,7 @@
  #include <realtimeapiset.h>
 #endif
 
-#if defined(_WIN32)
-class ScopedProAudioMmcssRegistration
-{
-public:
-    static bool lockFreeLiveFftMatchesJuce()
+static bool lockFreeLiveFftMatchesJuce()
     {
         XYPadLiveFFT1024 fft;
         juce::dsp::FFT reference (10);
@@ -74,6 +70,10 @@ public:
                   << " fixtures=6 tolerance=2e-6 finite=" << finite << "\n";
         return finite && forwardError <= 2.0e-6 && inverseError <= 2.0e-6 && roundtripError <= 2.0e-6;
     }
+#if defined(_WIN32)
+class ScopedProAudioMmcssRegistration
+{
+public:
     ScopedProAudioMmcssRegistration() noexcept
     {
         avrtModule = LoadLibraryW (L"avrt.dll");
@@ -1576,7 +1576,7 @@ int main (int argc, char** argv)
         return XYPadEngineTestAccess::runControlledHostBenchmark() ? 0 : 1;
     check (sizeof (XYPadEngine) < 64u * 1024u,
            "fixed-64-bar-tables-do-not-consume-windows-thread-stack");
-    check (XYPadEngineTestAccess::lockFreeLiveFftMatchesJuce(),
+    check (lockFreeLiveFftMatchesJuce(),
            "live-lock-free-fft-matches-juce-forward-inverse-and-roundtrip-reference");
     XYPadEngine queueProbe;
     check (XYPadEngineTestAccess::queueIsBoundedAndFifo (queueProbe),
