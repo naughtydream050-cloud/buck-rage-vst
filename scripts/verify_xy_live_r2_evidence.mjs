@@ -80,7 +80,7 @@ const acMap = {
   'AC-03': [['xy-engine', 'first-visit-bar4-live-wet-after-20ms-history-plus-1024-sample-pipeline-and-8ms-ramp']],
   'AC-04': [['xy-engine', 'live-grains-read-forward-and-reverse-within-valid-serial-range'], ['xy-engine', 'forward-reverse-linear-read-matches-scalar-reference-and-clamps-endpoints'], ['xy-engine', 'live-grain-reference-remains-valid-for-full-lifetime-through-history-ring-wrap']],
   'AC-05': [['xy-engine', 'live-stationary-xy-freezes-a-bounded-grain-and-holds-it-across-blocks'], ['xy-engine', 'live-fold-jump-starts-transition-on-the-next-sample-without-hop-delay'], ['xy-engine', 'xy-live-r2-rendered-transition-matches-equal-power-reference']],
-  'AC-06': [['xy-engine', 'pitch-top-plus-12-semitones'], ['xy-engine', 'pitch-bottom-minus-12-semitones'], ['xy-engine', 'pitch-middle-zero-semitones-preserves-frequency']],
+  'AC-06': [['xy-engine', 'pitch-top-plus-12-semitones'], ['xy-engine', 'pitch-bottom-minus-12-semitones'], ['xy-engine', 'pitch-middle-zero-semitones-preserves-frequency'], ['xy-engine', 'live-paired-sincos-matches-standard-functions-through-large-phases-and-fallback']],
   'AC-07': [['xy-engine', 'pitch-plus-12-is-independent-of-forward-x-slope'], ['xy-engine', 'pitch-minus-12-is-independent-of-reverse-x-slope'], ['xy-engine', 'live-pitch-y-does-not-change-x-direction-or-sample-clock']],
   'AC-08': [['xy-engine', 'live-pitch-neutral-identity-has-exact-1024-sample-delay']],
   'AC-09': [['xy-engine', 'depth-zero-bit-exact-dry'], ['runtime-smoke', 'xy-ready-bypass-excludes-xy-and-matches-preset-only'], ['runtime-smoke', 'xy-depth-zero-is-bit-exact-dry-before-and-after-ready']],

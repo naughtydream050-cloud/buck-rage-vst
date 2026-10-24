@@ -195,6 +195,35 @@ void operator delete[] (void* memory, std::size_t) noexcept { std::free (memory)
 class XYPadEngineTestAccess
 {
 public:
+    static bool liveSinCosMatchesStandardReference()
+    {
+        double maximumError = 0.0;
+        uint64_t samples = 0;
+        bool finite = true;
+        const auto verify = [&] (double phase)
+        {
+            double sine = 0.0, cosine = 0.0;
+            XYPadEngine::liveSinCos (phase, sine, cosine);
+            finite = finite && std::isfinite (sine) && std::isfinite (cosine);
+            maximumError = std::max (maximumError, std::abs (sine - std::sin (phase)));
+            maximumError = std::max (maximumError, std::abs (cosine - std::cos (phase)));
+            ++samples;
+        };
+        uint32_t random = 12345u;
+        for (int i = 0; i < 200000; ++i)
+        {
+            random = random * 1664525u + 1013904223u;
+            verify ((static_cast<double> (random) / 4294967295.0 * 2.0 - 1.0) * 1.0e9);
+        }
+        for (const auto turns : { 0.0, 1.0, -1.0, 1000000.0, -1000000.0, 159154942.0 })
+            for (const auto quadrant : { -2.0, -1.0, 0.0, 1.0, 2.0 })
+                for (const auto epsilon : { -1.0e-8, 0.0, 1.0e-8 })
+                    verify (turns * 6.2831853071795864769 + quadrant * 1.5707963267948966192 + epsilon);
+        verify (1.0e10); verify (-1.0e10);
+        std::cout << "METRIC live_sincos_reference phases=" << samples
+                  << " max_error=" << maximumError << " tolerance=2e-9 finite=" << finite << "\n";
+        return finite && maximumError <= 2.0e-9;
+    }
     static bool pitchWindowCacheMatchesOriginalExpression()
     {
         for (const auto rate : { 44100.0, 48000.0, 96000.0 })
@@ -1578,6 +1607,8 @@ int main (int argc, char** argv)
            "fixed-64-bar-tables-do-not-consume-windows-thread-stack");
     check (lockFreeLiveFftMatchesJuce(),
            "live-lock-free-fft-matches-juce-forward-inverse-and-roundtrip-reference");
+    check (XYPadEngineTestAccess::liveSinCosMatchesStandardReference(),
+           "live-paired-sincos-matches-standard-functions-through-large-phases-and-fallback");
     XYPadEngine queueProbe;
     check (XYPadEngineTestAccess::queueIsBoundedAndFifo (queueProbe),
            "render-job-spsc-queue-bounded-fifo-and-overflow-rejected");

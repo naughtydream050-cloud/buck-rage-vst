@@ -455,9 +455,10 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
                             / kLivePitchFftSize;
                     }
                     previous = phase;
-                    writeBin (transformed, bin,
-                        magnitude * static_cast<float> (std::cos (synthesis)),
-                        magnitude * static_cast<float> (std::sin (synthesis)));
+                    double sine = 0.0, cosine = 0.0;
+                    liveSinCos (synthesis, sine, cosine);
+                    writeBin (transformed, bin, magnitude * static_cast<float> (cosine),
+                                               magnitude * static_cast<float> (sine));
                 }
             }
             else
@@ -477,9 +478,10 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
                     const auto phaseOffset = std::remainder (phase - leftPhase[static_cast<size_t> (bin)], 2.0 * kPi);
                     const auto outputPhase = livePitchSynthesisPhase[static_cast<size_t> (bin)] + phaseOffset;
                     const auto magnitude = std::hypot (real, imag);
-                    writeBin (transformed, bin,
-                        magnitude * static_cast<float> (std::cos (outputPhase)),
-                        magnitude * static_cast<float> (std::sin (outputPhase)));
+                    double sine = 0.0, cosine = 0.0;
+                    liveSinCos (outputPhase, sine, cosine);
+                    writeBin (transformed, bin, magnitude * static_cast<float> (cosine),
+                                               magnitude * static_cast<float> (sine));
                 }
             }
             livePitchFft->performRealOnlyInverseTransform (transformed);
@@ -1239,8 +1241,10 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
             const auto bLeft = newWeight > 1.0e-9 ? newLeft / newWeight : 0.0;
             const auto bRight = newWeight > 1.0e-9 ? newRight / newWeight : 0.0;
             const auto angle = juce::jlimit (0.0, 1.0, phase) * kPi * 0.5;
-            wetLeft = aLeft * std::cos (angle) + bLeft * std::sin (angle);
-            wetRight = aRight * std::cos (angle) + bRight * std::sin (angle);
+            double sine = 0.0, cosine = 0.0;
+            liveSinCos (angle, sine, cosine);
+            wetLeft = aLeft * cosine + bLeft * sine;
+            wetRight = aRight * cosine + bRight * sine;
             totalWeight = 1.0;
         }
 
@@ -1259,17 +1263,19 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                 const auto blend = static_cast<double> (hp - seamStart)
                     / static_cast<double> (juce::jmax (1, seamFrames - 1));
                 const auto head = hp - seamStart;
-                holdLeft = static_cast<float> (holdLeft * std::cos (blend * kPi * 0.5)
-                    + liveHoldSnapshot[static_cast<size_t> (head) * 2u] * std::sin (blend * kPi * 0.5));
-                holdRight = static_cast<float> (holdRight * std::cos (blend * kPi * 0.5)
-                    + liveHoldSnapshot[static_cast<size_t> (head) * 2u + 1u] * std::sin (blend * kPi * 0.5));
+                double sine = 0.0, cosine = 0.0;
+                liveSinCos (blend * kPi * 0.5, sine, cosine);
+                holdLeft = static_cast<float> (holdLeft * cosine
+                    + liveHoldSnapshot[static_cast<size_t> (head) * 2u] * sine);
+                holdRight = static_cast<float> (holdRight * cosine
+                    + liveHoldSnapshot[static_cast<size_t> (head) * 2u + 1u] * sine);
             }
             const auto normalizedLeft = totalWeight > 1.0e-9 ? wetLeft / totalWeight : 0.0;
             const auto normalizedRight = totalWeight > 1.0e-9 ? wetRight / totalWeight : 0.0;
-            wetLeft = normalizedLeft * std::cos (simulatedHoldMix * kPi * 0.5)
-                    + static_cast<double> (holdLeft) * std::sin (simulatedHoldMix * kPi * 0.5);
-            wetRight = normalizedRight * std::cos (simulatedHoldMix * kPi * 0.5)
-                     + static_cast<double> (holdRight) * std::sin (simulatedHoldMix * kPi * 0.5);
+            double sine = 0.0, cosine = 0.0;
+            liveSinCos (simulatedHoldMix * kPi * 0.5, sine, cosine);
+            wetLeft = normalizedLeft * cosine + static_cast<double> (holdLeft) * sine;
+            wetRight = normalizedRight * cosine + static_cast<double> (holdRight) * sine;
             totalWeight = 1.0;
             ++simulatedHoldPhase;
             if (simulatedHoldPhase >= liveGrainFrames) simulatedHoldPhase = seamFrames;
@@ -1302,6 +1308,46 @@ float XYPadEngine::blendLiveReentrySample (float tail, float target, float q) no
 {
     const auto amount = juce::jlimit (0.0f, 1.0f, q);
     return tail * (1.0f - amount) + target * amount;
+}
+
+void XYPadEngine::liveSinCos (double phase, double& sine, double& cosine) noexcept
+{
+    if (! std::isfinite (phase) || std::abs (phase) > 1.0e9)
+    {
+        sine = std::sin (phase); cosine = std::cos (phase);
+        return;
+    }
+#if defined(TOYOTOMI_XY_HAS_SSE2)
+    const auto turns = static_cast<double> (_mm_cvtsd_si32 (_mm_set_sd (phase * (1.0 / (2.0 * kPi)))));
+#else
+    const auto turns = std::nearbyint (phase * (1.0 / (2.0 * kPi)));
+#endif
+    // The high part times this bounded integer quotient is exactly representable.
+    auto x = (phase - turns * 6.28125) - turns * 0.001935307179586476925286766559;
+    if (x > kPi) x -= 2.0 * kPi;
+    else if (x < -kPi) x += 2.0 * kPi;
+    double sign = 1.0;
+    if (x > kPi * 0.5) { x = kPi - x; sign = -1.0; }
+    else if (x < -kPi * 0.5) { x = -kPi - x; sign = -1.0; }
+    const auto z = x * x;
+    auto s = 1.0 / 355687428096000.0;
+    s = -1.0 / 1307674368000.0 + z * s;
+    s = 1.0 / 6227020800.0 + z * s;
+    s = -1.0 / 39916800.0 + z * s;
+    s = 1.0 / 362880.0 + z * s;
+    s = -1.0 / 5040.0 + z * s;
+    s = 1.0 / 120.0 + z * s;
+    s = -1.0 / 6.0 + z * s;
+    sine = x * (1.0 + z * s);
+    auto c = 1.0 / 20922789888000.0;
+    c = -1.0 / 87178291200.0 + z * c;
+    c = 1.0 / 479001600.0 + z * c;
+    c = -1.0 / 3628800.0 + z * c;
+    c = 1.0 / 40320.0 + z * c;
+    c = -1.0 / 720.0 + z * c;
+    c = 1.0 / 24.0 + z * c;
+    c = -1.0 / 2.0 + z * c;
+    cosine = sign * (1.0 + z * c);
 }
 
 void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
@@ -1639,8 +1685,10 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             const auto newNormLeft = newWindowTotal > 1.0e-9 ? newLeft / newWindowTotal : 0.0;
             const auto newNormRight = newWindowTotal > 1.0e-9 ? newRight / newWindowTotal : 0.0;
             const auto angle = transitionPhase * kPi * 0.5;
-            wetLeft = oldNormLeft * std::cos (angle) + newNormLeft * std::sin (angle);
-            wetRight = oldNormRight * std::cos (angle) + newNormRight * std::sin (angle);
+            double sine = 0.0, cosine = 0.0;
+            liveSinCos (angle, sine, cosine);
+            wetLeft = oldNormLeft * cosine + newNormLeft * sine;
+            wetRight = oldNormRight * cosine + newNormRight * sine;
             // The branches are already normalized. A unit denominator keeps
             // the existing hold/readiness path from normalizing them again.
             windowTotal = 1.0;
@@ -1663,8 +1711,8 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                 const auto blend = static_cast<double> (phase - seamStart)
                     / static_cast<double> (juce::jmax (1, seamFrames - 1));
                 const auto head = phase - seamStart;
-                const auto a = std::cos (blend * kPi * 0.5);
-                const auto b = std::sin (blend * kPi * 0.5);
+                double a = 0.0, b = 0.0;
+                liveSinCos (blend * kPi * 0.5, b, a);
                 loopLeft = static_cast<float> (loopLeft * a
                     + liveHoldSnapshot[static_cast<size_t> (head) * 2u] * b);
                 loopRight = static_cast<float> (loopRight * a
@@ -1672,10 +1720,10 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             }
             const auto normalizedLeft = windowTotal > 1.0e-9 ? wetLeft / windowTotal : 0.0;
             const auto normalizedRight = windowTotal > 1.0e-9 ? wetRight / windowTotal : 0.0;
-            wetLeft = normalizedLeft * std::cos (liveHoldMix * kPi * 0.5)
-                    + static_cast<double> (loopLeft) * std::sin (liveHoldMix * kPi * 0.5);
-            wetRight = normalizedRight * std::cos (liveHoldMix * kPi * 0.5)
-                     + static_cast<double> (loopRight) * std::sin (liveHoldMix * kPi * 0.5);
+            double sine = 0.0, cosine = 0.0;
+            liveSinCos (liveHoldMix * kPi * 0.5, sine, cosine);
+            wetLeft = normalizedLeft * cosine + static_cast<double> (loopLeft) * sine;
+            wetRight = normalizedRight * cosine + static_cast<double> (loopRight) * sine;
             windowTotal = 1.0;
             ++liveHoldPhase;
             if (liveHoldPhase >= liveGrainFrames) liveHoldPhase = seamFrames;
