@@ -928,6 +928,8 @@ public:
                 uint64_t measuredSamples = 0, events = 0;
                 double peakRatio = 0.0, callbackWallSeconds = 0.0;
                 uint64_t largestCallbackCycles = 0, maxCyclesAtSample = 0, maxCyclesWriteSerial = 0;
+                double wallRatioAtMaxCycles = 0.0;
+                uint64_t cyclesAtMaxWall = 0;
                 uint64_t maxWallAtSample = 0, maxWallWriteSerial = 0;
                 uint64_t conditionCpuStart = 0, conditionCpuEnd = 0;
                 if (! readCurrentThreadCpuTicks (conditionCpuStart)) return false;
@@ -961,12 +963,14 @@ public:
                         peakRatio = ratio;
                         maxWallAtSample = timelineSample;
                         maxWallWriteSerial = writeSerialBefore;
+                        cyclesAtMaxWall = callbackCycles;
                     }
                     if (callbackCycles > largestCallbackCycles)
                     {
                         largestCallbackCycles = callbackCycles;
                         maxCyclesAtSample = timelineSample;
                         maxCyclesWriteSerial = writeSerialBefore;
+                        wallRatioAtMaxCycles = ratio;
                     }
                     callbackWallSeconds += elapsed * 1.0e-6;
                     for (int frame = 0; frame < block; ++frame)
@@ -1002,6 +1006,7 @@ public:
                           << " p50=" << p50Cycles << " p99=" << p99Cycles << " max=" << maxCycles
                           << " p99_to_p50=" << p99CyclesToMedian
                           << " max_to_p50=" << maxCyclesToMedian
+                          << " max_cycles_wall_ratio=" << wallRatioAtMaxCycles
                           << " max_sample=" << maxCyclesAtSample
                           << " max_writer_index=" << (maxCyclesWriteSerial & engine.liveHistoryIndexMask)
                           << " max_frames_to_ring_wrap="
@@ -1010,6 +1015,7 @@ public:
                 std::cout << "METRIC reentrant_benchmark rate=" << rate << " mode="
                           << (mode < 5 ? fixedBlocks[mode] : -1) << " p99_deadline_ratio=" << p99Ratio
                           << " max_deadline_ratio=" << peakRatio
+                          << " max_wall_thread_cycles=" << cyclesAtMaxWall
                           << " max_wall_sample=" << maxWallAtSample
                           << " max_wall_writer_index=" << (maxWallWriteSerial & engine.liveHistoryIndexMask)
                           << " avg_thread_cpu_to_callback_wall=" << averageThreadCpuToCallbackWall
