@@ -130,7 +130,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     liveDirection = 1;
     livePitchSerial = 0;
     liveSmoothedSemitones = livePitchWetMix = 0.0f;
-    livePitchSmoothingCoefficient = 0.0f;
+    livePitchSmoothingCoefficient = livePitchWetMixStep = 0.0f;
 
     if (! std::isfinite (rate) || rate <= 0.0 || rate > kMaxSampleRate
         || maximumBlockSize <= 0)
@@ -219,6 +219,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         livePitchSynthesisPhase.reset (new (std::nothrow) double[static_cast<size_t> (kLivePitchBins)]);
         livePitchPhaseInitialized.reset (new (std::nothrow) uint8_t[static_cast<size_t> (kLivePitchBins)]);
         livePitchSmoothingCoefficient = static_cast<float> (1.0 - std::exp (-1.0 / (rate * 0.005)));
+        livePitchWetMixStep = 1.0f / static_cast<float> (juce::jmax (1, juce::roundToInt (rate * 0.005)));
         if ((! liveOnly && (! scratch || ! fftWork || ! fftWork2 || ! overlapNorm || ! previousInputPhase
             || ! synthesisPhase || ! phaseInitialized || ! fft)) || ! liveHistory || ! liveHistorySerials
             || ! liveHoldSnapshot || ! liveGrainWindow || ! liveReentryTailBuffers[0]
@@ -320,7 +321,7 @@ void XYPadEngine::release() noexcept
     liveSourceFadeActive = false;
     livePitchSerial = 0;
     liveSmoothedSemitones = livePitchWetMix = 0.0f;
-    livePitchSmoothingCoefficient = 0.0f;
+    livePitchSmoothingCoefficient = livePitchWetMixStep = 0.0f;
     renderQueueHead.store (0, std::memory_order_relaxed);
     renderQueueTail.store (0, std::memory_order_relaxed);
 }
@@ -378,16 +379,16 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
         const auto pitchControlSerial = frameStart + static_cast<uint64_t> (kLivePitchFftSize / 2);
         const auto ratioDelayIndex = static_cast<size_t> (pitchControlSerial
             % static_cast<uint64_t> (kLivePipelineLatency));
-        const auto frameSemitones = juce::jlimit (-12.0, 12.0,
-            static_cast<double> (livePitchSemitoneDelay[ratioDelayIndex]));
+        const auto frameSemitones = juce::jlimit (-12.0f, 12.0f,
+            livePitchSemitoneDelay[ratioDelayIndex]);
         // At neutral pitch the contract is the delayed identity path. Avoid
         // running a full stereo phase-vocoder frame until pitch is audible or
         // has been requested for this frame. This changes no latency or output
         // sample at 0 st, but keeps the common center-Y path inexpensive.
         if (std::abs (frameSemitones) >= 0.01 || livePitchWetMix > 0.0f)
         {
-        const auto ratio = std::pow (2.0, frameSemitones / 12.0);
-        std::array<double, static_cast<size_t> (kLivePitchBins)> leftPhase {};
+        const auto ratio = std::pow (2.0f, frameSemitones / 12.0f);
+        std::array<float, static_cast<size_t> (kLivePitchBins)> leftPhase {};
         const auto readBin = [] (const float* data, int bin, bool imaginary) noexcept
         {
             if (bin == 0) return imaginary ? 0.0f : data[0];
@@ -423,8 +424,8 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
             {
                 for (int bin = 0; bin < kLivePitchBins; ++bin)
                 {
-                    const auto sourceBin = static_cast<double> (bin) / ratio;
-                    if (sourceBin > kLivePitchFftSize / 2.0) { leftPhase[static_cast<size_t> (bin)] = 0.0; continue; }
+                    const auto sourceBin = static_cast<float> (bin) / ratio;
+                    if (sourceBin > kLivePitchFftSize / 2.0f) { leftPhase[static_cast<size_t> (bin)] = 0.0f; continue; }
                     const auto low = static_cast<int> (sourceBin);
                     const auto high = juce::jmin (kLivePitchFftSize / 2, low + 1);
                     const auto fraction = static_cast<float> (sourceBin - low);
@@ -447,11 +448,11 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
                     }
                     else
                     {
-                        const auto expected = 2.0 * kPi * sourceBin * kLivePitchHopSize / kLivePitchFftSize;
-                        const auto residual = std::remainder (phase - previous - expected, 2.0 * kPi);
-                        const auto instantaneousBin = sourceBin + residual * kLivePitchFftSize
+                        const auto expected = 2.0 * kPi * static_cast<double> (sourceBin) * kLivePitchHopSize / kLivePitchFftSize;
+                        const auto residual = std::remainder (static_cast<double> (phase) - previous - expected, 2.0 * kPi);
+                        const auto instantaneousBin = static_cast<double> (sourceBin) + residual * kLivePitchFftSize
                             / (2.0 * kPi * kLivePitchHopSize);
-                        synthesis += 2.0 * kPi * instantaneousBin * ratio * kLivePitchHopSize
+                        synthesis += 2.0 * kPi * instantaneousBin * static_cast<double> (ratio) * kLivePitchHopSize
                             / kLivePitchFftSize;
                     }
                     previous = phase;
@@ -465,8 +466,8 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
             {
                 for (int bin = 0; bin < kLivePitchBins; ++bin)
                 {
-                    const auto sourceBin = static_cast<double> (bin) / ratio;
-                    if (sourceBin > kLivePitchFftSize / 2.0) continue;
+                    const auto sourceBin = static_cast<float> (bin) / ratio;
+                    if (sourceBin > kLivePitchFftSize / 2.0f) continue;
                     const auto low = static_cast<int> (sourceBin);
                     const auto high = juce::jmin (kLivePitchFftSize / 2, low + 1);
                     const auto fraction = static_cast<float> (sourceBin - low);
@@ -475,7 +476,8 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
                     const auto imag = readBin (work, low, true)
                         + (readBin (work, high, true) - readBin (work, low, true)) * fraction;
                     const auto phase = std::atan2 (imag, real);
-                    const auto phaseOffset = std::remainder (phase - leftPhase[static_cast<size_t> (bin)], 2.0 * kPi);
+                    const auto phaseOffset = std::remainder (static_cast<double> (phase)
+                        - static_cast<double> (leftPhase[static_cast<size_t> (bin)]), 2.0 * kPi);
                     const auto outputPhase = livePitchSynthesisPhase[static_cast<size_t> (bin)] + phaseOffset;
                     const auto magnitude = std::hypot (real, imag);
                     double sine = 0.0, cosine = 0.0;
@@ -506,9 +508,8 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
     livePitchOlaLeft[olaIndex] = livePitchOlaRight[olaIndex] = livePitchOlaNorm[olaIndex] = 0.0f;
 
     const auto pitchTarget = std::abs (delayedSemitones) >= 0.01f ? 1.0f : 0.0f;
-    const auto pitchMixStep = 1.0f / static_cast<float> (juce::jmax (1, juce::roundToInt (sampleRate * 0.005)));
-    if (livePitchWetMix < pitchTarget) livePitchWetMix = juce::jmin (pitchTarget, livePitchWetMix + pitchMixStep);
-    else if (livePitchWetMix > pitchTarget) livePitchWetMix = juce::jmax (pitchTarget, livePitchWetMix - pitchMixStep);
+    if (livePitchWetMix < pitchTarget) livePitchWetMix = juce::jmin (pitchTarget, livePitchWetMix + livePitchWetMixStep);
+    else if (livePitchWetMix > pitchTarget) livePitchWetMix = juce::jmax (pitchTarget, livePitchWetMix - livePitchWetMixStep);
     outputLeft = delayedLeft + (pitchedLeft - delayedLeft) * livePitchWetMix;
     outputRight = delayedRight + (pitchedRight - delayedRight) * livePitchWetMix;
     outputMask = delayedMask;

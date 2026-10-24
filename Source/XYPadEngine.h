@@ -192,6 +192,7 @@ private:
     std::unique_ptr<uint8_t[]> livePitchPhaseInitialized;
     uint64_t livePitchSerial = 0;
     float liveSmoothedSemitones = 0.0f, livePitchWetMix = 0.0f;
+    float livePitchWetMixStep = 0.0f;
     float livePitchSmoothingCoefficient = 0.0f;
     std::array<LiveGrain, kLiveGrainCapacity> liveGrains {};
     uint64_t liveWriteSerial = 0;
