@@ -41,6 +41,12 @@ uses `check`. The verifier now recognizes each existing schema after requiring
 its mapped executed assertions. The approved manifests and their hashes remain
 unchanged; this does not remove any supplemental requirement.
 
+AC-04's test locator still referred to the retired copied-snapshot test label.
+Bind it to the executed forward/reverse test and add the complete-lifetime ring
+reference test. The scalar endpoint comparison stays mandatory. This follows
+the already-approved immutable-serial retention optimization without changing
+the AC requirement.
+
 Qualification still requires the exact CI executable and source hashes, local
 Ryzen 3 2200U results, all 21 deterministic AC, Jev and Sol approval. A remaining
 deadline failure blocks promotion.
