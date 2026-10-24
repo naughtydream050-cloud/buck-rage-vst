@@ -19,6 +19,7 @@
   #define NOMINMAX
  #endif
  #include <windows.h>
+ #include <realtimeapiset.h>
 #endif
 
 #if defined(_WIN32)
@@ -916,6 +917,8 @@ public:
                 }
                 std::vector<double> deadlineRatios;
                 deadlineRatios.reserve (static_cast<size_t> (rate / 64.0 * 30.0 + 64.0));
+                std::vector<uint64_t> callbackThreadCycles;
+                callbackThreadCycles.reserve (deadlineRatios.capacity());
                 uint64_t measuredSamples = 0, events = 0;
                 double peakRatio = 0.0, callbackWallSeconds = 0.0;
                 uint64_t conditionCpuStart = 0, conditionCpuEnd = 0;
@@ -930,14 +933,19 @@ public:
                         % static_cast<uint64_t> (XYPadEngine::kBarCount));
                     eventTransport.startPhase = static_cast<double> (timelineSample % 256u) / 256.0;
                     eventTransport.phasePerSample = 1.0 / 256.0;
+                    ULONG64 cyclesBefore = 0, cyclesAfter = 0;
+                    if (! QueryThreadCycleTime (GetCurrentThread(), &cyclesBefore)) return false;
                     const auto start = std::chrono::steady_clock::now();
                     // Process one real host-sized callback. The 256-point
                     // trajectory alternates X every sample within each BAR.
                     engine.processLive (input, output, mask, eventTransport, block);
                     const auto stop = std::chrono::steady_clock::now();
+                    if (! QueryThreadCycleTime (GetCurrentThread(), &cyclesAfter)
+                        || cyclesAfter < cyclesBefore) return false;
                     const auto elapsed = std::chrono::duration<double, std::micro> (stop - start).count();
                     const auto ratio = elapsed / (1.0e6 * block / rate);
                     deadlineRatios.push_back (ratio);
+                    callbackThreadCycles.push_back (static_cast<uint64_t> (cyclesAfter - cyclesBefore));
                     peakRatio = std::max (peakRatio, ratio);
                     callbackWallSeconds += elapsed * 1.0e-6;
                     for (int frame = 0; frame < block; ++frame)
@@ -953,9 +961,26 @@ public:
                         / callbackWallSeconds : std::numeric_limits<double>::infinity();
                 std::sort (deadlineRatios.begin(), deadlineRatios.end());
                 const auto p99Ratio = deadlineRatios[static_cast<size_t> (std::ceil (0.99 * deadlineRatios.size())) - 1u];
+                if (callbackThreadCycles.size() != deadlineRatios.size()
+                    || callbackThreadCycles.empty()) return false;
+                std::sort (callbackThreadCycles.begin(), callbackThreadCycles.end());
+                const auto p50Cycles = callbackThreadCycles[callbackThreadCycles.size() / 2u];
+                if (p50Cycles == 0) return false;
+                const auto p99Cycles = callbackThreadCycles[static_cast<size_t> (
+                    std::ceil (0.99 * callbackThreadCycles.size())) - 1u];
+                const auto maxCycles = callbackThreadCycles.back();
+                const auto maxCyclesToMedian = static_cast<double> (maxCycles)
+                                             / static_cast<double> (p50Cycles);
+                const auto p99CyclesToMedian = static_cast<double> (p99Cycles)
+                                             / static_cast<double> (p50Cycles);
                 const auto within = p99Ratio <= 0.50 && peakRatio <= 0.80;
                 allWithinDeadline = allWithinDeadline && within;
                 ++conditionCount;
+                std::cout << "METRIC reentrant_cycle_diagnostic rate=" << rate << " mode="
+                          << (mode < 5 ? fixedBlocks[mode] : -1)
+                          << " p50=" << p50Cycles << " p99=" << p99Cycles << " max=" << maxCycles
+                          << " p99_to_p50=" << p99CyclesToMedian
+                          << " max_to_p50=" << maxCyclesToMedian << "\n";
                 std::cout << "METRIC reentrant_benchmark rate=" << rate << " mode="
                           << (mode < 5 ? fixedBlocks[mode] : -1) << " p99_deadline_ratio=" << p99Ratio
                           << " max_deadline_ratio=" << peakRatio
