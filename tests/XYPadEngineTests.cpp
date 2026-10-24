@@ -913,7 +913,7 @@ public:
         }
         ScopedHostCallbackPacer pacer;
         if (! pacer.valid()) return false;
-        std::cout << "METRIC benchmark_schedule class=MMCSS-Pro-Audio process_priority=Normal host_cadence=sample_clock\n";
+        std::cout << "METRIC benchmark_schedule class=MMCSS-Pro-Audio process_priority=Normal host_cadence=sample_clock pitch_semitones=12\n";
 #else
         std::cerr << "FAIL benchmark-scheduling-requires-windows-mmcss\n";
         return false;
@@ -931,7 +931,7 @@ public:
                 std::vector<PluginStateModel::MotionPoint> points;
                 points.reserve (XYPadEngine::kMaxPoints);
                 for (int point = 0; point < XYPadEngine::kMaxPoints; ++point)
-                    points.push_back ({ (point & 1) == 0 ? 0.1f : 0.9f, 0.5f,
+                    points.push_back ({ (point & 1) == 0 ? 0.1f : 0.9f, 1.0f,
                         static_cast<double> (point) / XYPadEngine::kMaxPoints });
                 for (int bar = 0; bar < XYPadEngine::kBarCount; ++bar)
                     engine.setTrajectory (bar, points, static_cast<uint32_t> (701 + bar));
@@ -1051,7 +1051,8 @@ public:
                                              / static_cast<double> (p50Cycles);
                 const auto p99CyclesToMedian = static_cast<double> (p99Cycles)
                                              / static_cast<double> (p50Cycles);
-                const auto within = p99Ratio <= 0.50 && peakRatio <= 0.80;
+                const auto pitchActive = engine.livePitchWetMix >= 0.99f;
+                const auto within = p99Ratio <= 0.50 && peakRatio <= 0.80 && pitchActive;
                 allWithinDeadline = allWithinDeadline && within;
                 ++conditionCount;
                 std::cout << "METRIC benchmark_pacing rate=" << rate << " mode="
@@ -1059,7 +1060,8 @@ public:
                           << " wall_seconds=" << std::chrono::duration<double> (
                               std::chrono::steady_clock::now() - conditionWallStart).count()
                           << " max_dispatch_lateness_us=" << maxDispatchLatenessUs
-                          << " callback_count=" << deadlineRatios.size() << " schedule=sample_clock\n";
+                          << " callback_count=" << deadlineRatios.size()
+                          << " pitch_active=" << pitchActive << " schedule=sample_clock\n";
                 std::cout << "METRIC reentrant_cycle_diagnostic rate=" << rate << " mode="
                           << (mode < 5 ? fixedBlocks[mode] : -1)
                           << " p50=" << p50Cycles << " p99=" << p99Cycles << " max=" << maxCycles

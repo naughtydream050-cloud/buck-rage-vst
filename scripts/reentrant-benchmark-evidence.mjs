@@ -3,7 +3,7 @@ const expectedModes = [64, 128, 256, 512, 1024, -1];
 
 export function validateReentrantBenchmarkEvidence(text) {
   if (typeof text !== 'string'
-      || !text.includes('METRIC benchmark_schedule class=MMCSS-Pro-Audio process_priority=Normal host_cadence=sample_clock'))
+      || !text.includes('METRIC benchmark_schedule class=MMCSS-Pro-Audio process_priority=Normal host_cadence=sample_clock pitch_semitones=12'))
     return { pass: false, reason: 'MMCSS_PRO_AUDIO_NOT_RECORDED' };
 
   const rows = [];

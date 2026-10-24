@@ -22,6 +22,11 @@ Dispatch lateness and wall duration are separately reported. This measures
 processing cost under host cadence; it does not certify end-to-end DAW scheduling.
 The DSP production path receives no timer, sleep or scheduling changes.
 
+The prior benchmark's Y=0.5 selects the neutral identity path and skips the FFT.
+Use Y=1 (+12 st) throughout the stress trajectory and require the pitch blend
+to reach >=0.99. This exercises the existing streaming pitch processor together
+with maximum reentry load, as required by the approved performance plan.
+
 The existing parser also predates the three max-wall diagnostic fields in the
 current executable. Update its strict allowlisted row grammar and mutation
 fixtures; do not accept unrecognized fields or relax deadline rejection.
