@@ -1,5 +1,6 @@
 #include "XYPadEngine.h"
 #include "XYPadTailAVX2.h"
+#include "XYPadLiveFFT1024.h"
 
 #include <algorithm>
 #include <chrono>
@@ -26,6 +27,53 @@
 class ScopedProAudioMmcssRegistration
 {
 public:
+    static bool lockFreeLiveFftMatchesJuce()
+    {
+        XYPadLiveFFT1024 fft;
+        juce::dsp::FFT reference (10);
+        std::array<float, 2048> actual {}, expected {}, inverse {};
+        std::array<float, 1024> input {};
+        double forwardError = 0.0, inverseError = 0.0, roundtripError = 0.0;
+        bool finite = true;
+        for (int fixture = 0; fixture < 6; ++fixture)
+        {
+            uint32_t random = 1234567u;
+            for (int i = 0; i < 1024; ++i)
+            {
+                random = random * 1664525u + 1013904223u;
+                const auto angle = 2.0 * 3.14159265358979323846 * i / 1024.0;
+                input[static_cast<size_t> (i)] = fixture == 0 ? (i == 0 ? 0.5f : 0.0f)
+                    : fixture == 1 ? 0.25f : fixture == 2 ? (i % 2 ? -0.25f : 0.25f)
+                    : fixture == 3 ? static_cast<float> (0.2 * std::sin (7.0 * angle) + 0.1 * std::cos (129.0 * angle))
+                    : fixture == 4 ? static_cast<float> (0.3 * std::sin (511.0 * angle))
+                    : static_cast<float> (random >> 8u) / 16777216.0f - 0.5f;
+            }
+            actual.fill (0.0f); expected.fill (0.0f);
+            std::copy (input.begin(), input.end(), actual.begin());
+            std::copy (input.begin(), input.end(), expected.begin());
+            fft.performRealOnlyForwardTransform (actual.data());
+            reference.performRealOnlyForwardTransform (expected.data());
+            for (size_t i = 0; i < actual.size(); ++i)
+            {
+                finite = finite && std::isfinite (actual[i]) && std::isfinite (expected[i]);
+                forwardError = std::max (forwardError, std::abs (static_cast<double> (actual[i] - expected[i])) / 1024.0);
+            }
+            inverse = expected;
+            fft.performRealOnlyInverseTransform (inverse.data());
+            reference.performRealOnlyInverseTransform (expected.data());
+            fft.performRealOnlyInverseTransform (actual.data());
+            for (size_t i = 0; i < input.size(); ++i)
+            {
+                finite = finite && std::isfinite (inverse[i]) && std::isfinite (actual[i]);
+                inverseError = std::max (inverseError, std::abs (static_cast<double> (inverse[i] - expected[i])));
+                roundtripError = std::max (roundtripError, std::abs (static_cast<double> (actual[i] - input[i])));
+            }
+        }
+        std::cout << "METRIC live_lock_free_fft forward_normalized_error=" << forwardError
+                  << " inverse_sample_error=" << inverseError << " roundtrip_error=" << roundtripError
+                  << " fixtures=6 tolerance=2e-6 finite=" << finite << "\n";
+        return finite && forwardError <= 2.0e-6 && inverseError <= 2.0e-6 && roundtripError <= 2.0e-6;
+    }
     ScopedProAudioMmcssRegistration() noexcept
     {
         avrtModule = LoadLibraryW (L"avrt.dll");
@@ -1528,6 +1576,8 @@ int main (int argc, char** argv)
         return XYPadEngineTestAccess::runControlledHostBenchmark() ? 0 : 1;
     check (sizeof (XYPadEngine) < 64u * 1024u,
            "fixed-64-bar-tables-do-not-consume-windows-thread-stack");
+    check (XYPadEngineTestAccess::lockFreeLiveFftMatchesJuce(),
+           "live-lock-free-fft-matches-juce-forward-inverse-and-roundtrip-reference");
     XYPadEngine queueProbe;
     check (XYPadEngineTestAccess::queueIsBoundedAndFifo (queueProbe),
            "render-job-spsc-queue-bounded-fifo-and-overflow-rejected");

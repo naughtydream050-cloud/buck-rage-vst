@@ -11,6 +11,8 @@
 #include <thread>
 #include <vector>
 
+class XYPadLiveFFT1024;
+
 // Phase 2 XY scratch storage. All dynamic allocation and FFT setup happen in
 // prepare(); process() only copies into preallocated storage and uses atomics.
 class XYPadEngine final
@@ -180,7 +182,7 @@ private:
     static constexpr int kLivePitchBins = kLivePitchFftSize / 2 + 1;
     static constexpr int kLivePitchOlaCapacity = 2048;
     std::unique_ptr<float[]> livePitchWindow;
-    std::unique_ptr<juce::dsp::FFT> livePitchFft;
+    std::unique_ptr<XYPadLiveFFT1024> livePitchFft;
     std::unique_ptr<float[]> livePitchFftWork, livePitchFftWork2;
     std::unique_ptr<float[]> livePitchInputRing, livePitchIdentityDelay;
     std::unique_ptr<float[]> livePitchSemitoneDelay, livePitchMaskDelay;

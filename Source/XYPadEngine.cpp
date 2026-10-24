@@ -1,5 +1,6 @@
 #include "XYPadEngine.h"
 #include "XYPadTailAVX2.h"
+#include "XYPadLiveFFT1024.h"
 
 #include <algorithm>
 #include <chrono>
@@ -200,7 +201,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         liveReentryTailFrames = liveTransitionFrames;
         for (auto& tail : liveReentryTailBuffers)
             tail.reset (new (std::nothrow) float[static_cast<size_t> (liveReentryTailFrames) * 2u]);
-        livePitchFft = std::make_unique<juce::dsp::FFT> (10);
+        livePitchFft = std::make_unique<XYPadLiveFFT1024>();
         livePitchWindow.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchFftSize)]);
         for (int frame = 0; livePitchWindow && frame < kLivePitchFftSize; ++frame)
             livePitchWindow[static_cast<size_t> (frame)] = static_cast<float> (
