@@ -972,9 +972,6 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
             referenceValid = firstPositionValid && endpointsValid;
 #if defined(TOYOTOMI_XY_HAS_SSE2)
             const auto tailFrames = static_cast<size_t> (liveReentryTailFrames);
-            const auto noRingWrapForTail = grain.direction >= 0
-                ? lowerIndex + tailFrames < capacity && upperIndex + tailFrames < capacity
-                : lowerIndex >= tailFrames && upperIndex >= tailFrames;
             const auto blendableFrameCount = previousTail == nullptr ? tailFrames
                 : static_cast<size_t> (juce::jmax (0, liveReentryTailFrames - liveReentryTailPosition - 1));
 #endif
@@ -996,10 +993,14 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                 {
                     avxLower += static_cast<size_t> (avxStart);
                     avxUpper += static_cast<size_t> (avxStart);
-                    const auto noWrap = avxCount > 0
-                        && avxLower <= capacity - static_cast<uint64_t> (avxCount)
-                        && avxUpper <= capacity - static_cast<uint64_t> (avxCount);
-                    if (! noWrap) avxCount = 0;
+                    if (avxLower < capacity && avxUpper < capacity)
+                    {
+                        const auto available = static_cast<int> (juce::jmin (
+                            capacity - 1u - static_cast<uint64_t> (avxLower),
+                            capacity - 1u - static_cast<uint64_t> (avxUpper)) + 1u);
+                        avxCount = juce::jmin (avxCount, (available / 4) * 4);
+                    }
+                    else avxCount = 0;
                 }
                 else
                 {
@@ -1010,6 +1011,8 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                     {
                         avxLower -= back;
                         avxUpper -= back;
+                        const auto available = static_cast<int> (juce::jmin (avxLower, avxUpper) + 1u);
+                        avxCount = juce::jmin (avxCount, (available / 4) * 4);
                     }
                     else avxCount = 0;
                 }
@@ -1050,9 +1053,12 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                 const auto validHannFrame = age > 0 && age < liveGrainFrames - 1;
 #if defined(TOYOTOMI_XY_HAS_SSE2)
                 const auto previousFrame = liveReentryTailPosition + frame;
+                const auto pairWithinRing = grain.direction >= 0
+                    ? lowerIndex + 1u < capacity && upperIndex + 1u < capacity
+                    : lowerIndex >= 1u && upperIndex >= 1u;
                 if (validHannFrame && age + 1 < liveGrainFrames - 1
                     && static_cast<size_t> (frame + 1) < blendableFrameCount
-                    && noRingWrapForTail)
+                    && pairWithinRing)
                 {
                     const auto* history = liveHistory.get();
                     const auto loadPair = [history, &grain] (size_t index) noexcept

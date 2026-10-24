@@ -623,17 +623,19 @@ public:
             engine.liveReentryTailActive = false;
             engine.liveReentryTailPosition = 0;
             const auto capacity = static_cast<uint64_t> (engine.liveHistoryCapacityFrames);
-            for (uint64_t serial = 0; serial < capacity; ++serial)
+            const auto writeSerial = 2u * capacity + 1024u;
+            const auto oldestSerial = writeSerial - capacity;
+            for (uint64_t serial = oldestSerial; serial < writeSerial; ++serial)
             {
-                const auto index = static_cast<size_t> (serial);
+                const auto index = static_cast<size_t> (serial & (capacity - 1u));
                 const auto value = static_cast<float> (serial % 997u) / 997.0f;
                 engine.liveHistory[index * 2u] = value;
                 engine.liveHistory[index * 2u + 1u] = -0.5f * value;
                 engine.liveHistorySerials[index] = serial;
             }
-            engine.liveWriteSerial = capacity;
+            engine.liveWriteSerial = writeSerial;
             engine.liveHistoryValidFrames = capacity;
-            const auto newest = capacity > 0 ? capacity - 1u : 0u;
+            const auto newest = writeSerial - 1u;
             for (const auto direction : { 1, -1 })
                 for (const auto fraction : { 0.0, 0.375 })
                     for (const auto age : { 1, engine.liveGrainFrames / 3, engine.liveGrainFrames / 2,
@@ -655,7 +657,11 @@ public:
                     engine.launchLiveGrain (0.5f, direction, false, 0, newest);
                     auto& grain = engine.liveGrains[0];
                     grain.age = age;
-                    const auto currentSerial = static_cast<double> (capacity / 2u) + fraction;
+                    // Exercise the AVX2/SSE tail renderer on both sides of
+                    // the physical ring seam while the serial range remains valid.
+                    const auto seamBase = direction > 0 ? 2.0 * static_cast<double> (capacity) - 2.0
+                                                         : 2.0 * static_cast<double> (capacity) + 2.0;
+                    const auto currentSerial = seamBase + fraction;
                     grain.startSerial = currentSerial - static_cast<double> (direction * age);
                     grain.fadeInFrames = 0;
                     grain.fadeOutRemaining = 0;
