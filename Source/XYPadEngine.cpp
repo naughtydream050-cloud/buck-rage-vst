@@ -201,6 +201,9 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         for (auto& tail : liveReentryTailBuffers)
             tail.reset (new (std::nothrow) float[static_cast<size_t> (liveReentryTailFrames) * 2u]);
         livePitchFft = std::make_unique<juce::dsp::FFT> (10);
+        for (int frame = 0; frame < kLivePitchFftSize; ++frame)
+            livePitchWindow[static_cast<size_t> (frame)] = static_cast<float> (
+                0.5 - 0.5 * std::cos (2.0 * kPi * frame / (kLivePitchFftSize - 1)));
         livePitchFftWork.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchFftSize) * 2u]);
         livePitchFftWork2.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchFftSize) * 2u]);
         livePitchInputRing.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchFftSize) * 2u]);
@@ -406,7 +409,7 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
                 const auto sourceSerial = frameStart + static_cast<uint64_t> (frame);
                 const auto sourceIndex = static_cast<size_t> (sourceSerial
                     % static_cast<uint64_t> (kLivePitchFftSize));
-                const auto hann = 0.5 - 0.5 * std::cos (2.0 * kPi * frame / (kLivePitchFftSize - 1));
+                const auto hann = livePitchWindow[static_cast<size_t> (frame)];
                 work[static_cast<size_t> (frame)] = livePitchInputRing[sourceIndex * 2u
                     + static_cast<size_t> (channel)] * static_cast<float> (hann);
             }
@@ -481,8 +484,7 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
             auto* ola = channel == 0 ? livePitchOlaLeft.get() : livePitchOlaRight.get();
             for (int frame = 0; frame < kLivePitchFftSize; ++frame)
             {
-                const auto hann = static_cast<float> (0.5 - 0.5 * std::cos (2.0 * kPi * frame
-                    / (kLivePitchFftSize - 1)));
+                const auto hann = livePitchWindow[static_cast<size_t> (frame)];
                 const auto targetSerial = frameStart + static_cast<uint64_t> (kLivePipelineLatency + frame);
                 const auto targetIndex = static_cast<size_t> (targetSerial
                     % static_cast<uint64_t> (kLivePitchOlaCapacity));
@@ -1094,7 +1096,7 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
                             if (++index == capacity) index = 0;
                         }
                         else
-                            --index;
+                            index = index == 0 ? static_cast<size_t> (capacity - 1u) : index - 1u;
                     };
                     advance (lowerIndex);
                     advance (upperIndex);

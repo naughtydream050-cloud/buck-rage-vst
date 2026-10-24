@@ -147,6 +147,24 @@ void operator delete[] (void* memory, std::size_t) noexcept { std::free (memory)
 class XYPadEngineTestAccess
 {
 public:
+    static bool pitchWindowCacheMatchesOriginalExpression()
+    {
+        for (const auto rate : { 44100.0, 48000.0, 96000.0 })
+        {
+            XYPadEngine engine;
+            if (! engine.prepare (rate, 64, true, true)) return false;
+            for (int frame = 0; frame < XYPadEngine::kLivePitchFftSize; ++frame)
+            {
+                const auto prior = static_cast<float> (0.5 - 0.5 * std::cos (
+                    2.0 * 3.1415926535897932384626433832795 * frame
+                        / (XYPadEngine::kLivePitchFftSize - 1)));
+                if (engine.livePitchWindow[static_cast<size_t> (frame)] != prior) return false;
+            }
+            engine.release();
+        }
+        std::cout << "METRIC live_pitch_window_cache samples=3072 max_error=0 bit_exact=1\n";
+        return true;
+    }
     static bool liveGrainWindowLutMatchesAnalytic()
     {
         XYPadEngine engine;
@@ -1738,6 +1756,8 @@ int main (int argc, char** argv)
            "ac20-extreme-finite-history-keeps-reentry-tail-finite-safety-guard-enabled");
     check (XYPadEngineTestAccess::liveGrainWindowLutMatchesAnalytic(),
            "live-grain-window-lut-matches-analytic-hann");
+    check (XYPadEngineTestAccess::pitchWindowCacheMatchesOriginalExpression(),
+           "live-pitch-window-cache-is-bit-exact-to-prior-analysis-and-synthesis-expression");
     check (XYPadEngineTestAccess::repeatedReentryBlendIsFiniteAndPeakBounded(),
            "reentrant-linear-blend-is-finite-and-per-channel-peak-bounded-for-ten-transition-lengths");
     check (XYPadEngineTestAccess::reentryMutationGuardsRejectUnsafeChanges(),
