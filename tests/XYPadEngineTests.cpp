@@ -931,6 +931,8 @@ public:
 
     static bool runControlledHostBenchmark()
     {
+        // Match PluginProcessor::processBlock's existing floating-point mode.
+        juce::ScopedNoDenormals noDenormals;
 #if defined(_WIN32)
         ScopedProAudioMmcssRegistration scheduling;
         if (! scheduling.isRegistered() || GetPriorityClass (GetCurrentProcess()) != NORMAL_PRIORITY_CLASS)
@@ -940,7 +942,7 @@ public:
         }
         ScopedHostCallbackPacer pacer;
         if (! pacer.valid()) return false;
-        std::cout << "METRIC benchmark_schedule class=MMCSS-Pro-Audio process_priority=Normal host_cadence=sample_clock pitch_semitones=12\n";
+        std::cout << "METRIC benchmark_schedule class=MMCSS-Pro-Audio process_priority=Normal host_cadence=sample_clock pitch_semitones=12 denormals=disabled\n";
 #else
         std::cerr << "FAIL benchmark-scheduling-requires-windows-mmcss\n";
         return false;

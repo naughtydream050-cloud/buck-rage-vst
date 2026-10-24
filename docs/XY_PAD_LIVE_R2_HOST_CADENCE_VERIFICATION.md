@@ -27,6 +27,11 @@ Use Y=1 (+12 st) throughout the stress trajectory and require the pitch blend
 to reach >=0.99. This exercises the existing streaming pitch processor together
 with maximum reentry load, as required by the approved performance plan.
 
+Match the processor's existing `juce::ScopedNoDenormals` mode in the standalone
+benchmark. This guard is already at PluginProcessor::processBlock entry; the
+previous direct-engine benchmark omitted it. Record the mode explicitly. It
+changes no production DSP behavior and does not exclude any timed callback.
+
 The existing parser also predates the three max-wall diagnostic fields in the
 current executable. Update its strict allowlisted row grammar and mutation
 fixtures; do not accept unrecognized fields or relax deadline rejection.

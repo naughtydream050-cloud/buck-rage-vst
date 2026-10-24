@@ -8,13 +8,14 @@ const rows = rates.flatMap(rate => modes.map(mode => {
   const events = Math.floor(samples * 0.99609);
   return `METRIC reentrant_benchmark rate=${rate} mode=${mode} p99_deadline_ratio=0.25 max_deadline_ratio=0.75 max_wall_thread_cycles=100000 max_wall_sample=100000 max_wall_writer_index=1000 avg_thread_cpu_to_callback_wall=0.10 events=${events} samples=${samples} event_rate=${(events / samples).toFixed(6)} callback_shape=one_host_block status=PASS`;
 }));
-const valid = `METRIC benchmark_schedule class=MMCSS-Pro-Audio process_priority=Normal host_cadence=sample_clock pitch_semitones=12\n${rows.join('\n')}\nMETRIC reentrant_benchmark_complete conditions=18 status=PASS`;
+const valid = `METRIC benchmark_schedule class=MMCSS-Pro-Audio process_priority=Normal host_cadence=sample_clock pitch_semitones=12 denormals=disabled\n${rows.join('\n')}\nMETRIC reentrant_benchmark_complete conditions=18 status=PASS`;
 assert.deepEqual(validateReentrantBenchmarkEvidence(valid), { pass: true, reason: null, rows: 18 });
 
 const rejects = [
   [valid.replace('process_priority=Normal', 'process_priority=High'), 'MMCSS_PRO_AUDIO_NOT_RECORDED'],
   [valid.replace(' host_cadence=sample_clock', ''), 'MMCSS_PRO_AUDIO_NOT_RECORDED'],
   [valid.replace('pitch_semitones=12', 'pitch_semitones=0'), 'MMCSS_PRO_AUDIO_NOT_RECORDED'],
+  [valid.replace(' denormals=disabled', ''), 'MMCSS_PRO_AUDIO_NOT_RECORDED'],
   [valid.replace('max_deadline_ratio=0.75', 'max_deadline_ratio=0.81'), 'REALTIME_DEADLINE_EXCEEDED'],
   [valid.replace('p99_deadline_ratio=0.25', 'p99_deadline_ratio=0.51'), 'REALTIME_DEADLINE_EXCEEDED'],
   [valid.replace('status=PASS', 'status=FAIL'), 'REALTIME_DEADLINE_EXCEEDED'],
