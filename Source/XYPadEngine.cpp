@@ -913,6 +913,30 @@ bool XYPadEngine::readLiveStereoSample (double serial, uint64_t oldestSerial,
     return std::isfinite (left) && std::isfinite (right);
 }
 
+bool XYPadEngine::copyLiveHoldSnapshot (uint64_t startSerial, uint64_t newestSerial) noexcept
+{
+    if (liveHoldSnapshot == nullptr || liveHistory == nullptr || liveHistorySerials == nullptr
+        || liveGrainFrames <= 1 || liveHistoryCapacityFrames <= 0
+        || newestSerial < startSerial
+        || newestSerial - startSerial + 1u != static_cast<uint64_t> (liveGrainFrames))
+        return false;
+
+    const auto firstIndex = static_cast<size_t> (startSerial & liveHistoryIndexMask);
+    const auto lastIndex = static_cast<size_t> (newestSerial & liveHistoryIndexMask);
+    if (liveHistorySerials[firstIndex] != startSerial || liveHistorySerials[lastIndex] != newestSerial)
+        return false;
+
+    const auto capacity = static_cast<size_t> (liveHistoryCapacityFrames);
+    const auto firstFrames = juce::jmin (static_cast<size_t> (liveGrainFrames), capacity - firstIndex);
+    std::memcpy (liveHoldSnapshot.get(), liveHistory.get() + firstIndex * 2u,
+                 firstFrames * 2u * sizeof (float));
+    const auto remainingFrames = static_cast<size_t> (liveGrainFrames) - firstFrames;
+    if (remainingFrames > 0)
+        std::memcpy (liveHoldSnapshot.get() + firstFrames * 2u, liveHistory.get(),
+                     remainingFrames * 2u * sizeof (float));
+    return true;
+}
+
 void XYPadEngine::launchLiveGrain (float x, int direction, bool transition,
                                    uint64_t oldestSerial, uint64_t newestSerial) noexcept
 {
@@ -1612,18 +1636,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             && liveStationaryFrames >= stationaryFramesRequired && liveHoldSnapshot != nullptr)
         {
             const auto holdStart = newestSerial + 1u - static_cast<uint64_t> (liveGrainFrames);
-            bool holdCopyValid = true;
-            for (int holdFrame = 0; holdFrame < liveGrainFrames; ++holdFrame)
-            {
-                float left = 0.0f, right = 0.0f;
-                const auto serial = static_cast<double> (holdStart + static_cast<uint64_t> (holdFrame));
-                holdCopyValid = holdCopyValid
-                    && readLiveStereoSample (serial, oldestSerial, newestSerial, left, right);
-                if (! holdCopyValid) break;
-                liveHoldSnapshot[static_cast<size_t> (holdFrame) * 2u] = left;
-                liveHoldSnapshot[static_cast<size_t> (holdFrame) * 2u + 1u] = right;
-            }
-            if (holdCopyValid)
+            if (holdStart >= oldestSerial && copyLiveHoldSnapshot (holdStart, newestSerial))
             {
                 liveHoldReady = true;
                 liveHoldPhase = 0;

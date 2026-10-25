@@ -123,6 +123,7 @@ private:
                          uint64_t newestSerial, float& value) const noexcept;
     bool readLiveStereoSample (double serial, uint64_t oldestSerial, uint64_t newestSerial,
                                float& left, float& right) const noexcept;
+    bool copyLiveHoldSnapshot (uint64_t startSerial, uint64_t newestSerial) noexcept;
     void launchLiveGrain (float x, int direction, bool transition,
                           uint64_t oldestSerial, uint64_t newestSerial) noexcept;
     void captureLiveContinuationTail() noexcept;

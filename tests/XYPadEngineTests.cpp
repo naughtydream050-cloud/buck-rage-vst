@@ -195,6 +195,37 @@ void operator delete[] (void* memory, std::size_t) noexcept { std::free (memory)
 class XYPadEngineTestAccess
 {
 public:
+    static bool holdSnapshotBulkCopyMatchesRingAcrossWrap()
+    {
+        XYPadEngine engine;
+        if (! engine.prepare (96000.0, 128, true, true) || engine.liveHistory == nullptr
+            || engine.liveHistorySerials == nullptr || engine.liveHoldSnapshot == nullptr)
+            return false;
+        const auto frames = static_cast<uint64_t> (engine.liveGrainFrames);
+        const auto start = static_cast<uint64_t> (engine.liveHistoryCapacityFrames) - frames / 2u;
+        const auto newest = start + frames - 1u;
+        for (uint64_t serial = start; serial <= newest; ++serial)
+        {
+            const auto index = static_cast<size_t> (serial & engine.liveHistoryIndexMask);
+            engine.liveHistorySerials[index] = serial;
+            engine.liveHistory[index * 2u] = static_cast<float> (serial % 997u) * 0.001f;
+            engine.liveHistory[index * 2u + 1u] = -static_cast<float> (serial % 991u) * 0.001f;
+        }
+        const auto copied = engine.copyLiveHoldSnapshot (start, newest);
+        bool exact = copied;
+        for (uint64_t offset = 0; exact && offset < frames; ++offset)
+        {
+            const auto sourceIndex = static_cast<size_t> ((start + offset) & engine.liveHistoryIndexMask);
+            const auto destinationIndex = static_cast<size_t> (offset) * 2u;
+            exact = engine.liveHoldSnapshot[destinationIndex] == engine.liveHistory[sourceIndex * 2u]
+                 && engine.liveHoldSnapshot[destinationIndex + 1u] == engine.liveHistory[sourceIndex * 2u + 1u];
+        }
+        std::cout << "METRIC live_hold_snapshot bulk_copy_wrap_exact=" << exact
+                  << " frames=" << frames << "\n";
+        engine.release();
+        return exact;
+    }
+
     static bool pitchMappedBinPrefixMatchesDirectMapping()
     {
         constexpr double rate = 96000.0;
@@ -1746,6 +1777,8 @@ int main (int argc, char** argv)
            "fixed-64-bar-tables-do-not-consume-windows-thread-stack");
     check (lockFreeLiveFftMatchesJuce(),
            "live-lock-free-fft-matches-juce-forward-inverse-and-roundtrip-reference");
+    check (XYPadEngineTestAccess::holdSnapshotBulkCopyMatchesRingAcrossWrap(),
+           "xy-live-hold-snapshot-bulk-copy-preserves-wrapped-stereo-history");
     check (XYPadEngineTestAccess::liveSinCosMatchesStandardReference(),
            "live-paired-sincos-matches-standard-functions-through-large-phases-and-fallback");
     XYPadEngine queueProbe;
