@@ -130,6 +130,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     liveDirection = 1;
     livePitchSerial = 0;
     liveSmoothedSemitones = livePitchWetMix = 0.0f;
+    livePitchMappedBinCount = 0;
     livePitchSmoothingCoefficient = livePitchWetMixStep = 0.0f;
 
     if (! std::isfinite (rate) || rate <= 0.0 || rate > kMaxSampleRate
@@ -434,23 +435,23 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
 
             if (channel == 0)
             {
+                livePitchMappedBinCount = 0;
                 for (int bin = 0; bin < kLivePitchBins; ++bin)
                 {
                     const auto index = static_cast<size_t> (bin);
-                    // Mark out-of-range bins explicitly: the source map is
-                    // reused on the right channel and must never retain the
-                    // previous frame's valid mapping.
-                    livePitchSourceLowBins[index] = -1;
-                    livePitchSourceHighBins[index] = -1;
-                    livePitchSourceFractions[index] = 0.0f;
                     const auto sourceBin = static_cast<float> (bin) / ratio;
-                    if (sourceBin > kLivePitchFftSize / 2.0f) continue;
+                    // sourceBin increases monotonically with bin. The omitted
+                    // transformed bins stay zero because the buffer was
+                    // cleared above; recording this prefix also lets the
+                    // right channel skip the same known-zero suffix.
+                    if (sourceBin > kLivePitchFftSize / 2.0f) break;
                     const auto low = static_cast<int> (sourceBin);
                     const auto high = juce::jmin (kLivePitchFftSize / 2, low + 1);
                     const auto fraction = static_cast<float> (sourceBin - low);
                     livePitchSourceLowBins[index] = low;
                     livePitchSourceHighBins[index] = high;
                     livePitchSourceFractions[index] = fraction;
+                    livePitchMappedBinCount = bin + 1;
                     const auto real = readBin (work, low, false)
                         + (readBin (work, high, false) - readBin (work, low, false)) * fraction;
                     const auto imag = readBin (work, low, true)
@@ -489,13 +490,12 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
             }
             else
             {
-                for (int bin = 0; bin < kLivePitchBins; ++bin)
+                for (int bin = 0; bin < livePitchMappedBinCount; ++bin)
                 {
                     const auto index = static_cast<size_t> (bin);
                     const auto low = livePitchSourceLowBins[index];
                     const auto high = livePitchSourceHighBins[index];
                     const auto fraction = livePitchSourceFractions[index];
-                    if (low < 0 || high < low || high > kLivePitchFftSize / 2) continue;
                     const auto real = readBin (work, low, false)
                         + (readBin (work, high, false) - readBin (work, low, false)) * fraction;
                     const auto imag = readBin (work, low, true)

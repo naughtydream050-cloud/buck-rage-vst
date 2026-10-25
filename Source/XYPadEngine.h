@@ -204,6 +204,7 @@ private:
     float liveSmoothedSemitones = 0.0f, livePitchWetMix = 0.0f;
     float livePitchWetMixStep = 0.0f;
     float livePitchSmoothingCoefficient = 0.0f;
+    int livePitchMappedBinCount = 0;
     std::array<LiveGrain, kLiveGrainCapacity> liveGrains {};
     uint64_t liveWriteSerial = 0;
     uint64_t liveHistoryValidFrames = 0;
