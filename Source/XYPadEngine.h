@@ -195,9 +195,8 @@ private:
     // The right channel uses the exact bin mapping selected by the left
     // analysis in the same frame. Keeping this fixed-size map avoids a second
     // per-bin division/conversion pass without altering the interpolation.
-    std::array<int, kLivePitchBins> livePitchSourceLowBins {};
-    std::array<int, kLivePitchBins> livePitchSourceHighBins {};
-    std::array<float, kLivePitchBins> livePitchSourceFractions {};
+    std::unique_ptr<int[]> livePitchSourceLowBins, livePitchSourceHighBins;
+    std::unique_ptr<float[]> livePitchSourceFractions;
     std::unique_ptr<double[]> livePitchPreviousPhase, livePitchSynthesisPhase;
     std::unique_ptr<uint8_t[]> livePitchPhaseInitialized;
     uint64_t livePitchSerial = 0;

@@ -221,6 +221,9 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         livePitchReferenceInverseMagnitude.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchBins)]);
         livePitchSynthesisSine.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchBins)]);
         livePitchSynthesisCosine.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchBins)]);
+        livePitchSourceLowBins.reset (new (std::nothrow) int[static_cast<size_t> (kLivePitchBins)]);
+        livePitchSourceHighBins.reset (new (std::nothrow) int[static_cast<size_t> (kLivePitchBins)]);
+        livePitchSourceFractions.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchBins)]);
         livePitchPreviousPhase.reset (new (std::nothrow) double[static_cast<size_t> (kLivePitchBins)]);
         livePitchSynthesisPhase.reset (new (std::nothrow) double[static_cast<size_t> (kLivePitchBins)]);
         livePitchPhaseInitialized.reset (new (std::nothrow) uint8_t[static_cast<size_t> (kLivePitchBins)]);
@@ -235,7 +238,8 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
             || ! livePitchOlaRight || ! livePitchOlaNorm || ! livePitchPreviousPhase
             || ! livePitchSynthesisPhase || ! livePitchPhaseInitialized || ! livePitchReferenceReal
             || ! livePitchReferenceImag || ! livePitchReferenceInverseMagnitude
-            || ! livePitchSynthesisSine || ! livePitchSynthesisCosine)
+            || ! livePitchSynthesisSine || ! livePitchSynthesisCosine
+            || ! livePitchSourceLowBins || ! livePitchSourceHighBins || ! livePitchSourceFractions)
         {
             for (int i = 0; i < kBarCount; ++i) slots[static_cast<size_t> (i)].pcm.reset();
             scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
@@ -248,6 +252,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
             livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
             livePitchReferenceReal.reset(); livePitchReferenceImag.reset(); livePitchReferenceInverseMagnitude.reset();
             livePitchSynthesisSine.reset(); livePitchSynthesisCosine.reset();
+            livePitchSourceLowBins.reset(); livePitchSourceHighBins.reset(); livePitchSourceFractions.reset();
             livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
             maxFramesPerBar = 0;
             return false;
@@ -275,6 +280,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
         livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
         livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
+        livePitchSourceLowBins.reset(); livePitchSourceHighBins.reset(); livePitchSourceFractions.reset();
         maxFramesPerBar = 0;
         return false;
     }
@@ -304,6 +310,7 @@ void XYPadEngine::release() noexcept
     livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
     livePitchReferenceReal.reset(); livePitchReferenceImag.reset(); livePitchReferenceInverseMagnitude.reset();
     livePitchSynthesisSine.reset(); livePitchSynthesisCosine.reset();
+    livePitchSourceLowBins.reset(); livePitchSourceHighBins.reset(); livePitchSourceFractions.reset();
     livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
     maxFramesPerBar = maxBlock = 0;
     sampleRate = 0.0;
@@ -363,6 +370,7 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
          || ! livePitchOlaLeft || ! livePitchOlaRight || ! livePitchOlaNorm
          || ! livePitchReferenceReal || ! livePitchReferenceImag || ! livePitchReferenceInverseMagnitude
          || ! livePitchSynthesisSine || ! livePitchSynthesisCosine
+         || ! livePitchSourceLowBins || ! livePitchSourceHighBins || ! livePitchSourceFractions
          || ! livePitchPreviousPhase || ! livePitchSynthesisPhase || ! livePitchPhaseInitialized)
     {
         outputLeft = outputRight = outputMask = 0.0f;
