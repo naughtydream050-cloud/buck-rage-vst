@@ -437,7 +437,7 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
                 for (int bin = 0; bin < kLivePitchBins; ++bin)
                 {
                     const auto sourceBin = static_cast<float> (bin) / ratio;
-                    if (sourceBin > kLivePitchFftSize / 2.0f) { leftPhase[static_cast<size_t> (bin)] = 0.0f; continue; }
+                    if (sourceBin > kLivePitchFftSize / 2.0f) continue;
                     const auto low = static_cast<int> (sourceBin);
                     const auto high = juce::jmin (kLivePitchFftSize / 2, low + 1);
                     const auto fraction = static_cast<float> (sourceBin - low);
