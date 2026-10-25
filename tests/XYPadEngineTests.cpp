@@ -195,6 +195,51 @@ void operator delete[] (void* memory, std::size_t) noexcept { std::free (memory)
 class XYPadEngineTestAccess
 {
 public:
+    static bool pitchMappedBinPrefixMatchesDirectMapping()
+    {
+        constexpr double rate = 96000.0;
+        const float semitones[] { -12.0f, 0.0f, 12.0f };
+        bool matched = true;
+        for (const auto semitonesForFrame : semitones)
+        {
+            XYPadEngine engine;
+            if (! engine.prepare (rate, 128, true, true)) return false;
+            float outLeft = 0.0f, outRight = 0.0f, outMask = 0.0f;
+            for (int sample = 0; sample < XYPadEngine::kLivePitchFftSize; ++sample)
+            {
+                // 0 st normally uses the identity shortcut. Force only this
+                // frame's already-defined wet path so its mapping is tested.
+                if (sample == XYPadEngine::kLivePitchFftSize - 1)
+                    engine.livePitchWetMix = 1.0f;
+                const auto phase = 2.0 * 3.14159265358979323846 * sample / rate;
+                engine.processLivePitchSample (static_cast<float> (0.25 * std::sin (440.0 * phase)),
+                                               static_cast<float> (0.25 * std::sin (440.0 * phase + 0.37)),
+                                               semitonesForFrame, 1.0f,
+                                               outLeft, outRight, outMask);
+            }
+            const auto ratio = std::pow (2.0f, semitonesForFrame / 12.0f);
+            int expectedCount = 0;
+            for (int bin = 0; bin < XYPadEngine::kLivePitchBins; ++bin)
+            {
+                const auto sourceBin = static_cast<float> (bin) / ratio;
+                if (sourceBin > XYPadEngine::kLivePitchFftSize / 2.0f) break;
+                const auto low = static_cast<int> (sourceBin);
+                const auto high = juce::jmin (XYPadEngine::kLivePitchFftSize / 2, low + 1);
+                const auto fraction = static_cast<float> (sourceBin - low);
+                const auto index = static_cast<size_t> (bin);
+                matched = matched && engine.livePitchSourceLowBins[index] == low
+                    && engine.livePitchSourceHighBins[index] == high
+                    && engine.livePitchSourceFractions[index] == fraction;
+                ++expectedCount;
+            }
+            matched = matched && engine.livePitchMappedBinCount == expectedCount;
+            engine.release();
+        }
+        std::cout << "METRIC live_pitch_stereo_mapping direct_prefix_match=" << matched
+                  << " rates=96000 semitones=-12,0,12\n";
+        return matched;
+    }
+
     static bool writeActualLiveDiagnosticWavs()
     {
         constexpr double rate = 48000.0;
@@ -1917,6 +1962,8 @@ int main (int argc, char** argv)
            "live-grain-window-lut-matches-analytic-hann");
     check (XYPadEngineTestAccess::pitchWindowCacheMatchesOriginalExpression(),
            "live-pitch-window-cache-is-bit-exact-to-prior-analysis-and-synthesis-expression");
+    check (XYPadEngineTestAccess::pitchMappedBinPrefixMatchesDirectMapping(),
+           "live-pitch-right-channel-reuses-the-left-exact-bin-prefix-at-minus12-zero-and-plus12");
     check (XYPadEngineTestAccess::repeatedReentryBlendIsFiniteAndPeakBounded(),
            "reentrant-linear-blend-is-finite-and-per-channel-peak-bounded-for-ten-transition-lengths");
     check (XYPadEngineTestAccess::reentryMutationGuardsRejectUnsafeChanges(),
