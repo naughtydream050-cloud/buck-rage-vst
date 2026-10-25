@@ -436,18 +436,27 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
             {
                 for (int bin = 0; bin < kLivePitchBins; ++bin)
                 {
+                    const auto index = static_cast<size_t> (bin);
+                    // Mark out-of-range bins explicitly: the source map is
+                    // reused on the right channel and must never retain the
+                    // previous frame's valid mapping.
+                    livePitchSourceLowBins[index] = -1;
+                    livePitchSourceHighBins[index] = -1;
+                    livePitchSourceFractions[index] = 0.0f;
                     const auto sourceBin = static_cast<float> (bin) / ratio;
                     if (sourceBin > kLivePitchFftSize / 2.0f) continue;
                     const auto low = static_cast<int> (sourceBin);
                     const auto high = juce::jmin (kLivePitchFftSize / 2, low + 1);
                     const auto fraction = static_cast<float> (sourceBin - low);
+                    livePitchSourceLowBins[index] = low;
+                    livePitchSourceHighBins[index] = high;
+                    livePitchSourceFractions[index] = fraction;
                     const auto real = readBin (work, low, false)
                         + (readBin (work, high, false) - readBin (work, low, false)) * fraction;
                     const auto imag = readBin (work, low, true)
                         + (readBin (work, high, true) - readBin (work, low, true)) * fraction;
                     const auto magnitude = std::hypot (real, imag);
                     const auto phase = std::atan2 (imag, real);
-                    const auto index = static_cast<size_t> (bin);
                     livePitchReferenceReal[index] = real;
                     livePitchReferenceImag[index] = imag;
                     livePitchReferenceInverseMagnitude[index] = magnitude > 1.0e-12f ? 1.0f / magnitude : 0.0f;
@@ -482,16 +491,15 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
             {
                 for (int bin = 0; bin < kLivePitchBins; ++bin)
                 {
-                    const auto sourceBin = static_cast<float> (bin) / ratio;
-                    if (sourceBin > kLivePitchFftSize / 2.0f) continue;
-                    const auto low = static_cast<int> (sourceBin);
-                    const auto high = juce::jmin (kLivePitchFftSize / 2, low + 1);
-                    const auto fraction = static_cast<float> (sourceBin - low);
+                    const auto index = static_cast<size_t> (bin);
+                    const auto low = livePitchSourceLowBins[index];
+                    const auto high = livePitchSourceHighBins[index];
+                    const auto fraction = livePitchSourceFractions[index];
+                    if (low < 0 || high < low || high > kLivePitchFftSize / 2) continue;
                     const auto real = readBin (work, low, false)
                         + (readBin (work, high, false) - readBin (work, low, false)) * fraction;
                     const auto imag = readBin (work, low, true)
                         + (readBin (work, high, true) - readBin (work, low, true)) * fraction;
-                    const auto index = static_cast<size_t> (bin);
                     const auto inverseMagnitude = livePitchReferenceInverseMagnitude[index];
                     if (inverseMagnitude > 0.0f)
                     {
