@@ -188,6 +188,10 @@ private:
     std::unique_ptr<float[]> livePitchInputRing, livePitchIdentityDelay;
     std::unique_ptr<float[]> livePitchSemitoneDelay, livePitchMaskDelay;
     std::unique_ptr<float[]> livePitchOlaLeft, livePitchOlaRight, livePitchOlaNorm;
+    // Per-frame left-channel analysis shared by the right channel.  These are
+    // fixed-capacity buffers allocated in prepare(), never in process().
+    std::unique_ptr<float[]> livePitchReferenceReal, livePitchReferenceImag, livePitchReferenceInverseMagnitude;
+    std::unique_ptr<float[]> livePitchSynthesisSine, livePitchSynthesisCosine;
     std::unique_ptr<double[]> livePitchPreviousPhase, livePitchSynthesisPhase;
     std::unique_ptr<uint8_t[]> livePitchPhaseInitialized;
     uint64_t livePitchSerial = 0;

@@ -215,6 +215,11 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         livePitchOlaLeft.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchOlaCapacity)]);
         livePitchOlaRight.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchOlaCapacity)]);
         livePitchOlaNorm.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchOlaCapacity)]);
+        livePitchReferenceReal.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchBins)]);
+        livePitchReferenceImag.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchBins)]);
+        livePitchReferenceInverseMagnitude.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchBins)]);
+        livePitchSynthesisSine.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchBins)]);
+        livePitchSynthesisCosine.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchBins)]);
         livePitchPreviousPhase.reset (new (std::nothrow) double[static_cast<size_t> (kLivePitchBins)]);
         livePitchSynthesisPhase.reset (new (std::nothrow) double[static_cast<size_t> (kLivePitchBins)]);
         livePitchPhaseInitialized.reset (new (std::nothrow) uint8_t[static_cast<size_t> (kLivePitchBins)]);
@@ -227,7 +232,9 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
             || ! livePitchFftWork2 || ! livePitchInputRing || ! livePitchIdentityDelay
             || ! livePitchSemitoneDelay || ! livePitchMaskDelay || ! livePitchOlaLeft
             || ! livePitchOlaRight || ! livePitchOlaNorm || ! livePitchPreviousPhase
-            || ! livePitchSynthesisPhase || ! livePitchPhaseInitialized)
+            || ! livePitchSynthesisPhase || ! livePitchPhaseInitialized || ! livePitchReferenceReal
+            || ! livePitchReferenceImag || ! livePitchReferenceInverseMagnitude
+            || ! livePitchSynthesisSine || ! livePitchSynthesisCosine)
         {
             for (int i = 0; i < kBarCount; ++i) slots[static_cast<size_t> (i)].pcm.reset();
             scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
@@ -238,6 +245,8 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
             livePitchFft.reset(); livePitchWindow.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
             livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
             livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
+            livePitchReferenceReal.reset(); livePitchReferenceImag.reset(); livePitchReferenceInverseMagnitude.reset();
+            livePitchSynthesisSine.reset(); livePitchSynthesisCosine.reset();
             livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
             maxFramesPerBar = 0;
             return false;
@@ -292,6 +301,8 @@ void XYPadEngine::release() noexcept
     livePitchFft.reset(); livePitchWindow.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
     livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
     livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
+    livePitchReferenceReal.reset(); livePitchReferenceImag.reset(); livePitchReferenceInverseMagnitude.reset();
+    livePitchSynthesisSine.reset(); livePitchSynthesisCosine.reset();
     livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
     maxFramesPerBar = maxBlock = 0;
     sampleRate = 0.0;
@@ -348,8 +359,10 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
 {
     if (! livePitchFft || ! livePitchWindow || ! livePitchFftWork || ! livePitchFftWork2 || ! livePitchInputRing
         || ! livePitchIdentityDelay || ! livePitchSemitoneDelay || ! livePitchMaskDelay
-        || ! livePitchOlaLeft || ! livePitchOlaRight || ! livePitchOlaNorm
-        || ! livePitchPreviousPhase || ! livePitchSynthesisPhase || ! livePitchPhaseInitialized)
+         || ! livePitchOlaLeft || ! livePitchOlaRight || ! livePitchOlaNorm
+         || ! livePitchReferenceReal || ! livePitchReferenceImag || ! livePitchReferenceInverseMagnitude
+         || ! livePitchSynthesisSine || ! livePitchSynthesisCosine
+         || ! livePitchPreviousPhase || ! livePitchSynthesisPhase || ! livePitchPhaseInitialized)
     {
         outputLeft = outputRight = outputMask = 0.0f;
         return;
@@ -388,7 +401,6 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
         if (std::abs (frameSemitones) >= 0.01 || livePitchWetMix > 0.0f)
         {
         const auto ratio = std::pow (2.0f, frameSemitones / 12.0f);
-        std::array<float, static_cast<size_t> (kLivePitchBins)> leftPhase {};
         const auto readBin = [] (const float* data, int bin, bool imaginary) noexcept
         {
             if (bin == 0) return imaginary ? 0.0f : data[0];
@@ -435,8 +447,10 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
                         + (readBin (work, high, true) - readBin (work, low, true)) * fraction;
                     const auto magnitude = std::hypot (real, imag);
                     const auto phase = std::atan2 (imag, real);
-                    leftPhase[static_cast<size_t> (bin)] = phase;
                     const auto index = static_cast<size_t> (bin);
+                    livePitchReferenceReal[index] = real;
+                    livePitchReferenceImag[index] = imag;
+                    livePitchReferenceInverseMagnitude[index] = magnitude > 1.0e-12f ? 1.0f / magnitude : 0.0f;
                     auto& previous = livePitchPreviousPhase[index];
                     auto& synthesis = livePitchSynthesisPhase[index];
                     if (bin == 0 || bin == kLivePitchFftSize / 2)
@@ -458,6 +472,8 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
                     previous = phase;
                     double sine = 0.0, cosine = 0.0;
                     liveSinCos (synthesis, sine, cosine);
+                    livePitchSynthesisSine[index] = static_cast<float> (sine);
+                    livePitchSynthesisCosine[index] = static_cast<float> (cosine);
                     writeBin (transformed, bin, magnitude * static_cast<float> (cosine),
                                                magnitude * static_cast<float> (sine));
                 }
@@ -475,15 +491,35 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
                         + (readBin (work, high, false) - readBin (work, low, false)) * fraction;
                     const auto imag = readBin (work, low, true)
                         + (readBin (work, high, true) - readBin (work, low, true)) * fraction;
-                    const auto phase = std::atan2 (imag, real);
-                    const auto phaseOffset = std::remainder (static_cast<double> (phase)
-                        - static_cast<double> (leftPhase[static_cast<size_t> (bin)]), 2.0 * kPi);
-                    const auto outputPhase = livePitchSynthesisPhase[static_cast<size_t> (bin)] + phaseOffset;
-                    const auto magnitude = std::hypot (real, imag);
-                    double sine = 0.0, cosine = 0.0;
-                    liveSinCos (outputPhase, sine, cosine);
-                    writeBin (transformed, bin, magnitude * static_cast<float> (cosine),
-                                               magnitude * static_cast<float> (sine));
+                    const auto index = static_cast<size_t> (bin);
+                    const auto inverseMagnitude = livePitchReferenceInverseMagnitude[index];
+                    if (inverseMagnitude > 0.0f)
+                    {
+                        // Right = rightInput * conjugate(leftInput) / |leftInput|
+                        //         * left synthesis unit. This is algebraically the
+                        // same stereo phase-offset path, without a second atan2,
+                        // hypot and sin/cos triplet for every non-silent bin.
+                        const auto leftReal = livePitchReferenceReal[index];
+                        const auto leftImag = livePitchReferenceImag[index];
+                        const auto phaseReal = (real * leftReal + imag * leftImag) * inverseMagnitude;
+                        const auto phaseImag = (imag * leftReal - real * leftImag) * inverseMagnitude;
+                        const auto sine = livePitchSynthesisSine[index];
+                        const auto cosine = livePitchSynthesisCosine[index];
+                        writeBin (transformed, bin, phaseReal * cosine - phaseImag * sine,
+                                                   phaseReal * sine + phaseImag * cosine);
+                    }
+                    else
+                    {
+                        // Preserve the defined left-silent fallback: left phase is
+                        // zero and the right channel carries its own phase.
+                        const auto phase = std::atan2 (imag, real);
+                        const auto outputPhase = livePitchSynthesisPhase[index] + phase;
+                        double sine = 0.0, cosine = 0.0;
+                        liveSinCos (outputPhase, sine, cosine);
+                        const auto magnitude = std::hypot (real, imag);
+                        writeBin (transformed, bin, magnitude * static_cast<float> (cosine),
+                                                   magnitude * static_cast<float> (sine));
+                    }
                 }
             }
             livePitchFft->performRealOnlyInverseTransform (transformed);
