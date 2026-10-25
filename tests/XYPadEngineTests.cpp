@@ -1127,7 +1127,7 @@ public:
             && staleGrainRejected && peakViolationRejected;
     }
 
-    static bool runControlledHostBenchmark()
+    static bool runControlledHostBenchmark (bool diagnosticProfile = false)
     {
         // Match PluginProcessor::processBlock's existing floating-point mode.
         juce::ScopedNoDenormals noDenormals;
@@ -1145,20 +1145,32 @@ public:
         std::cerr << "FAIL benchmark-scheduling-requires-windows-mmcss\n";
         return false;
 #endif
-        const double rates[] { 44100.0, 48000.0, 96000.0 };
+        const double fullRates[] { 44100.0, 48000.0, 96000.0 };
         const int fixedBlocks[] { 64, 128, 256, 512, 1024 };
         bool allWithinDeadline = true;
         int conditionCount = 0;
-        for (const auto rate : rates)
+        const auto profileCount = diagnosticProfile ? 3 : 1;
+        for (int profile = 0; profile < profileCount; ++profile)
         {
-            for (int mode = 0; mode < 6; ++mode)
+            // This test-only profile separates the same live callback into
+            // full operation, pitch-neutral operation, and a stable-X path.
+            // It does not alter the production engine or acceptance limits.
+            const char* profileName = profile == 0 ? "full"
+                : (profile == 1 ? "pitch_neutral" : "stable_x");
+            const auto rateCount = diagnosticProfile ? 1 : 3;
+            for (int rateIndex = 0; rateIndex < rateCount; ++rateIndex)
             {
-                XYPadEngine engine;
+                const auto rate = diagnosticProfile ? 96000.0 : fullRates[rateIndex];
+                const auto modeCount = diagnosticProfile ? 3 : 6;
+                for (int mode = 0; mode < modeCount; ++mode)
+                {
+                    XYPadEngine engine;
                 if (! engine.prepare (rate, 1024, true, true)) return false;
                 std::vector<PluginStateModel::MotionPoint> points;
                 points.reserve (XYPadEngine::kMaxPoints);
                 for (int point = 0; point < XYPadEngine::kMaxPoints; ++point)
-                    points.push_back ({ (point & 1) == 0 ? 0.1f : 0.9f, 1.0f,
+                    points.push_back ({ profile == 2 ? 0.5f : ((point & 1) == 0 ? 0.1f : 0.9f),
+                        profile == 1 ? 0.5f : 1.0f,
                         static_cast<double> (point) / XYPadEngine::kMaxPoints });
                 for (int bar = 0; bar < XYPadEngine::kBarCount; ++bar)
                     engine.setTrajectory (bar, points, static_cast<uint32_t> (701 + bar));
@@ -1284,6 +1296,7 @@ public:
                 ++conditionCount;
                 std::cout << "METRIC benchmark_pacing rate=" << rate << " mode="
                           << (mode < 5 ? fixedBlocks[mode] : -1)
+                          << " profile=" << profileName
                           << " wall_seconds=" << std::chrono::duration<double> (
                               std::chrono::steady_clock::now() - conditionWallStart).count()
                           << " max_dispatch_lateness_us=" << maxDispatchLatenessUs
@@ -1291,6 +1304,7 @@ public:
                           << " pitch_active=" << pitchActive << " schedule=sample_clock\n";
                 std::cout << "METRIC reentrant_cycle_diagnostic rate=" << rate << " mode="
                           << (mode < 5 ? fixedBlocks[mode] : -1)
+                          << " profile=" << profileName
                           << " p50=" << p50Cycles << " p99=" << p99Cycles << " max=" << maxCycles
                           << " p99_to_p50=" << p99CyclesToMedian
                           << " max_to_p50=" << maxCyclesToMedian
@@ -1302,6 +1316,7 @@ public:
                               - static_cast<int> (maxCyclesWriteSerial & engine.liveHistoryIndexMask)) << "\n";
                 std::cout << "METRIC reentrant_benchmark rate=" << rate << " mode="
                           << (mode < 5 ? fixedBlocks[mode] : -1) << " p99_deadline_ratio=" << p99Ratio
+                          << " profile=" << profileName
                           << " max_deadline_ratio=" << peakRatio
                           << " max_wall_thread_cycles=" << cyclesAtMaxWall
                           << " max_wall_sample=" << maxWallAtSample
@@ -1313,11 +1328,12 @@ public:
                           << " callback_shape=one_host_block status="
                           << (within ? "PASS" : "FAIL") << std::endl;
                 engine.release();
+                }
             }
         }
         std::cout << "METRIC reentrant_benchmark_complete conditions=" << conditionCount
-                  << " status=" << (allWithinDeadline ? "PASS" : "FAIL") << "\n";
-        return conditionCount == 18 && allWithinDeadline;
+                  << " status=" << (diagnosticProfile ? "OBSERVED" : (allWithinDeadline ? "PASS" : "FAIL")) << "\n";
+        return diagnosticProfile ? conditionCount == 9 : (conditionCount == 18 && allWithinDeadline);
     }
 
     static bool liveFadedGrainNeverReturnsToFullGain()
@@ -1724,6 +1740,8 @@ int main (int argc, char** argv)
 {
     if (argc == 2 && std::strcmp (argv[1], "--benchmark-reentrant") == 0)
         return XYPadEngineTestAccess::runControlledHostBenchmark() ? 0 : 1;
+    if (argc == 2 && std::strcmp (argv[1], "--benchmark-reentrant-profile") == 0)
+        return XYPadEngineTestAccess::runControlledHostBenchmark (true) ? 0 : 1;
     check (sizeof (XYPadEngine) < 64u * 1024u,
            "fixed-64-bar-tables-do-not-consume-windows-thread-stack");
     check (lockFreeLiveFftMatchesJuce(),
