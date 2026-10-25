@@ -6,6 +6,13 @@
 bool xyPadTailAvx2Available() noexcept;
 bool xyPadTailFmaAvailable() noexcept;
 
+// Executes the vector-sized prefix of one radix-2 FFT stage. This lives in
+// the existing /arch:AVX2 translation unit, so generic builds never execute
+// AVX instructions unless the caller has checked xyPadTailAvx2Available().
+int xyPadLiveFftTransformStageAvx2 (float* real, float* imag,
+                                    const float* twiddleReal, const float* twiddleImag,
+                                    int size, int half, bool inverse) noexcept;
+
 bool xyPadRenderTailAvx2 (const float* history, const float* previousTail,
                           float* destination, size_t lowerIndex, size_t upperIndex,
                           uint64_t capacity, int direction, float fraction,

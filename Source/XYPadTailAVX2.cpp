@@ -13,6 +13,41 @@
 
 #if defined(_MSC_VER) || defined(__x86_64__) || defined(__i386__)
 TOYOTOMI_XY_AVX2_TARGET
+int xyPadLiveFftTransformStageAvx2 (float* real, float* imag,
+                                    const float* twiddleReal, const float* twiddleImag,
+                                    int size, int half, bool inverse) noexcept
+{
+    if (real == nullptr || imag == nullptr || twiddleReal == nullptr || twiddleImag == nullptr
+        || size <= 0 || half < 8 || (size % (2 * half)) != 0)
+        return 0;
+
+    const auto vectorCount = half & ~7;
+    const auto zero = _mm256_setzero_ps();
+    for (int base = 0; base < size; base += 2 * half)
+    {
+        for (int k = 0; k < vectorCount; k += 8)
+        {
+            const auto lo = static_cast<size_t> (base + k);
+            const auto hi = lo + static_cast<size_t> (half);
+            const auto wr = _mm256_loadu_ps (twiddleReal + k);
+            auto wi = _mm256_loadu_ps (twiddleImag + k);
+            if (inverse) wi = _mm256_sub_ps (zero, wi);
+            const auto hr = _mm256_loadu_ps (real + hi);
+            const auto ii = _mm256_loadu_ps (imag + hi);
+            const auto tr = _mm256_sub_ps (_mm256_mul_ps (hr, wr), _mm256_mul_ps (ii, wi));
+            const auto ti = _mm256_add_ps (_mm256_mul_ps (hr, wi), _mm256_mul_ps (ii, wr));
+            const auto lr = _mm256_loadu_ps (real + lo);
+            const auto li = _mm256_loadu_ps (imag + lo);
+            _mm256_storeu_ps (real + lo, _mm256_add_ps (lr, tr));
+            _mm256_storeu_ps (imag + lo, _mm256_add_ps (li, ti));
+            _mm256_storeu_ps (real + hi, _mm256_sub_ps (lr, tr));
+            _mm256_storeu_ps (imag + hi, _mm256_sub_ps (li, ti));
+        }
+    }
+    return vectorCount;
+}
+
+TOYOTOMI_XY_AVX2_TARGET
 bool xyPadRenderTailAvx2 (const float* history, const float* previousTail,
                           float* destination, size_t lowerIndex, size_t upperIndex,
                           uint64_t capacity, int direction, float fraction,
@@ -85,6 +120,12 @@ bool xyPadRenderTailAvx2 (const float* history, const float* previousTail,
     return true;
 }
 #else
+int xyPadLiveFftTransformStageAvx2 (float*, float*, const float*, const float*,
+                                    int, int, bool) noexcept
+{
+    return 0;
+}
+
 bool xyPadRenderTailAvx2 (const float*, const float*, float*, size_t, size_t,
                           uint64_t, int, float, int, int, int, float, bool, bool) noexcept
 {
