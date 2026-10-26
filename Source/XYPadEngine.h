@@ -201,10 +201,11 @@ private:
     std::unique_ptr<double[]> livePitchPreviousPhase, livePitchSynthesisPhase;
     std::unique_ptr<uint8_t[]> livePitchPhaseInitialized;
     uint64_t livePitchSerial = 0;
-    float liveSmoothedSemitones = 0.0f, livePitchWetMix = 0.0f;
+    float liveSmoothedSemitones = 0.0f, livePitchWetMix = 0.0f, livePitchMappedRatio = 0.0f;
     float livePitchWetMixStep = 0.0f;
     float livePitchSmoothingCoefficient = 0.0f;
     int livePitchMappedBinCount = 0;
+    bool livePitchMappingValid = false;
     std::array<LiveGrain, kLiveGrainCapacity> liveGrains {};
     uint64_t liveWriteSerial = 0;
     uint64_t liveHistoryValidFrames = 0;

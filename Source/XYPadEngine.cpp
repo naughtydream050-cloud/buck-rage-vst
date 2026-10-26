@@ -132,6 +132,8 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     livePitchSerial = 0;
     liveSmoothedSemitones = livePitchWetMix = 0.0f;
     livePitchMappedBinCount = 0;
+    livePitchMappedRatio = 0.0f;
+    livePitchMappingValid = false;
     livePitchSmoothingCoefficient = livePitchWetMixStep = 0.0f;
 
     if (! std::isfinite (rate) || rate <= 0.0 || rate > kMaxSampleRate
@@ -342,6 +344,8 @@ void XYPadEngine::release() noexcept
     liveSourceFadeActive = false;
     livePitchSerial = 0;
     liveSmoothedSemitones = livePitchWetMix = 0.0f;
+    livePitchMappedRatio = 0.0f;
+    livePitchMappingValid = false;
     livePitchSmoothingCoefficient = livePitchWetMixStep = 0.0f;
     renderQueueHead.store (0, std::memory_order_relaxed);
     renderQueueTail.store (0, std::memory_order_relaxed);
@@ -361,6 +365,9 @@ void XYPadEngine::clearLivePitchState() noexcept
     if (livePitchPhaseInitialized) std::fill_n (livePitchPhaseInitialized.get(), static_cast<size_t> (kLivePitchBins), uint8_t (0));
     livePitchSerial = 0;
     liveSmoothedSemitones = livePitchWetMix = 0.0f;
+    livePitchMappedRatio = 0.0f;
+    livePitchMappedBinCount = 0;
+    livePitchMappingValid = false;
 }
 
 void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, float semitones,
@@ -445,23 +452,30 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
 
             if (channel == 0)
             {
-                livePitchMappedBinCount = 0;
-                for (int bin = 0; bin < kLivePitchBins; ++bin)
+                if (! livePitchMappingValid || ratio != livePitchMappedRatio)
+                {
+                    livePitchMappedBinCount = 0;
+                    for (int bin = 0; bin < kLivePitchBins; ++bin)
+                    {
+                        const auto index = static_cast<size_t> (bin);
+                        const auto sourceBin = static_cast<float> (bin) / ratio;
+                        if (sourceBin > kLivePitchFftSize / 2.0f) break;
+                        const auto low = static_cast<int> (sourceBin);
+                        livePitchSourceLowBins[index] = low;
+                        livePitchSourceHighBins[index] = juce::jmin (kLivePitchFftSize / 2, low + 1);
+                        livePitchSourceFractions[index] = static_cast<float> (sourceBin - low);
+                        livePitchMappedBinCount = bin + 1;
+                    }
+                    livePitchMappedRatio = ratio;
+                    livePitchMappingValid = true;
+                }
+                for (int bin = 0; bin < livePitchMappedBinCount; ++bin)
                 {
                     const auto index = static_cast<size_t> (bin);
-                    const auto sourceBin = static_cast<float> (bin) / ratio;
-                    // sourceBin increases monotonically with bin. The omitted
-                    // transformed bins stay zero because the buffer was
-                    // cleared above; recording this prefix also lets the
-                    // right channel skip the same known-zero suffix.
-                    if (sourceBin > kLivePitchFftSize / 2.0f) break;
-                    const auto low = static_cast<int> (sourceBin);
-                    const auto high = juce::jmin (kLivePitchFftSize / 2, low + 1);
-                    const auto fraction = static_cast<float> (sourceBin - low);
-                    livePitchSourceLowBins[index] = low;
-                    livePitchSourceHighBins[index] = high;
-                    livePitchSourceFractions[index] = fraction;
-                    livePitchMappedBinCount = bin + 1;
+                    const auto low = livePitchSourceLowBins[index];
+                    const auto high = livePitchSourceHighBins[index];
+                    const auto fraction = livePitchSourceFractions[index];
+                    const auto sourceBin = static_cast<float> (low) + fraction;
                     const auto real = readBin (work, low, false)
                         + (readBin (work, high, false) - readBin (work, low, false)) * fraction;
                     const auto imag = readBin (work, low, true)
