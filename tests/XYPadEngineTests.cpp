@@ -70,6 +70,29 @@ static bool lockFreeLiveFftMatchesJuce()
                   << " fixtures=6 tolerance=2e-6 finite=" << finite << "\n";
         return finite && forwardError <= 2.0e-6 && inverseError <= 2.0e-6 && roundtripError <= 2.0e-6;
     }
+
+static bool windowedRingForwardMatchesBufferedForward()
+{
+    XYPadLiveFFT1024 ringFft, bufferedFft;
+    std::array<float, 2048> ring {}, windowed {}, actual {};
+    std::array<float, 1024> window {};
+    for (int i = 0; i < 1024; ++i)
+    {
+        const auto phase = 2.0 * 3.14159265358979323846 * static_cast<double> (i) / 1024.0;
+        const auto left = static_cast<float> (0.23 * std::sin (17.0 * phase) + 0.11 * std::cos (63.0 * phase));
+        ring[static_cast<size_t> (i) * 2u] = left;
+        ring[static_cast<size_t> (i) * 2u + 1u] = -left;
+        window[static_cast<size_t> (i)] = static_cast<float> (0.5 - 0.5 * std::cos (phase));
+        windowed[static_cast<size_t> (i)] = left * window[static_cast<size_t> (i)];
+    }
+    bufferedFft.performRealOnlyForwardTransform (windowed.data());
+    ringFft.performWindowedRingForwardTransform (ring.data(), 2048u, 0, window.data(), actual.data());
+    double error = 0.0;
+    for (size_t i = 0; i < actual.size(); ++i)
+        error = std::max (error, std::abs (static_cast<double> (actual[i] - windowed[i])));
+    std::cout << "METRIC live_windowed_ring_fft error=" << error << " tolerance=2e-6\n";
+    return error <= 2.0e-6;
+}
 #if defined(_WIN32)
 class ScopedProAudioMmcssRegistration
 {
@@ -1777,6 +1800,8 @@ int main (int argc, char** argv)
            "fixed-64-bar-tables-do-not-consume-windows-thread-stack");
     check (lockFreeLiveFftMatchesJuce(),
            "live-lock-free-fft-matches-juce-forward-inverse-and-roundtrip-reference");
+    check (windowedRingForwardMatchesBufferedForward(),
+           "live-windowed-ring-forward-matches-buffered-forward-reference");
     check (XYPadEngineTestAccess::holdSnapshotBulkCopyMatchesRingAcrossWrap(),
            "xy-live-hold-snapshot-bulk-copy-preserves-wrapped-stereo-history");
     check (XYPadEngineTestAccess::liveSinCosMatchesStandardReference(),

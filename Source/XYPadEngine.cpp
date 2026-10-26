@@ -436,17 +436,8 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
         for (int channel = 0; channel < 2; ++channel)
         {
             auto* work = livePitchFftWork.get();
-            std::fill_n (work, static_cast<size_t> (kLivePitchFftSize) * 2u, 0.0f);
-            for (int frame = 0; frame < kLivePitchFftSize; ++frame)
-            {
-                const auto sourceSerial = frameStart + static_cast<uint64_t> (frame);
-                const auto sourceIndex = static_cast<size_t> (sourceSerial
-                    % static_cast<uint64_t> (kLivePitchFftSize));
-                const auto hann = livePitchWindow[static_cast<size_t> (frame)];
-                work[static_cast<size_t> (frame)] = livePitchInputRing[sourceIndex * 2u
-                    + static_cast<size_t> (channel)] * static_cast<float> (hann);
-            }
-            livePitchFft->performRealOnlyForwardTransform (work);
+            livePitchFft->performWindowedRingForwardTransform (livePitchInputRing.get(), frameStart,
+                                                               channel, livePitchWindow.get(), work);
             auto* transformed = livePitchFftWork2.get();
             std::fill_n (transformed, static_cast<size_t> (kLivePitchFftSize) * 2u, 0.0f);
 

@@ -87,6 +87,31 @@ void XYPadLiveFFT1024::performRealOnlyForwardTransform (float* data) noexcept
     for (int i = 0; i < size; ++i) { data[2 * i] = real[static_cast<size_t> (i)]; data[2 * i + 1] = imag[static_cast<size_t> (i)]; }
 }
 
+void XYPadLiveFFT1024::performWindowedRingForwardTransform (const float* interleavedInput,
+                                                            uint64_t firstSerial, int channel,
+                                                            const float* window, float* destination) noexcept
+{
+    if (interleavedInput == nullptr || window == nullptr || destination == nullptr
+        || channel < 0 || channel > 1)
+        return;
+
+    for (int frame = 0; frame < size; ++frame)
+    {
+        const auto ringIndex = static_cast<size_t> ((firstSerial + static_cast<uint64_t> (frame))
+            % static_cast<uint64_t> (size));
+        const auto at = reversed[static_cast<size_t> (frame)];
+        real[at] = interleavedInput[ringIndex * 2u + static_cast<size_t> (channel)]
+            * window[static_cast<size_t> (frame)];
+        imag[at] = 0.0f;
+    }
+    transform (false);
+    for (int i = 0; i < size; ++i)
+    {
+        destination[2 * i] = real[static_cast<size_t> (i)];
+        destination[2 * i + 1] = imag[static_cast<size_t> (i)];
+    }
+}
+
 void XYPadLiveFFT1024::performRealOnlyInverseTransform (float* data) noexcept
 {
     if (data == nullptr) return;
