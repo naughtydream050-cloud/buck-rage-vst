@@ -107,6 +107,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     liveHistoryHasUnsafeMagnitude = false;
     liveTransitionFrames = 0;
     liveReentryTailFrames = liveReentryTailPosition = liveReentryTailBuffer = 0;
+    liveReentryTailStart = liveReentryTailAvailable = 0;
     liveReentryTailActive = false;
     liveWriteSerial = liveHistoryValidFrames = 0;
     liveGrains.fill (LiveGrain {});
@@ -320,6 +321,7 @@ void XYPadEngine::release() noexcept
     liveHistoryHasUnsafeMagnitude = false;
     liveTransitionFrames = 0;
     liveReentryTailFrames = liveReentryTailPosition = liveReentryTailBuffer = 0;
+    liveReentryTailStart = liveReentryTailAvailable = 0;
     liveReentryTailActive = false;
     liveTailAvx2Available = false;
     liveTailFmaAvailable = false;
@@ -1232,6 +1234,8 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
             {
                 liveReentryTailBuffer = destinationIndex;
                 liveReentryTailPosition = 0;
+                liveReentryTailStart = 0;
+                liveReentryTailAvailable = liveReentryTailFrames;
                 liveReentryTailActive = true;
                 return;
             }
@@ -1378,6 +1382,8 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
     }
     liveReentryTailBuffer = destinationIndex;
     liveReentryTailPosition = 0;
+    liveReentryTailStart = 0;
+    liveReentryTailAvailable = liveReentryTailFrames;
     liveReentryTailActive = true;
 }
 
@@ -1467,6 +1473,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         liveHoldReady = false;
         liveReentryTailActive = false;
         liveReentryTailPosition = 0;
+        liveReentryTailStart = liveReentryTailAvailable = 0;
         liveWasPlaying = false;
         liveSourceFadeActive = false;
         return;
@@ -1497,6 +1504,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         liveHoldReady = false;
         liveReentryTailActive = false;
         liveReentryTailPosition = 0;
+        liveReentryTailStart = liveReentryTailAvailable = 0;
         liveSourceFadeActive = false;
         clearLivePitchState();
     }
@@ -1544,6 +1552,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                 liveWetGain = 0.0f;
                 liveReentryTailActive = false;
                 liveReentryTailPosition = 0;
+                liveReentryTailStart = liveReentryTailAvailable = 0;
                 liveHoldReady = false;
                 liveHoldMix = 0.0f;
                 liveStationaryFrames = liveHoldPhase = 0;
@@ -1576,6 +1585,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             liveHoldReady = false;
             liveReentryTailActive = false;
             liveReentryTailPosition = 0;
+            liveReentryTailStart = liveReentryTailAvailable = 0;
             Trajectory candidate;
             if (publishedTrajectories != nullptr
                 && readTrajectory (publishedTrajectories[static_cast<size_t> (bar)], candidate))
@@ -1651,10 +1661,20 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                              && liveActiveTrajectory.count > 0;
         if (reenterNow)
         {
-            // Preserve the pre-pitch audible continuation before any grain
-            // snapshot slot can be recycled, then launch the newest target on
-            // this same sample. Both tail buffers were allocated in prepare().
-            captureLiveContinuationTail();
+            // A second interruption during an existing tail starts its new
+            // crossfade from the currently audible tail sample. Re-rendering
+            // another 3 ms future tail here is redundant and creates an
+            // unbounded per-sample spike under rapid XY movement.
+            if (liveReentryTailActive && liveReentryTailAvailable > liveReentryTailPosition)
+            {
+                const auto consumed = juce::jlimit (0, liveReentryTailAvailable,
+                                                    liveReentryTailPosition);
+                liveReentryTailStart += consumed;
+                liveReentryTailAvailable -= consumed;
+                liveReentryTailPosition = 0;
+            }
+            else
+                captureLiveContinuationTail();
             liveGrains.fill (LiveGrain {});
             launchLiveGrain (x, direction, false, oldestSerial, newestSerial);
             liveSamplesToLaunch = liveHopFrames;
@@ -1808,6 +1828,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             liveGrains.fill (LiveGrain {});
             liveReentryTailActive = false;
             liveReentryTailPosition = 0;
+            liveReentryTailStart = liveReentryTailAvailable = 0;
             liveHoldReady = false;
             liveHoldMix = 0.0f;
             liveStationaryFrames = liveHoldPhase = 0;
@@ -1825,7 +1846,11 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             const auto q = static_cast<float> (juce::jlimit (0, liveReentryTailFrames - 1,
                                                               liveReentryTailPosition))
                          / static_cast<float> (liveReentryTailFrames - 1);
-            const auto tailIndex = static_cast<size_t> (liveReentryTailPosition) * 2u;
+            const auto tailFrame = liveReentryTailAvailable > 0
+                ? juce::jmin (liveReentryTailStart + liveReentryTailPosition,
+                              liveReentryTailStart + liveReentryTailAvailable - 1)
+                : 0;
+            const auto tailIndex = static_cast<size_t> (tailFrame) * 2u;
             const auto* tail = liveReentryTailBuffers[static_cast<size_t> (liveReentryTailBuffer)].get();
             xStageLeft = blendLiveReentrySample (tail[tailIndex], xStageLeft, q);
             xStageRight = blendLiveReentrySample (tail[tailIndex + 1u], xStageRight, q);
@@ -1833,6 +1858,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             {
                 liveReentryTailActive = false;
                 liveReentryTailPosition = 0;
+                liveReentryTailStart = liveReentryTailAvailable = 0;
             }
         }
         if (readFailure)
@@ -1840,6 +1866,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             liveGrains.fill (LiveGrain {});
             liveReentryTailActive = false;
             liveReentryTailPosition = 0;
+            liveReentryTailStart = liveReentryTailAvailable = 0;
             liveWetGain = 0.0f;
             liveSamplesToLaunch = 0;
         }

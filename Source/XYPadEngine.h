@@ -216,6 +216,7 @@ private:
     int liveHopFrames = 0;
     int liveTransitionFrames = 0;
     int liveReentryTailFrames = 0, liveReentryTailPosition = 0, liveReentryTailBuffer = 0;
+    int liveReentryTailStart = 0, liveReentryTailAvailable = 0;
     int liveSamplesToLaunch = 0;
     int liveSilenceFramesCount = 0;
     int liveStationaryFrames = 0, liveHoldPhase = 0;
