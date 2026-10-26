@@ -16,5 +16,4 @@ private:
     std::array<float, size - 1> twiddleReal {}, twiddleImag {};
     std::array<float, size> real {}, imag {};
     bool avx2Available = false;
-    bool fmaAvailable = false;
 };

@@ -9,7 +9,6 @@
 XYPadLiveFFT1024::XYPadLiveFFT1024() noexcept
 {
     avx2Available = xyPadTailAvx2Available();
-    fmaAvailable = avx2Available && xyPadTailFmaAvailable();
     for (int i = 0; i < size; ++i)
     {
         unsigned value = static_cast<unsigned> (i), result = 0;
@@ -38,7 +37,7 @@ void XYPadLiveFFT1024::transform (bool inverse) noexcept
             ? xyPadLiveFftTransformStageAvx2 (real.data(), imag.data(),
                                                twiddleReal.data() + offset,
                                                twiddleImag.data() + offset,
-                                               size, half, inverse, fmaAvailable)
+                                               size, half, inverse)
             : 0;
         for (int base = 0; base < size; base += 2 * half)
         {
