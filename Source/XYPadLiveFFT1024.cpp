@@ -1,4 +1,5 @@
 #include "XYPadLiveFFT1024.h"
+#include "XYPadTailAVX2.h"
 #include <cmath>
 #if defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
  #include <emmintrin.h>
@@ -7,6 +8,7 @@
 
 XYPadLiveFFT1024::XYPadLiveFFT1024() noexcept
 {
+    avx2Available = xyPadTailAvx2Available();
     for (int i = 0; i < size; ++i)
     {
         unsigned value = static_cast<unsigned> (i), result = 0;
@@ -31,9 +33,15 @@ void XYPadLiveFFT1024::transform (bool inverse) noexcept
     int offset = 0;
     for (int half = 1; half < size; half *= 2)
     {
+        const auto vectorized = avx2Available
+            ? xyPadLiveFftTransformStageAvx2 (real.data(), imag.data(),
+                                               twiddleReal.data() + offset,
+                                               twiddleImag.data() + offset,
+                                               size, half, inverse)
+            : 0;
         for (int base = 0; base < size; base += 2 * half)
         {
-            int k = 0;
+            int k = vectorized;
 #if defined(XY_LIVE_FFT_SSE2)
             for (; k + 4 <= half; k += 4)
             {
