@@ -12,6 +12,12 @@ int xyPadLiveFftTransformStageAvx2 (float* real, float* imag,
                                     const float* twiddleReal, const float* twiddleImag,
                                     int size, int half, bool inverse) noexcept;
 
+// Executes every radix-2 stage in one AVX2 call. This removes per-stage
+// cross-translation-unit dispatch from the realtime pitch path.
+bool xyPadLiveFftTransformAvx2 (float* real, float* imag,
+                                const float* twiddleReal, const float* twiddleImag,
+                                int size, bool inverse) noexcept;
+
 bool xyPadRenderTailAvx2 (const float* history, const float* previousTail,
                           float* destination, size_t lowerIndex, size_t upperIndex,
                           uint64_t capacity, int direction, float fraction,

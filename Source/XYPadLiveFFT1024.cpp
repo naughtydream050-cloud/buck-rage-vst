@@ -30,6 +30,11 @@ XYPadLiveFFT1024::XYPadLiveFFT1024() noexcept
 
 void XYPadLiveFFT1024::transform (bool inverse) noexcept
 {
+    if (avx2Available && xyPadLiveFftTransformAvx2 (real.data(), imag.data(),
+                                                     twiddleReal.data(), twiddleImag.data(),
+                                                     size, inverse))
+        return;
+
     int offset = 0;
     for (int half = 1; half < size; half *= 2)
     {
