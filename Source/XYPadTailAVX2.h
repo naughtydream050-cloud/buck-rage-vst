@@ -10,7 +10,7 @@ bool xyPadTailFmaAvailable() noexcept;
 // existing AVX2 translation unit so generic builds remain CPU-safe.
 int xyPadLiveFftTransformStageAvx2 (float* real, float* imag,
                                     const float* twiddleReal, const float* twiddleImag,
-                                    int size, int half, bool inverse) noexcept;
+                                    int size, int half, bool inverse, bool useFma) noexcept;
 
 bool xyPadRenderTailAvx2 (const float* history, const float* previousTail,
                           float* destination, size_t lowerIndex, size_t upperIndex,

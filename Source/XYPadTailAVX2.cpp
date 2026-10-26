@@ -15,7 +15,7 @@
 TOYOTOMI_XY_AVX2_TARGET
 int xyPadLiveFftTransformStageAvx2 (float* real, float* imag,
                                     const float* twiddleReal, const float* twiddleImag,
-                                    int size, int half, bool inverse) noexcept
+                                    int size, int half, bool inverse, bool useFma) noexcept
 {
     if (real == nullptr || imag == nullptr || twiddleReal == nullptr || twiddleImag == nullptr
         || size <= 0 || half < 8 || (size % (2 * half)) != 0)
@@ -32,8 +32,12 @@ int xyPadLiveFftTransformStageAvx2 (float* real, float* imag,
             auto wi = _mm256_loadu_ps (twiddleImag + k);
             if (inverse) wi = _mm256_sub_ps (zero, wi);
             const auto hr = _mm256_loadu_ps (real + hi), ii = _mm256_loadu_ps (imag + hi);
-            const auto tr = _mm256_sub_ps (_mm256_mul_ps (hr, wr), _mm256_mul_ps (ii, wi));
-            const auto ti = _mm256_add_ps (_mm256_mul_ps (hr, wi), _mm256_mul_ps (ii, wr));
+            const auto tr = useFma
+                ? _mm256_fmsub_ps (hr, wr, _mm256_mul_ps (ii, wi))
+                : _mm256_sub_ps (_mm256_mul_ps (hr, wr), _mm256_mul_ps (ii, wi));
+            const auto ti = useFma
+                ? _mm256_fmadd_ps (hr, wi, _mm256_mul_ps (ii, wr))
+                : _mm256_add_ps (_mm256_mul_ps (hr, wi), _mm256_mul_ps (ii, wr));
             const auto lr = _mm256_loadu_ps (real + lo), li = _mm256_loadu_ps (imag + lo);
             _mm256_storeu_ps (real + lo, _mm256_add_ps (lr, tr));
             _mm256_storeu_ps (imag + lo, _mm256_add_ps (li, ti));
@@ -117,7 +121,7 @@ bool xyPadRenderTailAvx2 (const float* history, const float* previousTail,
 }
 #else
 int xyPadLiveFftTransformStageAvx2 (float*, float*, const float*, const float*,
-                                    int, int, bool) noexcept
+                                    int, int, bool, bool) noexcept
 {
     return 0;
 }
