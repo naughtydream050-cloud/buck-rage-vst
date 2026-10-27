@@ -1,6 +1,7 @@
 #pragma once
 #include <array>
 #include <cstdint>
+#include <juce_dsp/juce_dsp.h>
 
 // One audio-thread owner per prepared engine; no shared mutable state or locks.
 class XYPadLiveFFT1024 final
@@ -21,5 +22,6 @@ private:
     std::array<uint16_t, size> reversed {};
     std::array<float, size - 1> twiddleReal {}, twiddleImag {};
     std::array<float, size> real {}, imag {};
+    juce::dsp::FFT realFft { 10 };
     bool avx2Available = false;
 };
