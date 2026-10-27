@@ -11,9 +11,7 @@
 #include <thread>
 #include <vector>
 
-class XYPadLiveFFT1024;
-
-// Phase 2 XY scratch storage. All dynamic allocation and FFT setup happen in
+// Phase 2 XY scratch storage. All dynamic allocation and setup happen in
 // prepare(); process() only copies into preallocated storage and uses atomics.
 class XYPadEngine final
 {
@@ -107,6 +105,7 @@ private:
     struct LiveGrain
     {
         double startSerial = 0.0;
+        double readIncrement = 1.0;
         int direction = 1;
         int age = 0;
         int fadeInFrames = 0;
@@ -124,15 +123,14 @@ private:
     bool readLiveStereoSample (double serial, uint64_t oldestSerial, uint64_t newestSerial,
                                float& left, float& right) const noexcept;
     bool copyLiveHoldSnapshot (uint64_t startSerial, uint64_t newestSerial) noexcept;
-    void launchLiveGrain (float x, int direction, bool transition,
+    void launchLiveGrain (float x, double requestedIncrement, bool transition,
                           uint64_t oldestSerial, uint64_t newestSerial) noexcept;
     void captureLiveContinuationTail() noexcept;
     static float blendLiveReentrySample (float tail, float target, float q) noexcept;
+    void processLiveDelaySample (float inputLeft, float inputRight, float wetMask,
+                                 float& outputLeft, float& outputRight, float& outputMask) noexcept;
+    void clearLiveDelayState() noexcept;
     static void liveSinCos (double phase, double& sine, double& cosine) noexcept;
-    void processLivePitchSample (float inputLeft, float inputRight, float semitones,
-                                 float wetMask, float& outputLeft, float& outputRight,
-                                 float& outputMask) noexcept;
-    void clearLivePitchState() noexcept;
     static void sampleTimeline (const Transport&, int sample, int totalSamples,
                                 int& bar, double& phase) noexcept;
     static bool readTrajectory (const AtomicTrajectory&, Trajectory&) noexcept;
@@ -162,11 +160,6 @@ private:
     int activeBar = -1;
     uint32_t activeRevision = 0;
     std::unique_ptr<float[]> scratch;
-    std::unique_ptr<float[]> fftWork, fftWork2;
-    std::unique_ptr<float[]> overlapNorm;
-    std::unique_ptr<double[]> previousInputPhase, synthesisPhase;
-    std::unique_ptr<uint8_t[]> phaseInitialized;
-    std::unique_ptr<juce::dsp::FFT> fft;
     static constexpr double kLiveHistorySeconds = 0.125;
     static constexpr double kLiveWarmupSeconds = 0.020;
     static constexpr double kLiveGrainSeconds = 0.020;
@@ -178,34 +171,10 @@ private:
     std::unique_ptr<float[]> liveGrainWindow;
     std::array<std::unique_ptr<float[]>, 2> liveReentryTailBuffers;
     std::unique_ptr<uint64_t[]> liveHistorySerials;
-    static constexpr int kLivePitchFftSize = 1024;
-    static constexpr int kLivePitchHopSize = 256;
     static constexpr int kLivePipelineLatency = 1024;
-    static constexpr int kLivePitchBins = kLivePitchFftSize / 2 + 1;
-    static constexpr int kLivePitchOlaCapacity = 2048;
-    std::unique_ptr<float[]> livePitchWindow;
-    std::unique_ptr<XYPadLiveFFT1024> livePitchFft;
-    std::unique_ptr<float[]> livePitchFftWork, livePitchFftWork2;
-    std::unique_ptr<float[]> livePitchInputRing, livePitchIdentityDelay;
-    std::unique_ptr<float[]> livePitchSemitoneDelay, livePitchMaskDelay;
-    std::unique_ptr<float[]> livePitchOlaLeft, livePitchOlaRight, livePitchOlaNorm;
-    // Per-frame left-channel analysis shared by the right channel.  These are
-    // fixed-capacity buffers allocated in prepare(), never in process().
-    std::unique_ptr<float[]> livePitchReferenceReal, livePitchReferenceImag, livePitchReferenceInverseMagnitude;
-    std::unique_ptr<float[]> livePitchSynthesisSine, livePitchSynthesisCosine;
-    // The right channel uses the exact bin mapping selected by the left
-    // analysis in the same frame. Keeping this fixed-size map avoids a second
-    // per-bin division/conversion pass without altering the interpolation.
-    std::unique_ptr<int[]> livePitchSourceLowBins, livePitchSourceHighBins;
-    std::unique_ptr<float[]> livePitchSourceFractions;
-    std::unique_ptr<double[]> livePitchPreviousPhase, livePitchSynthesisPhase;
-    std::unique_ptr<uint8_t[]> livePitchPhaseInitialized;
-    uint64_t livePitchSerial = 0;
-    float liveSmoothedSemitones = 0.0f, livePitchWetMix = 0.0f, livePitchMappedRatio = 0.0f;
-    float livePitchWetMixStep = 0.0f;
-    float livePitchSmoothingCoefficient = 0.0f;
-    int livePitchMappedBinCount = 0;
-    bool livePitchMappingValid = false;
+    std::unique_ptr<float[]> liveOutputDelay;
+    std::unique_ptr<float[]> liveOutputMaskDelay;
+    uint64_t liveOutputDelaySerial = 0;
     std::array<LiveGrain, kLiveGrainCapacity> liveGrains {};
     uint64_t liveWriteSerial = 0;
     uint64_t liveHistoryValidFrames = 0;

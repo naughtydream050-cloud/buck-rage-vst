@@ -1,0 +1,20 @@
+{
+  "criteria": [
+    {"id":"AC-01","requirement":"Remove XY independent pitch processing from the audio path.","check":["XY audio path test and diff review"]},
+    {"id":"AC-02","requirement":"X forward and reverse continue to work.","check":["fixed PCM direction test"]},
+    {"id":"AC-03","requirement":"X speed produces corresponding natural pitch change.","check":["independent fixed PCM rate and frequency test"]},
+    {"id":"AC-04","requirement":"Y is audio-neutral while recording, display and state remain intact.","check":["audio comparison, editor and StateModel tests"]},
+    {"id":"AC-05","requirement":"Preserve 64 BAR independence and sync.","check":["BAR isolation and synchronization tests"]},
+    {"id":"AC-06","requirement":"Preserve capture, generation, micro-loop and crossfade.","check":["capture and transition regression tests"]},
+    {"id":"AC-07","requirement":"Preset-only output is bit-exact against baseline at matching timing.","check":["independent baseline output comparison"]},
+    {"id":"AC-08","requirement":"Test XY and preset combinations, missing capture, depth zero and bypass.","check":["processor combination tests"]},
+    {"id":"AC-09","requirement":"Verify latency and dry/wet alignment.","check":["impulse and host latency assertions"]},
+    {"id":"AC-10","requirement":"Maximum 96 kHz/64 sample DSP callback time is at most 0.533 ms.","check":["measured Release benchmark on target machine"]},
+    {"id":"AC-11","requirement":"Operate at 44.1, 48 and 96 kHz with variable block sizes.","check":["rate and block matrix"]},
+    {"id":"AC-12","requirement":"Finite output and no abnormal peak or transition clicks.","check":["numeric finite, peak and discontinuity tests"]},
+    {"id":"AC-13","requirement":"Audio thread has no allocation, locks or I/O.","check":["allocation instrumentation and code review"]},
+    {"id":"AC-14","requirement":"StateModel, TimelineScratchEngine, RuntimeSmoke and Windows CI pass.","check":["test logs and CI result"]},
+    {"id":"AC-15","requirement":"Produce and review XY, preset, combined and stereo WAV diagnostics.","check":["WAV generation and measured analysis"]},
+    {"id":"AC-16","requirement":"Jev evaluates every AC and Codex reviews complete evidence.","check":["independent gate report and final review"]}
+  ]
+}

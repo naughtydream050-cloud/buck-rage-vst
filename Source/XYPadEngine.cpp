@@ -1,6 +1,5 @@
 #include "XYPadEngine.h"
 #include "XYPadTailAVX2.h"
-#include "XYPadLiveFFT1024.h"
 
 #include <algorithm>
 #include <chrono>
@@ -100,15 +99,11 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         slot.captureTrajectory = {};
         slot.activeTimingGeneration = 0;
     }
-    scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
-    previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
+    scratch.reset();
     liveHistory.reset(); liveHistorySerials.reset(); liveHoldSnapshot.reset();
     liveGrainWindow.reset();
     for (auto& tail : liveReentryTailBuffers) tail.reset();
-    livePitchFft.reset(); livePitchWindow.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
-    livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
-    livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
-    livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
+    liveOutputDelay.reset(); liveOutputMaskDelay.reset();
     sampleRate = rate;
     maxBlock = maximumBlockSize;
     activeBar = -1;
@@ -139,12 +134,7 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     liveActiveRevision = 0;
     livePreviousX = 0.5f;
     liveDirection = 1;
-    livePitchSerial = 0;
-    liveSmoothedSemitones = livePitchWetMix = 0.0f;
-    livePitchMappedBinCount = 0;
-    livePitchMappedRatio = 0.0f;
-    livePitchMappingValid = false;
-    livePitchSmoothingCoefficient = livePitchWetMixStep = 0.0f;
+    liveOutputDelaySerial = 0;
 
     if (! std::isfinite (rate) || rate <= 0.0 || rate > kMaxSampleRate
         || maximumBlockSize <= 0)
@@ -191,14 +181,6 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
             std::fill_n (slot.pcm.get(), floatCount, 0.0f);
         }
         scratch.reset (new (std::nothrow) float[floatCount]);
-        fftWork.reset (new (std::nothrow) float[static_cast<size_t> (fftSize) * 2u]);
-        fftWork2.reset (new (std::nothrow) float[static_cast<size_t> (fftSize) * 2u]);
-        overlapNorm.reset (new (std::nothrow) float[static_cast<size_t> (maxFramesPerBar)]);
-        const auto phaseCount = static_cast<size_t> (2 * (fftSize / 2 + 1));
-        previousInputPhase.reset (new (std::nothrow) double[phaseCount]);
-        synthesisPhase.reset (new (std::nothrow) double[phaseCount]);
-        phaseInitialized.reset (new (std::nothrow) uint8_t[phaseCount]);
-        fft = std::make_unique<juce::dsp::FFT> (11);
         }
         liveHistory.reset (new (std::nothrow) float[static_cast<size_t> (liveHistoryCapacityFrames) * 2u]);
         liveHistorySerials.reset (new (std::nothrow) uint64_t[static_cast<size_t> (liveHistoryCapacityFrames)]);
@@ -215,65 +197,24 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
         liveReentryTailFrames = liveTransitionFrames;
         for (auto& tail : liveReentryTailBuffers)
             tail.reset (new (std::nothrow) float[static_cast<size_t> (liveReentryTailFrames) * 2u]);
-        livePitchFft = std::make_unique<XYPadLiveFFT1024>();
-        livePitchWindow.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchFftSize)]);
-        for (int frame = 0; livePitchWindow && frame < kLivePitchFftSize; ++frame)
-            livePitchWindow[static_cast<size_t> (frame)] = static_cast<float> (
-                0.5 - 0.5 * std::cos (2.0 * kPi * frame / (kLivePitchFftSize - 1)));
-        livePitchFftWork.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchFftSize) * 2u]);
-        livePitchFftWork2.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchFftSize) * 2u]);
-        livePitchInputRing.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchFftSize) * 2u]);
-        livePitchIdentityDelay.reset (new (std::nothrow) float[static_cast<size_t> (kLivePipelineLatency) * 2u]);
-        livePitchSemitoneDelay.reset (new (std::nothrow) float[static_cast<size_t> (kLivePipelineLatency)]);
-        livePitchMaskDelay.reset (new (std::nothrow) float[static_cast<size_t> (kLivePipelineLatency)]);
-        livePitchOlaLeft.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchOlaCapacity)]);
-        livePitchOlaRight.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchOlaCapacity)]);
-        livePitchOlaNorm.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchOlaCapacity)]);
-        livePitchReferenceReal.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchBins)]);
-        livePitchReferenceImag.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchBins)]);
-        livePitchReferenceInverseMagnitude.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchBins)]);
-        livePitchSynthesisSine.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchBins)]);
-        livePitchSynthesisCosine.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchBins)]);
-        livePitchSourceLowBins.reset (new (std::nothrow) int[static_cast<size_t> (kLivePitchBins)]);
-        livePitchSourceHighBins.reset (new (std::nothrow) int[static_cast<size_t> (kLivePitchBins)]);
-        livePitchSourceFractions.reset (new (std::nothrow) float[static_cast<size_t> (kLivePitchBins)]);
-        livePitchPreviousPhase.reset (new (std::nothrow) double[static_cast<size_t> (kLivePitchBins)]);
-        livePitchSynthesisPhase.reset (new (std::nothrow) double[static_cast<size_t> (kLivePitchBins)]);
-        livePitchPhaseInitialized.reset (new (std::nothrow) uint8_t[static_cast<size_t> (kLivePitchBins)]);
-        livePitchSmoothingCoefficient = static_cast<float> (1.0 - std::exp (-1.0 / (rate * 0.005)));
-        livePitchWetMixStep = 1.0f / static_cast<float> (juce::jmax (1, juce::roundToInt (rate * 0.005)));
-        if ((! liveOnly && (! scratch || ! fftWork || ! fftWork2 || ! overlapNorm || ! previousInputPhase
-            || ! synthesisPhase || ! phaseInitialized || ! fft)) || ! liveHistory || ! liveHistorySerials
+        liveOutputDelay.reset (new (std::nothrow) float[static_cast<size_t> (kLivePipelineLatency) * 2u]);
+        liveOutputMaskDelay.reset (new (std::nothrow) float[static_cast<size_t> (kLivePipelineLatency)]);
+        if ((! liveOnly && ! scratch) || ! liveHistory || ! liveHistorySerials
             || ! liveHoldSnapshot || ! liveGrainWindow || ! liveReentryTailBuffers[0]
-            || ! liveReentryTailBuffers[1] || ! livePitchFft || ! livePitchWindow || ! livePitchFftWork
-            || ! livePitchFftWork2 || ! livePitchInputRing || ! livePitchIdentityDelay
-            || ! livePitchSemitoneDelay || ! livePitchMaskDelay || ! livePitchOlaLeft
-            || ! livePitchOlaRight || ! livePitchOlaNorm || ! livePitchPreviousPhase
-            || ! livePitchSynthesisPhase || ! livePitchPhaseInitialized || ! livePitchReferenceReal
-            || ! livePitchReferenceImag || ! livePitchReferenceInverseMagnitude
-            || ! livePitchSynthesisSine || ! livePitchSynthesisCosine
-            || ! livePitchSourceLowBins || ! livePitchSourceHighBins || ! livePitchSourceFractions)
+            || ! liveReentryTailBuffers[1] || ! liveOutputDelay || ! liveOutputMaskDelay)
         {
             for (int i = 0; i < kBarCount; ++i) slots[static_cast<size_t> (i)].pcm.reset();
-            scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
-            previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset();
             liveHistory.reset(); liveHistorySerials.reset(); liveHoldSnapshot.reset();
             liveGrainWindow.reset();
             for (auto& tail : liveReentryTailBuffers) tail.reset();
-            livePitchFft.reset(); livePitchWindow.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
-            livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
-            livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
-            livePitchReferenceReal.reset(); livePitchReferenceImag.reset(); livePitchReferenceInverseMagnitude.reset();
-            livePitchSynthesisSine.reset(); livePitchSynthesisCosine.reset();
-            livePitchSourceLowBins.reset(); livePitchSourceHighBins.reset(); livePitchSourceFractions.reset();
-            livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
+            liveOutputDelay.reset(); liveOutputMaskDelay.reset();
             maxFramesPerBar = 0;
             return false;
         }
         std::fill_n (liveHistory.get(), static_cast<size_t> (liveHistoryCapacityFrames) * 2u, 0.0f);
         std::fill_n (liveHistorySerials.get(), static_cast<size_t> (liveHistoryCapacityFrames),
                      std::numeric_limits<uint64_t>::max());
-        clearLivePitchState();
+        clearLiveDelayState();
         if (! liveOnly)
         {
             workerExit.store (false, std::memory_order_release);
@@ -284,16 +225,11 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     {
         stopWorker();
         for (int i = 0; i < kBarCount; ++i) slots[static_cast<size_t> (i)].pcm.reset();
-        scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
-        previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
+        scratch.reset();
         liveHistory.reset(); liveHistorySerials.reset(); liveHoldSnapshot.reset();
         liveGrainWindow.reset();
         for (auto& tail : liveReentryTailBuffers) tail.reset();
-        livePitchFft.reset(); livePitchWindow.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
-        livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
-        livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
-        livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
-        livePitchSourceLowBins.reset(); livePitchSourceHighBins.reset(); livePitchSourceFractions.reset();
+        liveOutputDelay.reset(); liveOutputMaskDelay.reset();
         maxFramesPerBar = 0;
         return false;
     }
@@ -313,18 +249,11 @@ void XYPadEngine::release() noexcept
         slot.pcm.reset();
         slot.frames.store (0, std::memory_order_relaxed);
     }
-    scratch.reset(); fftWork.reset(); fftWork2.reset(); overlapNorm.reset();
-    previousInputPhase.reset(); synthesisPhase.reset(); phaseInitialized.reset(); fft.reset();
+    scratch.reset();
     liveHistory.reset(); liveHistorySerials.reset(); liveHoldSnapshot.reset();
     liveGrainWindow.reset();
     for (auto& tail : liveReentryTailBuffers) tail.reset();
-    livePitchFft.reset(); livePitchWindow.reset(); livePitchFftWork.reset(); livePitchFftWork2.reset();
-    livePitchInputRing.reset(); livePitchIdentityDelay.reset(); livePitchSemitoneDelay.reset();
-    livePitchMaskDelay.reset(); livePitchOlaLeft.reset(); livePitchOlaRight.reset(); livePitchOlaNorm.reset();
-    livePitchReferenceReal.reset(); livePitchReferenceImag.reset(); livePitchReferenceInverseMagnitude.reset();
-    livePitchSynthesisSine.reset(); livePitchSynthesisCosine.reset();
-    livePitchSourceLowBins.reset(); livePitchSourceHighBins.reset(); livePitchSourceFractions.reset();
-    livePitchPreviousPhase.reset(); livePitchSynthesisPhase.reset(); livePitchPhaseInitialized.reset();
+    liveOutputDelay.reset(); liveOutputMaskDelay.reset();
     maxFramesPerBar = maxBlock = 0;
     sampleRate = 0.0;
     activeBar = -1;
@@ -352,15 +281,14 @@ void XYPadEngine::release() noexcept
     liveDirection = 1;
     liveHavePreviousX = liveHaveSignal = livePendingTransition = liveWasPlaying = false;
     liveSourceFadeActive = false;
-    livePitchSerial = 0;
-    liveSmoothedSemitones = livePitchWetMix = 0.0f;
-    livePitchMappedRatio = 0.0f;
-    livePitchMappingValid = false;
-    livePitchSmoothingCoefficient = livePitchWetMixStep = 0.0f;
+    liveOutputDelaySerial = 0;
     renderQueueHead.store (0, std::memory_order_relaxed);
     renderQueueTail.store (0, std::memory_order_relaxed);
 }
 
+// Retained below temporarily only as excluded source while this change is
+// compiled. The active XY path uses the fixed output delay declared after it.
+#if 0
 void XYPadEngine::clearLivePitchState() noexcept
 {
     if (livePitchInputRing) std::fill_n (livePitchInputRing.get(), static_cast<size_t> (kLivePitchFftSize) * 2u, 0.0f);
@@ -583,6 +511,36 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
     outputRight = delayedRight + (pitchedRight - delayedRight) * livePitchWetMix;
     outputMask = delayedMask;
     ++livePitchSerial;
+}
+
+#endif
+
+void XYPadEngine::clearLiveDelayState() noexcept
+{
+    if (liveOutputDelay)
+        std::fill_n (liveOutputDelay.get(), static_cast<size_t> (kLivePipelineLatency) * 2u, 0.0f);
+    if (liveOutputMaskDelay)
+        std::fill_n (liveOutputMaskDelay.get(), static_cast<size_t> (kLivePipelineLatency), 0.0f);
+    liveOutputDelaySerial = 0;
+}
+
+void XYPadEngine::processLiveDelaySample (float inputLeft, float inputRight, float wetMask,
+                                          float& outputLeft, float& outputRight, float& outputMask) noexcept
+{
+    if (! liveOutputDelay || ! liveOutputMaskDelay)
+    {
+        outputLeft = outputRight = outputMask = 0.0f;
+        return;
+    }
+    const auto index = static_cast<size_t> (liveOutputDelaySerial
+        % static_cast<uint64_t> (kLivePipelineLatency));
+    outputLeft = liveOutputDelay[index * 2u];
+    outputRight = liveOutputDelay[index * 2u + 1u];
+    outputMask = liveOutputMaskDelay[index];
+    liveOutputDelay[index * 2u] = std::isfinite (inputLeft) ? inputLeft : 0.0f;
+    liveOutputDelay[index * 2u + 1u] = std::isfinite (inputRight) ? inputRight : 0.0f;
+    liveOutputMaskDelay[index] = std::isfinite (wetMask) ? juce::jlimit (0.0f, 1.0f, wetMask) : 0.0f;
+    ++liveOutputDelaySerial;
 }
 
 void XYPadEngine::stopWorker() noexcept
@@ -954,7 +912,7 @@ bool XYPadEngine::copyLiveHoldSnapshot (uint64_t startSerial, uint64_t newestSer
     return true;
 }
 
-void XYPadEngine::launchLiveGrain (float x, int direction, bool transition,
+void XYPadEngine::launchLiveGrain (float x, double requestedIncrement, bool transition,
                                    uint64_t oldestSerial, uint64_t newestSerial) noexcept
 {
     if (liveGrainFrames <= 1 || liveGrainFrames > liveHistoryCapacityFrames
@@ -969,9 +927,13 @@ void XYPadEngine::launchLiveGrain (float x, int direction, bool transition,
     const auto selectionOldestSerial = newestSerial + 1u - selectionFrames;
     const auto span = static_cast<double> (selectionFrames - static_cast<uint64_t> (liveGrainFrames));
     const auto offset = static_cast<double> (juce::jlimit (0.0f, 1.0f, x)) * span;
-    const auto start = direction >= 0
-        ? static_cast<double> (selectionOldestSerial) + offset
-        : static_cast<double> (selectionOldestSerial) + offset + static_cast<double> (liveGrainFrames - 1);
+    const auto start = static_cast<double> (selectionOldestSerial) + offset;
+    const auto requested = std::isfinite (requestedIncrement) ? requestedIncrement : 0.0;
+    const auto grainSpan = static_cast<double> (juce::jmax (1, liveGrainFrames - 1));
+    const auto forwardLimit = (static_cast<double> (newestSerial) - start) / grainSpan;
+    const auto reverseLimit = (start - static_cast<double> (oldestSerial)) / grainSpan;
+    const auto limit = requested >= 0.0 ? juce::jmax (0.0, forwardLimit) : juce::jmax (0.0, reverseLimit);
+    const auto increment = juce::jlimit (-limit, limit, requested);
 
     LiveGrain* destination = nullptr;
     for (auto& grain : liveGrains)
@@ -983,7 +945,8 @@ void XYPadEngine::launchLiveGrain (float x, int direction, bool transition,
             if (grain.age > destination->age) destination = &grain;
     }
     destination->startSerial = start;
-    destination->direction = direction >= 0 ? 1 : -1;
+    destination->readIncrement = increment;
+    destination->direction = increment >= 0.0 ? 1 : -1;
     destination->age = 0;
     destination->fadeInFrames = transition ? liveTransitionFrames : 0;
     destination->fadeOutRemaining = 0;
@@ -1016,6 +979,44 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
             onlyActiveGrain = index;
             ++activeCount;
         }
+    // Variable-rate grains cannot use the unit-step SIMD tail path below.
+    // Re-render the audible continuation at its exact fractional read step.
+    if (activeCount == 1)
+    {
+        const auto& grain = liveGrains[static_cast<size_t> (onlyActiveGrain)];
+        bool valid = true;
+        for (int frame = 0; frame < liveReentryTailFrames; ++frame)
+        {
+            const auto age = grain.age + frame;
+            float left = 0.0f, right = 0.0f;
+            if (age > 0 && age < liveGrainFrames - 1)
+                valid = readLiveStereoSample (grain.startSerial
+                    + grain.readIncrement * static_cast<double> (age), oldestSerial, newestSerial, left, right);
+            if (! valid) break;
+            if (previousTail != nullptr)
+            {
+                const auto previousFrame = liveReentryTailPosition + frame;
+                if (previousFrame < liveReentryTailFrames)
+                {
+                    const auto q = static_cast<float> (previousFrame) * tailBlendScale;
+                    const auto index = static_cast<size_t> (previousFrame) * 2u;
+                    left = previousTail[index] * (1.0f - q) + left * q;
+                    right = previousTail[index + 1u] * (1.0f - q) + right * q;
+                }
+            }
+            destination[static_cast<size_t> (frame) * 2u] = std::isfinite (left) ? left : 0.0f;
+            destination[static_cast<size_t> (frame) * 2u + 1u] = std::isfinite (right) ? right : 0.0f;
+        }
+        if (valid)
+        {
+            liveReentryTailBuffer = destinationIndex;
+            liveReentryTailPosition = 0;
+            liveReentryTailStart = 0;
+            liveReentryTailAvailable = liveReentryTailFrames;
+            liveReentryTailActive = true;
+            return;
+        }
+    }
     if (activeCount == 1)
     {
         const auto& grain = liveGrains[static_cast<size_t> (onlyActiveGrain)];
@@ -1462,12 +1463,12 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
 
     if (! enabled.load (std::memory_order_acquire) || liveHistory == nullptr
         || liveHistorySerials == nullptr
-        || livePitchInputRing == nullptr || livePitchIdentityDelay == nullptr
+        || liveOutputDelay == nullptr || liveOutputMaskDelay == nullptr
         || ! transport.playing || transport.startBar < 0
         || frames <= 0 || frames > maxBlock || rendered.getNumSamples() < frames
         || readyMask.getNumChannels() < 1 || readyMask.getNumSamples() < frames)
     {
-        if (liveWasPlaying) clearLivePitchState();
+        if (liveWasPlaying) clearLiveDelayState();
         liveGrains.fill (LiveGrain {});
         liveHistoryValidFrames = 0;
         liveHistoryHasUnsafeMagnitude = false;
@@ -1521,7 +1522,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         liveReentryTailPosition = 0;
         liveReentryTailStart = liveReentryTailAvailable = 0;
         liveSourceFadeActive = false;
-        clearLivePitchState();
+        clearLiveDelayState();
     }
     const auto sourceChannels = source.getNumChannels();
     const auto rampFrames = juce::jmax (1, juce::roundToInt (sampleRate * 0.008));
@@ -1610,23 +1611,23 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             liveActiveRevision = liveActiveTrajectory.revision;
         }
 
-        float x = 0.5f, y = 0.5f;
+        float x = 0.5f, ignoredY = 0.5f;
         double xSlopePerPhase = 0.0;
-        interpolateTrajectory (liveActiveTrajectory, phase, x, y, &xSlopePerPhase);
-        const auto pitchTargetSemitones = liveActiveTrajectory.count > 0
-            ? juce::jlimit (-12.0f, 12.0f, 24.0f * (y - 0.5f)) : 0.0f;
-        liveSmoothedSemitones += (pitchTargetSemitones - liveSmoothedSemitones)
-                               * livePitchSmoothingCoefficient;
+        interpolateTrajectory (liveActiveTrajectory, phase, x, ignoredY, &xSlopePerPhase);
         x = juce::jlimit (0.0f, 1.0f, x);
-        const auto velocityX = std::isfinite (transport.phasePerSample)
-                            && transport.phasePerSample > 0.0
-            ? xSlopePerPhase * transport.phasePerSample * sampleRate : 0.0;
+        const auto phasePerSample = std::isfinite (transport.phasePerSample)
+            && transport.phasePerSample > 0.0 ? transport.phasePerSample : 0.0;
+        const auto velocityX = xSlopePerPhase * phasePerSample;
+        const auto sourceFrames = juce::jmin (liveHistoryValidFrames,
+            static_cast<uint64_t> (juce::jmax (1, juce::roundToInt (sampleRate * kLiveHistorySeconds) + 2)));
+        const auto requestedIncrement = static_cast<double> (sourceFrames > 0 ? sourceFrames - 1u : 0u)
+            * velocityX;
         auto direction = liveDirection;
         auto targetJump = false;
         if (liveHavePreviousX)
         {
             const auto delta = x - livePreviousX;
-            const auto magnitude = std::abs (velocityX);
+            const auto magnitude = std::abs (requestedIncrement);
             const auto isDiscreteJump = std::abs (delta) > 0.05f;
             if (isDiscreteJump)
             {
@@ -1691,19 +1692,19 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             else
                 captureLiveContinuationTail();
             liveGrains.fill (LiveGrain {});
-            launchLiveGrain (x, direction, false, oldestSerial, newestSerial);
+            launchLiveGrain (x, requestedIncrement, false, oldestSerial, newestSerial);
             liveSamplesToLaunch = liveHopFrames;
         }
         else if (liveHaveSignal && targetJump && hasHistory && liveActiveTrajectory.count > 0)
         {
             liveSamplesToLaunch = 0;
-            launchLiveGrain (x, direction, true, oldestSerial, newestSerial);
+            launchLiveGrain (x, requestedIncrement, true, oldestSerial, newestSerial);
             liveSamplesToLaunch = liveHopFrames;
         }
         else if (liveHaveSignal && liveActiveTrajectory.count > 0 && hasHistory && liveSamplesToLaunch <= 0
                  && ! transitionInProgress)
         {
-            launchLiveGrain (x, direction, false, oldestSerial, newestSerial);
+            launchLiveGrain (x, requestedIncrement, false, oldestSerial, newestSerial);
             liveSamplesToLaunch = liveHopFrames;
         }
         if (liveSamplesToLaunch > 0) --liveSamplesToLaunch;
@@ -1722,7 +1723,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                 grain.active = false;
                 continue;
             }
-            const auto serial = grain.startSerial + static_cast<double> (grain.direction * grain.age);
+            const auto serial = grain.startSerial + grain.readIncrement * static_cast<double> (grain.age);
             float left = 0.0f, right = 0.0f;
             if (! readLiveStereoSample (serial, oldestSerial, newestSerial, left, right))
             {
@@ -1886,8 +1887,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             liveSamplesToLaunch = 0;
         }
         float delayedLeft = 0.0f, delayedRight = 0.0f, delayedMask = 0.0f;
-        processLivePitchSample (xStageLeft, xStageRight, liveSmoothedSemitones,
-                                readFailure ? 0.0f : liveWetGain,
+        processLiveDelaySample (xStageLeft, xStageRight, readFailure ? 0.0f : liveWetGain,
                                 delayedLeft, delayedRight, delayedMask);
         if (outputLeft != nullptr) outputLeft[i] = delayedLeft;
         if (outputRight != nullptr) outputRight[i] = delayedRight;
@@ -1898,7 +1898,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
 bool XYPadEngine::renderSlot (Slot& slot) noexcept
 {
     const auto frames = slot.frames.load (std::memory_order_acquire);
-    if (frames < fftSize || frames > maxFramesPerBar || slot.pcm == nullptr || scratch == nullptr)
+    if (frames < 2 || frames > maxFramesPerBar || slot.pcm == nullptr || scratch == nullptr)
         return false;
     return renderScrubAndPitch (slot, frames);
 }
@@ -2016,9 +2016,10 @@ bool XYPadEngine::renderScrubAndPitch (Slot& slot, int frames, int* longestTrans
         previousX = x;
     }
 
-    // Offline, centered, Hann-windowed spectral remap. The input BAR is already
-    // complete, so FFT windows add no host latency. Frame pitch follows the BAR
-    // trajectory and does not alter the previously rendered X scrub path.
+    // Y is intentionally audio-neutral. The rendered X scrub is final.
+    return true;
+
+#if 0 // Removed XY phase-vocoder implementation; retained only until source cleanup pass.
     std::fill_n (overlapNorm.get(), static_cast<size_t> (frames), 0.0f);
     for (int channel = 0; channel < 2; ++channel)
     {
@@ -2125,6 +2126,7 @@ bool XYPadEngine::renderScrubAndPitch (Slot& slot, int frames, int* longestTrans
             return false;
     }
     return true;
+#endif
 }
 
 void XYPadEngine::workerLoop() noexcept

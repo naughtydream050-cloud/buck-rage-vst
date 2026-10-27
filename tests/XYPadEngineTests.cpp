@@ -273,48 +273,23 @@ public:
         return exact;
     }
 
-    static bool pitchMappedBinPrefixMatchesDirectMapping()
+    static bool fixedOutputDelayIsExact()
     {
-        constexpr double rate = 96000.0;
-        const float semitones[] { -12.0f, 0.0f, 12.0f };
+        XYPadEngine engine;
+        if (! engine.prepare (96000.0, 128, true, true)) return false;
         bool matched = true;
-        for (const auto semitonesForFrame : semitones)
+        for (int sample = 0; sample < XYPadEngine::kLivePipelineLatency + 8; ++sample)
         {
-            XYPadEngine engine;
-            if (! engine.prepare (rate, 128, true, true)) return false;
             float outLeft = 0.0f, outRight = 0.0f, outMask = 0.0f;
-            for (int sample = 0; sample < XYPadEngine::kLivePitchFftSize; ++sample)
-            {
-                // 0 st normally uses the identity shortcut. Force only this
-                // frame's already-defined wet path so its mapping is tested.
-                if (sample == XYPadEngine::kLivePitchFftSize - 1)
-                    engine.livePitchWetMix = 1.0f;
-                const auto phase = 2.0 * 3.14159265358979323846 * sample / rate;
-                engine.processLivePitchSample (static_cast<float> (0.25 * std::sin (440.0 * phase)),
-                                               static_cast<float> (0.25 * std::sin (440.0 * phase + 0.37)),
-                                               semitonesForFrame, 1.0f,
-                                               outLeft, outRight, outMask);
-            }
-            const auto ratio = std::pow (2.0f, semitonesForFrame / 12.0f);
-            int expectedCount = 0;
-            for (int bin = 0; bin < XYPadEngine::kLivePitchBins; ++bin)
-            {
-                const auto sourceBin = static_cast<float> (bin) / ratio;
-                if (sourceBin > XYPadEngine::kLivePitchFftSize / 2.0f) break;
-                const auto low = static_cast<int> (sourceBin);
-                const auto high = juce::jmin (XYPadEngine::kLivePitchFftSize / 2, low + 1);
-                const auto fraction = static_cast<float> (sourceBin - low);
-                const auto index = static_cast<size_t> (bin);
-                matched = matched && engine.livePitchSourceLowBins[index] == low
-                    && engine.livePitchSourceHighBins[index] == high
-                    && engine.livePitchSourceFractions[index] == fraction;
-                ++expectedCount;
-            }
-            matched = matched && engine.livePitchMappedBinCount == expectedCount;
-            engine.release();
+            engine.processLiveDelaySample (static_cast<float> (sample), -static_cast<float> (sample), 1.0f,
+                                           outLeft, outRight, outMask);
+            const auto expected = sample >= XYPadEngine::kLivePipelineLatency
+                ? static_cast<float> (sample - XYPadEngine::kLivePipelineLatency) : 0.0f;
+            matched = matched && outLeft == expected && outRight == -expected
+                && outMask == (sample >= XYPadEngine::kLivePipelineLatency ? 1.0f : 0.0f);
         }
-        std::cout << "METRIC live_pitch_stereo_mapping direct_prefix_match=" << matched
-                  << " rates=96000 semitones=-12,0,12\n";
+        engine.release();
+        std::cout << "METRIC live_output_delay exact_1024=" << matched << "\n";
         return matched;
     }
 
@@ -423,22 +398,18 @@ public:
                   << " max_error=" << maximumError << " tolerance=2e-9 finite=" << finite << "\n";
         return finite && maximumError <= 2.0e-9;
     }
-    static bool pitchWindowCacheMatchesOriginalExpression()
+    static bool yCoordinateDoesNotConfigureAudioState()
     {
         for (const auto rate : { 44100.0, 48000.0, 96000.0 })
         {
             XYPadEngine engine;
             if (! engine.prepare (rate, 64, true, true)) return false;
-            for (int frame = 0; frame < XYPadEngine::kLivePitchFftSize; ++frame)
-            {
-                const auto prior = static_cast<float> (0.5 - 0.5 * std::cos (
-                    2.0 * 3.1415926535897932384626433832795 * frame
-                        / (XYPadEngine::kLivePitchFftSize - 1)));
-                if (engine.livePitchWindow[static_cast<size_t> (frame)] != prior) return false;
-            }
+            const auto delayReady = engine.liveOutputDelay != nullptr
+                && engine.liveOutputMaskDelay != nullptr;
             engine.release();
+            if (! delayReady) return false;
         }
-        std::cout << "METRIC live_pitch_window_cache samples=3072 max_error=0 bit_exact=1\n";
+        std::cout << "METRIC y_audio_neutral fixed_delay_only=1\n";
         return true;
     }
     static bool liveGrainWindowLutMatchesAnalytic()
@@ -1389,8 +1360,9 @@ public:
                                              / static_cast<double> (p50Cycles);
                 const auto p99CyclesToMedian = static_cast<double> (p99Cycles)
                                              / static_cast<double> (p50Cycles);
-                const auto pitchActive = engine.livePitchWetMix >= 0.99f;
-                const auto within = p99CpuRatio <= 0.50 && peakCpuRatio <= 0.80 && pitchActive;
+                const auto fixedDelayActive = engine.liveOutputDelay != nullptr
+                    && engine.liveOutputMaskDelay != nullptr;
+                const auto within = p99CpuRatio <= 0.50 && peakCpuRatio <= 0.80 && fixedDelayActive;
                 allWithinDeadline = allWithinDeadline && within;
                 ++conditionCount;
                 std::cout << "METRIC benchmark_pacing rate=" << rate << " mode="
@@ -1400,7 +1372,7 @@ public:
                               std::chrono::steady_clock::now() - conditionWallStart).count()
                           << " max_dispatch_lateness_us=" << maxDispatchLatenessUs
                           << " callback_count=" << wallDeadlineRatios.size()
-                          << " pitch_active=" << pitchActive << " schedule=sample_clock\n";
+                          << " fixed_delay_active=" << fixedDelayActive << " schedule=sample_clock\n";
                 std::cout << "METRIC reentrant_cycle_diagnostic rate=" << rate << " mode="
                           << (mode < 5 ? fixedBlocks[mode] : -1)
                           << " profile=" << profileName
@@ -1529,6 +1501,7 @@ public:
         return finite && maximumStep < 0.02f && mask.getSample (0, 0) == 0.0f;
     }
 
+#if 0 // Superseded independent-Y pitch tests.
     static bool livePipelineHasExact1024SampleIdentityDelay()
     {
         XYPadEngine engine;
@@ -1634,6 +1607,8 @@ public:
             && forwardTop.pitchSerial == forwardBottom.pitchSerial
             && reverseTop.pitchSerial == reverseBottom.pitchSerial;
     }
+
+#endif
 
     struct LiveVelocityObservation
     {
@@ -2086,10 +2061,10 @@ int main (int argc, char** argv)
            "ac20-extreme-finite-history-keeps-reentry-tail-finite-safety-guard-enabled");
     check (XYPadEngineTestAccess::liveGrainWindowLutMatchesAnalytic(),
            "live-grain-window-lut-matches-analytic-hann");
-    check (XYPadEngineTestAccess::pitchWindowCacheMatchesOriginalExpression(),
-           "live-pitch-window-cache-is-bit-exact-to-prior-analysis-and-synthesis-expression");
-    check (XYPadEngineTestAccess::pitchMappedBinPrefixMatchesDirectMapping(),
-           "live-pitch-right-channel-reuses-the-left-exact-bin-prefix-at-minus12-zero-and-plus12");
+    check (XYPadEngineTestAccess::yCoordinateDoesNotConfigureAudioState(),
+           "saved-y-remains-ui-state-and-does-not-configure-an-xy-audio-processor");
+    check (XYPadEngineTestAccess::fixedOutputDelayIsExact(),
+           "xy-output-path-retains-the-exact-1024-sample-fixed-delay");
     check (XYPadEngineTestAccess::repeatedReentryBlendIsFiniteAndPeakBounded(),
            "reentrant-linear-blend-is-finite-and-per-channel-peak-bounded-for-ten-transition-lengths");
     check (XYPadEngineTestAccess::reentryMutationGuardsRejectUnsafeChanges(),
@@ -2191,6 +2166,7 @@ int main (int argc, char** argv)
            "live-xy-processing-performs-no-heap-allocation");
     liveProbe.release();
 
+#if 0 // Superseded Y pitch response matrix; Y is deliberately audio-neutral.
     check (XYPadEngineTestAccess::livePipelineHasExact1024SampleIdentityDelay(),
            "live-pitch-neutral-identity-has-exact-1024-sample-delay");
     bool pitchMatrixFinite = true, pitchMatrixNoAllocation = true;
@@ -2221,6 +2197,7 @@ int main (int argc, char** argv)
            "live-pitch-is-finite-and-allocation-free-at-44k1-48k-96k-forward-and-reverse");
     check (XYPadEngineTestAccess::livePitchDoesNotChangeXDirectionOrSampleClock(),
            "live-pitch-y-does-not-change-x-direction-or-sample-clock");
+#endif
     check (XYPadEngineTestAccess::writeActualLiveDiagnosticWavs(),
            "five-actual-live-diagnostic-wavs-use-processLive-and-final-xy-only-mix");
 

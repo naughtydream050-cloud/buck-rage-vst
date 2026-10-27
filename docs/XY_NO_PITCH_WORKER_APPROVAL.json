@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "status": "APPROVED",
+  "approved_by": "Sol",
+  "task_id": "XY-NO-PITCH-20261027",
+  "task_class": "CRITICAL",
+  "risk_class": "realtime-dsp",
+  "repo_path": "D:\\Development\\_CODEX_TOOLS\\worktrees\\toyotomi-xy-ac10-verification",
+  "base_commit": "de111a418ad3da2a4d0df764a31c08a64420f32f",
+  "plan_path": "docs/XY_NO_PITCH_PLAN.md",
+  "criteria_path": "docs/XY_NO_PITCH_CRITERIA.json",
+  "task_spec_path": "docs/XY_NO_PITCH_IMPLEMENTATION_TASK.md",
+  "plan_sha256": "e1b8e75034272dae745a38e44f21bd1614ed324858b26c170ab4cf0359d1d9cf",
+  "criteria_sha256": "8a4b51fc0efc4a41cfa6d0e858dbe12bbf75bbda24da12aefc9cfa7a93d80d6a",
+  "task_spec_sha256": "fcf8fbe17d9082a012d950eb436dfd43685333f62407f288ac2a6f553c95feda",
+  "allowed_paths": [
+    "source/xypadengine.cpp",
+    "source/xypadengine.h",
+    "tests/xypadenginetests.cpp",
+    "tests/xylegacypitchreference.h"
+  ],
+  "verification_command": ["git", "diff", "--check"]
+}
