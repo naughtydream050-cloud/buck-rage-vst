@@ -1,6 +1,5 @@
 #include "XYPadEngine.h"
 #include "XYPadTailAVX2.h"
-#include "XYPadLiveFFT1024.h"
 
 #include <algorithm>
 #include <chrono>
@@ -23,76 +22,6 @@
  #include <realtimeapiset.h>
 #endif
 
-static bool lockFreeLiveFftMatchesJuce()
-    {
-        XYPadLiveFFT1024 fft;
-        juce::dsp::FFT reference (10);
-        std::array<float, 2048> actual {}, expected {}, inverse {};
-        std::array<float, 1024> input {};
-        double forwardError = 0.0, inverseError = 0.0, roundtripError = 0.0;
-        bool finite = true;
-        for (int fixture = 0; fixture < 6; ++fixture)
-        {
-            uint32_t random = 1234567u;
-            for (int i = 0; i < 1024; ++i)
-            {
-                random = random * 1664525u + 1013904223u;
-                const auto angle = 2.0 * 3.14159265358979323846 * i / 1024.0;
-                input[static_cast<size_t> (i)] = fixture == 0 ? (i == 0 ? 0.5f : 0.0f)
-                    : fixture == 1 ? 0.25f : fixture == 2 ? (i % 2 ? -0.25f : 0.25f)
-                    : fixture == 3 ? static_cast<float> (0.2 * std::sin (7.0 * angle) + 0.1 * std::cos (129.0 * angle))
-                    : fixture == 4 ? static_cast<float> (0.3 * std::sin (511.0 * angle))
-                    : static_cast<float> (random >> 8u) / 16777216.0f - 0.5f;
-            }
-            actual.fill (0.0f); expected.fill (0.0f);
-            std::copy (input.begin(), input.end(), actual.begin());
-            std::copy (input.begin(), input.end(), expected.begin());
-            fft.performRealOnlyForwardTransform (actual.data());
-            reference.performRealOnlyForwardTransform (expected.data());
-            for (size_t i = 0; i < actual.size(); ++i)
-            {
-                finite = finite && std::isfinite (actual[i]) && std::isfinite (expected[i]);
-                forwardError = std::max (forwardError, std::abs (static_cast<double> (actual[i] - expected[i])) / 1024.0);
-            }
-            inverse = expected;
-            fft.performRealOnlyInverseTransform (inverse.data());
-            reference.performRealOnlyInverseTransform (expected.data());
-            fft.performRealOnlyInverseTransform (actual.data());
-            for (size_t i = 0; i < input.size(); ++i)
-            {
-                finite = finite && std::isfinite (inverse[i]) && std::isfinite (actual[i]);
-                inverseError = std::max (inverseError, std::abs (static_cast<double> (inverse[i] - expected[i])));
-                roundtripError = std::max (roundtripError, std::abs (static_cast<double> (actual[i] - input[i])));
-            }
-        }
-        std::cout << "METRIC live_lock_free_fft forward_normalized_error=" << forwardError
-                  << " inverse_sample_error=" << inverseError << " roundtrip_error=" << roundtripError
-                  << " fixtures=6 tolerance=2e-6 finite=" << finite << "\n";
-        return finite && forwardError <= 2.0e-6 && inverseError <= 2.0e-6 && roundtripError <= 2.0e-6;
-    }
-
-static bool windowedRingForwardMatchesBufferedForward()
-{
-    XYPadLiveFFT1024 ringFft, bufferedFft;
-    std::array<float, 2048> ring {}, windowed {}, actual {};
-    std::array<float, 1024> window {};
-    for (int i = 0; i < 1024; ++i)
-    {
-        const auto phase = 2.0 * 3.14159265358979323846 * static_cast<double> (i) / 1024.0;
-        const auto left = static_cast<float> (0.23 * std::sin (17.0 * phase) + 0.11 * std::cos (63.0 * phase));
-        ring[static_cast<size_t> (i) * 2u] = left;
-        ring[static_cast<size_t> (i) * 2u + 1u] = -left;
-        window[static_cast<size_t> (i)] = static_cast<float> (0.5 - 0.5 * std::cos (phase));
-        windowed[static_cast<size_t> (i)] = left * window[static_cast<size_t> (i)];
-    }
-    bufferedFft.performRealOnlyForwardTransform (windowed.data());
-    ringFft.performWindowedRingForwardTransform (ring.data(), 2048u, 0, window.data(), actual.data());
-    double error = 0.0;
-    for (size_t i = 0; i < actual.size(); ++i)
-        error = std::max (error, std::abs (static_cast<double> (actual[i] - windowed[i])));
-    std::cout << "METRIC live_windowed_ring_fft error=" << error << " tolerance=2e-6\n";
-    return error <= 2.0e-6;
-}
 #if defined(_WIN32)
 class ScopedProAudioMmcssRegistration
 {
@@ -496,7 +425,7 @@ public:
     {
         TransitionMeasurement result;
         if (! engine.slots || ! engine.slots[0].pcm || ! engine.scratch
-            || frames < engine.fftSize || frames > engine.maxFramesPerBar)
+            || frames < 2 || frames > engine.maxFramesPerBar)
             return result;
 
         auto& slot = engine.slots[0];
@@ -1515,115 +1444,6 @@ public:
         return finite && maximumStep < 0.02f && mask.getSample (0, 0) == 0.0f;
     }
 
-#if 0 // Superseded independent-Y pitch tests.
-    static bool livePipelineHasExact1024SampleIdentityDelay()
-    {
-        XYPadEngine engine;
-        if (! engine.prepare (48000.0, 256, true)) return false;
-        bool exact = true;
-        float outL = 0.0f, outR = 0.0f, mask = 0.0f;
-        for (int sample = 0; sample <= XYPadEngine::kLivePipelineLatency; ++sample)
-        {
-            const auto inL = sample == 0 ? 0.75f : 0.0f;
-            const auto inR = sample == 0 ? -0.25f : 0.0f;
-            engine.processLivePitchSample (inL, inR, 0.0f, sample == 0 ? 1.0f : 0.0f,
-                                           outL, outR, mask);
-            if (sample < XYPadEngine::kLivePipelineLatency)
-                exact = exact && outL == 0.0f && outR == 0.0f && mask == 0.0f;
-            else
-                exact = exact && outL == 0.75f && outR == -0.25f && mask == 1.0f;
-        }
-        engine.release();
-        return exact;
-    }
-
-    static double renderLivePitchFrequency (double rate, float y,
-                                            bool& finite, bool& noAllocation)
-    {
-        XYPadEngine engine;
-        if (! engine.prepare (rate, 1024, true)) return 0.0;
-        std::vector<float> rendered (static_cast<size_t> (rate));
-        finite = true;
-        AllocationAudit::count.store (0, std::memory_order_relaxed);
-        AllocationAudit::enabled.store (true, std::memory_order_release);
-        const auto semitones = 24.0f * (y - 0.5f);
-        for (size_t sampleIndex = 0; sampleIndex < rendered.size(); ++sampleIndex)
-        {
-            const auto phase = 2.0 * 3.141592653589793 * 440.0
-                * static_cast<double> (sampleIndex) / rate;
-            const auto input = static_cast<float> (0.5 * std::sin (phase));
-            float left = 0.0f, right = 0.0f, mask = 0.0f;
-            engine.processLivePitchSample (input, input * 0.5f, semitones, 1.0f,
-                                           left, right, mask);
-            rendered[sampleIndex] = left;
-            finite = finite && std::isfinite (left) && std::isfinite (right)
-                && std::isfinite (mask);
-        }
-        AllocationAudit::enabled.store (false, std::memory_order_release);
-        noAllocation = AllocationAudit::count.load (std::memory_order_relaxed) == 0;
-        const auto start = static_cast<size_t> (rate * 0.30);
-        const auto end = static_cast<size_t> (rate * 0.80);
-        int crossings = 0;
-        for (size_t i = start + 1; i < end; ++i)
-            if ((rendered[i - 1] <= 0.0f && rendered[i] > 0.0f)
-                || (rendered[i - 1] >= 0.0f && rendered[i] < 0.0f)) ++crossings;
-        const auto frequency = crossings * rate / (2.0 * static_cast<double> (end - start));
-        engine.release();
-        return frequency;
-    }
-
-    static bool livePitchDoesNotChangeXDirectionOrSampleClock()
-    {
-        struct Result { int direction = 0; uint64_t writeSerial = 0, pitchSerial = 0; };
-        const auto render = [] (float y, bool reverse)
-        {
-            Result result;
-            XYPadEngine engine;
-            constexpr int blockSize = 256;
-            if (! engine.prepare (48000.0, blockSize, true)) return result;
-            const std::vector<PluginStateModel::MotionPoint> trajectory = reverse
-                ? std::vector<PluginStateModel::MotionPoint> {{ 0.8f, y, 0.0 }, { 0.2f, y, 2.0 }}
-                : std::vector<PluginStateModel::MotionPoint> {{ 0.2f, y, 0.0 }, { 0.8f, y, 2.0 }};
-            engine.setTrajectory (0, trajectory, 1);
-            juce::AudioBuffer<float> input (2, blockSize), output (2, blockSize), mask (1, blockSize);
-            uint64_t processed = 0;
-            for (int block = 0; block < 24; ++block)
-            {
-                for (int i = 0; i < blockSize; ++i)
-                {
-                    const auto angle = 2.0 * 3.141592653589793 * 440.0
-                        * static_cast<double> (processed + static_cast<uint64_t> (i)) / 48000.0;
-                    const auto sample = static_cast<float> (0.5 * std::sin (angle));
-                    input.setSample (0, i, sample);
-                    input.setSample (1, i, sample * 0.5f);
-                }
-                XYPadEngine::Transport transport;
-                transport.playing = true;
-                transport.startBar = 0;
-                transport.startPhase = static_cast<double> (processed) / 128000.0;
-                transport.phasePerSample = 1.0 / 128000.0;
-                engine.processLive (input, output, mask, transport, blockSize);
-                processed += blockSize;
-            }
-            result = { engine.liveDirection, engine.liveWriteSerial, engine.livePitchSerial };
-            engine.release();
-            return result;
-        };
-
-        const auto forwardTop = render (1.0f, false);
-        const auto forwardBottom = render (0.0f, false);
-        const auto reverseTop = render (1.0f, true);
-        const auto reverseBottom = render (0.0f, true);
-        return forwardTop.direction == 1 && forwardBottom.direction == 1
-            && reverseTop.direction == -1 && reverseBottom.direction == -1
-            && forwardTop.writeSerial == forwardBottom.writeSerial
-            && reverseTop.writeSerial == reverseBottom.writeSerial
-            && forwardTop.pitchSerial == forwardBottom.pitchSerial
-            && reverseTop.pitchSerial == reverseBottom.pitchSerial;
-    }
-
-#endif
-
     struct LiveVelocityObservation
     {
         int direction = 0;
@@ -2180,38 +2000,6 @@ int main (int argc, char** argv)
            "live-xy-processing-performs-no-heap-allocation");
     liveProbe.release();
 
-#if 0 // Superseded Y pitch response matrix; Y is deliberately audio-neutral.
-    check (XYPadEngineTestAccess::livePipelineHasExact1024SampleIdentityDelay(),
-           "live-pitch-neutral-identity-has-exact-1024-sample-delay");
-    bool pitchMatrixFinite = true, pitchMatrixNoAllocation = true;
-    bool pitchRanges = true;
-    for (const auto rate : { 44100.0, 48000.0, 96000.0 })
-    {
-        for (const auto y : { 1.0f, 0.5f, 0.0f })
-        {
-            bool finiteAtRate = true, noAllocationAtRate = true;
-            const auto frequency = XYPadEngineTestAccess::renderLivePitchFrequency (
-                rate, y, finiteAtRate, noAllocationAtRate);
-            const auto expected = y > 0.75f ? 880.0 : (y < 0.25f ? 220.0 : 440.0);
-            std::cout << "METRIC live_pitch sample_rate=" << rate << " saved_y=" << y
-                      << " estimated_hz=" << frequency << " expected_hz=" << expected
-                      << " finite=" << finiteAtRate << " no_allocation=" << noAllocationAtRate << "\n";
-            pitchRanges &= std::abs (frequency - expected) / expected < 0.01;
-            pitchMatrixFinite &= finiteAtRate;
-            pitchMatrixNoAllocation &= noAllocationAtRate;
-        }
-        bool reverseFinite = true, reverseNoAllocation = true;
-        const auto reverseFrequency = XYPadEngineTestAccess::renderLivePitchFrequency (
-            rate, 1.0f, reverseFinite, reverseNoAllocation);
-        pitchMatrixFinite &= reverseFinite && std::abs (reverseFrequency - 880.0) / 880.0 < 0.01;
-        pitchMatrixNoAllocation &= reverseNoAllocation;
-    }
-    check (pitchRanges, "live-pitch-top-center-bottom-map-to-plus12-zero-minus12-st");
-    check (pitchMatrixFinite && pitchMatrixNoAllocation,
-           "live-pitch-is-finite-and-allocation-free-at-44k1-48k-96k-forward-and-reverse");
-    check (XYPadEngineTestAccess::livePitchDoesNotChangeXDirectionOrSampleClock(),
-           "live-pitch-y-does-not-change-x-direction-or-sample-clock");
-#endif
     check (XYPadEngineTestAccess::writeActualLiveDiagnosticWavs(),
            "five-actual-live-diagnostic-wavs-use-processLive-and-final-xy-only-mix");
 

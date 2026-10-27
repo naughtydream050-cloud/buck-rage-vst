@@ -205,7 +205,6 @@ private:
     bool liveHistoryHasUnsafeMagnitude = false;
     bool liveWasPlaying = false;
     bool liveSourceFadeActive = false;
-    int fftSize = 2048, hopSize = 512;
     std::atomic<bool> enabled { false }, workerExit { false };
     std::thread worker;
     std::mutex nonRealtimeLifecycleMutex;

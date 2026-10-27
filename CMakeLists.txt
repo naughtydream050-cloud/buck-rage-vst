@@ -54,7 +54,6 @@ target_sources(ToyotomiHideyoshi PRIVATE
     Source/PluginProcessor.cpp
     Source/TimelineScratchEngine.cpp
     Source/XYPadEngine.cpp
-    Source/XYPadLiveFFT1024.cpp
     Source/XYPadCpuFeatures.cpp
     Source/XYPadTailAVX2.cpp
     Source/PluginEditorV2.cpp
@@ -75,7 +74,6 @@ if (TOYOTOMI_BUILD_STATE_TESTS)
         Source/PluginProcessor.cpp
         Source/TimelineScratchEngine.cpp
         Source/XYPadEngine.cpp
-        Source/XYPadLiveFFT1024.cpp
         Source/XYPadCpuFeatures.cpp
         Source/XYPadTailAVX2.cpp
         Source/PluginEditorV2.cpp
@@ -94,7 +92,6 @@ if (TOYOTOMI_BUILD_STATE_TESTS)
     juce_generate_juce_header(ToyotomiHideyoshiXYEngineTests)
     target_sources(ToyotomiHideyoshiXYEngineTests PRIVATE
         Source/XYPadEngine.cpp
-        Source/XYPadLiveFFT1024.cpp
         Source/XYPadCpuFeatures.cpp
         Source/XYPadTailAVX2.cpp
         Source/PluginStateModel.cpp
