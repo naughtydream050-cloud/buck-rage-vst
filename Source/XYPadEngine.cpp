@@ -58,6 +58,16 @@ int wrapBar (int bar) noexcept
     const auto wrapped = bar % XYPadEngine::kBarCount;
     return wrapped < 0 ? wrapped + XYPadEngine::kBarCount : wrapped;
 }
+
+float liveFiniteMagnitude (float real, float imaginary) noexcept
+{
+    // FFT bins in the live path are finite audio values in ordinary operation.
+    // Avoid hypot's overflow-scaling path there, while preserving its safety
+    // behavior if a malformed finite input would overflow the square.
+    const auto squared = real * real + imaginary * imaginary;
+    return std::isfinite (squared) ? std::sqrt (juce::jmax (0.0f, squared))
+                                   : std::hypot (real, imaginary);
+}
 }
 
 XYPadEngine::~XYPadEngine()
@@ -471,7 +481,7 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
                         + (readBin (work, high, false) - readBin (work, low, false)) * fraction;
                     const auto imag = readBin (work, low, true)
                         + (readBin (work, high, true) - readBin (work, low, true)) * fraction;
-                    const auto magnitude = std::hypot (real, imag);
+                    const auto magnitude = liveFiniteMagnitude (real, imag);
                     const auto phase = std::atan2 (imag, real);
                     livePitchReferenceReal[index] = real;
                     livePitchReferenceImag[index] = imag;
@@ -539,7 +549,7 @@ void XYPadEngine::processLivePitchSample (float inputLeft, float inputRight, flo
                         const auto outputPhase = livePitchSynthesisPhase[index] + phase;
                         double sine = 0.0, cosine = 0.0;
                         liveSinCos (outputPhase, sine, cosine);
-                        const auto magnitude = std::hypot (real, imag);
+                        const auto magnitude = liveFiniteMagnitude (real, imag);
                         writeBin (transformed, bin, magnitude * static_cast<float> (cosine),
                                                    magnitude * static_cast<float> (sine));
                     }
