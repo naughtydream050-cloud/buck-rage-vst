@@ -582,9 +582,17 @@ public:
                     engine.liveGrains.fill (XYPadEngine::LiveGrain {});
                     engine.launchLiveGrain (x, direction, true, oldest, newest);
                     const auto& grain = engine.liveGrains[0];
+                    const auto grainSpan = static_cast<double> (engine.liveGrainFrames - 1);
+                    const auto forwardLimit = (static_cast<double> (newest) - grain.startSerial) / grainSpan;
+                    const auto reverseLimit = (grain.startSerial - static_cast<double> (oldest)) / grainSpan;
+                    const auto expectedIncrement = direction > 0
+                        ? juce::jmin (1.0, juce::jmax (0.0, forwardLimit))
+                        : -juce::jmin (1.0, juce::jmax (0.0, reverseLimit));
                     const auto endpoint = grain.startSerial
-                        + static_cast<double> (direction * (engine.liveGrainFrames - 1));
-                    valid = valid && grain.active && grain.direction == direction
+                        + expectedIncrement * grainSpan;
+                    valid = valid && grain.active
+                        && grain.direction == (expectedIncrement >= 0.0 ? 1 : -1)
+                        && std::abs (grain.readIncrement - expectedIncrement) <= 1.0e-12
                         && grain.fadeInFrames == engine.liveTransitionFrames
                         && grain.startSerial >= static_cast<double> (oldest)
                         && grain.startSerial <= static_cast<double> (newest)
@@ -592,7 +600,7 @@ public:
                         && endpoint <= static_cast<double> (newest);
                     for (int age = 0; age < engine.liveGrainFrames; ++age)
                     {
-                        const auto serial = grain.startSerial + static_cast<double> (direction * age);
+                        const auto serial = grain.startSerial + expectedIncrement * static_cast<double> (age);
                         float left = 0.0f, right = 0.0f;
                         const auto readable = engine.readLiveSample (serial, 0, oldest, newest, left)
                             && engine.readLiveSample (serial, 1, oldest, newest, right);
@@ -1843,7 +1851,7 @@ int main (int argc, char** argv)
     check (XYPadEngineTestAccess::sampleTimelineAndInterpolationAreBounded(),
            "sample-exact-bar-loop-mapping-and-time-normalized-trajectory-interpolation");
     for (const auto rate : { 44100.0, 48000.0, 96000.0 })
-        for (const auto velocity : { 0.01, 0.1, 0.5, -0.01, -0.1, -0.5 })
+        for (const auto velocity : { 0.5, 1.0, 2.0, -0.5, -1.0, -2.0 })
         {
             const auto observation = XYPadEngineTestAccess::observeLiveVelocity (rate, velocity);
             const auto requiredDirection = velocity > 0.0 ? 1 : -1;

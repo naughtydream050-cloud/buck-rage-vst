@@ -1620,20 +1620,26 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         const auto velocityX = xSlopePerPhase * phasePerSample;
         const auto sourceFrames = juce::jmin (liveHistoryValidFrames,
             static_cast<uint64_t> (juce::jmax (1, juce::roundToInt (sampleRate * kLiveHistorySeconds) + 2)));
-        const auto requestedIncrement = static_cast<double> (sourceFrames > 0 ? sourceFrames - 1u : 0u)
+        auto requestedIncrement = static_cast<double> (sourceFrames > 0 ? sourceFrames - 1u : 0u)
             * velocityX;
         auto direction = liveDirection;
         auto targetJump = false;
         if (liveHavePreviousX)
         {
             const auto delta = x - livePreviousX;
-            const auto magnitude = std::abs (requestedIncrement);
             const auto isDiscreteJump = std::abs (delta) > 0.05f;
             if (isDiscreteJump)
             {
                 direction = delta > 0.0f ? 1 : -1;
+                // A discontinuous recorded X move has a direction even when
+                // its local trajectory slope is zero. Give that re-entry a
+                // bounded unit source rate so the first target grain starts
+                // forward or reverse on the same sample.
+                if (std::abs (requestedIncrement) < 0.002)
+                    requestedIncrement = static_cast<double> (direction);
                 liveStationaryFrames = 0;
             }
+            const auto magnitude = std::abs (requestedIncrement);
             else if (magnitude >= 0.002)
             {
                 direction = velocityX > 0.0 ? 1 : -1;
