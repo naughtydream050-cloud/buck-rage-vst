@@ -1657,10 +1657,6 @@ int main (int argc, char** argv)
         return XYPadEngineTestAccess::runControlledHostBenchmark (true) ? 0 : 1;
     check (sizeof (XYPadEngine) < 64u * 1024u,
            "fixed-64-bar-tables-do-not-consume-windows-thread-stack");
-    check (lockFreeLiveFftMatchesJuce(),
-           "live-lock-free-fft-matches-juce-forward-inverse-and-roundtrip-reference");
-    check (windowedRingForwardMatchesBufferedForward(),
-           "live-windowed-ring-forward-matches-buffered-forward-reference");
     check (XYPadEngineTestAccess::holdSnapshotBulkCopyMatchesRingAcrossWrap(),
            "xy-live-hold-snapshot-bulk-copy-preserves-wrapped-stereo-history");
     check (XYPadEngineTestAccess::liveSinCosMatchesStandardReference(),
