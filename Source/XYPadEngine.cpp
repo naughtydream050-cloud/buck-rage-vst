@@ -1627,6 +1627,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         if (liveHavePreviousX)
         {
             const auto delta = x - livePreviousX;
+            const auto magnitude = std::abs (requestedIncrement);
             const auto isDiscreteJump = std::abs (delta) > 0.05f;
             if (isDiscreteJump)
             {
@@ -1639,7 +1640,6 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                     requestedIncrement = static_cast<double> (direction);
                 liveStationaryFrames = 0;
             }
-            const auto magnitude = std::abs (requestedIncrement);
             else if (magnitude >= 0.002)
             {
                 direction = velocityX > 0.0 ? 1 : -1;
