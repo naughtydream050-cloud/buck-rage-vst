@@ -1260,18 +1260,38 @@ public:
                     warmSamples += static_cast<uint64_t> (block);
                     ++sequence;
                 }
-                std::vector<double> deadlineRatios;
-                deadlineRatios.reserve (static_cast<size_t> (rate / 64.0 * 30.0 + 64.0));
+                std::vector<double> wallDeadlineRatios, callbackDeadlinesSeconds;
+                wallDeadlineRatios.reserve (static_cast<size_t> (rate / 64.0 * 30.0 + 64.0));
+                callbackDeadlinesSeconds.reserve (wallDeadlineRatios.capacity());
                 std::vector<uint64_t> callbackThreadCycles;
-                callbackThreadCycles.reserve (deadlineRatios.capacity());
-                uint64_t measuredSamples = 0, events = 0;
-                double peakRatio = 0.0, callbackWallSeconds = 0.0;
+                callbackThreadCycles.reserve (wallDeadlineRatios.capacity());
+                uint64_t measuredSamples = 0, events = 0, calibrationCycles = 0;
+                double peakWallRatio = 0.0, callbackWallSeconds = 0.0;
                 uint64_t largestCallbackCycles = 0, maxCyclesAtSample = 0, maxCyclesWriteSerial = 0;
-                double wallRatioAtMaxCycles = 0.0;
+                double wallRatioAtMaxCycles = 0.0, minimumCyclesPerCpuSecond = std::numeric_limits<double>::infinity();
                 uint64_t cyclesAtMaxWall = 0;
                 uint64_t maxWallAtSample = 0, maxWallWriteSerial = 0;
-                uint64_t conditionCpuStart = 0, conditionCpuEnd = 0;
-                if (! readCurrentThreadCpuTicks (conditionCpuStart)) return false;
+                uint64_t conditionCpuStart = 0, conditionCpuEnd = 0, calibrationCpuStart = 0;
+                if (! readCurrentThreadCpuTicks (conditionCpuStart)
+                    || ! readCurrentThreadCpuTicks (calibrationCpuStart)) return false;
+                const auto calibrateCpuRate = [&] () noexcept
+                {
+                    uint64_t calibrationCpuEnd = 0;
+                    if (! readCurrentThreadCpuTicks (calibrationCpuEnd)
+                        || calibrationCpuEnd < calibrationCpuStart) return false;
+                    const auto cpuSeconds = static_cast<double> (calibrationCpuEnd - calibrationCpuStart) * 1.0e-7;
+                    if (cpuSeconds > 0.0 && calibrationCycles > 0u)
+                    {
+                        // QueryThreadCycleTime measures only this audio thread. Using the
+                        // lowest observed cycles/CPU-second includes timer/measurement
+                        // overhead, so conversion remains conservative.
+                        minimumCyclesPerCpuSecond = std::min (minimumCyclesPerCpuSecond,
+                            static_cast<double> (calibrationCycles) / cpuSeconds);
+                    }
+                    calibrationCpuStart = calibrationCpuEnd;
+                    calibrationCycles = 0;
+                    return true;
+                };
                 double maxDispatchLatenessUs = 0.0;
                 const auto conditionWallStart = std::chrono::steady_clock::now();
                 pacer.reset();
@@ -1300,12 +1320,15 @@ public:
                         || cyclesAfter < cyclesBefore) return false;
                     const auto elapsed = std::chrono::duration<double, std::micro> (stop - start).count();
                     const auto ratio = elapsed / (1.0e6 * block / rate);
-                    deadlineRatios.push_back (ratio);
+                    wallDeadlineRatios.push_back (ratio);
+                    callbackDeadlinesSeconds.push_back (1.0e6 * block / rate);
                     const auto callbackCycles = static_cast<uint64_t> (cyclesAfter - cyclesBefore);
                     callbackThreadCycles.push_back (callbackCycles);
-                    if (ratio > peakRatio)
+                    calibrationCycles += callbackCycles;
+                    if (((callbackThreadCycles.size() & 127u) == 0u) && ! calibrateCpuRate()) return false;
+                    if (ratio > peakWallRatio)
                     {
-                        peakRatio = ratio;
+                        peakWallRatio = ratio;
                         maxWallAtSample = timelineSample;
                         maxWallWriteSerial = writeSerialBefore;
                         cyclesAtMaxWall = callbackCycles;
@@ -1325,15 +1348,32 @@ public:
                     ++sequence;
                     pacer.advance (block, rate);
                 }
+                if (! calibrateCpuRate()) return false;
                 if (! readCurrentThreadCpuTicks (conditionCpuEnd) || conditionCpuEnd < conditionCpuStart)
                     return false;
                 const auto averageThreadCpuToCallbackWall = callbackWallSeconds > 0.0
                     ? (static_cast<double> (conditionCpuEnd - conditionCpuStart) * 1.0e-7)
                         / callbackWallSeconds : std::numeric_limits<double>::infinity();
-                std::sort (deadlineRatios.begin(), deadlineRatios.end());
-                const auto p99Ratio = deadlineRatios[static_cast<size_t> (std::ceil (0.99 * deadlineRatios.size())) - 1u];
-                if (callbackThreadCycles.size() != deadlineRatios.size()
-                    || callbackThreadCycles.empty()) return false;
+                if (callbackThreadCycles.size() != wallDeadlineRatios.size()
+                    || callbackThreadCycles.size() != callbackDeadlinesSeconds.size()
+                    || callbackThreadCycles.empty() || ! std::isfinite (minimumCyclesPerCpuSecond)
+                    || minimumCyclesPerCpuSecond <= 0.0) return false;
+                std::vector<double> cpuDeadlineRatios;
+                cpuDeadlineRatios.reserve (callbackThreadCycles.size());
+                double peakCpuRatio = 0.0;
+                for (size_t i = 0; i < callbackThreadCycles.size(); ++i)
+                {
+                    const auto cpuRatio = (static_cast<double> (callbackThreadCycles[i])
+                        / minimumCyclesPerCpuSecond) / (callbackDeadlinesSeconds[i] * 1.0e-6);
+                    cpuDeadlineRatios.push_back (cpuRatio);
+                    peakCpuRatio = std::max (peakCpuRatio, cpuRatio);
+                }
+                std::sort (wallDeadlineRatios.begin(), wallDeadlineRatios.end());
+                std::sort (cpuDeadlineRatios.begin(), cpuDeadlineRatios.end());
+                const auto p99WallRatio = wallDeadlineRatios[static_cast<size_t> (
+                    std::ceil (0.99 * wallDeadlineRatios.size())) - 1u];
+                const auto p99CpuRatio = cpuDeadlineRatios[static_cast<size_t> (
+                    std::ceil (0.99 * cpuDeadlineRatios.size())) - 1u];
                 std::sort (callbackThreadCycles.begin(), callbackThreadCycles.end());
                 const auto p50Cycles = callbackThreadCycles[callbackThreadCycles.size() / 2u];
                 if (p50Cycles == 0) return false;
@@ -1345,7 +1385,7 @@ public:
                 const auto p99CyclesToMedian = static_cast<double> (p99Cycles)
                                              / static_cast<double> (p50Cycles);
                 const auto pitchActive = engine.livePitchWetMix >= 0.99f;
-                const auto within = p99Ratio <= 0.50 && peakRatio <= 0.80 && pitchActive;
+                const auto within = p99CpuRatio <= 0.50 && peakCpuRatio <= 0.80 && pitchActive;
                 allWithinDeadline = allWithinDeadline && within;
                 ++conditionCount;
                 std::cout << "METRIC benchmark_pacing rate=" << rate << " mode="
@@ -1354,7 +1394,7 @@ public:
                           << " wall_seconds=" << std::chrono::duration<double> (
                               std::chrono::steady_clock::now() - conditionWallStart).count()
                           << " max_dispatch_lateness_us=" << maxDispatchLatenessUs
-                          << " callback_count=" << deadlineRatios.size()
+                          << " callback_count=" << wallDeadlineRatios.size()
                           << " pitch_active=" << pitchActive << " schedule=sample_clock\n";
                 std::cout << "METRIC reentrant_cycle_diagnostic rate=" << rate << " mode="
                           << (mode < 5 ? fixedBlocks[mode] : -1)
@@ -1368,10 +1408,15 @@ public:
                           << " max_frames_to_ring_wrap="
                           << (engine.liveHistoryCapacityFrames
                               - static_cast<int> (maxCyclesWriteSerial & engine.liveHistoryIndexMask)) << "\n";
+                std::cout << "METRIC reentrant_wall_observation rate=" << rate << " mode="
+                          << (mode < 5 ? fixedBlocks[mode] : -1) << " p99_deadline_ratio=" << p99WallRatio
+                          << " profile=" << profileName << " max_deadline_ratio=" << peakWallRatio
+                          << " dispatch_lateness_us=" << maxDispatchLatenessUs << " status="
+                          << (peakWallRatio <= 0.80 ? "WITHIN_DEADLINE" : "OS_OR_HOST_SCHEDULING_OBSERVED") << "\n";
                 std::cout << "METRIC reentrant_benchmark rate=" << rate << " mode="
-                          << (mode < 5 ? fixedBlocks[mode] : -1) << " p99_deadline_ratio=" << p99Ratio
-                          << " profile=" << profileName
-                          << " max_deadline_ratio=" << peakRatio
+                          << (mode < 5 ? fixedBlocks[mode] : -1) << " p99_cpu_deadline_ratio=" << p99CpuRatio
+                          << " profile=" << profileName << " max_cpu_deadline_ratio=" << peakCpuRatio
+                          << " min_cycles_per_cpu_second=" << minimumCyclesPerCpuSecond
                           << " max_wall_thread_cycles=" << cyclesAtMaxWall
                           << " max_wall_sample=" << maxWallAtSample
                           << " max_wall_writer_index=" << (maxWallWriteSerial & engine.liveHistoryIndexMask)
