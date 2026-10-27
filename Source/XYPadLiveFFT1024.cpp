@@ -1,6 +1,5 @@
 #include "XYPadLiveFFT1024.h"
 #include "XYPadTailAVX2.h"
-#include <algorithm>
 #include <cmath>
 #if defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
  #include <emmintrin.h>
@@ -79,7 +78,13 @@ void XYPadLiveFFT1024::transform (bool inverse) noexcept
 void XYPadLiveFFT1024::performRealOnlyForwardTransform (float* data) noexcept
 {
     if (data == nullptr) return;
-    realFft.performRealOnlyForwardTransform (data);
+    for (int i = 0; i < size; ++i)
+    {
+        const auto at = reversed[static_cast<size_t> (i)];
+        real[at] = data[i]; imag[at] = 0.0f;
+    }
+    transform (false);
+    for (int i = 0; i < size; ++i) { data[2 * i] = real[static_cast<size_t> (i)]; data[2 * i + 1] = imag[static_cast<size_t> (i)]; }
 }
 
 void XYPadLiveFFT1024::performWindowedRingForwardTransform (const float* interleavedInput,
@@ -94,15 +99,30 @@ void XYPadLiveFFT1024::performWindowedRingForwardTransform (const float* interle
     {
         const auto ringIndex = static_cast<size_t> ((firstSerial + static_cast<uint64_t> (frame))
             % static_cast<uint64_t> (size));
-        destination[static_cast<size_t> (frame)] = interleavedInput[ringIndex * 2u + static_cast<size_t> (channel)]
+        const auto at = reversed[static_cast<size_t> (frame)];
+        real[at] = interleavedInput[ringIndex * 2u + static_cast<size_t> (channel)]
             * window[static_cast<size_t> (frame)];
+        imag[at] = 0.0f;
     }
-    std::fill_n (destination + size, static_cast<size_t> (size), 0.0f);
-    realFft.performRealOnlyForwardTransform (destination);
+    transform (false);
+    for (int i = 0; i < size; ++i)
+    {
+        destination[2 * i] = real[static_cast<size_t> (i)];
+        destination[2 * i + 1] = imag[static_cast<size_t> (i)];
+    }
 }
 
 void XYPadLiveFFT1024::performRealOnlyInverseTransform (float* data) noexcept
 {
     if (data == nullptr) return;
-    realFft.performRealOnlyInverseTransform (data);
+    for (int i = 0; i < size; ++i)
+    {
+        const auto source = i >= size / 2 ? size - i : i;
+        const auto at = reversed[static_cast<size_t> (i)];
+        real[at] = data[2 * source];
+        imag[at] = data[2 * source + 1] * (i >= size / 2 ? -1.0f : 1.0f);
+    }
+    transform (true);
+    constexpr auto scale = 1.0f / static_cast<float> (size);
+    for (int i = 0; i < size; ++i) { data[i] = real[static_cast<size_t> (i)] * scale; data[i + size] = imag[static_cast<size_t> (i)] * scale; }
 }
