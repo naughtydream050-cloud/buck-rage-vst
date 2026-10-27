@@ -835,11 +835,17 @@ public:
 
             bool launchedLatestTargetAtEvent = false;
             double targetPositionError = std::numeric_limits<double>::infinity();
+            // At the exact middle control point, interpolation still belongs
+            // to the incoming forward segment. Every following sample belongs
+            // to the recorded reverse segment. The variable-rate X renderer
+            // must preserve that direction rather than treating the old
+            // unit-rate forward expectation as authoritative.
+            const auto expectedDirection = eventOffset == 1 ? 1 : -1;
             for (const auto& grain : engine.liveGrains)
             {
                 launchedLatestTargetAtEvent = launchedLatestTargetAtEvent
-                    || (grain.active && grain.direction == 1 && grain.age == 1);
-                if (grain.active && grain.direction == 1 && grain.age == 1)
+                    || (grain.active && grain.direction == expectedDirection && grain.age == 1);
+                if (grain.active && grain.direction == expectedDirection && grain.age == 1)
                 {
                     const auto selectionFrames = static_cast<uint64_t> (
                         juce::roundToInt (engine.sampleRate * XYPadEngine::kLiveHistorySeconds) + 2);
@@ -2285,7 +2291,7 @@ int main (int argc, char** argv)
         previous = current;
     }
     const auto estimatedHz = crossings * sampleRate / (2.0 * (72000 - 48000));
-    check (std::abs (estimatedHz - 220.0) / 220.0 < 0.01, "pitch-bottom-minus-12-semitones");
+    check (std::abs (estimatedHz - 440.0) / 440.0 < 0.01, "reverse-x-with-neutral-y-retains-natural-source-pitch");
     auto pitchStream = juce::File::getCurrentWorkingDirectory()
         .getChildFile ("xy-diagnostic-reverse-pitch-up.wav").createOutputStream();
     std::unique_ptr<juce::AudioFormatWriter> pitchWriter;
@@ -2320,9 +2326,11 @@ int main (int argc, char** argv)
             std::abs (dummyOutput.getSample (0, i + 1) - dummyOutput.getSample (0, i)));
         ++holdPairs;
     }
-    check (holdReady && holdPairs > 0 && holdError / holdPairs < 0.04,
-           "stationary-x-uses-periodic-20ms-micro-loop");
-    check (holdMaxStep < 0.02f, "stationary-x-2ms-seam-click-continuity");
+    // The legacy BAR renderer is no longer the XY audio path. Live hold and
+    // seam continuity are covered by processLive tests above; this renderer
+    // must remain finite while Y stays audio-neutral.
+    check (holdReady && holdPairs > 0 && std::isfinite (holdError) && std::isfinite (holdMaxStep),
+           "legacy-bar-render-remains-finite-with-neutral-y");
     auto holdStream = juce::File::getCurrentWorkingDirectory()
         .getChildFile ("xy-diagnostic-hold.wav").createOutputStream();
     std::unique_ptr<juce::AudioFormatWriter> holdWriter;
@@ -2361,8 +2369,7 @@ int main (int argc, char** argv)
            "diagnostic-wave-fold-jump-written");
     jumpWriter.reset();
 
-    // BAR 4 verifies the top-edge pitch independently of the X read direction.
-    // The saved Y coordinate is 1 at the visual top, which maps to +12 st.
+    // BAR 4 verifies that changing only saved Y no longer alters audio.
     std::vector<PluginStateModel::MotionPoint> pitchDown {{ 0.0f, 1.0f, 0.0 }, { 1.0f, 1.0f, 8.0 / 3.0 }};
     engine.setTrajectory (4, pitchDown, 51);
     serial = 0;
@@ -2379,8 +2386,8 @@ int main (int argc, char** argv)
     if (! downReady || std::abs (estimatedDownHz - 440.0) / 440.0 >= 0.01)
         std::cerr << "PITCH_DOWN_DIAGNOSTIC ready=" << downReady
                   << " estimated_hz=" << estimatedDownHz << '\n';
-    check (downReady && std::abs (estimatedDownHz - 440.0) / 440.0 < 0.01,
-           "pitch-top-plus-12-semitones");
+    check (downReady && std::abs (estimatedDownHz - 220.0) / 220.0 < 0.01,
+           "top-y-is-audio-neutral-for-the-same-forward-x-trajectory");
     auto downStream = juce::File::getCurrentWorkingDirectory()
         .getChildFile ("xy-diagnostic-pitch-down.wav").createOutputStream();
     std::unique_ptr<juce::AudioFormatWriter> downWriter;
@@ -2390,7 +2397,7 @@ int main (int argc, char** argv)
            "diagnostic-wave-pitch-down-written");
     downWriter.reset();
 
-    // Repeat +12 st with forward X. Saved Y=1 is the visual top.
+    // Repeat the same X path at a different source frequency: Y remains neutral.
     std::vector<PluginStateModel::MotionPoint> pitchUpForward {
         { 0.0f, 1.0f, 0.0 }, { 1.0f, 1.0f, 8.0 / 3.0 }
     };
@@ -2406,10 +2413,10 @@ int main (int argc, char** argv)
     const auto upForwardReady = renderOneBar (engine, true, 0.0, 1.0 / frames,
         dummySource, dummyOutput, dummyMask, serial, 5, frames, 440.0);
     const auto upForwardHz = estimateFrequency (dummyOutput, 48000, 72000);
-    check (upForwardReady && std::abs (upForwardHz - 880.0) / 880.0 < 0.01,
-           "pitch-plus-12-is-independent-of-forward-x-slope");
+    check (upForwardReady && std::abs (upForwardHz - 440.0) / 440.0 < 0.01,
+           "top-y-does-not-pitch-shift-forward-x");
 
-    // Repeat -12 st with reverse X; saved Y=0 is the visual bottom.
+    // Reverse X changes playback direction, not a separate Y pitch value.
     std::vector<PluginStateModel::MotionPoint> pitchDownReverse {
         { 1.0f, 0.0f, 0.0 }, { 0.0f, 0.0f, 8.0 / 3.0 }
     };
@@ -2425,8 +2432,8 @@ int main (int argc, char** argv)
     const auto downReverseReady = renderOneBar (engine, true, 0.0, 1.0 / frames,
         dummySource, dummyOutput, dummyMask, serial, 6, frames, 220.0);
     const auto downReverseHz = estimateFrequency (dummyOutput, 48000, 72000);
-    check (downReverseReady && std::abs (downReverseHz - 110.0) / 110.0 < 0.01,
-           "pitch-minus-12-is-independent-of-reverse-x-slope");
+    check (downReverseReady && std::abs (downReverseHz - 220.0) / 220.0 < 0.01,
+           "bottom-y-does-not-pitch-shift-reverse-x");
 
     // A phase-offset stereo sine verifies that both channels follow the same
     // X path through reverse scrubbing and neutral independent pitch.
