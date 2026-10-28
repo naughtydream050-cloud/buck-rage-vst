@@ -1867,11 +1867,10 @@ float XYPadEngine::mixLayers (float dry, float presetOutput, float xyWet,
              + boundedDepth * (dry * (1.0f - boundedXyBlend) + xyWet * boundedXyBlend);
     }
 
-    constexpr float equalPower = 0.7071067811865475f;
-    const auto presetWet = (presetOutput - dry * (1.0f - boundedDepth)) / boundedDepth;
-    const auto layered = dry * (1.0f - boundedDepth)
-                       + boundedDepth * (equalPower * presetWet + equalPower * xyWet);
-    // Fade from the unchanged preset path into the parallel XY/preset mix. This
-    // keeps XY's warmup and source-silence ramps from dipping the preset level.
-    return presetOutput + (layered - presetOutput) * boundedXyBlend;
+    const auto xyOutput = dry * (1.0f - boundedDepth) + xyWet * boundedDepth;
+    // The preset keeps running internally, but an active XY trajectory owns the
+    // output. This is a linear route crossfade: XY warmup/source-end ramps
+    // return to the untouched preset path, while full XY no longer masks the
+    // scratch with a parallel preset layer.
+    return presetOutput * (1.0f - boundedXyBlend) + xyOutput * boundedXyBlend;
 }

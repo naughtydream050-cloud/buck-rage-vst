@@ -1771,14 +1771,23 @@ int main (int argc, char** argv)
     check (xyBlendZero == 0.37f, "xy-warmup-does-not-change-existing-preset-output");
     const auto xyOnly = XYPadEngine::mixLayers (0.25f, 0.25f, -0.5f, 0.4f, false);
     check (std::abs (xyOnly - (-0.05f)) < 1.0e-6f, "xy-only-depth-law");
-    const auto presetWet = 0.2f;
     const auto depth = 0.6f;
-    const auto presetOutput = 0.4f * 0.1f + depth * presetWet;
-    const auto both = XYPadEngine::mixLayers (0.1f, presetOutput, -0.3f, depth, true);
-    const auto expectedBoth = 0.1f * 0.4f + depth * 0.7071067811865475f * (presetWet - 0.3f);
-    check (std::abs (both - expectedBoth) < 1.0e-6f, "parallel-equal-power-layer-mix");
+    const auto presetOutput = 0.37f;
+    const auto xyOutput = 0.1f * (1.0f - depth) + (-0.3f) * depth;
+    const auto xyPriority = XYPadEngine::mixLayers (0.1f, presetOutput, -0.3f, depth, true, 1.0f);
+    const auto xyPriorityOtherPreset = XYPadEngine::mixLayers (0.1f, -0.91f, -0.3f, depth, true, 1.0f);
+    check (std::abs (xyPriority - xyOutput) < 1.0e-6f
+           && std::abs (xyPriorityOtherPreset - xyOutput) < 1.0e-6f,
+           "xy-priority-full-blend-is-independent-of-preset-output");
+    const auto midpoint = XYPadEngine::mixLayers (0.1f, presetOutput, -0.3f, depth, true, 0.5f);
+    const auto expectedMidpoint = 0.5f * (presetOutput + xyOutput);
+    check (std::abs (midpoint - expectedMidpoint) < 1.0e-6f
+           && midpoint >= juce::jmin (presetOutput, xyOutput)
+           && midpoint <= juce::jmax (presetOutput, xyOutput),
+           "xy-priority-midpoint-is-bounded-linear-route-crossfade");
     const auto correlatedPeak = XYPadEngine::mixLayers (0.0f, 1.0f, 1.0f, 1.0f, true);
-    check (correlatedPeak > 1.4f && correlatedPeak < 1.42f, "correlated-layer-peak-measured-no-limiter");
+    check (std::abs (correlatedPeak - 1.0f) < 1.0e-6f && std::isfinite (correlatedPeak),
+           "xy-priority-removes-parallel-correlated-peak");
 
     constexpr double sampleRate = 48000.0;
     constexpr int frames = static_cast<int> (sampleRate * 4.0 * 60.0 / 90.0);

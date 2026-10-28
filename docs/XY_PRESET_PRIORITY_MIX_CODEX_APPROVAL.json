@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "status": "APPROVED",
+  "approved_by": "Sol",
+  "task_id": "toyotomi-xy-preset-priority-mix",
+  "task_class": "CRITICAL",
+  "risk_class": "realtime-dsp",
+  "repo_path": "D:\\Development\\_CODEX_TOOLS\\worktrees\\toyotomi-xy-no-pitch-gate",
+  "base_commit": "d03647f1d11cffddc2110f645a8fcdfb22355cfb",
+  "plan_path": "docs/XY_PRESET_PRIORITY_MIX_PLAN.md",
+  "plan_sha256": "85f7764da6f8f9709eb63610edcf9d8d43dc8f605270b657323d475e91285eae",
+  "criteria_path": "docs/XY_PRESET_PRIORITY_MIX_CRITERIA.json",
+  "criteria_sha256": "5651a896b6fe6500862ec2cb9c9b6116329aad10cf840a2411c50bd4d56d4831",
+  "task_spec_path": "docs/XY_PRESET_PRIORITY_MIX_GLM_TASK.md",
+  "task_spec_sha256": "be3f0b5b6012432f37032e2153b448f628b9344afec6c4ff9b703b1e00f86a22",
+  "allowed_paths": [
+    "source/xypadengine.cpp",
+    "tests/xypadenginetests.cpp"
+  ],
+  "forbidden": [
+    "UI", "State", "parameter IDs", "Y audio behavior", "latency", "Preset algorithms",
+    "Timeline/transport", "candidate", "final", "Program Files", "CMake", "workflow"
+  ],
+  "deployment": "D manual-test only after deterministic checks and artifact provenance; no candidate promotion"
+}

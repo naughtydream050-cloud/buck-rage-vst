@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "baseline": "d03647f1d11cffddc2110f645a8fcdfb22355cfb",
+  "criteria": [
+    {"id":"AC-01","requirement":"With XY blend zero, preset output is bit-exact unchanged.","check":["mixLayers bit comparison"]},
+    {"id":"AC-02","requirement":"With XY blend one, output is xyOutput and independent of preset output.","check":["two distinct preset values and exact formula"]},
+    {"id":"AC-03","requirement":"Intermediate blend is a bounded linear preset-to-XY crossfade.","check":["sampled blend sweep, finite and no overshoot"]},
+    {"id":"AC-04","requirement":"Preset OFF retains the existing XY-only warm-up and ramp behavior.","check":["XY-only mix regression"]},
+    {"id":"AC-05","requirement":"Depth zero is bit-exact dry and bypass keeps XY blend zero.","check":["depth and bypass processor regression"]},
+    {"id":"AC-06","requirement":"Saved trajectory playback receives the same XY-priority routing as live input.","check":["trajectory ready-mask deterministic regression"]},
+    {"id":"AC-07","requirement":"Hold remains XY-active and does not restore the preset until XY becomes inactive.","check":["hold transition deterministic regression"]},
+    {"id":"AC-08","requirement":"Missing PCM, warm-up, and input-silence end return to the preset path.","check":["ready-mask zero transition regression"]},
+    {"id":"AC-09","requirement":"Changing a preset cannot change fully-active XY output.","check":["two preset-output invariance test"]},
+    {"id":"AC-10","requirement":"Preset DSP continues to process internally and resumes through the existing blend without reset.","check":["blend endpoint and processor regression"]},
+    {"id":"AC-11","requirement":"Stereo channels remain independent, finite, and free of abnormal crossfade peaks.","check":["stereo mix sweep"]},
+    {"id":"AC-12","requirement":"No allocation, lock, ValueTree access, I/O, or logging is added to the audio thread.","check":["code review and existing realtime regression"]},
+    {"id":"AC-13","requirement":"Y remains audio-neutral and no UI, State, parameter, latency, or preset algorithm changes occur.","check":["diff allowlist and existing XY regressions"]},
+    {"id":"AC-14","requirement":"The focused XY deterministic test passes.","check":["XYPadEngineTests command"]},
+    {"id":"AC-15","requirement":"The unconfirmed boon sound is not falsely claimed fixed; XY-only and prior parallel mix are separately measurable.","check":["focused diagnostic mix assertions"]},
+    {"id":"AC-16","requirement":"A D manual-test bundle is provenance-bound to its CI artifact and is not promoted to candidate.","check":["artifact source/hash verification"]}
+  ]
+}
