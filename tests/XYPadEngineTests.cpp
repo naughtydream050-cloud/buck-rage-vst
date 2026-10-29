@@ -1460,8 +1460,10 @@ public:
         constexpr int blockSize = 256;
         if (! engine.prepare (rate, blockSize, true, true)) return result;
 
-        const auto startX = velocity >= 0.0 ? 0.25f : 0.75f;
-        const auto endX = static_cast<float> (static_cast<double> (startX) + velocity);
+        // A unit sweep is the complete legal Pad range, not a request beyond
+        // its clamped 0..1 coordinates.
+        const auto startX = velocity >= 0.0 ? 0.0f : 1.0f;
+        const auto endX = velocity >= 0.0 ? 1.0f : 0.0f;
         const std::vector<PluginStateModel::MotionPoint> points {
             { startX, 0.5f, 0.0 }, { endX, 0.5f, 1.0 }
         };
