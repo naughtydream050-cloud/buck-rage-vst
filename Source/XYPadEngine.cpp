@@ -675,8 +675,8 @@ bool XYPadEngine::copyLiveHoldSnapshot (uint64_t startSerial, uint64_t newestSer
 }
 
 void XYPadEngine::launchLiveGrain (float x, double requestedIncrement, bool transition,
-                                   bool preserveExactTarget,
-                                   uint64_t oldestSerial, uint64_t newestSerial) noexcept
+                                   uint64_t oldestSerial, uint64_t newestSerial,
+                                   bool preserveExactTarget) noexcept
 {
     if (liveGrainFrames <= 1 || liveGrainFrames > liveHistoryCapacityFrames
         || newestSerial < oldestSerial)
@@ -1484,19 +1484,19 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             else
                 captureLiveContinuationTail();
             liveGrains.fill (LiveGrain {});
-            launchLiveGrain (x, requestedIncrement, false, true, oldestSerial, newestSerial);
+            launchLiveGrain (x, requestedIncrement, false, oldestSerial, newestSerial, true);
             liveSamplesToLaunch = liveHopFrames;
         }
         else if (liveHaveSignal && targetJump && hasHistory && liveActiveTrajectory.count > 0)
         {
             liveSamplesToLaunch = 0;
-            launchLiveGrain (x, requestedIncrement, true, false, oldestSerial, newestSerial);
+            launchLiveGrain (x, requestedIncrement, true, oldestSerial, newestSerial, false);
             liveSamplesToLaunch = liveHopFrames;
         }
         else if (liveHaveSignal && liveActiveTrajectory.count > 0 && hasHistory && liveSamplesToLaunch <= 0
                  && ! transitionInProgress)
         {
-            launchLiveGrain (x, requestedIncrement, false, false, oldestSerial, newestSerial);
+            launchLiveGrain (x, requestedIncrement, false, oldestSerial, newestSerial, false);
             liveSamplesToLaunch = liveHopFrames;
         }
         if (liveSamplesToLaunch > 0) --liveSamplesToLaunch;
