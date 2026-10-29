@@ -675,6 +675,7 @@ bool XYPadEngine::copyLiveHoldSnapshot (uint64_t startSerial, uint64_t newestSer
 }
 
 void XYPadEngine::launchLiveGrain (float x, double requestedIncrement, bool transition,
+                                   bool preserveExactTarget,
                                    uint64_t oldestSerial, uint64_t newestSerial) noexcept
 {
     if (liveGrainFrames <= 1 || liveGrainFrames > liveHistoryCapacityFrames
@@ -692,7 +693,7 @@ void XYPadEngine::launchLiveGrain (float x, double requestedIncrement, bool tran
     const auto grainSpan = static_cast<double> (juce::jmax (1, liveGrainFrames - 1));
     double start = 0.0;
     double increment = 0.0;
-    if (transition)
+    if (transition || preserveExactTarget)
     {
         // An abrupt UI jump must retain its existing exact X target. Its
         // re-entry tail provides continuity, while this range clamp keeps the
@@ -1483,19 +1484,19 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             else
                 captureLiveContinuationTail();
             liveGrains.fill (LiveGrain {});
-            launchLiveGrain (x, requestedIncrement, false, oldestSerial, newestSerial);
+            launchLiveGrain (x, requestedIncrement, false, true, oldestSerial, newestSerial);
             liveSamplesToLaunch = liveHopFrames;
         }
         else if (liveHaveSignal && targetJump && hasHistory && liveActiveTrajectory.count > 0)
         {
             liveSamplesToLaunch = 0;
-            launchLiveGrain (x, requestedIncrement, true, oldestSerial, newestSerial);
+            launchLiveGrain (x, requestedIncrement, true, false, oldestSerial, newestSerial);
             liveSamplesToLaunch = liveHopFrames;
         }
         else if (liveHaveSignal && liveActiveTrajectory.count > 0 && hasHistory && liveSamplesToLaunch <= 0
                  && ! transitionInProgress)
         {
-            launchLiveGrain (x, requestedIncrement, false, oldestSerial, newestSerial);
+            launchLiveGrain (x, requestedIncrement, false, false, oldestSerial, newestSerial);
             liveSamplesToLaunch = liveHopFrames;
         }
         if (liveSamplesToLaunch > 0) --liveSamplesToLaunch;

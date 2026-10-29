@@ -124,6 +124,7 @@ private:
                                float& left, float& right) const noexcept;
     bool copyLiveHoldSnapshot (uint64_t startSerial, uint64_t newestSerial) noexcept;
     void launchLiveGrain (float x, double requestedIncrement, bool transition,
+                          bool preserveExactTarget = false,
                           uint64_t oldestSerial, uint64_t newestSerial) noexcept;
     void captureLiveContinuationTail() noexcept;
     static float blendLiveReentrySample (float tail, float target, float q) noexcept;

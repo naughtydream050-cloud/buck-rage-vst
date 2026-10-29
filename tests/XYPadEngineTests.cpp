@@ -905,7 +905,7 @@ public:
                             engine.liveReentryTailBuffers[0][index + 1u] = -0.3f - 0.0001f * static_cast<float> (frame);
                         }
 
-                    engine.launchLiveGrain (0.5f, direction, false, 0, newest);
+                    engine.launchLiveGrain (0.5f, direction, false, false, 0, newest);
                     auto& grain = engine.liveGrains[0];
                     grain.age = age;
                     // Exercise the AVX2/SSE tail renderer on both sides of
