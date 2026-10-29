@@ -18,7 +18,8 @@ sounds close to a hold instead of a directional scrub.
 
 One normalized horizontal sweep per bar maps to a signed 1.0x live-grain
 read increment.  Positive X slope is forward; negative X slope is reverse.
-The existing source-bound calculation remains the final safety clamp.
+The live source placement reserves a complete 20 ms grain in the requested
+direction before its final source-range clamp.
 
 ## Acceptance criteria
 

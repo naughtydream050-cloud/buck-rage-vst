@@ -687,15 +687,22 @@ void XYPadEngine::launchLiveGrain (float x, double requestedIncrement, bool tran
         return;
 
     const auto selectionOldestSerial = newestSerial + 1u - selectionFrames;
-    const auto span = static_cast<double> (selectionFrames - static_cast<uint64_t> (liveGrainFrames));
-    const auto offset = static_cast<double> (juce::jlimit (0.0f, 1.0f, x)) * span;
-    const auto start = static_cast<double> (selectionOldestSerial) + offset;
+    const auto sourceSpan = static_cast<double> (selectionFrames - static_cast<uint64_t> (liveGrainFrames));
     const auto requested = std::isfinite (requestedIncrement) ? requestedIncrement : 0.0;
     const auto grainSpan = static_cast<double> (juce::jmax (1, liveGrainFrames - 1));
-    const auto forwardLimit = (static_cast<double> (newestSerial) - start) / grainSpan;
-    const auto reverseLimit = (start - static_cast<double> (oldestSerial)) / grainSpan;
-    const auto limit = requested >= 0.0 ? juce::jmax (0.0, forwardLimit) : juce::jmax (0.0, reverseLimit);
-    const auto increment = juce::jlimit (-limit, limit, requested);
+    const auto maximumMagnitude = sourceSpan / grainSpan;
+    const auto magnitude = juce::jmin (std::abs (requested), maximumMagnitude);
+    const auto increment = requested < 0.0 ? -magnitude : magnitude;
+
+    // Reserve a complete grain in the direction of travel. Without this,
+    // Forward at the right edge begins at newest input and clamps to zero;
+    // Reverse has the mirrored failure at the left edge.
+    const auto travel = magnitude * grainSpan;
+    const auto placementSpan = juce::jmax (0.0, sourceSpan - travel);
+    const auto directionOffset = increment < 0.0 ? travel : 0.0;
+    const auto offset = directionOffset
+                      + static_cast<double> (juce::jlimit (0.0f, 1.0f, x)) * placementSpan;
+    const auto start = static_cast<double> (selectionOldestSerial) + offset;
 
     LiveGrain* destination = nullptr;
     for (auto& grain : liveGrains)
