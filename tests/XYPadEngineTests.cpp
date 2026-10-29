@@ -1450,6 +1450,7 @@ public:
         int stationaryFrames = 0;
         int requiredHoldFrames = 0;
         bool holdReady = false;
+        double signedReadIncrement = 0.0;
     };
 
     static LiveVelocityObservation observeLiveVelocity (double rate, double velocity)
@@ -1492,6 +1493,9 @@ public:
         result.stationaryFrames = engine.liveStationaryFrames;
         result.requiredHoldFrames = juce::jmax (1, static_cast<int> (std::ceil (rate * 0.002)));
         result.holdReady = engine.liveHoldReady;
+        for (const auto& grain : engine.liveGrains)
+            if (grain.active && std::abs (grain.readIncrement) > std::abs (result.signedReadIncrement))
+                result.signedReadIncrement = grain.readIncrement;
         engine.release();
         return result;
     }
@@ -1680,6 +1684,17 @@ int main (int argc, char** argv)
                       << " required=" << observation.requiredHoldFrames
                       << " hold_ready=" << observation.holdReady << '\n';
             check (pass, "xy-live-r2-normalized-velocity-remains-moving-across-sample-rates");
+        }
+    for (const auto rate : { 44100.0, 48000.0, 96000.0 })
+        for (const auto velocity : { 1.0, -1.0 })
+        {
+            const auto observation = XYPadEngineTestAccess::observeLiveVelocity (rate, velocity);
+            const auto expected = velocity;
+            const auto pass = std::abs (observation.signedReadIncrement - expected) <= 0.02;
+            std::cout << "METRIC xy_directional_read_rate rate=" << rate
+                      << " requested=" << expected
+                      << " actual=" << observation.signedReadIncrement << '\\n';
+            check (pass, "one-bar-full-x-sweep-launches-audible-signed-unit-read-rate");
         }
     for (const auto rate : { 44100.0, 48000.0, 96000.0 })
     {

@@ -1377,13 +1377,12 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         double xSlopePerPhase = 0.0;
         interpolateTrajectory (liveActiveTrajectory, phase, x, ignoredY, &xSlopePerPhase);
         x = juce::jlimit (0.0f, 1.0f, x);
-        const auto phasePerSample = std::isfinite (transport.phasePerSample)
-            && transport.phasePerSample > 0.0 ? transport.phasePerSample : 0.0;
-        const auto velocityX = xSlopePerPhase * phasePerSample;
-        const auto sourceFrames = juce::jmin (liveHistoryValidFrames,
-            static_cast<uint64_t> (juce::jmax (1, juce::roundToInt (sampleRate * kLiveHistorySeconds) + 2)));
-        auto requestedIncrement = static_cast<double> (sourceFrames > 0 ? sourceFrames - 1u : 0u)
-            * velocityX;
+        // X slope is already expressed in complete PAD traversals per BAR.
+        // Mapping it through the 125 ms source width and host phase-per-sample
+        // made a left-to-right BAR gesture read at roughly 0.07x at 130 BPM:
+        // sonically close to a hold. A unit X sweep now means unit source rate;
+        // launchLiveGrain retains the final serial-range clamp.
+        auto requestedIncrement = std::isfinite (xSlopePerPhase) ? xSlopePerPhase : 0.0;
         auto direction = liveDirection;
         auto targetJump = false;
         if (liveHavePreviousX)
@@ -1404,7 +1403,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             }
             else if (magnitude >= 0.002)
             {
-                direction = velocityX > 0.0 ? 1 : -1;
+                direction = requestedIncrement > 0.0 ? 1 : -1;
                 liveStationaryFrames = 0;
             }
             else if (magnitude <= 0.001)
