@@ -1303,7 +1303,8 @@ bool hasRedActiveLamp (const juce::Image& image)
         for (int x = 0; x < image.getWidth(); ++x)
         {
             const auto c = image.getPixelAt (x, y);
-            if (c.getRed() > 120 && c.getGreen() < 100 && c.getBlue() < 100)
+            if (c.getRed() > 120 && c.getGreen() < 100 && c.getBlue() < 100
+                && c.getRed() > c.getGreen() * 1.5f && c.getRed() > c.getBlue() * 1.5f)
                 return true;
         }
     return false;
