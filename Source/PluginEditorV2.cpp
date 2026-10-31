@@ -111,11 +111,11 @@ struct NativeDisplayAssets final
     void load()
     {
         for (int digit = 0; digit < 10; ++digit)
-            digits[(size_t) digit] = readAsset ("toy_display_digit_" + juce::String (digit) + ".png");
-        dot = readAsset ("toy_display_dot.png"); minus = readAsset ("toy_display_minus.png");
-        slash = readAsset ("toy_display_slash.png"); s = readAsset ("toy_display_s.png");
-        t = readAsset ("toy_display_t.png"); percent = readAsset ("toy_display_percent.png");
-        init = readAsset ("toy_display_init.png"); minusInf = readAsset ("toy_display_minus_inf.png");
+            digits[(size_t) digit] = readAsset ("ui_polish_display_digit_" + juce::String (digit) + ".png");
+        dot = readAsset ("ui_polish_display_dot.png"); minus = readAsset ("ui_polish_display_minus.png");
+        slash = readAsset ("ui_polish_display_slash.png"); s = readAsset ("ui_polish_display_s.png");
+        t = readAsset ("ui_polish_display_t.png"); percent = readAsset ("ui_polish_display_percent.png");
+        init = readAsset ("ui_polish_display_init.png"); minusInf = readAsset ("ui_polish_display_minus_inf.png");
     }
 
     const juce::Image* imageFor (juce_wchar character) const
@@ -188,7 +188,6 @@ struct V2AssetCatalog final
     // shell/label split introduced a same-basename BinaryData collision and
     // produced the unreadable labels seen in the editor.
     std::array<std::array<juce::Image, 4>, 64> barCells;
-    std::array<juce::Image, 4> barShells;
     std::array<juce::Image, 10> barMinis;
     std::array<std::array<juce::Image, 2>, 10> presets;
     std::array<std::array<juce::Image, 2>, 5> lengths;
@@ -247,7 +246,8 @@ struct V2AssetCatalog final
                 const auto stateAsset = property (record, juce::String (stateNames[(size_t) state]) + "_asset");
                 barMapValid = barMapValid && nativeSizeIs (stateAsset, 56, 80);
                 loadBarMap (barCells[(size_t) bar][(size_t) state],
-                            juce::File (property (stateAsset, "file").toString()).getFileName(),
+                            "ui_polish_bar_" + juce::String (bar + 1).paddedLeft ('0', 2)
+                                + "_" + juce::String (stateNames[(size_t) state]) + ".png",
                             { 0, 0, 56, 80 });
             }
         }
@@ -262,9 +262,6 @@ struct V2AssetCatalog final
             loadBarMap (tabs[(size_t) index][1], "tab_" + juce::String (kTabNames[(size_t) index]) + "_selected.png", kTabs[(size_t) index]);
         }
         loadBarMapContract();
-        const std::array<const char*, 4> shellNames {{ "normal", "selected", "playing", "selected_playing" }};
-        for (int state = 0; state < 4; ++state)
-            loadBarMap (barShells[(size_t) state], "bar_cell_shell_" + juce::String (shellNames[(size_t) state]) + "_56x80.png", { 0, 0, 56, 80 });
         for (int preset = 0; preset < 10; ++preset)
             loadBarMap (barMinis[(size_t) preset], "bar_mini_" + juce::String (kPresetNames[(size_t) preset]) + ".png", { 0, 0, 40, 20 });
         for (int index = 0; index < 10; ++index)
@@ -286,8 +283,8 @@ struct V2AssetCatalog final
         load (headerBpmBacking, "toy_display_header_bpm_backing.png", GeneratedLayout::bpmValueBounds());
         load (headerTimeSigBacking, "toy_display_header_timesig_backing.png", GeneratedLayout::timeSigValueBounds());
         load (headerPresetBacking, "toy_display_header_preset_backing.png", GeneratedLayout::presetValueBounds());
-        load (hostSyncLampOn, "toy_display_host_sync_lamp_on.png", GeneratedLayout::hostSyncLampBounds());
-        load (hostSyncLampOff, "toy_display_host_sync_lamp_off.png", GeneratedLayout::hostSyncLampBounds());
+        load (hostSyncLampOn, "ui_polish_host_sync_on.png", GeneratedLayout::hostSyncLampBounds());
+        load (hostSyncLampOff, "ui_polish_host_sync_off.png", GeneratedLayout::hostSyncLampBounds());
         load (parameterReadoutBackings[0], "toy_display_speed_readout_backing.png", GeneratedLayout::speedReadoutBounds());
         load (parameterReadoutBackings[1], "toy_display_pitch_readout_backing.png", GeneratedLayout::pitchReadoutBounds());
         load (parameterReadoutBackings[2], "toy_display_depth_readout_backing.png", GeneratedLayout::depthReadoutBounds());
@@ -389,7 +386,7 @@ class ToyotomiHideyoshiAudioProcessorEditorV2::OutputMeter final : public juce::
 {
 public:
     explicit OutputMeter (ToyotomiHideyoshiAudioProcessor& source)
-        : processor (source), meterLeds {{ readAsset ("output_meter_left.png"), readAsset ("output_meter_right.png") }},
+        : processor (source), meterLeds {{ readAsset ("ui_polish_output_meter_left.png"), readAsset ("ui_polish_output_meter_right.png") }},
           readoutBackings {{ readAsset ("toy_display_output_l_readout_backing.png"), readAsset ("toy_display_output_r_readout_backing.png") }}
     {
         nativeDisplay.load();
@@ -501,14 +498,10 @@ public:
             const auto bar = tab * 16 + index;
             const auto state = resolveCellState (bar == selected, bar == playing);
             const auto bounds = cellBounds (index);
-            // Keep the proven completed cell: standalone label assets are
-            // ambiguous in BinaryData and corrupt the BAR text. Replace only
-            // the mini's backing pixels, then draw the selected preset mini.
+            // A complete state image owns this cell's border. The mini is a
+            // separate current-preset overlay only; no second state shell is
+            // painted, so selected and playing indicators cannot collide.
             drawNative (g, assets.barCells[(size_t) bar][(size_t) state], bounds);
-            g.saveState();
-            g.reduceClipRegion ({ bounds.getX() + 8, bounds.getY() + 36, 40, 20 });
-            drawNative (g, assets.barShells[(size_t) state], bounds);
-            g.restoreState();
             drawNative (g, assets.barMinis[(size_t) static_cast<int> (processor.getStateModel().getSlot (bar).preset)],
                         { bounds.getX() + 8, bounds.getY() + 36, 40, 20 });
         }
@@ -533,7 +526,17 @@ public:
         drawNative (g, assets.headerPresetBacking, GeneratedLayout::presetValueBounds());
         drawNativeValue (g, assets.nativeDisplay, ui.projectPresetId == 0 ? "Init" : "Init",
                          GeneratedLayout::presetValueBounds(), 10.0f, juce::Justification::centredLeft);
-        drawNative (g, hostSync ? assets.hostSyncLampOn : assets.hostSyncLampOff, GeneratedLayout::hostSyncLampBounds());
+        const auto hostLampBounds = GeneratedLayout::hostSyncLampBounds();
+        drawNative (g, hostSync ? assets.hostSyncLampOn : assets.hostSyncLampOff, hostLampBounds);
+        if (hostSync && playing >= 0)
+        {
+            const auto phase = 0.5f + 0.5f * std::sin ((float) juce::Time::getMillisecondCounterHiRes()
+                                                        * juce::MathConstants<float>::twoPi / 2000.0f);
+            g.saveState();
+            g.setOpacity (phase * 0.10f);
+            drawNative (g, assets.hostSyncLampOn, hostLampBounds);
+            g.restoreState();
+        }
         // The static faceplate owns the neutral XY panel and fixed labels.
 
         const std::array<float, 3> normalized {{ (slot.speed - .25f) / 3.75f, (slot.pitch + 12.0f) / 24.0f, slot.depth }};
@@ -576,13 +579,25 @@ public:
                     const auto location = toPoint (slot.xyMotion[index]);
                     if (index == 0) trace.startNewSubPath (location); else trace.lineTo (location);
                 }
-                g.setColour (juce::Colour (0xffd6a446));
-                g.strokePath (trace, juce::PathStrokeType (1.25f));
+                const auto activeTrace = xyRecording || selected == playing;
+                const auto haloAlpha = activeTrace ? 0.20f : 0.07f;
+                g.setColour (juce::Colour (0xffffbd3c).withAlpha (haloAlpha));
+                g.strokePath (trace, juce::PathStrokeType (activeTrace ? 8.0f : 5.0f));
+                g.setColour (juce::Colour (0xffffc44a).withAlpha (activeTrace ? 0.46f : 0.20f));
+                g.strokePath (trace, juce::PathStrokeType (activeTrace ? 3.5f : 2.5f));
+                g.setColour (juce::Colour (0xfffff0bc));
+                g.strokePath (trace, juce::PathStrokeType (1.15f));
             }
             const PluginStateModel::MotionPoint current { slot.currentX, slot.currentY };
             const auto currentPoint = toPoint (current);
-            g.setColour (juce::Colour (0xffd6a446));
-            g.fillEllipse (currentPoint.x - 2.0f, currentPoint.y - 2.0f, 4.0f, 4.0f);
+            const auto activePoint = xyRecording || selected == playing;
+            g.setColour (juce::Colour (0xffffbd3c).withAlpha (activePoint ? 0.18f : 0.08f));
+            g.fillEllipse (currentPoint.x - (activePoint ? 7.0f : 5.0f), currentPoint.y - (activePoint ? 7.0f : 5.0f),
+                           activePoint ? 14.0f : 10.0f, activePoint ? 14.0f : 10.0f);
+            g.setColour (juce::Colour (0xffffd96b));
+            g.fillEllipse (currentPoint.x - 3.0f, currentPoint.y - 3.0f, 6.0f, 6.0f);
+            g.setColour (juce::Colour (0xfffff3c4));
+            g.fillEllipse (currentPoint.x - 1.25f, currentPoint.y - 1.25f, 2.5f, 2.5f);
             g.restoreState();
         }
 

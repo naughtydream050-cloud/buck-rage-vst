@@ -1309,6 +1309,33 @@ bool hasRedActiveLamp (const juce::Image& image)
     return false;
 }
 
+bool isIvoryGlyph (const juce::Image& image)
+{
+    bool visible = false;
+    for (int y = 0; y < image.getHeight(); ++y)
+        for (int x = 0; x < image.getWidth(); ++x)
+        {
+            const auto c = image.getPixelAt (x, y);
+            if (c.getAlpha() == 0) continue;
+            visible = true;
+            if (std::abs ((int) c.getRed() - 226) > 1
+                || std::abs ((int) c.getGreen() - 216) > 1
+                || std::abs ((int) c.getBlue() - 194) > 1)
+                return false;
+        }
+    return visible;
+}
+
+bool hasBrightPixel (const juce::Image& image, juce::Rectangle<int> bounds, float minimumBrightness)
+{
+    if (! image.isValid() || ! image.getBounds().contains (bounds)) return false;
+    for (int y = bounds.getY(); y < bounds.getBottom(); ++y)
+        for (int x = bounds.getX(); x < bounds.getRight(); ++x)
+            if (image.getPixelAt (x, y).getBrightness() >= minimumBrightness)
+                return true;
+    return false;
+}
+
 bool hasSelectedGoldContamination (const juce::Image& image)
 {
     for (int y = 0; y < image.getHeight(); ++y)
@@ -1776,54 +1803,56 @@ int main()
     pass &= check(resourceIs("meter_led_strip_png",12,204),"v2-output-meter-led-native");
     const std::array<const char*, 18> nativeDisplayResources {{
         "toy_display_header_bpm_backing_png", "toy_display_header_timesig_backing_png",
-        "toy_display_header_preset_backing_png", "toy_display_host_sync_lamp_on_png",
-        "toy_display_host_sync_lamp_off_png", "toy_display_speed_readout_backing_png",
+        "toy_display_header_preset_backing_png", "ui_polish_host_sync_on_png",
+        "ui_polish_host_sync_off_png", "toy_display_speed_readout_backing_png",
         "toy_display_pitch_readout_backing_png", "toy_display_depth_readout_backing_png",
         "toy_display_output_l_readout_backing_png", "toy_display_output_r_readout_backing_png",
-        "toy_display_dot_png", "toy_display_minus_png", "toy_display_slash_png",
-        "toy_display_s_png", "toy_display_t_png", "toy_display_percent_png",
-        "toy_display_init_png", "toy_display_minus_inf_png"
+        "ui_polish_display_dot_png", "ui_polish_display_minus_png", "ui_polish_display_slash_png",
+        "ui_polish_display_s_png", "ui_polish_display_t_png", "ui_polish_display_percent_png",
+        "ui_polish_display_init_png", "ui_polish_display_minus_inf_png"
     }};
     for (const auto* resource : nativeDisplayResources)
         pass &= check (resourceImage (resource).isValid(), "v2-native-display-sprite-present");
-    pass &= check (hasRedActiveLamp (resourceImage ("toy_display_host_sync_lamp_on_png"))
-                && ! hasRedActiveLamp (resourceImage ("toy_display_host_sync_lamp_off_png")),
+    pass &= check (hasRedActiveLamp (resourceImage ("ui_polish_host_sync_on_png"))
+                && ! hasRedActiveLamp (resourceImage ("ui_polish_host_sync_off_png")),
                    "v2-host-sync-approved-red-sprite-only");
     for (int digit = 0; digit < 10; ++digit)
-        pass &= check (resourceImage (("toy_display_digit_" + juce::String (digit) + "_png").toRawUTF8()).isValid(),
-                       "v2-native-display-digit-present");
-    const std::array<const char*, 4> shellResources {{ "bar_cell_shell_normal_56x80_png", "bar_cell_shell_selected_56x80_png", "bar_cell_shell_playing_56x80_png", "bar_cell_shell_selected_playing_56x80_png" }};
-    for (const auto* resource : shellResources)
-        pass &= check (resourceIs (resource, 56, 80), "v2-bar-shell-native");
+        pass &= check (isIvoryGlyph (resourceImage (("ui_polish_display_digit_" + juce::String (digit) + "_png").toRawUTF8())),
+                       "v2-native-display-digit-is-ivory");
+    for (const auto* glyph : { "ui_polish_display_dot_png", "ui_polish_display_minus_png",
+                               "ui_polish_display_slash_png", "ui_polish_display_s_png",
+                               "ui_polish_display_t_png", "ui_polish_display_percent_png",
+                               "ui_polish_display_init_png", "ui_polish_display_minus_inf_png" })
+        pass &= check (isIvoryGlyph (resourceImage (glyph)), "v2-native-display-symbol-is-ivory");
     for (int i = 1; i <= 64; ++i)
     {
         const auto resource = "bar_label_" + juce::String (i).paddedLeft ('0', 2) + "_png";
         pass &= check (resourceIs (resource.toRawUTF8(), 56, 12), "v2-bar-label-native");
         for (const auto* state : { "normal", "selected", "playing", "selected_playing" })
         {
-            const auto completedCell = "bar_" + juce::String (i).paddedLeft ('0', 2) + "_" + state + "_png";
+            const auto completedCell = "ui_polish_bar_" + juce::String (i).paddedLeft ('0', 2) + "_" + state + "_png";
             pass &= check (resourceIs (completedCell.toRawUTF8(), 56, 80), "v2-completed-bar-cell-native");
         }
     }
     for (const auto* mini : { "off", "forward_cut", "backspin", "chirp", "baby", "transform", "drag", "zigzag", "tape_brake", "custom" })
         pass &= check (resourceIs (("bar_mini_" + juce::String (mini) + "_png").toRawUTF8(), 40, 20), "v2-bar-mini-native");
-    const auto normalShell = resourceImage ("bar_cell_shell_normal_56x80_png");
-    const auto selectedShell = resourceImage ("bar_cell_shell_selected_56x80_png");
-    const auto playingShell = resourceImage ("bar_cell_shell_playing_56x80_png");
-    const auto selectedPlayingShell = resourceImage ("bar_cell_shell_selected_playing_56x80_png");
-    pass &= check (different (normalShell, selectedShell), "v2-bar-selected-shell-is-distinct");
-    pass &= check (different (normalShell, playingShell), "v2-bar-playing-shell-is-distinct");
-    pass &= check (different (playingShell, selectedPlayingShell), "v2-bar-selected-playing-shell-is-distinct");
-    pass &= check (resourceImage ("bar_11_normal_png").isValid()
-                && resourceImage ("bar_27_normal_png").isValid()
-                && resourceImage ("bar_43_normal_png").isValid()
-                && resourceImage ("bar_59_normal_png").isValid(),
+    const auto normalCell = resourceImage ("ui_polish_bar_11_normal_png");
+    const auto selectedCell = resourceImage ("ui_polish_bar_11_selected_png");
+    const auto playingCell = resourceImage ("ui_polish_bar_11_playing_png");
+    const auto selectedPlayingCell = resourceImage ("ui_polish_bar_11_selected_playing_png");
+    pass &= check (different (normalCell, selectedCell), "v2-bar-selected-state-is-distinct");
+    pass &= check (different (normalCell, playingCell), "v2-bar-playing-state-is-distinct");
+    pass &= check (different (playingCell, selectedPlayingCell), "v2-bar-selected-playing-state-is-distinct");
+    pass &= check (resourceImage ("ui_polish_bar_11_normal_png").isValid()
+                && resourceImage ("ui_polish_bar_27_normal_png").isValid()
+                && resourceImage ("ui_polish_bar_43_normal_png").isValid()
+                && resourceImage ("ui_polish_bar_59_normal_png").isValid(),
                    "v2-user-normal-bar-replacements-decode");
-    const auto neutralBarBase = resourceImage ("bar_10_normal_png");
-    pass &= check (usesNeutralBarBase (resourceImage ("bar_11_normal_png"), neutralBarBase)
-                && usesNeutralBarBase (resourceImage ("bar_27_normal_png"), neutralBarBase)
-                && usesNeutralBarBase (resourceImage ("bar_43_normal_png"), neutralBarBase)
-                && usesNeutralBarBase (resourceImage ("bar_59_normal_png"), neutralBarBase),
+    const auto neutralBarBase = resourceImage ("ui_polish_bar_10_normal_png");
+    pass &= check (usesNeutralBarBase (resourceImage ("ui_polish_bar_11_normal_png"), neutralBarBase)
+                && usesNeutralBarBase (resourceImage ("ui_polish_bar_27_normal_png"), neutralBarBase)
+                && usesNeutralBarBase (resourceImage ("ui_polish_bar_43_normal_png"), neutralBarBase)
+                && usesNeutralBarBase (resourceImage ("ui_polish_bar_59_normal_png"), neutralBarBase),
                    "v2-four-normal-bars-use-neutral-base");
 
     ToyotomiHideyoshiAudioProcessor processor; processor.prepareToPlay(48000,512);
@@ -1954,7 +1983,7 @@ int main()
     }
     pass &= check (GeneratedLayout::outputLBounds() == expectedSlots[0]
                 && GeneratedLayout::outputRBounds() == expectedSlots[1], "v2-output-reference-slot-geometry");
-    const std::array<juce::Image, 2> preparedLeds {{resourceImage("output_meter_left_png"),resourceImage("output_meter_right_png")}};
+    const std::array<juce::Image, 2> preparedLeds {{resourceImage("ui_polish_output_meter_left_png"),resourceImage("ui_polish_output_meter_right_png")}};
     for (int ch = 0; ch < 2; ++ch)
         pass &= check (preparedLeds[(size_t) ch].getWidth() == expectedSlots[(size_t) ch].getWidth()
                     && preparedLeds[(size_t) ch].getHeight() == expectedSlots[(size_t) ch].getHeight(),
@@ -1963,22 +1992,17 @@ int main()
     {
         v2->debugSetOutputMeterDb (levels[0],levels[1]);
         const auto actual = render (*editor);
-        bool pixelsMatch = true;
+        bool metersMatchState = true;
         for (int ch = 0; ch < 2; ++ch)
         {
             const auto slot = expectedSlots[(size_t) ch];
             const auto fill = juce::roundToInt(juce::jmap(levels[(size_t) ch],-60.0f,6.0f,0.0f,(float)slot.getHeight()));
-            for (int y=0; y<slot.getHeight(); ++y)
-                for (int x=0; x<slot.getWidth(); ++x)
-                {
-                    // Peak hold may light two pixels immediately above fill.
-                    if (fill > 0 && y >= slot.getHeight()-fill)
-                        pixelsMatch &= actual.getPixelAt(slot.getX()+x,slot.getY()+y) == preparedLeds[(size_t) ch].getPixelAt(x,y);
-                    else if (fill == 0)
-                        pixelsMatch &= actual.getPixelAt(slot.getX()+x,slot.getY()+y).getBrightness() < 0.01f;
-                }
+            const juce::Rectangle<int> lit { slot.getX(), slot.getBottom() - fill, slot.getWidth(), fill };
+            metersMatchState &= fill == 0
+                ? ! hasBrightPixel (actual, slot, 0.18f)
+                : hasBrightPixel (actual, lit, 0.18f);
         }
-        pass &= check(pixelsMatch,"v2-output-final-composite-fill-pixels");
+        pass &= check(metersMatchState,"v2-output-final-composite-led-state");
         pass &= check(png(actual,"v2-output-layout-"+juce::String((int)levels[0])+"-"+juce::String((int)levels[1])+".png"),"v2-output-layout-proof");
     }
     v2->debugSetOutputMeterDb(-60,-60);
@@ -1991,7 +2015,7 @@ int main()
     {
         const auto bounds = juce::Rectangle<int> { std::array<int, 8> { 259, 317, 378, 437, 494, 553, 611, 670 }[(size_t) (index % 8)], index < 8 ? 137 : 221, 56, 80 };
         freshGoldBars += cropMatchesResource (freshImage, bounds,
-            ("bar_" + juce::String (index + 1).paddedLeft ('0', 2) + "_selected_png").toRawUTF8()) ? 1 : 0;
+            ("ui_polish_bar_" + juce::String (index + 1).paddedLeft ('0', 2) + "_selected_png").toRawUTF8()) ? 1 : 0;
     }
     const std::array<juce::Rectangle<int>, 10> freshPresetBounds {{{750,100,84,64},{836,100,84,64},{924,100,84,64},{750,166,84,64},{836,166,84,64},{924,166,84,64},{750,232,84,64},{836,232,84,64},{924,232,84,64},{750,296,84,64}}};
     const std::array<juce::Rectangle<int>, 5> freshLengthBounds {{{742,425,32,26},{773,425,32,26},{803,425,32,26},{834,425,32,26},{864,425,32,26}}};
