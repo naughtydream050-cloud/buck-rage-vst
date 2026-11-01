@@ -122,7 +122,8 @@ foreach ($state in @('off','on')) {
 
 # Generate complete BAR state sprites. The original cell includes a fixed
 # waveform, so replace only the dynamic mini rectangle with neutral texture.
-# A playing BAR always owns the full red border, including selected+playing.
+# Selected+playing uses one authored asset: red outer playback ring and a
+# distinct inset gold editing ring. No independent shells are layered.
 $neutralShell = [System.Drawing.Bitmap]::FromFile((Join-Path $runtime 'bar-map\shells\bar_cell_shell_normal_56x80.png'))
 for ($bar = 1; $bar -le 64; ++$bar) {
     $id = $bar.ToString('00')
@@ -143,6 +144,10 @@ for ($bar = 1; $bar -le 64; ++$bar) {
                 if ($playing) {
                     $g.DrawRectangle((New-GlowPen ([System.Drawing.Color]::FromArgb(54,220,50,40)) 4), 1, 1, 53, 77)
                     $g.DrawRectangle((New-GlowPen ([System.Drawing.Color]::FromArgb(235,220,50,40)) 1), 1, 1, 53, 77)
+                }
+                if ($state -eq 'selected_playing') {
+                    $g.DrawRectangle((New-GlowPen ([System.Drawing.Color]::FromArgb(44,214,166,77)) 3), 4, 4, 47, 71)
+                    $g.DrawRectangle((New-GlowPen ([System.Drawing.Color]::FromArgb(215,214,166,77)) 1), 4, 4, 47, 71)
                 }
                 $target.Save((Join-Path $out "ui_polish_bar_${id}_$state.png"), [System.Drawing.Imaging.ImageFormat]::Png)
             } finally { $g.Dispose(); $target.Dispose() }

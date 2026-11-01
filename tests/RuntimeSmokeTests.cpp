@@ -1347,14 +1347,14 @@ bool hasBrightPixel (const juce::Image& image, juce::Rectangle<int> bounds, floa
     return false;
 }
 
-bool hasSelectedGoldContamination (const juce::Image& image)
+bool hasGoldRing (const juce::Image& image)
 {
     for (int y = 0; y < image.getHeight(); ++y)
         for (int x = 0; x < image.getWidth(); ++x)
         {
             const auto c = image.getPixelAt (x, y);
-            if (c.getRed() > 120 && c.getGreen() > 75 && c.getBlue() < 70
-                && c.getRed() > c.getGreen() * 1.15f)
+            if (c.getRed() > 150 && c.getGreen() > 100 && c.getBlue() < 150
+                && c.getRed() > c.getGreen() * 1.10f)
                 return true;
         }
     return false;
@@ -1856,7 +1856,8 @@ int main()
     const auto selectedPlayingCell = resourceImage ("ui_polish_bar_11_selected_playing_png");
     pass &= check (different (normalCell, selectedCell), "v2-bar-selected-state-is-distinct");
     pass &= check (different (normalCell, playingCell), "v2-bar-playing-state-is-distinct");
-    pass &= check (! different (playingCell, selectedPlayingCell), "v2-bar-selected-playing-uses-playing-red-shell");
+    pass &= check (different (playingCell, selectedPlayingCell) && hasGoldRing (selectedPlayingCell),
+                   "v2-bar-selected-playing-uses-authored-dual-ring-shell");
     for (const auto* cell : { &normalCell, &selectedCell, &playingCell })
         pass &= check (! hasBrightPixel (*cell, { 8, 36, 40, 20 }, 0.45f),
                        "v2-bar-state-has-no-embedded-mini-waveform");
@@ -2702,7 +2703,7 @@ int main()
     pass &= check(processor.getCurrentTimelineSlot() == 10
                && cropHasVisibleCellContent (selectedPlaying,{378,221,56,80})
                && cropsDiffer (playing, selectedPlaying, {378,221,56,80})
-               && cropMatchesResource (selectedPlaying, {378,221,56,80}, "ui_polish_bar_11_playing_png")
+               && cropMatchesResource (selectedPlaying, {378,221,56,80}, "ui_polish_bar_11_selected_playing_png")
                && ! hasPlayingInteriorRedDot (selectedPlaying, {378,221,56,80}), "v2-selected-playing-border-without-dot");
     playHead.set (false, 0.0);
     processor.processBlock (audio, midi);

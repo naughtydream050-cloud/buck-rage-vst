@@ -1,7 +1,7 @@
 ﻿{
     "schema":  1,
     "intent":  "approved black-gold digital neon polish",
-    "generated_at_utc":  "2026-11-01T03:24:57.4292845Z",
+    "generated_at_utc":  "2026-11-01T03:29:42.6891665Z",
     "assets":  [
                    {
                        "file":  "ui_polish_bar_01_normal.png",
@@ -20,8 +20,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_01_selected_playing.png",
-                       "bytes":  6178,
-                       "sha256":  "DF06E66DBB5CB8D90014942FA9D3B9970AC62010B5E748B35FA2825DB424CA3F"
+                       "bytes":  6195,
+                       "sha256":  "316D2E4C9E79420A3133E4F2CC78893C0F336FC93736B816BF1837BD33EE182D"
                    },
                    {
                        "file":  "ui_polish_bar_02_normal.png",
@@ -40,8 +40,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_02_selected_playing.png",
-                       "bytes":  6292,
-                       "sha256":  "10C81E654536B29EBC410A3C6D7DC0A354465D35A454A9F68FCD6003FDE9A5CC"
+                       "bytes":  6370,
+                       "sha256":  "84D7992256C226568BB1FDF3DD6ADF01E46B45B48AF22640402D633B32C0E4E6"
                    },
                    {
                        "file":  "ui_polish_bar_03_normal.png",
@@ -60,8 +60,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_03_selected_playing.png",
-                       "bytes":  6375,
-                       "sha256":  "CF1C3EA5E7B376EE320C0151D68EB8045C54FB6ED356B09C51B041EBDD32F144"
+                       "bytes":  6341,
+                       "sha256":  "1FB9699A06183D56774FFD5BAE49F42DC883EA41E13D89BD2CBB9D92832BD105"
                    },
                    {
                        "file":  "ui_polish_bar_04_normal.png",
@@ -80,8 +80,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_04_selected_playing.png",
-                       "bytes":  6467,
-                       "sha256":  "DFFAF233642C887C85481AD475B0BBD61AB5AF49F2B1689F73A8852CB6D3A1E3"
+                       "bytes":  6473,
+                       "sha256":  "8460892AB1EE7C586C92FE4D2751BCA33B8B6F366CFBD4D2006073B97620DB14"
                    },
                    {
                        "file":  "ui_polish_bar_05_normal.png",
@@ -100,8 +100,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_05_selected_playing.png",
-                       "bytes":  6272,
-                       "sha256":  "90D04D450535C9ED103314EEFC99552B2FEABDC08F5C283BE7E68769FC30DD31"
+                       "bytes":  6230,
+                       "sha256":  "A6DD193D63553804FB676D03C1AA71DC3EE09C338D0ECD48BE497FDDA16F44CE"
                    },
                    {
                        "file":  "ui_polish_bar_06_normal.png",
@@ -120,8 +120,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_06_selected_playing.png",
-                       "bytes":  6156,
-                       "sha256":  "708FB7754188A4AF06FD4F348F20440E9711A8C4AC576BFA7FDF24A20C2AE0F5"
+                       "bytes":  6195,
+                       "sha256":  "D214D1D5A2F4A7F078ED073649E7060DABFDA5B042FC43E9378DF91D764EB145"
                    },
                    {
                        "file":  "ui_polish_bar_07_normal.png",
@@ -140,8 +140,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_07_selected_playing.png",
-                       "bytes":  6240,
-                       "sha256":  "A8DCB670399ECBF3E20772A0E25FF85375852D1E3A1DB131E5BD3402941DA4BA"
+                       "bytes":  6291,
+                       "sha256":  "2D29B2FECBAD2C6F3A0EF620A7C3FDB68953B555FC34FBEF2DEBCA969C4BB233"
                    },
                    {
                        "file":  "ui_polish_bar_08_normal.png",
@@ -160,8 +160,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_08_selected_playing.png",
-                       "bytes":  6120,
-                       "sha256":  "A2F6A02DBA2AABD70A35834263E17DFD2C81C780590D9295E8535D9F266757E2"
+                       "bytes":  6110,
+                       "sha256":  "371128B1521EE38E436AD1DC25195FBCBAD2A394B2D2CAEB05E98AD725AB3DA4"
                    },
                    {
                        "file":  "ui_polish_bar_09_normal.png",
@@ -180,8 +180,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_09_selected_playing.png",
-                       "bytes":  6667,
-                       "sha256":  "C3ACD872BD1B5A1380DD5707B50CBFFEABF1919A045BCA7ADCAA832FB63CC1E1"
+                       "bytes":  6639,
+                       "sha256":  "FF2A7C9DE7439B26729C5D302E675C342AD71D07DA265D673F9353B0B1802737"
                    },
                    {
                        "file":  "ui_polish_bar_10_normal.png",
@@ -200,8 +200,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_10_selected_playing.png",
-                       "bytes":  6783,
-                       "sha256":  "41E9E1F73CA6A69B53AE2216B83C3B6293A4277842B47A8AC1CF97D0B08A1E76"
+                       "bytes":  6823,
+                       "sha256":  "FF5BFF41CD9183A0D71B4B808A1F5613733989428669C3085A4E8473C27F81F8"
                    },
                    {
                        "file":  "ui_polish_bar_11_normal.png",
@@ -220,8 +220,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_11_selected_playing.png",
-                       "bytes":  6042,
-                       "sha256":  "D6E08B53F9C5F6FB7734E958D1D3ACE5D29476CA3649634F3C7A14BAF8E3749E"
+                       "bytes":  6009,
+                       "sha256":  "F021E415DA941DC0CB30D69D1DED3E08BCCD1DFAD19E2BABE02CA766671A8462"
                    },
                    {
                        "file":  "ui_polish_bar_12_normal.png",
@@ -240,8 +240,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_12_selected_playing.png",
-                       "bytes":  6719,
-                       "sha256":  "203A255FCF29FB84FB9CDCF500A7EEED277D48E6449F3DCE886468F5C394673E"
+                       "bytes":  6685,
+                       "sha256":  "A92B8AEFA4956D0975B1726084261DFCC0E50533EA0152656DC8EAA39A6A9DD1"
                    },
                    {
                        "file":  "ui_polish_bar_13_normal.png",
@@ -260,8 +260,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_13_selected_playing.png",
-                       "bytes":  6604,
-                       "sha256":  "3DD6EE30AFCB9680780708CC2FD70D6BA8237F75B05C02AFCB20FB93123078B6"
+                       "bytes":  6598,
+                       "sha256":  "3DDEC34F5123569C6DE4E6F5CA665620272AB21BF04AF328098C4836E028A342"
                    },
                    {
                        "file":  "ui_polish_bar_14_normal.png",
@@ -280,8 +280,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_14_selected_playing.png",
-                       "bytes":  6756,
-                       "sha256":  "35E2440C740DC9E09AFF3CB07A1C37AEC11F86C2578B5F525CBD2116365D71D3"
+                       "bytes":  6734,
+                       "sha256":  "E3F2CC38C98686AF1E27276158A91B91FF0D6522A76F61D138F7CB8918C969D9"
                    },
                    {
                        "file":  "ui_polish_bar_15_normal.png",
@@ -300,8 +300,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_15_selected_playing.png",
-                       "bytes":  6825,
-                       "sha256":  "D3875B380D6A8E27A44FF8C37BF80A4CBE78FB6AC665F2A37A516B15F0D2F3AA"
+                       "bytes":  6844,
+                       "sha256":  "188F22A148723FA771C1C330BEA06805BAE6D5214C4E28176EA46B7AAF06653A"
                    },
                    {
                        "file":  "ui_polish_bar_16_normal.png",
@@ -320,8 +320,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_16_selected_playing.png",
-                       "bytes":  6620,
-                       "sha256":  "5D4D799BC0D5E872E464EB867854DF392BB2D23DA24EA14B0FE1160D55FF903B"
+                       "bytes":  6665,
+                       "sha256":  "22B3E468409A42E639807616F019D5610864AB942F4B54B7EF34A8956252FD6D"
                    },
                    {
                        "file":  "ui_polish_bar_17_normal.png",
@@ -340,8 +340,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_17_selected_playing.png",
-                       "bytes":  6926,
-                       "sha256":  "B1D22CFF0AAAF9F6BE96D2CE54C372D53637080AF8241BDEEE524989D73B2366"
+                       "bytes":  6877,
+                       "sha256":  "F0F34F697C4C997D735B0FF07D8E35B9D5FDB5EE4161C927E10D32226B502474"
                    },
                    {
                        "file":  "ui_polish_bar_18_normal.png",
@@ -360,8 +360,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_18_selected_playing.png",
-                       "bytes":  6981,
-                       "sha256":  "E294A575F9D6A8B061AFC3FCCA0C844FEA26A079C6CFB90382A6AED130833486"
+                       "bytes":  6955,
+                       "sha256":  "446D8D429C61C78C1A131BDD3C4F794903F4A0A760023E132E7840B31B0B226C"
                    },
                    {
                        "file":  "ui_polish_bar_19_normal.png",
@@ -380,8 +380,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_19_selected_playing.png",
-                       "bytes":  6962,
-                       "sha256":  "A0F2745C9F5E8ECCF02A03EB736F932C0F5CC58998B3D997985A843A3E605BB5"
+                       "bytes":  6934,
+                       "sha256":  "FA88ADF8BD045866C925F1C0B89BEE7EFE6C1A534FF0803C0780E3B11A81AF99"
                    },
                    {
                        "file":  "ui_polish_bar_20_normal.png",
@@ -400,8 +400,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_20_selected_playing.png",
-                       "bytes":  7047,
-                       "sha256":  "3EE120C9196F278ED94EC7E143E14DE91F016B7FB3FD3FFFF13BB60B28C2ED2C"
+                       "bytes":  7008,
+                       "sha256":  "287418607CEBD438F74609C64628F86656140CE787AA9496F90684E0B11F602D"
                    },
                    {
                        "file":  "ui_polish_bar_21_normal.png",
@@ -420,8 +420,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_21_selected_playing.png",
-                       "bytes":  6975,
-                       "sha256":  "93F3D0ED6B907437218DD37C2A98D608D0B2F4A34F2FC44892E85907608BF894"
+                       "bytes":  6935,
+                       "sha256":  "B4781CE43A0E1BA81EAD09EA745084DCEC75D1385BA730D824867BCAE40EF922"
                    },
                    {
                        "file":  "ui_polish_bar_22_normal.png",
@@ -440,8 +440,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_22_selected_playing.png",
-                       "bytes":  7019,
-                       "sha256":  "BB7854F866EA2663A86A602CEBE632A87D943D5E62819EE166020C1A051D7F4D"
+                       "bytes":  6981,
+                       "sha256":  "435EBDBCA21A42BEA189E368EADA6FF561584F8E8A021D5AC8441F8C29FDE6FE"
                    },
                    {
                        "file":  "ui_polish_bar_23_normal.png",
@@ -460,8 +460,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_23_selected_playing.png",
-                       "bytes":  7012,
-                       "sha256":  "56D4680FC3B9887AABAD93F1F1CE6747CD9CACBDD2A29FBF1701B0743A59851E"
+                       "bytes":  6986,
+                       "sha256":  "071F7F7C87E396BA67E3AD97CACA360203093150CB58BA038CD5B27D35EF9AFC"
                    },
                    {
                        "file":  "ui_polish_bar_24_normal.png",
@@ -480,8 +480,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_24_selected_playing.png",
-                       "bytes":  7012,
-                       "sha256":  "6FBAF9E78693EF101ECBED3FE508569BAFFAC759E0FA5241404831A5B61DD495"
+                       "bytes":  6978,
+                       "sha256":  "B540255F6606414CF210EABF0609EDCAA7821F03D43F25A3AF9284FFB24E14A1"
                    },
                    {
                        "file":  "ui_polish_bar_25_normal.png",
@@ -500,8 +500,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_25_selected_playing.png",
-                       "bytes":  7035,
-                       "sha256":  "F5F94E11BD3070AB468C3029DD21C2553E6D1463175C495E7C261EB570C09054"
+                       "bytes":  6991,
+                       "sha256":  "20B6646741286E0110CC3BCA1DF5B0A00F6A345B8CA755F2CE37D2D6895ECB23"
                    },
                    {
                        "file":  "ui_polish_bar_26_normal.png",
@@ -520,8 +520,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_26_selected_playing.png",
-                       "bytes":  7051,
-                       "sha256":  "9863A241DB3C3B95DE661CF8E393E63C7461D08BFC22981D96F74F3698A69217"
+                       "bytes":  7013,
+                       "sha256":  "8A1CBD074D1970A3455670685BD280A42FAF9349F77C83F297960C78667562A5"
                    },
                    {
                        "file":  "ui_polish_bar_27_normal.png",
@@ -540,8 +540,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_27_selected_playing.png",
-                       "bytes":  6262,
-                       "sha256":  "BF8294204071D732684828D788358234BBABE6B89B708E8560E13B0E1094B67C"
+                       "bytes":  6258,
+                       "sha256":  "83CA1A021EC02771A4C801D8E54997D3AAFEFDCEEBAA6EEBF970749D0B96C3FB"
                    },
                    {
                        "file":  "ui_polish_bar_28_normal.png",
@@ -560,8 +560,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_28_selected_playing.png",
-                       "bytes":  7041,
-                       "sha256":  "46963B85AEB6FF906AE5B9CB68F7B97794CA19C6289A184C620787D47CF560FC"
+                       "bytes":  7007,
+                       "sha256":  "FDE2CCA98731810553CE419DD132320839A7AE17BBC832B9F49B58B98C86EA15"
                    },
                    {
                        "file":  "ui_polish_bar_29_normal.png",
@@ -580,8 +580,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_29_selected_playing.png",
-                       "bytes":  7042,
-                       "sha256":  "CAE68F1673026CD6DB419212F8804FB9804473492C1C5C0906B2398C4E2DD329"
+                       "bytes":  7003,
+                       "sha256":  "DDDF18F4698E20919A1E2BE00E18ED1E6FF03A0A82A515977DDBE61A47D3736F"
                    },
                    {
                        "file":  "ui_polish_bar_30_normal.png",
@@ -600,8 +600,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_30_selected_playing.png",
-                       "bytes":  7050,
-                       "sha256":  "A3BD6A498BBCC9AAC20A056EA3352E3989D01C97D43C99E58DAA6A80C2ED5C21"
+                       "bytes":  7020,
+                       "sha256":  "B13318F39285C39C0E17677B9E271A7292248B7078DA573122AAFD21C3BE72EE"
                    },
                    {
                        "file":  "ui_polish_bar_31_normal.png",
@@ -620,8 +620,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_31_selected_playing.png",
-                       "bytes":  6956,
-                       "sha256":  "6B5A8FA5EC6813611AD69CD3B49026B6D374B5647E3DDEB2921F0CD39FB16F5E"
+                       "bytes":  6914,
+                       "sha256":  "93E5FE9F1D940230CFC701844D275438F56B5AC9C622340E3DFED6816DD81DFF"
                    },
                    {
                        "file":  "ui_polish_bar_32_normal.png",
@@ -640,8 +640,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_32_selected_playing.png",
-                       "bytes":  7027,
-                       "sha256":  "287D1074C3359F0D6E44A2FB4EE5FC4B471F459816B1154CF70F17F0F2660771"
+                       "bytes":  6995,
+                       "sha256":  "C050272E942B170EC056FB8D36702CC9DE7054035242B1F03C6D6546AE1370E5"
                    },
                    {
                        "file":  "ui_polish_bar_33_normal.png",
@@ -660,8 +660,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_33_selected_playing.png",
-                       "bytes":  7028,
-                       "sha256":  "7B4E1B490DD48C5859344E4F5DD3E69E677ADF80A89623E43336A3BB1A92DF4C"
+                       "bytes":  6997,
+                       "sha256":  "35D2B7D66F7566969A19DFF49B39A161CDAF01E1A22C5400C407C00463FCF86F"
                    },
                    {
                        "file":  "ui_polish_bar_34_normal.png",
@@ -680,8 +680,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_34_selected_playing.png",
-                       "bytes":  7004,
-                       "sha256":  "2D11543258C175337F98BA96A6250DBCCF362B6286956AE78F28AEFBE05C422A"
+                       "bytes":  6979,
+                       "sha256":  "8A27DCACE8A49FFCA0239854C2DE2D02087C52E1B2CAB3D25D3CD97BCA1B318D"
                    },
                    {
                        "file":  "ui_polish_bar_35_normal.png",
@@ -700,8 +700,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_35_selected_playing.png",
-                       "bytes":  7030,
-                       "sha256":  "25B31621ACCFFA76D9840187CACD7FDE97F79C5EACE4716E9876C7FA6593A139"
+                       "bytes":  6995,
+                       "sha256":  "A2097CD86DA0D2AE220D86877090BABBA90DA40BEDEA4FB16E9AB37B08B5AF5D"
                    },
                    {
                        "file":  "ui_polish_bar_36_normal.png",
@@ -720,8 +720,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_36_selected_playing.png",
-                       "bytes":  7049,
-                       "sha256":  "F7258578DC4AC846BD715184F40DE4310B9CFA86ACEF2ACE72216CCFA567F845"
+                       "bytes":  7016,
+                       "sha256":  "FE888868ACDD642924269A627A6D53BCC6E0411953678063617DC608F4DB9C51"
                    },
                    {
                        "file":  "ui_polish_bar_37_normal.png",
@@ -740,8 +740,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_37_selected_playing.png",
-                       "bytes":  6994,
-                       "sha256":  "EFF0621E09FFE61F2490CE3F5C81DCCF3D90F26E7EADD11498CF121C2C763391"
+                       "bytes":  6951,
+                       "sha256":  "FB98B5345B224CF4E0B9BB0B28919D94DDBA36C66005AB0650CD52D667F6DDA7"
                    },
                    {
                        "file":  "ui_polish_bar_38_normal.png",
@@ -760,8 +760,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_38_selected_playing.png",
-                       "bytes":  7036,
-                       "sha256":  "F3525D11A5E05296D8F726AB4E3085A2CD82EB76B3D6978387D5B2A51DBFC336"
+                       "bytes":  7006,
+                       "sha256":  "7DD7400E028AC2EB93477FFE2A6816F5ADDE8FF2B613B6CCB8A62B6C7B0CEC32"
                    },
                    {
                        "file":  "ui_polish_bar_39_normal.png",
@@ -780,8 +780,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_39_selected_playing.png",
-                       "bytes":  7031,
-                       "sha256":  "15D43874C614E90126F70957412390C60C24824B96520D9551AF47A9CA362404"
+                       "bytes":  7002,
+                       "sha256":  "D8B65E6C007440FD8828616960C6181DF3774EFD6126F28314D34BA6373D1F17"
                    },
                    {
                        "file":  "ui_polish_bar_40_normal.png",
@@ -800,8 +800,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_40_selected_playing.png",
-                       "bytes":  7011,
-                       "sha256":  "376DECEF85EB3BB271ED33FFCF94C43F40588BF59745B9C582C7BD81AB5BE5F3"
+                       "bytes":  6990,
+                       "sha256":  "B066CC60329B724323CDECE10460EFB9F9B0C0A6B57495E480F197338D3DC11F"
                    },
                    {
                        "file":  "ui_polish_bar_41_normal.png",
@@ -820,8 +820,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_41_selected_playing.png",
-                       "bytes":  6955,
-                       "sha256":  "DB25144880AB378358528792FF4C85F8D6E4819D1580A412514B863C4FD90859"
+                       "bytes":  6915,
+                       "sha256":  "64989894006F5A32B408BD2512CDDED996E68504D8D50E6B8964950C42A75850"
                    },
                    {
                        "file":  "ui_polish_bar_42_normal.png",
@@ -840,8 +840,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_42_selected_playing.png",
-                       "bytes":  6978,
-                       "sha256":  "22BA71554E8E0B92BA59BAE57FBA443B9CF746E65162A15FADC8B1846615DDEA"
+                       "bytes":  6971,
+                       "sha256":  "5DF4CF0DA8ECCB4B71BD55A7FA5ABD501038102CCC18A24ED54F670703820418"
                    },
                    {
                        "file":  "ui_polish_bar_43_normal.png",
@@ -860,8 +860,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_43_selected_playing.png",
-                       "bytes":  6293,
-                       "sha256":  "EF883A835E909F28FAC1373EAE520429DD2F10E3CF17647832C92886F33AEE08"
+                       "bytes":  6291,
+                       "sha256":  "BC440F8BBA409C100196143078C07CA7A46847EA8876D9668CE9E0243B988CF6"
                    },
                    {
                        "file":  "ui_polish_bar_44_normal.png",
@@ -880,8 +880,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_44_selected_playing.png",
-                       "bytes":  7013,
-                       "sha256":  "B4932A6578507815161CD58F6FAA2FCA07374A85B58CBD8DFBEFE183E15CB400"
+                       "bytes":  6983,
+                       "sha256":  "D58789BDCCBCE5994657410C531D6FEB6FE3866D71C9CD0651177AAE37DF6011"
                    },
                    {
                        "file":  "ui_polish_bar_45_normal.png",
@@ -900,8 +900,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_45_selected_playing.png",
-                       "bytes":  7002,
-                       "sha256":  "9631248E153203DED51C3106F99BE230EE49D7B2DFD137ED7709C67B361059B2"
+                       "bytes":  6972,
+                       "sha256":  "06D6BC7EC9BA0314C85E83F3176BBEFF1707272D9E7F977AAEEA99C97A06A2D8"
                    },
                    {
                        "file":  "ui_polish_bar_46_normal.png",
@@ -920,8 +920,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_46_selected_playing.png",
-                       "bytes":  7012,
-                       "sha256":  "898CA829196A0F2ABADF5B7AD8928EE4D8F153C0DAB54FC465F5BEE554CACC10"
+                       "bytes":  6996,
+                       "sha256":  "B03D6DCA7AC61921F795B49470E7A3602755570A48A79EE9C87F7323D7FBFBA5"
                    },
                    {
                        "file":  "ui_polish_bar_47_normal.png",
@@ -940,8 +940,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_47_selected_playing.png",
-                       "bytes":  6961,
-                       "sha256":  "6C735D759735BAD1B66F8C2BE7DF1E86C365F584ED17E3E8643F8334A229038B"
+                       "bytes":  6928,
+                       "sha256":  "C400AD7359683C8C6336F37C64BC13A97C414ADCFB72776B4F48488EA8391EDF"
                    },
                    {
                        "file":  "ui_polish_bar_48_normal.png",
@@ -960,8 +960,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_48_selected_playing.png",
-                       "bytes":  7007,
-                       "sha256":  "B1240F616E77E9F3011792224712ADA06B0CE8ED05C61B46DE171F5525D4670B"
+                       "bytes":  6994,
+                       "sha256":  "E2DD23AA2536365956398DF5EA31FA6B4619C44B0E7920BA7FA6A9AFA9989105"
                    },
                    {
                        "file":  "ui_polish_bar_49_normal.png",
@@ -980,8 +980,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_49_selected_playing.png",
-                       "bytes":  7024,
-                       "sha256":  "9BFEE0BA2D233AF9D0232F2C8F1BEF0DBB65EDF1C5AB163360DAA1B8DA8B842F"
+                       "bytes":  7004,
+                       "sha256":  "814B3639FB021F5F1857CF70183A47AFDB2623D08AE19D928E7E3E52F2B1AC33"
                    },
                    {
                        "file":  "ui_polish_bar_50_normal.png",
@@ -1000,8 +1000,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_50_selected_playing.png",
-                       "bytes":  7043,
-                       "sha256":  "CB82A12F4CDCCA2559F568DF81277A8AD8E65039E2DE539D6C81C682D6B6FA1D"
+                       "bytes":  7009,
+                       "sha256":  "D0B48F40D248E09F716D6E88B087A94497BC6D430DF955985AE19F6FAC514177"
                    },
                    {
                        "file":  "ui_polish_bar_51_normal.png",
@@ -1020,8 +1020,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_51_selected_playing.png",
-                       "bytes":  6968,
-                       "sha256":  "D6B110DDEF1A5773D1632150ED6813E4608A5EB29650B271439E801E6E28E597"
+                       "bytes":  6919,
+                       "sha256":  "79141C5B1F3211089B891870BD3FFA899F05F9EC12211FAA289C0A03CDDDFD91"
                    },
                    {
                        "file":  "ui_polish_bar_52_normal.png",
@@ -1040,8 +1040,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_52_selected_playing.png",
-                       "bytes":  7026,
-                       "sha256":  "E194F87787E7BC1348544153886CAD59FCF4CE8E287DCDC039D7BA614153D54F"
+                       "bytes":  6998,
+                       "sha256":  "81169E10DDA84443976EB7BCBD6502DD2985991973704F0B048745451DE554B2"
                    },
                    {
                        "file":  "ui_polish_bar_53_normal.png",
@@ -1060,8 +1060,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_53_selected_playing.png",
-                       "bytes":  7012,
-                       "sha256":  "52B006925C8E81486098475EE7F3B2613178908598C0D5A05C7F6D567D7E859C"
+                       "bytes":  6985,
+                       "sha256":  "517D63E10892F5C005272F1448D7DEFB98554D3FDD317FA56B75070E68ADF61A"
                    },
                    {
                        "file":  "ui_polish_bar_54_normal.png",
@@ -1080,8 +1080,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_54_selected_playing.png",
-                       "bytes":  7011,
-                       "sha256":  "23DB085DADE5258181BB9AAFACE09F459111180F0849C304EBB94FBF31AAC013"
+                       "bytes":  6976,
+                       "sha256":  "8D4870B7C7E684D486B28147BE568764620E152785A2605C6EA5BE1477251297"
                    },
                    {
                        "file":  "ui_polish_bar_55_normal.png",
@@ -1100,8 +1100,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_55_selected_playing.png",
-                       "bytes":  7031,
-                       "sha256":  "E0F881E0878163FED4F1B37BC10E056C09D6AAA03502735321461736876F057B"
+                       "bytes":  6987,
+                       "sha256":  "A19B94ECB1C95658FC23F83925BFF2588DDD650D869DABC028E29B15384919AE"
                    },
                    {
                        "file":  "ui_polish_bar_56_normal.png",
@@ -1120,8 +1120,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_56_selected_playing.png",
-                       "bytes":  7039,
-                       "sha256":  "9BF8891FC35FEA74815D011F77DFD6525E5A2BB43C02307A3DEFE84776E66844"
+                       "bytes":  7008,
+                       "sha256":  "3DF276F5D94049133799859E175653AA6E14B71416F0C08D5FC200C784F99587"
                    },
                    {
                        "file":  "ui_polish_bar_57_normal.png",
@@ -1140,8 +1140,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_57_selected_playing.png",
-                       "bytes":  6983,
-                       "sha256":  "031C00EABBF920736CAD83C4BFCCEE8A4672468931FB6FC2444313F3D7D51B96"
+                       "bytes":  6948,
+                       "sha256":  "72DB43FA3F15EF8034B5DFE16A7BC8EF84E993A050AF0DD1F1069D689FB58C95"
                    },
                    {
                        "file":  "ui_polish_bar_58_normal.png",
@@ -1160,8 +1160,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_58_selected_playing.png",
-                       "bytes":  7035,
-                       "sha256":  "B8341C43AA6080B1C9AAA443458361A6ABF2F3D652F448AA897F3D019B5AB794"
+                       "bytes":  6996,
+                       "sha256":  "B4C5A5683800034A6B362B76DB17DAD9F0B0EF0B5F9A5AC94EFA070AF99638C9"
                    },
                    {
                        "file":  "ui_polish_bar_59_normal.png",
@@ -1180,8 +1180,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_59_selected_playing.png",
-                       "bytes":  6277,
-                       "sha256":  "FBE065A2AC908896E85E78BB1A9865B62BF63E0467DBE2AA9FD13CA335C09704"
+                       "bytes":  6258,
+                       "sha256":  "07001457C885B683691DB064501FD847ECBFBA1999860FEBA8005C7C7C16A498"
                    },
                    {
                        "file":  "ui_polish_bar_60_normal.png",
@@ -1200,8 +1200,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_60_selected_playing.png",
-                       "bytes":  7052,
-                       "sha256":  "ADB78F11482C2EECB57DBF99D9F5F6AB684F1027FBD2BF8BF49789B1E28BD111"
+                       "bytes":  7028,
+                       "sha256":  "599A420EA3F2EF8695999F6B31F9BC28DE5A6ECFF07F35F9060242D6FDED7114"
                    },
                    {
                        "file":  "ui_polish_bar_61_normal.png",
@@ -1220,8 +1220,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_61_selected_playing.png",
-                       "bytes":  6987,
-                       "sha256":  "99A7210C01E29F8A0539C05B1C73F1078C759D2B5B7572D247E6A9EDED23022C"
+                       "bytes":  6939,
+                       "sha256":  "94219BA0947BB741207D94219E3D384E1613EB0DBB9F225D77071EF1E03FE407"
                    },
                    {
                        "file":  "ui_polish_bar_62_normal.png",
@@ -1240,8 +1240,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_62_selected_playing.png",
-                       "bytes":  7050,
-                       "sha256":  "DA4507BA9AAAC38287DC80C5D70B2D44EAA4794B2665465F97CB571BACE5AD55"
+                       "bytes":  7023,
+                       "sha256":  "1EE54256AB2D2AE096D2119AB76AB5A7D57BBC087FD807B78512E9430CEE36D1"
                    },
                    {
                        "file":  "ui_polish_bar_63_normal.png",
@@ -1260,8 +1260,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_63_selected_playing.png",
-                       "bytes":  7027,
-                       "sha256":  "F72A86F374EB4EA741615ABC71D9120374DA059294F762E17E2BCDE0FE42CA9F"
+                       "bytes":  7007,
+                       "sha256":  "17FE4F7A6E867B08E77A7D1D41B23BC28A358536850B43E65A29298DF3190363"
                    },
                    {
                        "file":  "ui_polish_bar_64_normal.png",
@@ -1280,8 +1280,8 @@
                    },
                    {
                        "file":  "ui_polish_bar_64_selected_playing.png",
-                       "bytes":  7025,
-                       "sha256":  "85C769D10B675C67DF18502FFA71574BD5C165C581BA91CAA14B454413F39B1E"
+                       "bytes":  6993,
+                       "sha256":  "D1D0B93284CF3FAFED6CA87F61824D7D41C6D54D3BCF8EA20CC38536087188AD"
                    },
                    {
                        "file":  "ui_polish_display_digit_0.png",
@@ -1396,7 +1396,7 @@
                    {
                        "file":  "ui-polish-manifest.json",
                        "bytes":  71039,
-                       "sha256":  "D567A5455662A6545CC8735DC9F6D10AADF701B615661951D416EB1572B26CF8"
+                       "sha256":  "F3BD860736172A149FC82F42B731FD64C864E0D8F118A038EC002F691E213866"
                    }
                ]
 }

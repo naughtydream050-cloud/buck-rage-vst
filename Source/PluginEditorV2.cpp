@@ -94,6 +94,7 @@ enum XYButtonId { xyRecordButton, xyClearButton, xyResetViewButton, xyNoButton =
 
 CellState resolveCellState (bool selected, bool playing) noexcept
 {
+    if (selected && playing) return selectedPlayingState;
     if (playing) return playingState;
     if (selected) return selectedState;
     return normalState;
@@ -497,9 +498,9 @@ public:
             const auto bar = tab * 16 + index;
             const auto state = resolveCellState (bar == selected, bar == playing);
             const auto bounds = cellBounds (index);
-            // A complete state image owns this cell's border. The mini is a
-            // separate current-preset overlay only; no second state shell is
-            // painted, so selected and playing indicators cannot collide.
+            // A complete state image owns the cell border. The mini is the
+            // single current-preset overlay; selected+playing uses a designed
+            // dual-ring shell instead of independently layered state images.
             drawNative (g, assets.barCells[(size_t) bar][(size_t) state], bounds);
             drawNative (g, assets.barMinis[(size_t) static_cast<int> (processor.getStateModel().getSlot (bar).preset)],
                         { bounds.getX() + 8, bounds.getY() + 36, 40, 20 });
