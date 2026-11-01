@@ -7,7 +7,6 @@ constexpr float kWetRampSeconds = 0.008f;
 constexpr double kMinimumReadableDistance = 2.0;
 constexpr double kBackspinWrapSeconds = 0.008;
 constexpr double kTapeBrakeStartRate = 0.92;
-constexpr double kForwardCutWindowSeconds = 0.125;
 constexpr double kForwardCutFadeSeconds = 0.005;
 constexpr double kForwardCutSilenceHoldSeconds = 0.030;
 constexpr float kForwardCutSilenceThreshold = 1.0e-4f;
@@ -176,13 +175,15 @@ void TimelineScratchEngine::beginBar (int bar, const Slot& slot, double quarters
                                     juce::jmax (sampleRateHz * kDragMinimumWindowSeconds,
                                                 activeDurationSamples * dragRate + kMinimumReadableDistance + 1.0));
     dragWindowStartSerial = dragWindowEndSerial = dragReadSerial = 0.0;
-    forwardWindowSamples = sampleRateHz * kForwardCutWindowSeconds;
-    const auto cycleSeconds = 0.125 / (double) speed;
-    forwardCycleSamples = juce::jmax (1.0, sampleRateHz * cycleSeconds);
+    // FORWARD CUT is a host-grid stutter: Speed 1 is a sixteenth note, with
+    // lower/higher speeds widening/narrowing the cycle. The fixed source is
+    // the audible portion of that cycle; the remaining tail stays silent.
+    forwardCycleSamples = juce::jmax (1.0,
+        sampleRateHz * secondsPerQuarter * 0.25 / (double) speed);
     const auto minimumSilenceSamples = juce::jmax (sampleRateHz * 0.005,
                                                    forwardCycleSamples * 0.15);
-    forwardReadSamples = juce::jmax (0.0, juce::jmin (forwardWindowSamples,
-                                                      forwardCycleSamples - minimumSilenceSamples));
+    forwardReadSamples = juce::jmax (1.0, forwardCycleSamples - minimumSilenceSamples);
+    forwardWindowSamples = forwardReadSamples;
     forwardFadeSamples = juce::jmin (sampleRateHz * kForwardCutFadeSeconds,
                                      juce::jmax (1.0, forwardReadSamples));
     forwardCyclePosition = 0.0;

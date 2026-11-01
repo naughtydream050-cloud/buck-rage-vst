@@ -551,7 +551,9 @@ int main()
         const auto active = diagnostics.preset == TimelineScratchEngine::Preset::forwardCut
             && diagnostics.effectiveWet > 0.99f && differsFromDry;
         forwardWetThroughout &= active;
-        forwardBounded &= diagnostics.captureWindowSamples == 6000.0
+        const auto expectedGridCycle = 48000.0 * (60.0 / 140.0) * 0.25;
+        forwardBounded &= std::abs (diagnostics.forwardCycleSamples - expectedGridCycle) < 1.0
+            && diagnostics.captureWindowSamples == diagnostics.forwardReadSamples
             && diagnostics.readPosition > 0.0;
         forwardRetriggered |= diagnostics.readRate > 0.1 && diagnostics.readPosition > 0.0;
         forwardPopFree &= boundedFinite (audio) && noHardJump (audio, previousForwardSample);
@@ -600,6 +602,35 @@ int main()
     }
     check (forwardRetriggers[0] < forwardRetriggers[1] && forwardRetriggers[1] < forwardRetriggers[2],
            "forward-cut-speed-increases-retrigger-density");
+
+    // Grid timing must be derived from host tempo, not a fixed wall-clock
+    // window. Speed 1 is exactly one sixteenth note at each test tempo.
+    bool forwardGridTempo = true, forwardGridFixedCapture = true;
+    for (const auto bpm : std::array<double, 3> { 90.0, 120.0, 180.0 })
+    {
+        TimelineScratchEngine tempoEngine;
+        tempoEngine.prepare (48000.0, 512, 2);
+        fillHistory (tempoEngine, audio);
+        fillTone (audio, 840000);
+        auto tempoTransport = transport (1, 0.0);
+        tempoTransport.secondsPerQuarter = 60.0 / bpm;
+        tempoTransport.barPhasePerSample = 1.0 / (tempoTransport.secondsPerQuarter * 4.0 * 48000.0);
+        tempoEngine.process (audio, tempoTransport, forward);
+        const auto initial = tempoEngine.getDiagnostics();
+        const auto expectedCycle = 48000.0 * tempoTransport.secondsPerQuarter * 0.25;
+        forwardGridTempo &= std::abs (initial.forwardCycleSamples - expectedCycle) < 1.0
+            && std::abs (initial.forwardReadSamples - initial.captureWindowSamples) < 1.0;
+        const auto captureStart = initial.captureStartSerial;
+        for (int block = 0; block < 12; ++block)
+        {
+            fillTone (audio, 841000 + block * audio.getNumSamples());
+            tempoEngine.process (audio, tempoTransport, forward);
+            forwardGridFixedCapture &= std::abs (tempoEngine.getDiagnostics().captureStartSerial - captureStart) < 0.001;
+        }
+        tempoEngine.release();
+    }
+    check (forwardGridTempo, "forward-cut-grid-tempo-sync-90-120-180");
+    check (forwardGridFixedCapture, "forward-cut-grid-capture-stays-fixed-with-advancing-writer");
 
     // Source silence is measured on the pre-effect input, sample by sample.
     // A short gap is tolerated; a 30 ms hold latches the current BAR dry.
