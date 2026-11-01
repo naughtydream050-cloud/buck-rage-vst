@@ -30,6 +30,31 @@ function New-GlowPen([System.Drawing.Color]$color, [float]$width) {
 # Preserve the original glyph geometry and alpha, while making every visible
 # glyph pixel warm ivory. No value, layout or display backing is regenerated.
 $ivory = [System.Drawing.Color]::FromArgb(255, 226, 216, 194)
+
+# Rebuild the digit source sprites from the approved master reference. The old
+# imported atlas is not present in this checkout and left opaque rectangles.
+$reference = [System.Drawing.Bitmap]::FromFile((Join-Path $root 'Resources\ui-v2\reference\master-timeline-reference-1024x683.png'))
+$digitSources = [ordered]@{
+    0 = @(356,232,7,10); 1 = @(296,146,7,11); 2 = @(353,146,7,11); 3 = @(412,146,7,11); 4 = @(470,146,7,11);
+    5 = @(529,146,7,11); 6 = @(587,146,8,11); 7 = @(647,146,7,11); 8 = @(706,146,7,11); 9 = @(296,232,8,10)
+}
+foreach ($digit in $digitSources.Keys) {
+    $x, $y, $width, $height = $digitSources[$digit]
+    $glyph = [System.Drawing.Bitmap]::new($width, $height, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    try {
+        for ($gy = 0; $gy -lt $height; ++$gy) {
+            for ($gx = 0; $gx -lt $width; ++$gx) {
+                $pixel = $reference.GetPixel($x + $gx, $y + $gy)
+                if ([Math]::Max($pixel.R, [Math]::Max($pixel.G, $pixel.B)) -ge 70) {
+                    $glyph.SetPixel($gx, $gy, $pixel)
+                }
+            }
+        }
+        $glyph.Save((Join-Path $runtime "native-display\toy_display_digit_$digit.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+    } finally { $glyph.Dispose() }
+}
+$reference.Dispose()
+
 $glyphs = @('dot','minus','slash','s','t','percent','init','minus_inf') + (0..9 | ForEach-Object { "digit_$_" })
 foreach ($glyph in $glyphs) {
     $sourcePath = Join-Path $runtime "native-display\toy_display_$glyph.png"
@@ -95,9 +120,10 @@ foreach ($state in @('off','on')) {
     } finally { $g.Dispose(); $hi.Dispose() }
 }
 
-# Generate a complete, opaque state sprite for every BAR. Each state begins
-# from that BAR's neutral cell so label/mini geometry remains intact. This
-# removes the old second shell paint path that caused visual state collisions.
+# Generate complete BAR state sprites. The original cell includes a fixed
+# waveform, so replace only the dynamic mini rectangle with neutral texture.
+# A playing BAR always owns the full red border, including selected+playing.
+$neutralShell = [System.Drawing.Bitmap]::FromFile((Join-Path $runtime 'bar-map\shells\bar_cell_shell_normal_56x80.png'))
 for ($bar = 1; $bar -le 64; ++$bar) {
     $id = $bar.ToString('00')
     $source = [System.Drawing.Bitmap]::FromFile((Join-Path $runtime "bars\bar_${id}_normal.png"))
@@ -107,22 +133,23 @@ for ($bar = 1; $bar -le 64; ++$bar) {
             $g = [System.Drawing.Graphics]::FromImage($target)
             try {
                 $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-                $selected = $state -in @('selected','selected_playing')
+                $g.DrawImage($neutralShell, [System.Drawing.Rectangle]::new(8, 36, 40, 20), [System.Drawing.Rectangle]::new(8, 36, 40, 20), [System.Drawing.GraphicsUnit]::Pixel)
+                $selected = $state -eq 'selected'
                 $playing = $state -in @('playing','selected_playing')
                 if ($selected) {
                     $g.DrawRectangle((New-GlowPen ([System.Drawing.Color]::FromArgb(52,214,166,77)) 4), 1, 1, 53, 77)
                     $g.DrawRectangle((New-GlowPen ([System.Drawing.Color]::FromArgb(235,214,166,77)) 1), 1, 1, 53, 77)
                 }
                 if ($playing) {
-                    $g.FillRectangle([System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(44,220,50,40)), 4, 3, 48, 7)
-                    $g.FillRectangle([System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(190,220,50,40)), 6, 4, 44, 3)
-                    $g.FillRectangle([System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255,255,84,67)), 7, 4, 42, 1)
+                    $g.DrawRectangle((New-GlowPen ([System.Drawing.Color]::FromArgb(54,220,50,40)) 4), 1, 1, 53, 77)
+                    $g.DrawRectangle((New-GlowPen ([System.Drawing.Color]::FromArgb(235,220,50,40)) 1), 1, 1, 53, 77)
                 }
                 $target.Save((Join-Path $out "ui_polish_bar_${id}_$state.png"), [System.Drawing.Imaging.ImageFormat]::Png)
             } finally { $g.Dispose(); $target.Dispose() }
         }
     } finally { $source.Dispose() }
 }
+$neutralShell.Dispose()
 
 $manifest = [ordered]@{
     schema = 1

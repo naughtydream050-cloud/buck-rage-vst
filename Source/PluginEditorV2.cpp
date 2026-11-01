@@ -94,7 +94,6 @@ enum XYButtonId { xyRecordButton, xyClearButton, xyResetViewButton, xyNoButton =
 
 CellState resolveCellState (bool selected, bool playing) noexcept
 {
-    if (selected && playing) return selectedPlayingState;
     if (playing) return playingState;
     if (selected) return selectedState;
     return normalState;

@@ -1,8 +1,8 @@
 """Build only source-derived dynamic display sprites for Toyotomi's 1024 UI.
 
 No fonts, vector shapes, AI generation, or coordinate changes are involved.
-The script uses the approved master reference and the imported transparent
-glyph sheet, then emits uniquely-prefixed BinaryData filenames.
+The script uses the approved master reference and emits uniquely-prefixed
+BinaryData filenames.
 """
 from hashlib import sha256
 from pathlib import Path
@@ -11,7 +11,6 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 REFERENCE = ROOT / "Resources/ui-v2/reference/master-timeline-reference-1024x683.png"
-GLYPHS = ROOT / "archive/imported-d-root-20260809/toyotomi-glyph-candidates.png"
 OUT = ROOT / "Resources/ui-v2/runtime-1024/native-display"
 REPORT = ROOT / "reports/latest/native-display-assets.json"
 
@@ -66,7 +65,6 @@ def write(image, filename, records, source):
 
 def main():
     reference = Image.open(REFERENCE).convert("RGBA")
-    candidate = Image.open(GLYPHS).convert("RGBA")
     OUT.mkdir(parents=True, exist_ok=True)
     records = []
 
@@ -89,18 +87,17 @@ def main():
     write(neutral_backing(reference, (433, 30, 11, 12)), "toy_display_host_sync_lamp_off.png", records,
           "master-reference lamp substrate")
 
-    # Transparent atlas: digits 1-8 are the supplied 2x native captures;
-    # zero is the second glyph in its native '10' capture. Nine is captured
-    # from the approved BAR 9 label in the master reference.
-    candidate_digits = {
-        0: (469, 12, 15, 28), 1: (14, 14, 8, 28), 2: (69, 14, 15, 28),
-        3: (124, 14, 13, 28), 4: (174, 14, 15, 28), 5: (224, 14, 13, 28),
-        6: (272, 14, 17, 28), 7: (327, 14, 12, 28), 8: (372, 14, 15, 28),
+    # Each tight crop contains only the approved master-reference BAR numeral.
+    # foreground_sprite restores transparent background pixels before polish.
+    reference_digits = {
+        0: (356, 232, 7, 10), 1: (296, 146, 7, 11), 2: (353, 146, 7, 11),
+        3: (412, 146, 7, 11), 4: (470, 146, 7, 11), 5: (529, 146, 7, 11),
+        6: (587, 146, 8, 11), 7: (647, 146, 7, 11), 8: (706, 146, 7, 11),
+        9: (296, 232, 8, 10),
     }
-    for digit, bounds in candidate_digits.items():
-        write(crop(candidate, bounds), f"toy_display_digit_{digit}.png", records, "imported transparent native glyph sheet")
-    write(foreground_sprite(reference, (296, 232, 8, 10)), "toy_display_digit_9.png", records,
-          "master-reference BAR 9 glyph")
+    for digit, bounds in reference_digits.items():
+        write(foreground_sprite(reference, bounds), f"toy_display_digit_{digit}.png", records,
+              "master-reference BAR-number glyph")
 
     # Symbols and complete word assets come only from their approved source
     # instances; no missing character is synthesized.
@@ -119,7 +116,6 @@ def main():
 
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.write_text(json.dumps({"reference": str(REFERENCE.relative_to(ROOT)).replace("\\", "/"),
-                                  "glyph_sheet": str(GLYPHS.relative_to(ROOT)).replace("\\", "/"),
                                   "assets": records}, indent=2) + "\n", encoding="utf-8")
 
 

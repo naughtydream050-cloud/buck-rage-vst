@@ -1327,6 +1327,16 @@ bool isIvoryGlyph (const juce::Image& image)
     return visible;
 }
 
+bool hasTransparentGlyphBackground (const juce::Image& image)
+{
+    if (! image.isValid()) return false;
+    int visible = 0, transparent = 0;
+    for (int y = 0; y < image.getHeight(); ++y)
+        for (int x = 0; x < image.getWidth(); ++x)
+            if (image.getPixelAt (x, y).getAlpha() == 0) ++transparent; else ++visible;
+    return visible > 0 && transparent > 0 && visible < image.getWidth() * image.getHeight();
+}
+
 bool hasBrightPixel (const juce::Image& image, juce::Rectangle<int> bounds, float minimumBrightness)
 {
     if (! image.isValid() || ! image.getBounds().contains (bounds)) return false;
@@ -1818,8 +1828,11 @@ int main()
                 && ! hasRedActiveLamp (resourceImage ("ui_polish_host_sync_off_png")),
                    "v2-host-sync-approved-red-sprite-only");
     for (int digit = 0; digit < 10; ++digit)
-        pass &= check (isIvoryGlyph (resourceImage (("ui_polish_display_digit_" + juce::String (digit) + "_png").toRawUTF8())),
-                       "v2-native-display-digit-is-ivory");
+    {
+        const auto digitImage = resourceImage (("ui_polish_display_digit_" + juce::String (digit) + "_png").toRawUTF8());
+        pass &= check (isIvoryGlyph (digitImage) && hasTransparentGlyphBackground (digitImage),
+                       "v2-native-display-digit-is-ivory-shaped-glyph");
+    }
     for (const auto* glyph : { "ui_polish_display_dot_png", "ui_polish_display_minus_png",
                                "ui_polish_display_slash_png", "ui_polish_display_s_png",
                                "ui_polish_display_t_png", "ui_polish_display_percent_png",
@@ -1843,7 +1856,10 @@ int main()
     const auto selectedPlayingCell = resourceImage ("ui_polish_bar_11_selected_playing_png");
     pass &= check (different (normalCell, selectedCell), "v2-bar-selected-state-is-distinct");
     pass &= check (different (normalCell, playingCell), "v2-bar-playing-state-is-distinct");
-    pass &= check (different (playingCell, selectedPlayingCell), "v2-bar-selected-playing-state-is-distinct");
+    pass &= check (! different (playingCell, selectedPlayingCell), "v2-bar-selected-playing-uses-playing-red-shell");
+    for (const auto* cell : { &normalCell, &selectedCell, &playingCell })
+        pass &= check (! hasBrightPixel (*cell, { 8, 36, 40, 20 }, 0.45f),
+                       "v2-bar-state-has-no-embedded-mini-waveform");
     pass &= check (resourceImage ("ui_polish_bar_11_normal_png").isValid()
                 && resourceImage ("ui_polish_bar_27_normal_png").isValid()
                 && resourceImage ("ui_polish_bar_43_normal_png").isValid()
@@ -2686,6 +2702,7 @@ int main()
     pass &= check(processor.getCurrentTimelineSlot() == 10
                && cropHasVisibleCellContent (selectedPlaying,{378,221,56,80})
                && cropsDiffer (playing, selectedPlaying, {378,221,56,80})
+               && cropMatchesResource (selectedPlaying, {378,221,56,80}, "ui_polish_bar_11_playing_png")
                && ! hasPlayingInteriorRedDot (selectedPlaying, {378,221,56,80}), "v2-selected-playing-border-without-dot");
     playHead.set (false, 0.0);
     processor.processBlock (audio, midi);
