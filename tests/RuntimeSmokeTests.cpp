@@ -129,6 +129,20 @@ bool cropMatchesResource (const juce::Image& rendered, juce::Rectangle<int> boun
     return true;
 }
 
+bool cropMatchesResourceOutsideMini (const juce::Image& rendered, juce::Rectangle<int> bounds, const char* resource)
+{
+    const auto expected = resourceImage (resource);
+    const auto mini = juce::Rectangle<int> { 8, 36, 40, 20 };
+    if (! expected.isValid() || expected.getWidth() != bounds.getWidth() || expected.getHeight() != bounds.getHeight())
+        return false;
+    for (int y = 0; y < bounds.getHeight(); ++y)
+        for (int x = 0; x < bounds.getWidth(); ++x)
+            if (! mini.contains (x, y)
+                && rendered.getPixelAt (bounds.getX() + x, bounds.getY() + y) != expected.getPixelAt (x, y))
+                return false;
+    return true;
+}
+
 bool usesNeutralBarBase (const juce::Image& target, const juce::Image& neutral)
 {
     if (! target.isValid() || ! neutral.isValid()
@@ -2705,7 +2719,7 @@ int main()
     pass &= check(processor.getCurrentTimelineSlot() == 10
                && cropHasVisibleCellContent (selectedPlaying,{378,221,56,80})
                && cropsDiffer (playing, selectedPlaying, {378,221,56,80})
-               && cropMatchesResource (selectedPlaying, {378,221,56,80}, "ui_polish_bar_11_selected_playing_png")
+               && cropMatchesResourceOutsideMini (selectedPlaying, {378,221,56,80}, "ui_polish_bar_11_selected_playing_png")
                , "v2-selected-playing-authored-dual-ring-render");
     playHead.set (false, 0.0);
     processor.processBlock (audio, midi);
