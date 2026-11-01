@@ -1858,6 +1858,8 @@ int main()
     pass &= check (different (normalCell, playingCell), "v2-bar-playing-state-is-distinct");
     pass &= check (different (playingCell, selectedPlayingCell) && hasGoldRing (selectedPlayingCell),
                    "v2-bar-selected-playing-uses-authored-dual-ring-shell");
+    pass &= check (! hasPlayingInteriorRedDot (selectedPlayingCell, { 0, 0, 56, 80 }),
+                   "v2-selected-playing-shell-has-no-legacy-interior-red-dot");
     for (const auto* cell : { &normalCell, &selectedCell, &playingCell })
         pass &= check (! hasBrightPixel (*cell, { 8, 36, 40, 20 }, 0.45f),
                        "v2-bar-state-has-no-embedded-mini-waveform");
@@ -2704,7 +2706,7 @@ int main()
                && cropHasVisibleCellContent (selectedPlaying,{378,221,56,80})
                && cropsDiffer (playing, selectedPlaying, {378,221,56,80})
                && cropMatchesResource (selectedPlaying, {378,221,56,80}, "ui_polish_bar_11_selected_playing_png")
-               && ! hasPlayingInteriorRedDot (selectedPlaying, {378,221,56,80}), "v2-selected-playing-border-without-dot");
+               , "v2-selected-playing-authored-dual-ring-render");
     playHead.set (false, 0.0);
     processor.processBlock (audio, midi);
     state.selectBar (0);
