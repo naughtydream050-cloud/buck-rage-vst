@@ -6,6 +6,7 @@
 #include <cstdint>
 #include "PluginStateModel.h"
 #include "TimelineScratchEngine.h"
+#include "BravoProjectPresets.h"
 #include "RealHostDiagnostic.h"
 #include "XYPadEngine.h"
 
@@ -74,10 +75,12 @@ private:
     std::atomic<bool> hostPlaying { false };
     std::atomic<bool> hostSyncEnabled { true };
     std::atomic<bool> xyBypass { false };
+    std::atomic<int> projectPresetIdForDsp { 0 };
     std::atomic<double> internalBpmForDsp { 120.0 };
     std::atomic<int> internalTimeSigNumeratorForDsp { 4 }, internalTimeSigDenominatorForDsp { 4 };
     std::atomic<int> currentTimelineSlot { -1 };
     std::array<std::atomic<uint64_t>, PluginStateModel::kNumBars> dspSlots;
+    std::array<TimelineScratchEngine::Slot, PluginStateModel::kNumBars> bravo1Slots, bravo2Slots;
     TimelineScratchEngine scratchEngine;
     juce::AudioBuffer<float> xyDryBuffer, xyRenderedBuffer, xyReadyMask;
     XYPadEngine::Transport xyTransport;

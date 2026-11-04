@@ -524,7 +524,7 @@ public:
                                                           + "/" + juce::String (processor.getEffectiveTimeSignatureDenominator()),
                          GeneratedLayout::timeSigValueBounds(), 12.0f);
         drawNative (g, assets.headerPresetBacking, GeneratedLayout::presetValueBounds());
-        drawNativeValue (g, assets.nativeDisplay, ui.projectPresetId == 0 ? "Init" : "Init",
+        drawNativeValue (g, assets.nativeDisplay, PluginStateModel::projectPresetText (ui.projectPresetId),
                          GeneratedLayout::presetValueBounds(), 10.0f, juce::Justification::centredLeft);
         const auto hostLampBounds = GeneratedLayout::hostSyncLampBounds();
         drawNative (g, hostSync ? assets.hostSyncLampOn : assets.hostSyncLampOff, hostLampBounds);
@@ -808,10 +808,14 @@ void ToyotomiHideyoshiAudioProcessorEditorV2::showProjectPresetMenu()
     juce::PopupMenu menu;
     const auto selected = processor.getStateModel().getUiState().projectPresetId == 0;
     menu.addItem (1, "Init", true, selected);
+    menu.addItem (2, "BRAVO 1", true, processor.getStateModel().getUiState().projectPresetId == 1);
+    menu.addItem (3, "BRAVO 2", true, processor.getStateModel().getUiState().projectPresetId == 2);
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this),
                         [this] (int result)
                         {
                             if (result == 1) processor.getStateModel().setProjectPresetId (0);
+                            else if (result == 2) processor.getStateModel().setProjectPresetId (1);
+                            else if (result == 3) processor.getStateModel().setProjectPresetId (2);
                             surface->repaint();
                         });
 }

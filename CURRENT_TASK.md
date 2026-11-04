@@ -1,5 +1,19 @@
 # CURRENT TASK
 
+## Current generic BRAVO continuation (supersedes historical task below)
+
+- HEAD: `9cf30367efe2808295dd568f430c944a9c1b6879`; preserve dirty work.
+- Phase 4: generic BRAVO 1/2 profiles. Source-song reconstruction ended as
+  `INSUFFICIENT_ANALYSIS`; these profiles make no source-matching claim.
+- ID 1 uses dry/dry/transform/forwardCut; ID 2 uses dry/dry/zigzag/tapeBrake.
+  Profile arrays are fixed before audio processing and override manual audio
+  slots only while selected.
+- Existing project IDs, manual 64 BAR state, XY data, UI, latency, and DSP
+  algorithms are preserved. C++ tests/CI/Jev final/artifact: NOT RUN.
+- Next: compile and run the focused profile/state/runtime tests, then Windows
+  CI and Jev review before any manual-test bundle. No candidate/final/Program
+  Files writes.
+
 ## Phase
 
 Approved XY Pad Phase 2 live processing — re-entrant transition repair and AC-20 performance qualification.

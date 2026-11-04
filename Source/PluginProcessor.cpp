@@ -17,6 +17,8 @@ ToyotomiHideyoshiAudioProcessor::ToyotomiHideyoshiAudioProcessor()
     : AudioProcessor(BusesProperties().withInput("Input",juce::AudioChannelSet::stereo(),true).withOutput("Output",juce::AudioChannelSet::stereo(),true))
 {
     for (auto& slot : dspSlots) slot.store (packDspSlot (PluginStateModel::TimelineSlot {}), std::memory_order_relaxed);
+    bravo1Slots = BravoProjectPresets::make (1);
+    bravo2Slots = BravoProjectPresets::make (2);
     stateModel.setDspSlotChangedCallback ([this] (int bar, const PluginStateModel::TimelineSlot& slot) { publishDspSlot (bar, slot); });
     stateModel.setDspXYMotionChangedCallback ([this] (int bar,
         const std::vector<PluginStateModel::MotionPoint>& points, uint32_t revision)
@@ -26,6 +28,7 @@ ToyotomiHideyoshiAudioProcessor::ToyotomiHideyoshiAudioProcessor()
     stateModel.setDspTimingChangedCallback ([this] (const PluginStateModel::UiState& ui)
     {
         xyBypass.store (ui.bypass, std::memory_order_relaxed);
+        projectPresetIdForDsp.store (ui.projectPresetId, std::memory_order_relaxed);
         hostSyncEnabled.store (ui.hostSync, std::memory_order_relaxed);
         internalBpmForDsp.store (ui.internalBpm, std::memory_order_relaxed);
         internalTimeSigNumeratorForDsp.store (ui.internalTimeSigNumerator, std::memory_order_relaxed);
@@ -295,6 +298,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         // indicator. The edit-selected (yellow) BAR remains independent.
         const auto barPosition = hostPpq / quartersPerBar;
         const auto hostBar = (int64_t) std::floor (barPosition);
+        transport.absoluteStartBar = hostBar;
         transport.startBar = (int) (((hostBar % PluginStateModel::kNumBars)
             + PluginStateModel::kNumBars) % PluginStateModel::kNumBars);
         transport.startBarPhase = barPosition - std::floor (barPosition);
@@ -325,6 +329,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
                 const auto loopStartPhase = loopBarPosition - std::floor (loopBarPosition);
                 transport.loopBoundarySample = offset;
                 transport.loopStartBar = loopStartBar;
+                transport.absoluteLoopStartBar = (int64_t) std::floor (loopBarPosition);
                 transport.loopStartPhase = loopStartPhase;
                 predictedLoopPending = true;
                 predictedLoopHadSamples = hasHostSamplePosition;
@@ -350,8 +355,9 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
             discontinuityReason = TimelineScratchEngine::DiscontinuityReason::start;
         }
         const auto barPosition = internalQuarterPosition / quartersPerBar;
-        const auto internalBar = (int) std::floor (barPosition);
-        transport.startBar = playing ? ((internalBar % PluginStateModel::kNumBars) + PluginStateModel::kNumBars) % PluginStateModel::kNumBars : -1;
+        const auto internalBar = (int64_t) std::floor (barPosition);
+        transport.absoluteStartBar = playing ? (int64_t) internalBar : -1;
+        transport.startBar = playing ? (int) (((internalBar % PluginStateModel::kNumBars) + PluginStateModel::kNumBars) % PluginStateModel::kNumBars) : -1;
         transport.startBarPhase = barPosition - std::floor (barPosition);
         if (playing) internalQuarterPosition += effectiveBpm * (double) buffer.getNumSamples() / (60.0 * preparedSampleRate);
         timelineSlot = transport.startBar;
@@ -374,6 +380,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         }
         transport.playing = false;
         transport.startBar = -1;
+        transport.absoluteStartBar = -1;
         timelineSlot = -1;
     }
     transport.discontinuity = discontinuity;
@@ -382,6 +389,10 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
     std::array<TimelineScratchEngine::Slot, PluginStateModel::kNumBars> snapshot;
     for (int bar = 0; bar < PluginStateModel::kNumBars; ++bar)
         snapshot[(size_t) bar] = unpackDspSlot (dspSlots[(size_t) bar].load (std::memory_order_acquire));
+    const auto projectPresetId = projectPresetIdForDsp.load (std::memory_order_relaxed);
+    const auto& audibleSlots = projectPresetId == 1 ? bravo1Slots
+                             : projectPresetId == 2 ? bravo2Slots
+                                                    : snapshot;
     if (hostDiagnostic.isEnabled())
     {
         RealHostDiagnostic::Block block;
@@ -446,7 +457,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         xyEngine.processLive (xyDryBuffer, xyRenderedBuffer, xyReadyMask, xyTransport, buffer.getNumSamples());
     }
 
-    scratchEngine.process (buffer, transport, snapshot);
+    scratchEngine.process (buffer, transport, audibleSlots);
     const auto channels = juce::jmin (2, buffer.getNumChannels());
     const auto hasXyBlock = canRunXY && xyReadyMask.getNumSamples() >= buffer.getNumSamples()
                          && xyRenderedBuffer.getNumSamples() >= buffer.getNumSamples();
@@ -465,7 +476,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         if (bar < 0) bar += PluginStateModel::kNumBars;
         const auto hasCurrentBar = bar >= 0 && bar < PluginStateModel::kNumBars
             && transport.playing;
-        const auto slot = hasCurrentBar ? snapshot[static_cast<size_t> (bar)]
+        const auto slot = hasCurrentBar ? audibleSlots[static_cast<size_t> (bar)]
                                          : TimelineScratchEngine::Slot {};
         const auto currentDepth = hasCurrentBar ? juce::jlimit (0.0f, 1.0f, slot.depth) : 0.0f;
         const auto currentPresetActive = hasCurrentBar

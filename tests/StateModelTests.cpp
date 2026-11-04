@@ -85,6 +85,19 @@ int main()
            && restored.getUiState().internalTimeSigDenominator == 8
            && restored.getUiState().projectPresetId == 0,
            "top-controls-round-trip");
+    for (int profileId = 1; profileId <= 2; ++profileId)
+    {
+        restored.setProjectPresetId (profileId);
+        PluginStateModel profileRestored;
+        check (profileRestored.fromValueTree (restored.toValueTree())
+               && profileRestored.getUiState().projectPresetId == profileId
+               && profileRestored.getSlot (4).customMotion
+               && profileRestored.getSlot (4).motion.size() == 3,
+               "bravo-profile-id-round-trip-preserves-manual-slots");
+    }
+    restored.setProjectPresetId (99);
+    check (restored.getUiState().projectPresetId == 2,
+           "bravo-profile-id-clamped");
     PluginStateModel noSelectionRestored;
     PluginStateModel freshState;
     check (noSelectionRestored.fromValueTree (freshState.toValueTree())

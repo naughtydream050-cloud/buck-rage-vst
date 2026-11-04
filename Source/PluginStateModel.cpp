@@ -148,7 +148,22 @@ void PluginStateModel::setInternalTimeSignature (int numerator, int denominator)
         if (denominator == value) { ui.internalTimeSigDenominator = value; break; }
     notifyDspTimingChanged();
 }
-void PluginStateModel::setProjectPresetId (int id) { ui.projectPresetId = juce::jlimit (0, 0, id); }
+void PluginStateModel::setProjectPresetId (int id)
+{
+    ui.projectPresetId = juce::jlimit (0, 2, id);
+    notifyDspTimingChanged();
+}
+
+juce::String PluginStateModel::projectPresetText (int presetId) noexcept
+{
+    switch (presetId)
+    {
+        case 0:  return "Init";
+        case 1:  return "BRAVO 1";
+        case 2:  return "BRAVO 2";
+        default: return "Init";
+    }
+}
 void PluginStateModel::setSlotPreset (int bar, ScratchPreset preset) { auto& slot = mutableSlot (bar); slot.preset = preset; slot.customMotion = false; slot.motion = presetMotion (preset); notifyDspSlotChanged (bar); }
 void PluginStateModel::setSlotLength (int bar, NoteLength value) { mutableSlot (bar).length = static_cast<NoteLength> (juce::jlimit (0, 4, static_cast<int> (value))); notifyDspSlotChanged (bar); }
 void PluginStateModel::setSlotSpeed (int bar, float value) { mutableSlot (bar).speed = finiteClamp (value, kMinSpeed, kMaxSpeed, 1.0f); notifyDspSlotChanged (bar); }

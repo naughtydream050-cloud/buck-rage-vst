@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "plan": "BRAVO_GENERIC_PRESET_PLAN.md",
+  "criteria": [
+    {"id":"AC-01","requirement":"IDs 0 Init, 1 BRAVO 1, and 2 BRAVO 2 persist and restore."},
+    {"id":"AC-02","requirement":"BRAVO 1 has exactly the approved four-BAR dry,dry,transform,forwardCut pattern."},
+    {"id":"AC-03","requirement":"BRAVO 2 has exactly the approved four-BAR dry,dry,zigzag,tapeBrake pattern."},
+    {"id":"AC-04","requirement":"BRAVO overrides only audio slot selection; Init restores bit-identical manual slot selection and manual/XY state remains unchanged."},
+    {"id":"AC-05","requirement":"No independent pitch shifter, allocation, lock, ValueTree access, I/O, or logging is added to audio processing."},
+    {"id":"AC-06","requirement":"Existing XY priority, DEPTH 0, bypass, stereo, 1024-sample alignment, seek/loop/STOP safety, and finite output regressions pass."},
+    {"id":"AC-07","requirement":"StateModel, TimelineScratchEngine, Runtime Smoke, diagnostics, and Windows CI pass from the same source."},
+    {"id":"AC-08","requirement":"Jev reviews all criteria against bounded evidence and Codex approves exact diff and artifact before manual-test placement."}
+  ]
+}

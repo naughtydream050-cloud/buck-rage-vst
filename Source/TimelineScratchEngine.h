@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include <array>
 #include <cstdint>
+#include <cmath>
 #include <vector>
 
 // One realtime-safe engine serves the currently playing timeline BAR.  The
@@ -23,17 +24,32 @@ public:
     };
 
     struct Transport final
+        {
+            bool playing = false, discontinuity = false;
+            // A mid-block loop was already applied by the previous process call.
+            bool confirmedPredictedLoop = false;
+            DiscontinuityReason discontinuityReason = DiscontinuityReason::none;
+            // Modulo-64 BAR for DSP slot selection and UI. Remains -1..63 when sync enabled.
+            int startBar = -1;
+            // Absolute timeline BAR from raw Host PPQ and internal clock. Can be <0 and >=64.
+            int64_t absoluteStartBar = -1;
+            double startBarPhase = 0.0, barPhasePerSample = 0.0, quartersPerBar = 4.0,
+                   secondsPerQuarter = 0.5;
+            int loopBoundarySample = -1, loopStartBar = 0;
+            // Absolute loop BAR from Host LoopPoints PPQ start.
+            int64_t absoluteLoopStartBar = 0;
+            double loopStartPhase = 0.0;
+        };
+
+    // Zero-based absolute position; deliberately independent of manual BAR modulo.
+    static double absoluteBarAtSample (const Transport& t, int sample) noexcept
     {
-        bool playing = false, discontinuity = false;
-        // A mid-block loop was already applied by the previous process call.
-        bool confirmedPredictedLoop = false;
-        DiscontinuityReason discontinuityReason = DiscontinuityReason::none;
-        int startBar = -1;
-        double startBarPhase = 0.0, barPhasePerSample = 0.0, quartersPerBar = 4.0,
-               secondsPerQuarter = 0.5;
-        int loopBoundarySample = -1, loopStartBar = 0;
-        double loopStartPhase = 0.0;
-    };
+        const bool loop = t.loopBoundarySample >= 0 && sample >= t.loopBoundarySample;
+        const auto base = loop ? t.absoluteLoopStartBar : t.absoluteStartBar;
+        const auto phase = loop ? t.loopStartPhase : t.startBarPhase;
+        const auto offset = loop ? sample - t.loopBoundarySample : sample;
+        return (double) base + phase + t.barPhasePerSample * (double) offset;
+    }
 
     struct BackspinReadState final
     {

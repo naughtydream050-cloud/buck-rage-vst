@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "status": "IMPLEMENTATION_AUTHORIZED_NOT_RELEASE_APPROVED",
+  "source_head_before_implementation": "9cf30367efe2808295dd568f430c944a9c1b6879",
+  "plan": "BRAVO_GENERIC_PRESET_PLAN.md",
+  "plan_sha256": "4b4b937acbc95dbb2b798882cc87abcc00f56ccf5aa14257d826b150e953ec79",
+  "criteria": "BRAVO_GENERIC_PRESET_CRITERIA.json",
+  "criteria_sha256": "8c67b75fe368543d49315c43091d7b21ba52124682c33d582aa93a9f2a6d00dd",
+  "allowed_paths": [
+    "Source/BravoProjectPresets.h",
+    "Source/PluginProcessor.h",
+    "Source/PluginProcessor.cpp",
+    "tests/TimelineScratchEngineTests.cpp",
+    "docs/BRAVO_GENERIC_PRESET_PLAN.md",
+    "docs/BRAVO_GENERIC_PRESET_CRITERIA.json"
+  ],
+  "forbidden": ["UI", "parameter IDs", "manual state data", "XY data", "candidate", "final", "Program Files", "independent pitch shifter"],
+  "release_approval": false,
+  "fl_validation": "NOT_TESTED"
+}

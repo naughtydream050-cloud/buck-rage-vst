@@ -67,6 +67,7 @@ public:
     void setInternalBpm (double);
     void setInternalTimeSignature (int numerator, int denominator);
     void setProjectPresetId (int);
+    static juce::String projectPresetText (int presetId) noexcept;
     void setSlotPreset (int, ScratchPreset);
     void setSlotLength (int, NoteLength);
     void setSlotSpeed (int, float);

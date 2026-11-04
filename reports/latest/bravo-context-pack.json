@@ -1,0 +1,10 @@
+{
+  "phase": "4 BRAVO generic preset profiles; verification pending",
+  "head": "9cf30367efe2808295dd568f430c944a9c1b6879",
+  "scope": "BRAVO 1 and 2 generic four-BAR profiles; manual64 and XY preserved",
+  "validation": {"analysis_synthetic_tests": "PASS 5/5", "cpp_tests": "NOT RUN", "ci": "NOT RUN", "fl": "NOT TESTED"},
+  "blocker": "No local C++ toolchain discovered; compile/CI evidence required before bundle",
+  "next": "Run focused C++ profile/state/runtime tests and Windows CI, then Jev review",
+  "artifact": null,
+  "candidate_changed": false
+}

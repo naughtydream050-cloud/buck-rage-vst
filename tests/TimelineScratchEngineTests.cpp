@@ -1,4 +1,5 @@
 #include "TimelineScratchEngine.h"
+#include "BravoProjectPresets.h"
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -308,6 +309,49 @@ void testPredictedLoopIsAppliedOnce()
 
 int main()
 {
+    const auto bravo1 = BravoProjectPresets::make (1);
+    const auto bravo2 = BravoProjectPresets::make (2);
+    const auto init = BravoProjectPresets::make (0);
+    bool bravoProfilesExact = true;
+    for (int bar = 0; bar < 64; ++bar)
+    {
+        const auto phase = bar % 4;
+        bravoProfilesExact &= init[(size_t) bar].preset == TimelineScratchEngine::Preset::off;
+        bravoProfilesExact &= bravo1[(size_t) bar].preset == (phase == 2 ? TimelineScratchEngine::Preset::transform
+            : phase == 3 ? TimelineScratchEngine::Preset::forwardCut : TimelineScratchEngine::Preset::off);
+        bravoProfilesExact &= bravo2[(size_t) bar].preset == (phase == 2 ? TimelineScratchEngine::Preset::zigzag
+            : phase == 3 ? TimelineScratchEngine::Preset::tapeBrake : TimelineScratchEngine::Preset::off);
+        if (phase >= 2)
+        {
+            bravoProfilesExact &= bravo1[(size_t) bar].length == TimelineScratchEngine::Length::oneBar
+                && bravo1[(size_t) bar].depth == .90f && bravo1[(size_t) bar].speed == 1.0f;
+            bravoProfilesExact &= bravo2[(size_t) bar].length == TimelineScratchEngine::Length::oneBar
+                && bravo2[(size_t) bar].depth == .85f && bravo2[(size_t) bar].speed == 1.0f;
+        }
+    }
+    check (bravoProfilesExact, "generic-bravo-four-bar-profiles-exact");
+    {
+        auto t = transport (0, 0.75);
+        t.absoluteStartBar = 64;
+        t.barPhasePerSample = 0.125;
+        check (TimelineScratchEngine::absoluteBarAtSample (t, 0) == 64.75
+            && TimelineScratchEngine::absoluteBarAtSample (t, 2) == 65.0,
+            "bravo-absolute-bar65-sub-bar-carry-no-modulo");
+        t.loopBoundarySample = 3;
+        t.absoluteLoopStartBar = 80;
+        t.loopStartBar = 16;
+        t.loopStartPhase = 0.25;
+        check (TimelineScratchEngine::absoluteBarAtSample (t, 2) == 65.0
+            && TimelineScratchEngine::absoluteBarAtSample (t, 3) == 80.25
+            && TimelineScratchEngine::absoluteBarAtSample (t, 5) == 80.5,
+            "bravo-absolute-mid-block-loop-exact-sample");
+        t.loopBoundarySample = -1;
+        t.absoluteStartBar = -2;
+        t.startBarPhase = 0.5;
+        check (TimelineScratchEngine::absoluteBarAtSample (t, 0) == -1.5
+            && t.startBar == 0 && t.loopStartBar == 16,
+            "bravo-negative-absolute-bar-keeps-manual-fields");
+    }
     constexpr std::array<double, 7> phases { .05, .10, .25, .50, .75, .90, .95 };
     TimelineScratchEngine engine;
     engine.prepare (48000.0, 512, 2);
