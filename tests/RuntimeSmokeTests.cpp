@@ -2730,6 +2730,37 @@ int main()
     processor.setPlayHead (nullptr);
     state.selectTab(0); state.selectBar(10); auto selected=render(*editor); pass &= check(png(selected,"v2-bar-selected.png"),"v2-bar-selected-render");
     state.selectBar(0); auto priorMini=render(*editor).getClippedImage({267,173,40,20}); for(int p=0;p<10;++p){state.setSelectedPreset((PluginStateModel::ScratchPreset)p);auto image=render(*editor);const auto nextMini=image.getClippedImage({267,173,40,20});pass &= check(png(image,"v2-preset-"+juce::String(p)+".png") && png(image,"v2-full-preset-"+juce::String(p)+".png"),"v2-preset-render");pass &= check(state.getSlot(0).preset==(PluginStateModel::ScratchPreset)p && (p == 0 || different(priorMini,nextMini)),"v2-preset-updates-selected-bar-mini");priorMini=nextMini;}
+    // The project profile is an alternate audible slot source.  BAR MAP must
+    // project those same fixed slots without mutating the editable manual map.
+    state.reset(); state.selectTab (0); state.selectBar (0);
+    state.setSlotPreset (2, PluginStateModel::ScratchPreset::backspin);
+    state.setSlotPreset (3, PluginStateModel::ScratchPreset::baby);
+    const auto bar3Mini = juce::Rectangle<int> { 386, 173, 40, 20 };
+    const auto bar4Mini = juce::Rectangle<int> { 445, 173, 40, 20 };
+    state.setProjectPresetId (0);
+    const auto initProfileMap = render (*editor);
+    state.setSlotPreset (2, PluginStateModel::ScratchPreset::transform);
+    state.setSlotPreset (3, PluginStateModel::ScratchPreset::forwardCut);
+    const auto bravo1ReferenceMap = render (*editor);
+    state.setSlotPreset (2, PluginStateModel::ScratchPreset::zigzag);
+    state.setSlotPreset (3, PluginStateModel::ScratchPreset::tapeBrake);
+    const auto bravo2ReferenceMap = render (*editor);
+    state.setSlotPreset (2, PluginStateModel::ScratchPreset::backspin);
+    state.setSlotPreset (3, PluginStateModel::ScratchPreset::baby);
+    state.setProjectPresetId (1);
+    const auto bravo1ProfileMap = render (*editor);
+    state.setProjectPresetId (2);
+    const auto bravo2ProfileMap = render (*editor);
+    pass &= check (! different (bravo1ReferenceMap.getClippedImage (bar3Mini), bravo1ProfileMap.getClippedImage (bar3Mini))
+                && ! different (bravo1ReferenceMap.getClippedImage (bar4Mini), bravo1ProfileMap.getClippedImage (bar4Mini))
+                && ! different (bravo2ReferenceMap.getClippedImage (bar3Mini), bravo2ProfileMap.getClippedImage (bar3Mini))
+                && ! different (bravo2ReferenceMap.getClippedImage (bar4Mini), bravo2ProfileMap.getClippedImage (bar4Mini))
+                && different (initProfileMap.getClippedImage (bar3Mini), bravo1ProfileMap.getClippedImage (bar3Mini))
+                && different (bravo1ProfileMap.getClippedImage (bar3Mini), bravo2ProfileMap.getClippedImage (bar3Mini))
+                && state.getSlot (2).preset == PluginStateModel::ScratchPreset::backspin
+                && state.getSlot (3).preset == PluginStateModel::ScratchPreset::baby,
+                   "v2-bravo-profile-bar-map-minis-project-without-manual-mutation");
+    state.setProjectPresetId (0);
     for(int l=0;l<5;++l){state.setSelectedLength((PluginStateModel::NoteLength)l);auto image=render(*editor);pass &=check(png(image,"v2-length-"+juce::String(l)+".png") && png(image,"v2-full-length-"+juce::String(l)+".png"),"v2-length-render");}
     const auto bypassBefore=state.getUiState().bypass; state.setSelectedPreset(PluginStateModel::ScratchPreset::custom);state.setBypass(!bypassBefore);auto bypassImage=render(*editor);pass &=check(png(bypassImage,"v2-full-bypass-on.png") && state.getSlot(0).preset==PluginStateModel::ScratchPreset::custom,"v2-bypass-preset-isolation");
     state.setSlotSpeed(0,PluginStateModel::kMinSpeed);state.setSlotPitch(0,PluginStateModel::kMinPitch);state.setSlotDepth(0,0.f);auto min=render(*editor);state.setSlotSpeed(0,PluginStateModel::kMaxSpeed);state.setSlotPitch(0,PluginStateModel::kMaxPitch);state.setSlotDepth(0,1.f);auto max=render(*editor);pass &=check(different(min,max) && png(min,"v2-knobs-min.png") && png(max,"v2-knobs-max.png"),"v2-knob-min-max-render");

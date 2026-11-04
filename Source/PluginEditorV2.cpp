@@ -489,6 +489,11 @@ public:
         const int selected = ui.selectedBar;
         const int playing = processor.getCurrentTimelineSlot();
         const bool hasSelection = PluginStateModel::hasSelectedBar (selected);
+        // A project profile replaces the audible 64-BAR slot source, so its
+        // minis must be projected into BAR MAP as well.  The editable manual
+        // state remains untouched and is still the source while Init is active.
+        const bool projectProfileActive = ui.projectPresetId == 1 || ui.projectPresetId == 2;
+        const auto projectProfileSlots = BravoProjectPresets::make (ui.projectPresetId);
 
         for (int index = 0; index < 4; ++index)
             drawNative (g, assets.tabs[(size_t) index][tabHighlight == index ? 1 : 0], kTabs[(size_t) index]);
@@ -502,7 +507,10 @@ public:
             // single current-preset overlay; selected+playing uses a designed
             // dual-ring shell instead of independently layered state images.
             drawNative (g, assets.barCells[(size_t) bar][(size_t) state], bounds);
-            drawNative (g, assets.barMinis[(size_t) static_cast<int> (processor.getStateModel().getSlot (bar).preset)],
+            const auto miniPreset = projectProfileActive
+                ? static_cast<int> (projectProfileSlots[(size_t) bar].preset)
+                : static_cast<int> (processor.getStateModel().getSlot (bar).preset);
+            drawNative (g, assets.barMinis[(size_t) miniPreset],
                         { bounds.getX() + 8, bounds.getY() + 36, 40, 20 });
         }
 
