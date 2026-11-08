@@ -1,18 +1,19 @@
 # CURRENT TASK
 
-## Current generic BRAVO continuation (supersedes historical task below)
+## Current source-specific BRAVO continuation (supersedes historical task below)
 
-- HEAD: `9cf30367efe2808295dd568f430c944a9c1b6879`; preserve dirty work.
-- Phase 4: generic BRAVO 1/2 profiles. Source-song reconstruction ended as
-  `INSUFFICIENT_ANALYSIS`; these profiles make no source-matching claim.
-- ID 1 uses dry/dry/transform/forwardCut; ID 2 uses dry/dry/zigzag/tapeBrake.
-  Profile arrays are fixed before audio processing and override manual audio
-  slots only while selected.
-- Existing project IDs, manual 64 BAR state, XY data, UI, latency, and DSP
-  algorithms are preserved. C++ tests/CI/Jev final/artifact: NOT RUN.
-- Next: compile and run the focused profile/state/runtime tests, then Windows
-  CI and Jev review before any manual-test bundle. No candidate/final/Program
-  Files writes.
+- HEAD: `05b5e09ad9b4529ab0d91d67d1c8933e071191ca`; preserve dirty work.
+- Phase 4: BRAVO 1/2 now use the measured event map in
+  `reports/bravodomo-preset-analysis/source-specific-event-map.json`, not the
+  former repeating four-BAR template. BRAVO 1 is BAR 3,53,54,56,70,99; BRAVO 2
+  is BAR 2,4,7,19,20,24,31,33. These are approximations, not listening claims.
+- The immutable absolute schedule prevents BAR 65+ from aliasing into the manual
+  64-BAR map. IDs, manual slots, XY data, UI, latency and effects are preserved.
+- Source-map verifier and `git diff --check`: PASS. C++ tests/CI/artifact: NOT
+  RUN because no local CMake/compiler exists. Jev flags this missing execution
+  evidence (requirement score 0.50); no manual-test bundle was made.
+- Next: run focused native tests and Windows CI on an equipped host, then repeat
+  Jev review. No candidate/final/Program Files writes.
 
 ## Phase
 

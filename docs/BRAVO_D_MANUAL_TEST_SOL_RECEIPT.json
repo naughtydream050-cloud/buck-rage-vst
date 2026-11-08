@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "status": "APPROVED",
+  "approved_by": "Sol",
+  "task_id": "TOYOTOMI-BRAVO-D-MANUAL-TEST-001",
+  "task_class": "CRITICAL",
+  "risk_class": "realtime-dsp",
+  "repo_path": "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\worktrees\\toyotomi-xy-preset-priority",
+  "base_commit": "05b5e09ad9b4529ab0d91d67d1c8933e071191ca",
+  "plan_path": "docs/BRAVO_D_MANUAL_TEST_PLAN.md",
+  "plan_sha256": "801ece9e7fc44aebf3cbd6ddc14de2a9cfbf6ddeb84267e41a74c4a1c37310a2",
+  "criteria_path": "docs/BRAVO_D_MANUAL_TEST_CRITERIA.json",
+  "criteria_sha256": "89e16b93345d2a3a5d775e361dd9cb4280ec8c25617dc92f8c7a60d0c96a6131",
+  "task_spec_path": "docs/BRAVO_D_MANUAL_TEST_WORKER_TASK.md",
+  "task_spec_sha256": "f553146b13cefc526cd4f146afbf04875fb41cd642a1eccfc3958cec14f1fb06",
+  "allowed_paths": [
+    "source/bravoprojectpresets.h",
+    "source/pluginprocessor.cpp",
+    "source/timelinescratchengine.h",
+    "source/timelinescratchengine.cpp",
+    "tests/timelinescratchenginetests.cpp"
+  ],
+  "approval_scope": "Measured BRAVO schedule correction and deterministic evidence only; no promotion authority."
+}

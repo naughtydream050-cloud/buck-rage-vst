@@ -312,24 +312,48 @@ int main()
     const auto bravo1 = BravoProjectPresets::make (1);
     const auto bravo2 = BravoProjectPresets::make (2);
     const auto init = BravoProjectPresets::make (0);
-    bool bravoProfilesExact = true;
-    for (int bar = 0; bar < 64; ++bar)
+    const auto bravo1Song = BravoProjectPresets::absoluteSchedule (1);
+    const auto bravo2Song = BravoProjectPresets::absoluteSchedule (2);
+    const auto is = [] (const TimelineScratchEngine::AbsoluteSchedule& schedule, int oneBasedBar,
+                        TimelineScratchEngine::Preset preset)
+    { return schedule.slotAt (oneBasedBar - 1).preset == preset; };
+    const auto bravoProfilesExact = init[0].preset == TimelineScratchEngine::Preset::off
+        && is (bravo1Song, 3, TimelineScratchEngine::Preset::forwardCut)
+        && is (bravo1Song, 53, TimelineScratchEngine::Preset::tapeBrake)
+        && is (bravo1Song, 70, TimelineScratchEngine::Preset::tapeBrake)
+        && is (bravo1Song, 99, TimelineScratchEngine::Preset::tapeBrake)
+        && is (bravo1Song, 4, TimelineScratchEngine::Preset::off)
+        && is (bravo2Song, 2, TimelineScratchEngine::Preset::tapeBrake)
+        && is (bravo2Song, 4, TimelineScratchEngine::Preset::forwardCut)
+        && is (bravo2Song, 7, TimelineScratchEngine::Preset::transform)
+        && is (bravo2Song, 20, TimelineScratchEngine::Preset::forwardCut)
+        && is (bravo2Song, 33, TimelineScratchEngine::Preset::transform)
+        && is (bravo2Song, 3, TimelineScratchEngine::Preset::off)
+        && bravo1[2].preset == TimelineScratchEngine::Preset::forwardCut
+        && bravo1[52].preset == TimelineScratchEngine::Preset::tapeBrake
+        && bravo2[1].preset == TimelineScratchEngine::Preset::tapeBrake
+        && bravo2[3].preset == TimelineScratchEngine::Preset::forwardCut;
+    check (bravoProfilesExact, "bravo-source-specific-absolute-schedules-and-ui-projection");
     {
-        const auto phase = bar % 4;
-        bravoProfilesExact &= init[(size_t) bar].preset == TimelineScratchEngine::Preset::off;
-        bravoProfilesExact &= bravo1[(size_t) bar].preset == (phase == 2 ? TimelineScratchEngine::Preset::transform
-            : phase == 3 ? TimelineScratchEngine::Preset::forwardCut : TimelineScratchEngine::Preset::off);
-        bravoProfilesExact &= bravo2[(size_t) bar].preset == (phase == 2 ? TimelineScratchEngine::Preset::zigzag
-            : phase == 3 ? TimelineScratchEngine::Preset::tapeBrake : TimelineScratchEngine::Preset::off);
-        if (phase >= 2)
-        {
-            bravoProfilesExact &= bravo1[(size_t) bar].length == TimelineScratchEngine::Length::oneBar
-                && bravo1[(size_t) bar].depth == .90f && bravo1[(size_t) bar].speed == 1.0f;
-            bravoProfilesExact &= bravo2[(size_t) bar].length == TimelineScratchEngine::Length::oneBar
-                && bravo2[(size_t) bar].depth == .85f && bravo2[(size_t) bar].speed == 1.0f;
-        }
+        TimelineScratchEngine absoluteScheduleEngine;
+        absoluteScheduleEngine.prepare (48000.0, 64, 2);
+        juce::AudioBuffer<float> absoluteScheduleAudio (2, 64);
+        fillTone (absoluteScheduleAudio, 0);
+        auto bar70 = transport (5, 0.0); // 70th BAR modulo 64 is manual BAR 6.
+        bar70.absoluteStartBar = 69;
+        absoluteScheduleEngine.process (absoluteScheduleAudio, bar70, init, bravo1Song);
+        const auto at70 = absoluteScheduleEngine.getDiagnostics().preset;
+        fillTone (absoluteScheduleAudio, 64);
+        auto bar6 = transport (5, 0.0);
+        bar6.absoluteStartBar = 5;
+        bar6.discontinuity = true;
+        absoluteScheduleEngine.process (absoluteScheduleAudio, bar6, init, bravo1Song);
+        const auto at6 = absoluteScheduleEngine.getDiagnostics().preset;
+        check (at70 == TimelineScratchEngine::Preset::tapeBrake
+                   && at6 == TimelineScratchEngine::Preset::off,
+               "bravo-bar70-is-absolute-and-does-not-alias-to-bar6");
+        absoluteScheduleEngine.release();
     }
-    check (bravoProfilesExact, "generic-bravo-four-bar-profiles-exact");
     {
         auto t = transport (0, 0.75);
         t.absoluteStartBar = 64;

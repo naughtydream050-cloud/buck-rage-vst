@@ -1,0 +1,21 @@
+{
+  "schema": "toyotomi.bravo.d-manual-test.ac.v1",
+  "criteria": [
+    {"id":"AC-01","requirement":"BRAVO 1 contains only measured absolute BAR 3,53,54,56,70,99 events.","check":["source-map verifier","focused schedule test"]},
+    {"id":"AC-02","requirement":"BRAVO 2 contains only measured absolute BAR 2,4,7,19,20,24,31,33 events.","check":["source-map verifier","focused schedule test"]},
+    {"id":"AC-03","requirement":"No generic four-BAR repeat remains.","check":["focused schedule test"]},
+    {"id":"AC-04","requirement":"BAR 65+ uses absolute transport and BAR 70 never aliases to BAR 6.","check":["focused schedule test"]},
+    {"id":"AC-05","requirement":"Empty song BARs are dry and events retain measured sub-bar timing and length.","check":["focused schedule test"]},
+    {"id":"AC-06","requirement":"The existing manual 64-BAR map remains independent.","check":["StateModelTests","RuntimeSmoke"]},
+    {"id":"AC-07","requirement":"Init and BRAVO selection save and restore without altering manual data.","check":["StateModelTests"]},
+    {"id":"AC-08","requirement":"XY priority, DEPTH zero and bypass semantics remain intact.","check":["RuntimeSmoke","XYEngineTests"]},
+    {"id":"AC-09","requirement":"Stereo output is finite and uses safe history fallback.","check":["ScratchEngineTests","RuntimeSmoke"]},
+    {"id":"AC-10","requirement":"Seek, loop and STOP/restart do not replay stale BRAVO state.","check":["ScratchEngineTests"]},
+    {"id":"AC-11","requirement":"1024-sample latency and dry/wet alignment remain unchanged.","check":["RuntimeSmoke"]},
+    {"id":"AC-12","requirement":"Audio processing adds no allocation, lock, ValueTree, I/O or logging.","check":["source review","RuntimeSmoke"]},
+    {"id":"AC-13","requirement":"44.1/48/96 kHz fixed and variable block runs retain finite output.","check":["native performance harness"]},
+    {"id":"AC-14","requirement":"p99 is at most 50 percent and maximum at most 80 percent of deadline for all 18 recorded conditions.","check":["native performance harness"]},
+    {"id":"AC-15","requirement":"Windows CI tests and VST3 artifact succeed for the same source commit.","check":["GitHub Actions","artifact provenance"]},
+    {"id":"AC-16","requirement":"Jev individually classifies all AC evidence and Codex reviews the exact artifact before manual deployment.","check":["plan compliance gate","Codex receipt"]}
+  ]
+}

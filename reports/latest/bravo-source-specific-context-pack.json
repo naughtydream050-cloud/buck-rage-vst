@@ -1,0 +1,10 @@
+{
+  "phase": "4 dynamic/DSP",
+  "scope": "measurement-backed BRAVO absolute schedules only",
+  "head": "05b5e09ad9b4529ab0d91d67d1c8933e071191ca",
+  "changed_files": ["Source/BravoProjectPresets.h", "Source/PluginProcessor.cpp", "Source/TimelineScratchEngine.h", "Source/TimelineScratchEngine.cpp", "tests/TimelineScratchEngineTests.cpp"],
+  "validation": {"source_event_map": "PASS 2 tracks / 14 adopted", "diff_check": "PASS", "cpp_tests": "NOT RUN: no cmake/compiler", "ci": "NOT RUN", "daw": "NOT TESTED"},
+  "blocker": "native compiler/toolchain unavailable on this host",
+  "next": "run ScratchEngine, StateModel and RuntimeSmoke tests plus Windows CI, then repeat Jev review",
+  "candidate_changed": false
+}

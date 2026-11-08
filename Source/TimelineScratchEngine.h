@@ -23,6 +23,23 @@ public:
         float speed = 1.0f, pitch = 0.0f, depth = 1.0f;
     };
 
+    // Immutable optional song schedule. Its zero-based indexes correspond to
+    // absolute Host BARs and are never folded into the manual 64-BAR map.
+    struct AbsoluteSchedule final
+    {
+        const Slot* slots = nullptr;
+        int slotCount = 0;
+
+        const Slot& slotAt (int64_t absoluteBar) const noexcept
+        {
+            static const Slot dry {};
+            return slots != nullptr && absoluteBar >= 0 && absoluteBar < slotCount
+                ? slots[(size_t) absoluteBar] : dry;
+        }
+
+        bool enabled() const noexcept { return slots != nullptr && slotCount > 0; }
+    };
+
     struct Transport final
         {
             bool playing = false, discontinuity = false;
@@ -85,7 +102,8 @@ public:
     void prepare (double sampleRate, int maxBlockSize, int channels);
     void release();
     void resetTransport (bool preserveHistory = false) noexcept;
-    void process (juce::AudioBuffer<float>&, const Transport&, const std::array<Slot, 64>&) noexcept;
+    void process (juce::AudioBuffer<float>&, const Transport&, const std::array<Slot, 64>&,
+                  const AbsoluteSchedule& = {}) noexcept;
     int getAllocatedHistorySamples() const noexcept { return historySamples; }
     BackspinReadState getBackspinReadState() const noexcept;
     Diagnostics getDiagnostics() const noexcept;
@@ -142,6 +160,7 @@ private:
     std::array<std::vector<float>, 2> history;
     uint64_t writeSerial = 0, minimumReadableSerial = 0;
     int activeBar = -1;
+    int64_t activeAbsoluteBar = -1;
     Slot activeSlot {};
     double activeDurationQuarters = 0.25, activeDurationSamples = 0.0,
            tapeReadSerial = 0.0, tapeWindowStartSerial = 0.0, tapeWindowEndSerial = 0.0,

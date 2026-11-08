@@ -457,7 +457,8 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         xyEngine.processLive (xyDryBuffer, xyRenderedBuffer, xyReadyMask, xyTransport, buffer.getNumSamples());
     }
 
-    scratchEngine.process (buffer, transport, audibleSlots);
+    scratchEngine.process (buffer, transport, audibleSlots,
+                           BravoProjectPresets::absoluteSchedule (projectPresetId));
     const auto channels = juce::jmin (2, buffer.getNumChannels());
     const auto hasXyBlock = canRunXY && xyReadyMask.getNumSamples() >= buffer.getNumSamples()
                          && xyRenderedBuffer.getNumSamples() >= buffer.getNumSamples();

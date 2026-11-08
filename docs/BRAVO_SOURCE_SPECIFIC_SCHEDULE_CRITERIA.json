@@ -1,0 +1,10 @@
+{
+  "schema": "toyotomi.bravo.source-specific-schedule.ac.v1",
+  "criteria": [
+    {"id":"AC-01","requirement":"BRAVO 1/2 use only the measured source-specific absolute BAR events; no every-four-BAR repetition remains."},
+    {"id":"AC-02","requirement":"BAR 65+ events are read by absolute BAR and never alias to BAR 1-64 or manual state."},
+    {"id":"AC-03","requirement":"Init/manual 64-BAR slots, state IDs, XY, UI, latency and existing effects are unchanged."},
+    {"id":"AC-04","requirement":"The immutable schedule adds no audio-thread allocation, lock, ValueTree, I/O or logging."},
+    {"id":"AC-05","requirement":"Focused deterministic tests cover selected, empty, BAR 65+ and non-aliasing cases; existing relevant tests still run."}
+  ]
+}

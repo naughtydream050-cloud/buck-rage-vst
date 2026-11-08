@@ -2,12 +2,14 @@
 
 ## Current BRAVO work (supersedes historical status below)
 
-Active worktree: `01_PLUGINS/worktrees/toyotomi-xy-preset-priority`, HEAD
-`9cf30367efe2808295dd568f430c944a9c1b6879`. Source reconstruction stopped as
-`INSUFFICIENT_ANALYSIS`; it is retained as evidence. The active task is now a
-generic profile implementation: BRAVO 1/2 select fixed four-BAR audio-slot
-patterns without changing manual state or XY data. Focused C++ tests/CI/Jev and
-artifact are NOT RUN. FL validation NOT TESTED.
+Active worktree: `01_PLUGINS/worktrees/toyotomi-xy-preset-priority`, base HEAD
+`05b5e09ad9b4529ab0d91d67d1c8933e071191ca`. BRAVO 1/2 now use a measurement
+report rather than the former generic four-BAR pattern. Adopted locations are
+stored in `reports/bravodomo-preset-analysis/source-specific-event-map.json`;
+the schedule supports absolute BAR 65+ without manual 64-BAR aliasing. This is
+an approximation, not a listening/effect-identity claim. Source-map verification
+and diff check PASS; focused C++ tests/CI/artifact remain NOT RUN because this
+host has no CMake/compiler. FL validation NOT TESTED.
 
 ## Current phase
 

@@ -30,7 +30,7 @@ void TimelineScratchEngine::prepare (double rate, int, int channels)
     for (auto& channel : history) channel.assign ((size_t) historySamples, 0.0f);
     writeSerial = minimumReadableSerial = 0;
     barEntrySerial = 0;
-    activeBar = -1; wetRamp = 0.0f; waitingForDry = false;
+    activeBar = -1; activeAbsoluteBar = -1; wetRamp = 0.0f; waitingForDry = false;
     backspinCaptured = tapeBrakeCaptured = babyCaptured = forwardCaptured = dragCaptured = false;
     backspinWindowSamples = backspinWindowStartSerial = backspinWindowEndSerial = 0.0;
     backspinPrimaryReadSerial = backspinSecondaryReadSerial = 0.0;
@@ -60,7 +60,7 @@ void TimelineScratchEngine::release()
 {
     for (auto& channel : history) { channel.clear(); channel.shrink_to_fit(); }
     historySamples = channelCount = 0; sampleRateHz = 0.0;
-    writeSerial = minimumReadableSerial = 0; activeBar = -1; wetRamp = 0.0f;
+    writeSerial = minimumReadableSerial = 0; activeBar = -1; activeAbsoluteBar = -1; wetRamp = 0.0f;
     backspinCaptured = tapeBrakeCaptured = babyCaptured = forwardCaptured = dragCaptured = false;
     backspinWindowSamples = backspinWindowStartSerial = backspinWindowEndSerial = 0.0;
     backspinPrimaryReadSerial = backspinSecondaryReadSerial = 0.0;
@@ -90,7 +90,7 @@ void TimelineScratchEngine::resetTransport (bool preserveHistory) noexcept
 {
     if (! preserveHistory)
         minimumReadableSerial = writeSerial;
-    activeBar = -1; wetRamp = 0.0f; waitingForDry = false;
+    activeBar = -1; activeAbsoluteBar = -1; wetRamp = 0.0f; waitingForDry = false;
     backspinCaptured = tapeBrakeCaptured = babyCaptured = forwardCaptured = dragCaptured = false;
     forwardSourceEnded = false;
     forwardSourceHasSignal = false;
@@ -553,7 +553,8 @@ void TimelineScratchEngine::advanceForwardCutReadHead() noexcept
 }
 
 void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Transport& transport,
-                                     const std::array<Slot, 64>& slots) noexcept
+                                     const std::array<Slot, 64>& slots,
+                                     const AbsoluteSchedule& absoluteSchedule) noexcept
 {
     if (historySamples <= 0 || sampleRateHz <= 0.0) return;
     if ((transport.discontinuity && ! transport.confirmedPredictedLoop)
@@ -604,10 +605,19 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
         const auto bar = transport.playing
             ? ((loopBoundaryApplied ? transport.loopStartBar : transport.startBar) + wholeBars + 64) % 64
             : -1;
-        if (bar != activeBar && bar >= 0)
+        const auto absoluteBar = transport.playing
+            ? (int64_t) std::floor (absoluteBarAtSample (transport, sampleIndex)) : -1;
+        const auto changedBar = absoluteSchedule.enabled() ? absoluteBar != activeAbsoluteBar : bar != activeBar;
+        const auto& incomingSlot = absoluteSchedule.enabled() ? absoluteSchedule.slotAt (absoluteBar)
+            : (bar >= 0 ? slots[(size_t) bar] : absoluteSchedule.slotAt (-1));
+        if (changedBar && bar >= 0)
         {
             if (wetRamp > 0.001f) waitingForDry = true;
-            else beginBar (bar, slots[(size_t) bar], transport.quartersPerBar, transport.secondsPerQuarter);
+            else
+            {
+                beginBar (bar, incomingSlot, transport.quartersPerBar, transport.secondsPerQuarter);
+                activeAbsoluteBar = absoluteBar;
+            }
         }
 
         const auto elapsedQuarters = phase * transport.quartersPerBar;
@@ -691,7 +701,8 @@ void TimelineScratchEngine::process (juce::AudioBuffer<float>& buffer, const Tra
         if (waitingForDry && wetRamp <= 0.0f && bar >= 0)
         {
             waitingForDry = false;
-            beginBar (bar, slots[(size_t) bar], transport.quartersPerBar, transport.secondsPerQuarter);
+            beginBar (bar, incomingSlot, transport.quartersPerBar, transport.secondsPerQuarter);
+            activeAbsoluteBar = absoluteBar;
         }
 
         float observedWet[2] {};
