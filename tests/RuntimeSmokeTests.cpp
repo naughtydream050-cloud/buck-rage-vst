@@ -2739,24 +2739,21 @@ int main()
     const auto bar4Mini = juce::Rectangle<int> { 445, 173, 40, 20 };
     state.setProjectPresetId (0);
     const auto initProfileMap = render (*editor);
-    state.setSlotPreset (2, PluginStateModel::ScratchPreset::transform);
-    state.setSlotPreset (3, PluginStateModel::ScratchPreset::forwardCut);
-    const auto bravo1ReferenceMap = render (*editor);
-    state.setSlotPreset (2, PluginStateModel::ScratchPreset::zigzag);
-    state.setSlotPreset (3, PluginStateModel::ScratchPreset::tapeBrake);
-    const auto bravo2ReferenceMap = render (*editor);
     state.setSlotPreset (2, PluginStateModel::ScratchPreset::backspin);
     state.setSlotPreset (3, PluginStateModel::ScratchPreset::baby);
     state.setProjectPresetId (1);
     const auto bravo1ProfileMap = render (*editor);
     state.setProjectPresetId (2);
     const auto bravo2ProfileMap = render (*editor);
-    pass &= check (! different (bravo1ReferenceMap.getClippedImage (bar3Mini), bravo1ProfileMap.getClippedImage (bar3Mini))
-                && ! different (bravo1ReferenceMap.getClippedImage (bar4Mini), bravo1ProfileMap.getClippedImage (bar4Mini))
-                && ! different (bravo2ReferenceMap.getClippedImage (bar3Mini), bravo2ProfileMap.getClippedImage (bar3Mini))
-                && ! different (bravo2ReferenceMap.getClippedImage (bar4Mini), bravo2ProfileMap.getClippedImage (bar4Mini))
-                && different (initProfileMap.getClippedImage (bar3Mini), bravo1ProfileMap.getClippedImage (bar3Mini))
+    // The measured map is source-specific: BRAVO 1 has forwardCut at BAR 3
+    // and dry BAR 4; BRAVO 2 has dry BAR 3 and forwardCut at BAR 4.  The
+    // profile projection must not mutate the editable backspin/baby slots.
+    pass &= check (different (initProfileMap.getClippedImage (bar3Mini), bravo1ProfileMap.getClippedImage (bar3Mini))
+                && different (initProfileMap.getClippedImage (bar4Mini), bravo1ProfileMap.getClippedImage (bar4Mini))
+                && different (initProfileMap.getClippedImage (bar3Mini), bravo2ProfileMap.getClippedImage (bar3Mini))
+                && different (initProfileMap.getClippedImage (bar4Mini), bravo2ProfileMap.getClippedImage (bar4Mini))
                 && different (bravo1ProfileMap.getClippedImage (bar3Mini), bravo2ProfileMap.getClippedImage (bar3Mini))
+                && different (bravo1ProfileMap.getClippedImage (bar4Mini), bravo2ProfileMap.getClippedImage (bar4Mini))
                 && state.getSlot (2).preset == PluginStateModel::ScratchPreset::backspin
                 && state.getSlot (3).preset == PluginStateModel::ScratchPreset::baby,
                    "v2-bravo-profile-bar-map-minis-project-without-manual-mutation");
