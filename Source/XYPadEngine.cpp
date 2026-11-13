@@ -1398,16 +1398,23 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             liveActiveRevision = liveActiveTrajectory.revision;
         }
 
-        float x = 0.5f, ignoredY = 0.5f;
+        float x = 0.5f, y = 0.5f;
         double xSlopePerPhase = 0.0;
-        interpolateTrajectory (liveActiveTrajectory, phase, x, ignoredY, &xSlopePerPhase);
+        interpolateTrajectory (liveActiveTrajectory, phase, x, y, &xSlopePerPhase);
         x = juce::jlimit (0.0f, 1.0f, x);
+        y = juce::jlimit (0.0f, 1.0f, y);
         // X slope is already expressed in complete PAD traversals per BAR.
         // Mapping it through the 125 ms source width and host phase-per-sample
         // made a left-to-right BAR gesture read at roughly 0.07x at 130 BPM:
         // sonically close to a hold. A unit X sweep now means unit source rate;
         // launchLiveGrain retains the final serial-range clamp.
         auto requestedIncrement = std::isfinite (xSlopePerPhase) ? xSlopePerPhase : 0.0;
+        // Keep direction, stationary/hold and hop decisions strictly X-derived.
+        // Y is sampled only when a grain is launched: 0 -> 0.5x, 0.5 -> 1x,
+        // 1 -> 2x, yielding natural source-rate pitch without a pitch shifter.
+        const auto ySpeedMultiplier = yAxisSpeed.load (std::memory_order_acquire)
+            ? std::exp2 (2.0 * static_cast<double> (y) - 1.0) : 1.0;
+        const auto launchIncrement = requestedIncrement * ySpeedMultiplier;
         auto direction = liveDirection;
         auto targetJump = false;
         if (liveHavePreviousX)
@@ -1484,19 +1491,19 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             else
                 captureLiveContinuationTail();
             liveGrains.fill (LiveGrain {});
-            launchLiveGrain (x, requestedIncrement, false, oldestSerial, newestSerial, true);
+            launchLiveGrain (x, launchIncrement, false, oldestSerial, newestSerial, true);
             liveSamplesToLaunch = liveHopFrames;
         }
         else if (liveHaveSignal && targetJump && hasHistory && liveActiveTrajectory.count > 0)
         {
             liveSamplesToLaunch = 0;
-            launchLiveGrain (x, requestedIncrement, true, oldestSerial, newestSerial, false);
+            launchLiveGrain (x, launchIncrement, true, oldestSerial, newestSerial, false);
             liveSamplesToLaunch = liveHopFrames;
         }
         else if (liveHaveSignal && liveActiveTrajectory.count > 0 && hasHistory && liveSamplesToLaunch <= 0
                  && ! transitionInProgress)
         {
-            launchLiveGrain (x, requestedIncrement, false, oldestSerial, newestSerial, false);
+            launchLiveGrain (x, launchIncrement, false, oldestSerial, newestSerial, false);
             liveSamplesToLaunch = liveHopFrames;
         }
         if (liveSamplesToLaunch > 0) --liveSamplesToLaunch;

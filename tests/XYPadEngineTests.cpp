@@ -10,6 +10,7 @@
 #include <iostream>
 #include <limits>
 #include <thread>
+#include <utility>
 #include <memory>
 #include <new>
 #include <vector>
@@ -327,7 +328,7 @@ public:
                   << " max_error=" << maximumError << " tolerance=2e-9 finite=" << finite << "\n";
         return finite && maximumError <= 2.0e-9;
     }
-    static bool yCoordinateDoesNotConfigureAudioState()
+    static bool yAxisSpeedIsOptInAndLockFree()
     {
         for (const auto rate : { 44100.0, 48000.0, 96000.0 })
         {
@@ -335,10 +336,13 @@ public:
             if (! engine.prepare (rate, 64, true, true)) return false;
             const auto delayReady = engine.liveOutputDelay != nullptr
                 && engine.liveOutputMaskDelay != nullptr;
+            const auto defaultOff = ! engine.yAxisSpeed.load (std::memory_order_acquire);
+            engine.setYAxisSpeedEnabled (true);
+            const auto enabled = engine.yAxisSpeed.load (std::memory_order_acquire);
             engine.release();
-            if (! delayReady) return false;
+            if (! delayReady || ! defaultOff || ! enabled) return false;
         }
-        std::cout << "METRIC y_audio_neutral fixed_delay_only=1\n";
+        std::cout << "METRIC y_axis_speed opt_in_lock_free=1\n";
         return true;
     }
     static bool liveGrainWindowLutMatchesAnalytic()
@@ -1453,19 +1457,21 @@ public:
         double signedReadIncrement = 0.0;
     };
 
-    static LiveVelocityObservation observeLiveVelocity (double rate, double velocity)
+    static LiveVelocityObservation observeLiveVelocity (double rate, double velocity,
+                                                        float y = 0.5f, bool yAxisSpeed = false)
     {
         LiveVelocityObservation result;
         XYPadEngine engine;
         constexpr int blockSize = 256;
         if (! engine.prepare (rate, blockSize, true, true)) return result;
+        engine.setYAxisSpeedEnabled (yAxisSpeed);
 
         // A unit sweep is the complete legal Pad range, not a request beyond
         // its clamped 0..1 coordinates.
         const auto startX = velocity >= 0.0 ? 0.0f : 1.0f;
         const auto endX = velocity >= 0.0 ? 1.0f : 0.0f;
         const std::vector<PluginStateModel::MotionPoint> points {
-            { startX, 0.5f, 0.0 }, { endX, 0.5f, 1.0 }
+            { startX, y, 0.0 }, { endX, y, 1.0 }
         };
         engine.setTrajectory (0, points, 1);
 
@@ -1698,6 +1704,18 @@ int main (int argc, char** argv)
                       << " actual=" << observation.signedReadIncrement << '\\n';
             check (pass, "one-bar-full-x-sweep-launches-audible-signed-unit-read-rate");
         }
+    for (const auto yAndExpected : { std::pair<float, double> { 0.0f, 0.5 },
+                                     std::pair<float, double> { 0.5f, 1.0 },
+                                     std::pair<float, double> { 1.0f, 2.0 } })
+    {
+        const auto observation = XYPadEngineTestAccess::observeLiveVelocity (48000.0, 1.0,
+                                                                                yAndExpected.first, true);
+        const auto pass = std::abs (observation.signedReadIncrement - yAndExpected.second) <= 0.03;
+        std::cout << "METRIC xy_y_axis_speed y=" << yAndExpected.first
+                  << " expected=" << yAndExpected.second
+                  << " actual=" << observation.signedReadIncrement << '\n';
+        check (pass, "y-axis-speed-scales-x-derived-live-read-rate-without-changing-direction");
+    }
     for (const auto rate : { 44100.0, 48000.0, 96000.0 })
     {
         double liveTransitionRatio = 0.0;
@@ -1917,8 +1935,8 @@ int main (int argc, char** argv)
            "ac20-extreme-finite-history-keeps-reentry-tail-finite-safety-guard-enabled");
     check (XYPadEngineTestAccess::liveGrainWindowLutMatchesAnalytic(),
            "live-grain-window-lut-matches-analytic-hann");
-    check (XYPadEngineTestAccess::yCoordinateDoesNotConfigureAudioState(),
-           "saved-y-remains-ui-state-and-does-not-configure-an-xy-audio-processor");
+    check (XYPadEngineTestAccess::yAxisSpeedIsOptInAndLockFree(),
+           "y-axis-speed-is-an-opt-in-lock-free-live-audio-setting");
     check (XYPadEngineTestAccess::fixedOutputDelayIsExact(),
            "xy-output-path-retains-the-exact-1024-sample-fixed-delay");
     check (XYPadEngineTestAccess::repeatedReentryBlendIsFiniteAndPeakBounded(),

@@ -72,6 +72,8 @@ int main()
     model.setInternalBpm (133.25);
     model.setInternalTimeSignature (6, 8);
     model.setProjectPresetId (0);
+    check (! model.getUiState().yAxisSpeedEnabled, "y-axis-speed-defaults-off");
+    model.setYAxisSpeedEnabled (true);
 
     const auto state = model.toValueTree();
     PluginStateModel restored;
@@ -83,7 +85,8 @@ int main()
     check (! restored.getUiState().hostSync && restored.getUiState().internalBpm == 133.25
            && restored.getUiState().internalTimeSigNumerator == 6
            && restored.getUiState().internalTimeSigDenominator == 8
-           && restored.getUiState().projectPresetId == 0,
+           && restored.getUiState().projectPresetId == 0
+           && restored.getUiState().yAxisSpeedEnabled,
            "top-controls-round-trip");
     for (int profileId = 1; profileId <= 2; ++profileId)
     {
@@ -214,6 +217,8 @@ int main()
     check (legacyTabRestored.fromValueTree (legacyTabState)
            && legacyTabRestored.getUiState().selectedTab == 2,
            "legacy-tab-page-restores-without-gold-highlight");
+    check (! legacyTabRestored.getUiState().yAxisSpeedEnabled,
+           "legacy-state-without-y-axis-speed-defaults-off");
 
     PluginStateModel preserved = restored;
     juce::ValueTree future ("ToyotomiHideyoshiState"); future.setProperty ("stateVersion", 99, nullptr);

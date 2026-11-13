@@ -64,6 +64,8 @@ public:
                       const Transport& transport, int frameCount) noexcept;
 
     State getState (int bar) const noexcept;
+    // Published from the message/state thread; read once at live grain launch.
+    void setYAxisSpeedEnabled (bool enabled) noexcept { yAxisSpeed.store (enabled, std::memory_order_release); }
     static float mixLayers (float dry, float presetOutput, float xyWet,
                             float depth, bool presetActive, float xyBlend = 1.0f) noexcept;
     int getMaxFramesPerBar() const noexcept { return maxFramesPerBar; }
@@ -206,7 +208,7 @@ private:
     bool liveHistoryHasUnsafeMagnitude = false;
     bool liveWasPlaying = false;
     bool liveSourceFadeActive = false;
-    std::atomic<bool> enabled { false }, workerExit { false };
+    std::atomic<bool> enabled { false }, workerExit { false }, yAxisSpeed { false };
     std::thread worker;
     std::mutex nonRealtimeLifecycleMutex;
 

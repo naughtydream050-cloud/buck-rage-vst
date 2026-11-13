@@ -372,11 +372,20 @@ private:
 class ToyotomiHideyoshiAudioProcessorEditorV2::XYRegion final : public juce::Component
 {
 public:
-    explicit XYRegion (std::function<void(juce::Point<float>)> callback) : update (std::move (callback)) {}
-    void mouseDown (const juce::MouseEvent& event) override { if (update) update (event.position); }
-    void mouseDrag (const juce::MouseEvent& event) override { if (update) update (event.position); }
+    XYRegion (std::function<void(juce::Point<float>)> callback, std::function<void()> menuCallback)
+        : update (std::move (callback)), showMenu (std::move (menuCallback)) {}
+    void mouseDown (const juce::MouseEvent& event) override
+    {
+        if (event.mods.isRightButtonDown()) { if (showMenu) showMenu(); return; }
+        if (update) update (event.position);
+    }
+    void mouseDrag (const juce::MouseEvent& event) override
+    {
+        if (event.mods.isLeftButtonDown() && update) update (event.position);
+    }
 private:
     std::function<void(juce::Point<float>)> update;
+    std::function<void()> showMenu;
 };
 
 // Same ownership pattern as Buck Raw Shit's StereoMeter: one child owns the
@@ -669,7 +678,8 @@ ToyotomiHideyoshiAudioProcessorEditorV2::ToyotomiHideyoshiAudioProcessorEditorV2
         [this] { beginBpmTextEdit(); });
     addAndMakeVisible (*bpmInput);
     bpmInput->setBounds (GeneratedLayout::bpmBounds());
-    xyInput = std::make_unique<XYRegion> ([this] (juce::Point<float> point) { updateXYFromPad (point); });
+    xyInput = std::make_unique<XYRegion> ([this] (juce::Point<float> point) { updateXYFromPad (point); },
+                                          [this] { showYAxisSpeedMenu(); });
     addAndMakeVisible (*xyInput);
     xyInput->setBounds (GeneratedLayout::xyPadBounds());
 
@@ -824,6 +834,21 @@ void ToyotomiHideyoshiAudioProcessorEditorV2::showProjectPresetMenu()
                             if (result == 1) processor.getStateModel().setProjectPresetId (0);
                             else if (result == 2) processor.getStateModel().setProjectPresetId (1);
                             else if (result == 3) processor.getStateModel().setProjectPresetId (2);
+                            surface->repaint();
+                        });
+}
+
+void ToyotomiHideyoshiAudioProcessorEditorV2::showYAxisSpeedMenu()
+{
+    juce::PopupMenu menu;
+    const auto enabled = processor.getStateModel().getUiState().yAxisSpeedEnabled;
+    menu.addItem (1, "Y axis Speed", true, enabled);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (xyInput.get()),
+                        [this] (int result)
+                        {
+                            if (result == 1)
+                                processor.getStateModel().setYAxisSpeedEnabled (
+                                    ! processor.getStateModel().getUiState().yAxisSpeedEnabled);
                             surface->repaint();
                         });
 }

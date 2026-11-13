@@ -1,0 +1,20 @@
+{
+  "criteria": [
+    {"id":"AC-01","requirement":"Old project state defaults Y axis Speed to off.","check":["StateModelTests old-state fixture"]},
+    {"id":"AC-02","requirement":"The setting round-trips in project state without changing XY points.","check":["StateModelTests save/restore"]},
+    {"id":"AC-03","requirement":"Right-click opens the toggle and does not record, clear, or move a trajectory.","check":["RuntimeSmoke focused input test"]},
+    {"id":"AC-04","requirement":"With the toggle off, X-only XY output remains baseline-equivalent.","check":["XYPadEngine deterministic off fixture"]},
+    {"id":"AC-05","requirement":"Centre Y maps to 1.0 and leaves the X-derived increment unchanged.","check":["XYPadEngine increment fixture"]},
+    {"id":"AC-06","requirement":"Bottom Y maps to 0.5 and top Y maps to 2.0.","check":["XYPadEngine increment fixture"]},
+    {"id":"AC-07","requirement":"Forward and reverse signed X increments retain their direction under Y scaling.","check":["XYPadEngine signed-rate fixture"]},
+    {"id":"AC-08","requirement":"X hold and micro-loop behaviour are unchanged by Y speed.","check":["XYPadEngine hold fixture"]},
+    {"id":"AC-09","requirement":"Stereo uses the same scaled reading position for both channels.","check":["XYPadEngine stereo fixture"]},
+    {"id":"AC-10","requirement":"X retrigger timing is unchanged; an X-retrigger plus Y-ramp comparison is captured.","check":["XYPadEngine retrigger fixture"]},
+    {"id":"AC-11","requirement":"Endpoint and abrupt Y changes remain finite and use existing transitions.","check":["XYPadEngine boundary fixture"]},
+    {"id":"AC-12","requirement":"No history, seek, loop, and stop safely fall back without invalid reads.","check":["RuntimeSmoke transport fixture"]},
+    {"id":"AC-13","requirement":"Depth zero and bypass preserve their existing semantics.","check":["RuntimeSmoke depth/bypass fixture"]},
+    {"id":"AC-14","requirement":"No realtime allocation, lock, ValueTree, file IO, or logging is introduced.","check":["diff review and existing realtime tests"]},
+    {"id":"AC-15","requirement":"Existing 18-condition performance thresholds are unchanged and no BRAVO or latency scope changes occur.","check":["source assertions and benchmark contract"]},
+    {"id":"AC-16","requirement":"Focused regressions and Windows CI pass on one source before any manual bundle is produced.","check":["native tests and Windows CI"]}
+  ]
+}

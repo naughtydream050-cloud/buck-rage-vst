@@ -153,6 +153,11 @@ void PluginStateModel::setProjectPresetId (int id)
     ui.projectPresetId = juce::jlimit (0, 2, id);
     notifyDspTimingChanged();
 }
+void PluginStateModel::setYAxisSpeedEnabled (bool enabled)
+{
+    ui.yAxisSpeedEnabled = enabled;
+    notifyDspTimingChanged();
+}
 
 juce::String PluginStateModel::projectPresetText (int presetId) noexcept
 {
@@ -224,6 +229,7 @@ juce::ValueTree PluginStateModel::toValueTree() const
     global.setProperty ("internalTimeSigNumerator", ui.internalTimeSigNumerator, nullptr);
     global.setProperty ("internalTimeSigDenominator", ui.internalTimeSigDenominator, nullptr);
     global.setProperty ("projectPresetId", ui.projectPresetId, nullptr);
+    global.setProperty ("yAxisSpeedEnabled", ui.yAxisSpeedEnabled, nullptr);
     root.addChild (global, -1, nullptr);
     juce::ValueTree timeline (barsId);
     for (int bar = 0; bar < kNumBars; ++bar)
@@ -255,8 +261,9 @@ bool PluginStateModel::fromValueTree (const juce::ValueTree& root)
         parsed.setHostSync (static_cast<bool> (global.getProperty ("hostSync", true)));
         parsed.setInternalBpm (static_cast<double> (global.getProperty ("internalBpm", 120.0)));
         parsed.setInternalTimeSignature (static_cast<int> (global.getProperty ("internalTimeSigNumerator", 4)),
-                                        static_cast<int> (global.getProperty ("internalTimeSigDenominator", 4)));
+                                         static_cast<int> (global.getProperty ("internalTimeSigDenominator", 4)));
         parsed.setProjectPresetId (static_cast<int> (global.getProperty ("projectPresetId", 0)));
+        parsed.setYAxisSpeedEnabled (static_cast<bool> (global.getProperty ("yAxisSpeedEnabled", false)));
     }
     const auto timeline = root.getChildWithName (barsId);
     for (int i = 0; i < timeline.getNumChildren(); ++i)

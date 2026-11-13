@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "status": "APPROVED",
+  "approved_by": "Sol",
+  "task_id": "toyotomi-xy-y-axis-speed-001",
+  "task_class": "CRITICAL",
+  "risk_class": "realtime-dsp",
+  "repo_path": "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\worktrees\\toyotomi-xy-preset-priority",
+  "base_commit": "e6321dc974914a225bca9656a3035988510ae1aa",
+  "plan_path": "docs/XY_Y_AXIS_SPEED_PLAN.md",
+  "criteria_path": "docs/XY_Y_AXIS_SPEED_AC.json",
+  "task_spec_path": "docs/XY_Y_AXIS_SPEED_WORKER_TASK.md",
+  "plan_sha256": "9ac05f8975d5250e3f65b2fa04d43edef8ade52eed55e946d2aa1329289a11e4",
+  "criteria_sha256": "3d19f20269480a40610722819b6e34f1a9f7528c7bd9882b5e7f13ca5f20a0fc",
+  "task_spec_sha256": "c53632782b56f4e5cfbcea447c504fa8a79ef2be2f16d7d0d1833aa224cbc17c",
+  "allowed_paths": [
+    "source/xypadengine.h", "source/xypadengine.cpp", "source/pluginstatemodel.h", "source/pluginstatemodel.cpp",
+    "source/pluginprocessor.h", "source/pluginprocessor.cpp", "source/plugineditorv2.cpp", "source/uicomponents.h",
+    "source/uicomponents.cpp", "tests/xypadenginetests.cpp", "tests/statemodeltests.cpp", "tests/runtimesmoketests.cpp"
+  ]
+}
