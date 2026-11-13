@@ -1483,7 +1483,9 @@ public:
             input.setSample (1, i, -0.125f);
         }
 
-        const auto targetSamples = static_cast<int> (rate * 0.05);
+        // A 2x grain needs three grain lengths of retained audio (one source
+        // span plus two read spans). Keep enough history for that legal case.
+        const auto targetSamples = static_cast<int> (rate * 0.10);
         int processed = 0;
         while (processed < targetSamples)
         {
