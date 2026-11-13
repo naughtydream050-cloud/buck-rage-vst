@@ -1491,7 +1491,11 @@ public:
             XYPadEngine::Transport transport;
             transport.playing = true;
             transport.startBar = 0;
-            transport.startPhase = static_cast<double> (processed) / rate;
+            // Measure the requested rate from the middle of the legal source
+            // span.  At the oldest edge a 2x grain is deliberately clamped by
+            // the production range guard, which tests safety rather than the
+            // Y multiplier.
+            transport.startPhase = 0.5 + static_cast<double> (processed) / rate;
             transport.phasePerSample = 1.0 / rate;
             engine.processLive (input, output, mask, transport, count);
             processed += count;
