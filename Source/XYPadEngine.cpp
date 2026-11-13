@@ -1410,11 +1410,6 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         // launchLiveGrain retains the final serial-range clamp.
         auto requestedIncrement = std::isfinite (xSlopePerPhase) ? xSlopePerPhase : 0.0;
         // Keep direction, stationary/hold and hop decisions strictly X-derived.
-        // Y is sampled only when a grain is launched: 0 -> 0.5x, 0.5 -> 1x,
-        // 1 -> 2x, yielding natural source-rate pitch without a pitch shifter.
-        const auto ySpeedMultiplier = yAxisSpeed.load (std::memory_order_acquire)
-            ? std::exp2 (2.0 * static_cast<double> (y) - 1.0) : 1.0;
-        const auto launchIncrement = requestedIncrement * ySpeedMultiplier;
         auto direction = liveDirection;
         auto targetJump = false;
         if (liveHavePreviousX)
@@ -1453,6 +1448,14 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         livePreviousX = x;
         liveHavePreviousX = true;
         liveDirection = direction;
+
+        // Y is sampled only when a grain is launched: 0 -> 0.5x, 0.5 -> 1x,
+        // 1 -> 2x, yielding natural source-rate pitch without a pitch shifter.
+        // Calculate this after the X-only discontinuity correction above, so a
+        // jump's first grain retains both its direction and its Y speed.
+        const auto ySpeedMultiplier = yAxisSpeed.load (std::memory_order_acquire)
+            ? std::exp2 (2.0 * static_cast<double> (y) - 1.0) : 1.0;
+        const auto launchIncrement = requestedIncrement * ySpeedMultiplier;
 
         const auto hasHistory = liveHistoryValidFrames >= static_cast<uint64_t> (liveWarmupFrames)
                              && liveHistoryValidFrames >= static_cast<uint64_t> (liveGrainFrames);
