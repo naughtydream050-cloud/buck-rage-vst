@@ -841,15 +841,26 @@ void ToyotomiHideyoshiAudioProcessorEditorV2::showProjectPresetMenu()
 void ToyotomiHideyoshiAudioProcessorEditorV2::showYAxisSpeedMenu()
 {
     juce::PopupMenu menu;
-    const auto enabled = processor.getStateModel().getUiState().yAxisSpeedEnabled;
-    menu.addItem (1, "Y axis Speed", true, enabled);
+    const auto& state = processor.getStateModel();
+    const auto ui = state.getUiState();
+    const auto bar = ui.selectedBar;
+    menu.addItem (1, "Y axis Speed", true, ui.yAxisSpeedEnabled);
+    menu.addItem (2, "Load BRAVO XY Accelerator",
+                  ui.yAxisSpeedEnabled && ! xyRecording && PluginStateModel::hasSelectedBar (bar)
+                  && ! state.getSlot (bar).xyMotionExists && state.getSlot (bar).xyMotion.empty());
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (xyInput.get()),
-                        [this] (int result)
+                        [safe = juce::Component::SafePointer<ToyotomiHideyoshiAudioProcessorEditorV2> (this),
+                         bar] (int result)
                         {
+                            auto* editor = safe.getComponent();
+                            if (editor == nullptr || result == 0) return;
+                            auto& state = editor->processor.getStateModel();
                             if (result == 1)
-                                processor.getStateModel().setYAxisSpeedEnabled (
-                                    ! processor.getStateModel().getUiState().yAxisSpeedEnabled);
-                            surface->repaint();
+                                state.setYAxisSpeedEnabled (! state.getUiState().yAxisSpeedEnabled);
+                            else if (result == 2 && ! editor->xyRecording
+                                     && state.getUiState().selectedBar == bar)
+                                state.loadBravoXYAccelerator (bar);
+                            editor->surface->repaint();
                         });
 }
 

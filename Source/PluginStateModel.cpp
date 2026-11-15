@@ -191,6 +191,25 @@ void PluginStateModel::setSlotXYPosition (int bar, float x, float y)
     slot.currentX = finiteClamp (x, 0.0f, 1.0f, 0.5f);
     slot.currentY = finiteClamp (y, 0.0f, 1.0f, 0.5f);
 }
+bool PluginStateModel::loadBravoXYAccelerator (int bar)
+{
+    if (! ui.yAxisSpeedEnabled || ! hasSelectedBar (bar)) return false;
+    auto& slot = mutableSlot (bar);
+    if (slot.xyMotionExists || ! slot.xyMotion.empty()) return false;
+
+    // Time is normalized over the recorded span by the existing XY renderer.
+    slot.xyMotion = {
+        { .45f, .50f, 0.0 },   { .70f, .50f, .50 }, { .45f, .50f, .5001 },
+        { .70f, .65f, .70 },   { .45f, .65f, .7001 },
+        { .70f, .80f, .83 },   { .45f, .80f, .8301 },
+        { .70f, .93f, .92 },   { .45f, .93f, .9201 }, { .70f, 1.0f, 1.0 }
+    };
+    slot.xyMotionExists = true;
+    slot.xyMotionDurationSeconds = slot.xyMotion.back().timeSeconds;
+    notifyDspXYMotionChanged (bar);
+    return true;
+}
+
 void PluginStateModel::beginSlotXYMotion (int bar, float x, float y)
 {
     auto& slot = mutableSlot (bar);

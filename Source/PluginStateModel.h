@@ -90,6 +90,7 @@ public:
     void resetSelectedSlot();
 
     void setSlotXYPosition (int, float x, float y);
+    bool loadBravoXYAccelerator (int bar);
     void beginSlotXYMotion (int, float x, float y);
     void appendSlotXYMotion (int, float x, float y, double elapsedSeconds);
     void clearSlotXYMotion (int);

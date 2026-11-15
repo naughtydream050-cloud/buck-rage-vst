@@ -2,6 +2,7 @@
 #include "PluginEditorV2.h"
 #include "GeneratedLayout.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -669,6 +670,193 @@ bool testProcessorDeclaresAndImplementsFixed1024SampleLatency()
     }
     processor.releaseResources();
     return check (exact, "processor-dry-impulse-is-exactly-1024-samples-late-across-variable-blocks");
+}
+
+struct CountTailRender
+{
+    std::vector<float> samples;
+    bool finite = true;
+};
+
+const char* countPresetName (PluginStateModel::ScratchPreset preset)
+{
+    using Preset = PluginStateModel::ScratchPreset;
+    switch (preset)
+    {
+        case Preset::off: return "off";
+        case Preset::forwardCut: return "forward_cut";
+        case Preset::backspin: return "backspin";
+        case Preset::chirp: return "chirp";
+        case Preset::baby: return "baby";
+        case Preset::transform: return "transform";
+        case Preset::drag: return "drag";
+        case Preset::zigzag: return "zigzag";
+        case Preset::tapeBrake: return "tape_brake";
+        case Preset::custom: return "custom";
+    }
+    return "unknown";
+}
+
+CountTailRender renderCountTailCase (PluginStateModel::ScratchPreset first,
+                                     PluginStateModel::ScratchPreset following,
+                                     PluginStateModel::NoteLength length, float depth)
+{
+    constexpr double rate = 48000.0, bpm = 240.0;
+    constexpr int blockSize = 256, latency = 1024;
+    constexpr int barSamples = 48000;
+    constexpr int totalSamples = barSamples * 3 + latency + blockSize;
+    ToyotomiHideyoshiAudioProcessor processor;
+    processor.prepareToPlay (rate, blockSize);
+    processor.setHostSyncEnabled (true);
+    auto& state = processor.getStateModel();
+    state.setSlotPreset (0, PluginStateModel::ScratchPreset::off);
+    state.setSlotPreset (1, first);
+    state.setSlotPreset (2, following);
+    for (const auto slot : { 1, 2 })
+    {
+        state.setSlotLength (slot, length);
+        state.setSlotSpeed (slot, 1.0f);
+        state.setSlotPitch (slot, 0.0f);
+        state.setSlotDepth (slot, depth);
+    }
+
+    TestPlayHead playHead;
+    processor.setPlayHead (&playHead);
+    juce::MidiBuffer midi;
+    juce::AudioBuffer<float> audio (2, blockSize);
+    CountTailRender result;
+    result.samples.resize ((size_t) totalSamples * 2u);
+    for (int cursor = 0; cursor < totalSamples; cursor += blockSize)
+    {
+        const auto frames = juce::jmin (blockSize, totalSamples - cursor);
+        for (int sample = 0; sample < frames; ++sample)
+        {
+            const auto n = static_cast<double> (cursor + sample);
+            // Different frequencies and phases on L/R make copied old PCM
+            // distinguishable from a common dry-gain reduction.
+            audio.setSample (0, sample, 0.29f * std::sin (0.01731 * n));
+            audio.setSample (1, sample, 0.23f * std::cos (0.02317 * n));
+        }
+        if (frames < blockSize) audio.clear (0, frames, blockSize - frames);
+        playHead.set (true, static_cast<double> (cursor) * bpm / (60.0 * rate), bpm,
+                      4, 4, cursor);
+        processor.processBlock (audio, midi);
+        for (int sample = 0; sample < frames; ++sample)
+            for (int channel = 0; channel < 2; ++channel)
+            {
+                const auto value = audio.getSample (channel, sample);
+                result.samples[(size_t) (cursor + sample) * 2u + (size_t) channel] = value;
+                result.finite &= std::isfinite (value);
+            }
+    }
+    result.finite &= processor.getLatencySamples() == latency;
+    processor.setPlayHead (nullptr);
+    processor.releaseResources();
+    return result;
+}
+
+bool writeCountTailWav (const char* name, const CountTailRender& source)
+{
+    constexpr int channels = 2;
+    const auto frames = static_cast<int> (source.samples.size() / channels);
+    juce::AudioBuffer<float> audio (channels, frames);
+    for (int frame = 0; frame < frames; ++frame)
+        for (int channel = 0; channel < channels; ++channel)
+            audio.setSample (channel, frame, source.samples[(size_t) frame * 2u + (size_t) channel]);
+    juce::WavAudioFormat format;
+    auto stream = juce::File::getCurrentWorkingDirectory().getChildFile (name).createOutputStream();
+    std::unique_ptr<juce::AudioFormatWriter> writer;
+    if (stream != nullptr) writer.reset (format.createWriterFor (stream.release(), 48000.0, channels, 24, {}, 0));
+    return writer != nullptr && writer->writeFromAudioSampleBuffer (audio, 0, frames);
+}
+
+bool testCountPresetEndTailMeasurementMatrix()
+{
+    using Preset = PluginStateModel::ScratchPreset;
+    constexpr int latency = 1024, barSamples = 48000;
+    const std::array<Preset, 10> presets {{ Preset::off, Preset::forwardCut, Preset::backspin,
+        Preset::chirp, Preset::baby, Preset::transform, Preset::drag, Preset::zigzag,
+        Preset::tapeBrake, Preset::custom }};
+    juce::Array<juce::var> rows;
+    bool finite = true, depthZeroExact = true;
+    int rowCount = 0;
+    CountTailRender exampleProcessed, exampleReference;
+
+    for (const auto length : { PluginStateModel::NoteLength::sixteenth, PluginStateModel::NoteLength::oneBar })
+        for (const auto following : { Preset::off, Preset::drag })
+            for (const auto depth : { 0.0f, 1.0f })
+                for (const auto preset : presets)
+                {
+                    const auto processed = renderCountTailCase (preset, following, length, depth);
+                    const auto reference = renderCountTailCase (Preset::off, following, length, depth);
+                    finite &= processed.finite && reference.finite
+                           && processed.samples.size() == reference.samples.size();
+                    const auto expiryInput = length == PluginStateModel::NoteLength::sixteenth
+                        ? barSamples + barSamples / 16 : barSamples * 2;
+                    const auto first = juce::jlimit (0, (int) processed.samples.size() / 2,
+                        expiryInput + latency);
+                    const auto last = juce::jmin ((int) processed.samples.size() / 2, first + barSamples / 4);
+                    int firstResidual = -1, lastResidual = -1;
+                    double maximumResidual = 0.0, attenuationScore = 0.0, copiedPcmScore = 0.0;
+                    for (int frame = first; frame < last; ++frame)
+                        for (int channel = 0; channel < 2; ++channel)
+                        {
+                            const auto index = (size_t) frame * 2u + (size_t) channel;
+                            const auto delta = (double) processed.samples[index] - reference.samples[index];
+                            const auto magnitude = std::abs (delta);
+                            if (magnitude > 1.0e-5)
+                            {
+                                if (firstResidual < 0) firstResidual = frame;
+                                lastResidual = frame;
+                                maximumResidual = juce::jmax (maximumResidual, magnitude);
+                                // A simple attenuation follows -dry/reference; an old PCM tail
+                                // is compared with the preceding processed delta instead.
+                                attenuationScore += delta * -((double) reference.samples[index]);
+                                if (frame >= first + 256)
+                                {
+                                    const auto earlier = (size_t) (frame - 256) * 2u + (size_t) channel;
+                                    copiedPcmScore += delta * ((double) processed.samples[earlier] - reference.samples[earlier]);
+                                }
+                            }
+                        }
+                    const auto duration = firstResidual < 0 ? 0 : lastResidual - firstResidual + 1;
+                    const char* classification = duration == 0 ? "no_difference"
+                        : std::abs (copiedPcmScore) > std::abs (attenuationScore) ? "old_processed_pcm"
+                        : "temporary_dry_attenuation";
+                    if (depth == 0.0f) depthZeroExact &= duration == 0;
+                    auto* row = new juce::DynamicObject();
+                    row->setProperty ("preset", countPresetName (preset));
+                    row->setProperty ("length_case", length == PluginStateModel::NoteLength::sixteenth ? "intra_bar" : "bar_boundary");
+                    row->setProperty ("following", countPresetName (following));
+                    row->setProperty ("depth_percent", depth * 100.0f);
+                    row->setProperty ("xy_present", false);
+                    row->setProperty ("alignment_samples", latency);
+                    row->setProperty ("channels", "LR");
+                    row->setProperty ("classification", classification);
+                    row->setProperty ("residual_duration_samples", duration);
+                    row->setProperty ("maximum_residual", maximumResidual);
+                    rows.add (juce::var (row));
+                    ++rowCount;
+                    if (preset == Preset::baby && length == PluginStateModel::NoteLength::sixteenth
+                        && following == Preset::off && depth == 1.0f)
+                    {
+                        exampleProcessed = processed;
+                        exampleReference = reference;
+                    }
+                }
+
+    auto* report = new juce::DynamicObject();
+    report->setProperty ("schema", 1);
+    report->setProperty ("fixed_latency_samples", latency);
+    report->setProperty ("rows", juce::var (rows));
+    const auto reportFile = juce::File::getCurrentWorkingDirectory().getChildFile ("count-preset-tail-measurements.json");
+    const auto saved = reportFile.replaceWithText (juce::JSON::toString (juce::var (report), true));
+    std::cout << "COUNT_TAIL_MATRIX rows=" << rowCount << " alignment=" << latency
+              << " depth_zero_exact=" << depthZeroExact << " finite=" << finite << "\n";
+    return check (rowCount == 80 && finite && depthZeroExact && saved
+                  && writeCountTailWav ("count-tail-processed.wav", exampleProcessed)
+                  && writeCountTailWav ("count-tail-reference.wav", exampleReference),
+                  "count-tail-all-ten-presets-measured-at-final-output");
 }
 
 bool testXyTransportUsesProcessorClock()
@@ -1819,6 +2007,7 @@ int main()
     pass &= testXyLayerIndependenceAtProcessorBoundary();
     pass &= testUnavailableLiveXyPreservesPresetPerSample();
     pass &= testProcessorDeclaresAndImplementsFixed1024SampleLatency();
+    pass &= testCountPresetEndTailMeasurementMatrix();
     pass &= testXyTransportUsesProcessorClock();
     pass &= testAbsoluteHostBarSync();
     pass &= testHostPpqJitterAndVariableBlocksDoNotReset();

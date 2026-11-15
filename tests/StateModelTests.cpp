@@ -1,6 +1,7 @@
 #include "PluginStateModel.h"
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <iostream>
 
 namespace
@@ -11,6 +12,45 @@ void check (bool value, const char* label) { std::cout << (value ? "PASS " : "FA
 
 int main()
 {
+    {
+        PluginStateModel trial;
+        const auto before = trial.toValueTree();
+        check (! trial.loadBravoXYAccelerator (4)
+               && trial.toValueTree().isEquivalentTo (before), "bravo-xy-requires-y-speed");
+        trial.setYAxisSpeedEnabled (true);
+        trial.setProjectPresetId (2);
+        trial.setSlotPreset (3, PluginStateModel::ScratchPreset::backspin);
+        trial.setSlotPreset (4, PluginStateModel::ScratchPreset::baby);
+        trial.setSlotDepth (4, 0.5f);
+        const auto untouched = trial.getSlot (3).xyMotion;
+        int publications = 0;
+        trial.setDspXYMotionChangedCallback ([&] (int bar, const auto&, uint32_t)
+        {
+            if (bar == 4) ++publications;
+        });
+        publications = 0;
+        check (! trial.loadBravoXYAccelerator (-1) && ! trial.loadBravoXYAccelerator (64)
+               && trial.loadBravoXYAccelerator (4), "bravo-xy-loads-only-valid-empty-bar");
+        const auto points = trial.getSlot (4).xyMotion;
+        check (! trial.loadBravoXYAccelerator (4) && publications == 1
+               && trial.getSlot (4).xyMotion == points, "bravo-xy-single-publication-and-no-overwrite");
+        check (points.size() == 10 && points[2].timeSeconds == .5001
+               && points[4].timeSeconds == .7001 && points[6].timeSeconds == .8301
+               && points[8].timeSeconds == .9201 && points.back().y == 1.0f
+               && std::abs ((points[3].timeSeconds - points[1].timeSeconds) - .20) < 1.0e-9
+               && std::abs ((points[5].timeSeconds - points[3].timeSeconds) - .13) < 1.0e-9
+               && std::abs ((points[7].timeSeconds - points[5].timeSeconds) - .09) < 1.0e-9,
+               "bravo-xy-accelerating-steps");
+        PluginStateModel reread;
+        check (reread.fromValueTree (trial.toValueTree()) && reread.getSlot (4).xyMotion == points
+               && reread.getSlot (4).preset == PluginStateModel::ScratchPreset::baby
+               && reread.getSlot (4).depth == 0.5f && reread.getSlot (3).xyMotion == untouched,
+               "bravo-xy-round-trip-keeps-count-and-neighbour-bar");
+        check (reread.getSlot (3).preset == PluginStateModel::ScratchPreset::backspin
+               && reread.getUiState().projectPresetId == 2
+               && reread.getUiState().yAxisSpeedEnabled,
+               "bravo-xy-load-preserves-project-preset-and-other-count-settings");
+    }
     PluginStateModel model;
     check (model.getUiState().selectedBar == PluginStateModel::kNoSelectedBar,
            "fresh-default-has-no-selected-bar");

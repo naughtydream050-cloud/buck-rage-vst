@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "title": "BRAVO XY Accelerator and COUNT 5 measurement verification",
+  "acceptance_criteria": [
+    {"id": "AC-01", "requirement": "The BRAVO accelerator is available only with Y Speed ON, REC stopped, and a valid empty selected BAR; its asynchronous result rechecks editor lifetime and selected BAR."},
+    {"id": "AC-02", "requirement": "Loading changes only the selected empty BAR, publishes once, preserves COUNT/DEPTH and all other state, prevents overwrite, and round-trips through the existing state representation."},
+    {"id": "AC-03", "requirement": "The authored motion has normalized X return intervals 0.20, 0.13 and 0.09 BAR and the existing Y Speed path produces a measurable later acceleration/pitch-direction difference without a DSP change."},
+    {"id": "AC-04", "requirement": "COUNT measurement covers OFF, CUSTOM and all eight factory presets with XY absent, stereo phase-coded input, intra-BAR length expiry and one-BAR boundary, next BAR OFF and active, and DEPTH 0/100."},
+    {"id": "AC-05", "requirement": "COUNT evidence compensates the fixed 1024 samples and records residual classification as old processed PCM, temporary dry attenuation, or no difference, with duration; no COUNT production DSP changes are made."},
+    {"id": "AC-06", "requirement": "Focused native tests, Windows CI and artifact provenance pass on one source SHA; Jev and Codex final reviews leave no FAIL or UNKNOWN before manual-test placement."}
+  ]
+}
