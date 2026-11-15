@@ -228,14 +228,24 @@ public:
         constexpr double rate = 48000.0;
         constexpr int frames = 192000, blockSize = 256, latency = 1024;
         constexpr double samplesPerBar = rate * 240.0 / 130.0;
-        const char* names[] { "forward-neutral", "reverse-pitch-up", "hold", "fold-jump", "pitch-down" };
-        for (int scenario = 0; scenario < 5; ++scenario)
+        const char* names[] { "forward-neutral", "reverse-pitch-up", "hold", "fold-jump", "pitch-down",
+                              "bravo-accelerator-y-off", "bravo-accelerator-y-on" };
+        std::vector<float> bravoAcceleratorYOff;
+        bool bravoAcceleratorYChangesAudio = false;
+        for (int scenario = 0; scenario < 7; ++scenario)
         {
             XYPadEngine engine;
             if (! engine.prepare (rate, blockSize, true, true)) return false;
+            const auto bravoAccelerator = scenario >= 5;
+            engine.setYAxisSpeedEnabled (scenario == 6);
             const auto y = scenario == 1 ? 1.0f : scenario == 4 ? 0.0f : 0.5f;
             std::vector<PluginStateModel::MotionPoint> points;
-            if (scenario == 2) points = {{ 0.5f, y, 0.0 }, { 0.5f, y, 1.0 }};
+            if (bravoAccelerator) points = {{ 0.45f, 0.50f, 0.00 }, { 0.70f, 0.50f, 0.50 },
+                                            { 0.45f, 0.50f, 0.5001 }, { 0.70f, 0.65f, 0.70 },
+                                            { 0.45f, 0.65f, 0.7001 }, { 0.70f, 0.80f, 0.83 },
+                                            { 0.45f, 0.80f, 0.8301 }, { 0.70f, 0.93f, 0.92 },
+                                            { 0.45f, 0.93f, 0.9201 }, { 0.70f, 1.00f, 1.00 }};
+            else if (scenario == 2) points = {{ 0.5f, y, 0.0 }, { 0.5f, y, 1.0 }};
             else if (scenario == 3) points = {{ 0.1f, y, 0.0 }, { 0.9f, y, 0.25 },
                 { 0.1f, y, 0.5 }, { 0.9f, y, 0.501 }, { 0.2f, y, 1.0 }};
             else points = {{ scenario == 1 ? 0.9f : 0.1f, y, 0.0 },
@@ -282,6 +292,18 @@ public:
                     delayIndex = (delayIndex + 1) % latency;
                 }
             }
+            if (scenario == 5)
+                bravoAcceleratorYOff.assign (audio.getReadPointer (0), audio.getReadPointer (0) + frames);
+            if (scenario == 6 && bravoAcceleratorYOff.size() == static_cast<size_t> (frames))
+            {
+                double absoluteDifference = 0.0;
+                for (int sample = 0; sample < frames; ++sample)
+                    absoluteDifference += std::abs (static_cast<double> (audio.getSample (0, sample))
+                                                    - bravoAcceleratorYOff[static_cast<size_t> (sample)]);
+                bravoAcceleratorYChangesAudio = absoluteDifference > 1.0;
+                std::cout << "METRIC bravo_accelerator_y_on_off absolute_difference="
+                          << absoluteDifference << " changed=" << bravoAcceleratorYChangesAudio << '\n';
+            }
             juce::WavAudioFormat format;
             const auto file = juce::File::getCurrentWorkingDirectory().getChildFile (
                 juce::String ("xy-diagnostic-live-") + names[scenario] + ".wav");
@@ -297,7 +319,7 @@ public:
                       << " path=processLive+mixLayers preset=OFF depth=1\n";
             if (! written || ! finite || firstWet < 0 || firstWet > 3000) return false;
         }
-        return true;
+        return bravoAcceleratorYChangesAudio;
     }
     static bool liveSinCosMatchesStandardReference()
     {
