@@ -47,8 +47,6 @@ public:
         double internalBpm = 120.0;
         int internalTimeSigNumerator = 4, internalTimeSigDenominator = 4;
         int projectPresetId = 0;
-        // Missing from an older project tree means false during restoration.
-        bool yAxisSpeedEnabled = false;
     };
 
     PluginStateModel();
@@ -69,7 +67,6 @@ public:
     void setInternalBpm (double);
     void setInternalTimeSignature (int numerator, int denominator);
     void setProjectPresetId (int);
-    void setYAxisSpeedEnabled (bool);
     static juce::String projectPresetText (int presetId) noexcept;
     void setSlotPreset (int, ScratchPreset);
     void setSlotLength (int, NoteLength);
@@ -90,7 +87,6 @@ public:
     void resetSelectedSlot();
 
     void setSlotXYPosition (int, float x, float y);
-    bool loadBravoXYAccelerator (int bar);
     void beginSlotXYMotion (int, float x, float y);
     void appendSlotXYMotion (int, float x, float y, double elapsedSeconds);
     void clearSlotXYMotion (int);

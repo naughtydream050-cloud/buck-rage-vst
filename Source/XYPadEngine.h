@@ -64,8 +64,6 @@ public:
                       const Transport& transport, int frameCount) noexcept;
 
     State getState (int bar) const noexcept;
-    // Published from the message/state thread; read once at live grain launch.
-    void setYAxisSpeedEnabled (bool enabled) noexcept { yAxisSpeed.store (enabled, std::memory_order_release); }
     static float mixLayers (float dry, float presetOutput, float xyWet,
                             float depth, bool presetActive, float xyBlend = 1.0f) noexcept;
     int getMaxFramesPerBar() const noexcept { return maxFramesPerBar; }
@@ -107,6 +105,7 @@ private:
     struct LiveGrain
     {
         double startSerial = 0.0;
+        double readPosition = 0.0;
         double readIncrement = 1.0;
         int direction = 1;
         int age = 0;
@@ -134,6 +133,7 @@ private:
                                  float& outputLeft, float& outputRight, float& outputMask) noexcept;
     void clearLiveDelayState() noexcept;
     static void liveSinCos (double phase, double& sine, double& cosine) noexcept;
+    static double liveYSpeedMultiplier (float y) noexcept;
     static void sampleTimeline (const Transport&, int sample, int totalSamples,
                                 int& bar, double& phase) noexcept;
     static bool readTrajectory (const AtomicTrajectory&, Trajectory&) noexcept;
@@ -193,13 +193,14 @@ private:
     int liveSamplesToLaunch = 0;
     int liveSilenceFramesCount = 0;
     int liveStationaryFrames = 0, liveHoldPhase = 0;
+    double liveHoldReadPosition = 0.0;
     int liveActiveBar = -1;
     uint32_t liveActiveRevision = 0;
     Trajectory liveActiveTrajectory {};
     float livePreviousX = 0.5f;
     float liveWetGain = 0.0f;
     float liveHoldMix = 0.0f;
-    int liveDirection = 1;
+    int liveDirection = 1, liveHoldDirection = 1;
     bool liveHavePreviousX = false, liveHaveSignal = false, livePendingTransition = false;
     bool liveHoldReady = false;
     bool liveReentryTailActive = false;
@@ -208,7 +209,7 @@ private:
     bool liveHistoryHasUnsafeMagnitude = false;
     bool liveWasPlaying = false;
     bool liveSourceFadeActive = false;
-    std::atomic<bool> enabled { false }, workerExit { false }, yAxisSpeed { false };
+    std::atomic<bool> enabled { false }, workerExit { false };
     std::thread worker;
     std::mutex nonRealtimeLifecycleMutex;
 

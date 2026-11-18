@@ -153,12 +153,6 @@ void PluginStateModel::setProjectPresetId (int id)
     ui.projectPresetId = juce::jlimit (0, 2, id);
     notifyDspTimingChanged();
 }
-void PluginStateModel::setYAxisSpeedEnabled (bool enabled)
-{
-    ui.yAxisSpeedEnabled = enabled;
-    notifyDspTimingChanged();
-}
-
 juce::String PluginStateModel::projectPresetText (int presetId) noexcept
 {
     switch (presetId)
@@ -191,25 +185,6 @@ void PluginStateModel::setSlotXYPosition (int bar, float x, float y)
     slot.currentX = finiteClamp (x, 0.0f, 1.0f, 0.5f);
     slot.currentY = finiteClamp (y, 0.0f, 1.0f, 0.5f);
 }
-bool PluginStateModel::loadBravoXYAccelerator (int bar)
-{
-    if (! ui.yAxisSpeedEnabled || ! hasSelectedBar (bar)) return false;
-    auto& slot = mutableSlot (bar);
-    if (slot.xyMotionExists || ! slot.xyMotion.empty()) return false;
-
-    // Time is normalized over the recorded span by the existing XY renderer.
-    slot.xyMotion = {
-        { .45f, .50f, 0.0 },   { .70f, .50f, .50 }, { .45f, .50f, .5001 },
-        { .70f, .65f, .70 },   { .45f, .65f, .7001 },
-        { .70f, .80f, .83 },   { .45f, .80f, .8301 },
-        { .70f, .93f, .92 },   { .45f, .93f, .9201 }, { .70f, 1.0f, 1.0 }
-    };
-    slot.xyMotionExists = true;
-    slot.xyMotionDurationSeconds = slot.xyMotion.back().timeSeconds;
-    notifyDspXYMotionChanged (bar);
-    return true;
-}
-
 void PluginStateModel::beginSlotXYMotion (int bar, float x, float y)
 {
     auto& slot = mutableSlot (bar);
@@ -248,7 +223,6 @@ juce::ValueTree PluginStateModel::toValueTree() const
     global.setProperty ("internalTimeSigNumerator", ui.internalTimeSigNumerator, nullptr);
     global.setProperty ("internalTimeSigDenominator", ui.internalTimeSigDenominator, nullptr);
     global.setProperty ("projectPresetId", ui.projectPresetId, nullptr);
-    global.setProperty ("yAxisSpeedEnabled", ui.yAxisSpeedEnabled, nullptr);
     root.addChild (global, -1, nullptr);
     juce::ValueTree timeline (barsId);
     for (int bar = 0; bar < kNumBars; ++bar)
@@ -282,7 +256,8 @@ bool PluginStateModel::fromValueTree (const juce::ValueTree& root)
         parsed.setInternalTimeSignature (static_cast<int> (global.getProperty ("internalTimeSigNumerator", 4)),
                                          static_cast<int> (global.getProperty ("internalTimeSigDenominator", 4)));
         parsed.setProjectPresetId (static_cast<int> (global.getProperty ("projectPresetId", 0)));
-        parsed.setYAxisSpeedEnabled (static_cast<bool> (global.getProperty ("yAxisSpeedEnabled", false)));
+        // yAxisSpeedEnabled was an experimental opt-in.  Restore every other
+        // legacy field but ignore it: vertical speed is now always active.
     }
     const auto timeline = root.getChildWithName (barsId);
     for (int i = 0; i < timeline.getNumChildren(); ++i)

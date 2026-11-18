@@ -50,7 +50,6 @@ private:
     void beginBpmTextEdit();
     void commitBpmTextEdit();
     void showProjectPresetMenu();
-    void showYAxisSpeedMenu();
     void stepProjectPreset (int direction);
     void timerCallback() override;
     void addImageHit (juce::Rectangle<int>, std::function<void()>);

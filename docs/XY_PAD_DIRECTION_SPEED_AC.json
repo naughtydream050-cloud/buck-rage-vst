@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "task": "Toyotomi XY Pad horizontal direction vertical speed",
+  "criteria": [
+    {"id":"AC-01","requirement":"No Y-axis mode or BRAVO accelerator menu/state remains; legacy yAxisSpeedEnabled is ignored while old XY points restore.","check":"StateModelTests plus source-scope scan"},
+    {"id":"AC-02","requirement":"Left-to-right reads forward, right-to-left reads reverse, and an X reversal preserves the existing safe transition.","check":"XYPadEngine deterministic direction/transition tests"},
+    {"id":"AC-03","requirement":"Y rate is live and continuous: f(y)=0.5+0.5y+y*y at every read sample, with bottom/centre/top 0.5/1/2.","check":"XYPadEngine numeric ramp test and diagnostic WAV"},
+    {"id":"AC-04","requirement":"A vertical path loops the current short slice, retains previous direction, defaults forward first, and uses the Y rate in both directions.","check":"XYPadEngine vertical-loop forward/reverse test and diagnostic WAV"},
+    {"id":"AC-05","requirement":"No unsafe history read, non-finite output, allocation, lock, UI, ValueTree, I/O or logging is added to audio processing; stereo, abrupt turn, BAR change, DEPTH 0, bypass and 1024-sample delay regressions pass.","check":"existing focused regression, runtime smoke and realtime safety checks"},
+    {"id":"AC-06","requirement":"BRAVO 1/2, COUNT 5 and existing manual BAR state retain their algorithms and serialized content; COUNT-tail behaviour is not changed.","check":"StateModelTests and runtime regressions"},
+    {"id":"AC-07","requirement":"44.1/48/96 kHz fixed and variable block tests retain p99 <= 50% deadline and maximum <= 80% deadline.","check":"existing 18-condition performance harness"},
+    {"id":"AC-08","requirement":"A horizontal path at fixed Y keeps the existing X-derived base magnitude; changing Y does not change the horizontal direction.","check":"XYPadEngine fixed-Y trajectory comparison"},
+    {"id":"AC-09","requirement":"The quadratic ramp samples 0, .25, .5, .75 and 1 as .5, .6875, 1, 1.4375 and 2 without a mode switch.","check":"XYPadEngine exact rate-function test"},
+    {"id":"AC-10","requirement":"Legacy state containing yAxisSpeedEnabled restores all supported state but cannot opt out of the new Y rule, and a newly written tree omits that property.","check":"StateModelTests legacy fixture and serialized property scan"},
+    {"id":"AC-11","requirement":"The right-click XY menu contains neither Y axis Speed nor Load BRAVO XY Accelerator and cannot mutate an XY path.","check":"Runtime/UI source interaction check"},
+    {"id":"AC-12","requirement":"Existing XY points retain their coordinates, times and revision on state restore under the new audio rule.","check":"StateModelTests old/new XY round trip"},
+    {"id":"AC-13","requirement":"No FFT or independent pitch shifter is added; pitch variation is only the natural result of source read rate.","check":"source scope review and XYPadEngine test evidence"},
+    {"id":"AC-14","requirement":"BRAVO 1/2, COUNT 5 and existing manual BAR state retain their algorithms and serialized content; COUNT-tail behaviour is not changed.","check":"StateModelTests and runtime regressions"},
+    {"id":"AC-15","requirement":"44.1/48/96 kHz fixed and variable block tests retain p99 <= 50% deadline and maximum <= 80% deadline.","check":"existing 18-condition performance harness"},
+    {"id":"AC-16","requirement":"Same-SHA Windows CI, Jev individual criterion PASS and Codex review precede manual-test placement.","check":"CI run, plan-compliance evidence and artifact SHA"}
+  ]
+}

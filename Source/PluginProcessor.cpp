@@ -28,7 +28,6 @@ ToyotomiHideyoshiAudioProcessor::ToyotomiHideyoshiAudioProcessor()
     stateModel.setDspTimingChangedCallback ([this] (const PluginStateModel::UiState& ui)
     {
         xyBypass.store (ui.bypass, std::memory_order_relaxed);
-        xyEngine.setYAxisSpeedEnabled (ui.yAxisSpeedEnabled);
         projectPresetIdForDsp.store (ui.projectPresetId, std::memory_order_relaxed);
         hostSyncEnabled.store (ui.hostSync, std::memory_order_relaxed);
         internalBpmForDsp.store (ui.internalBpm, std::memory_order_relaxed);

@@ -172,6 +172,7 @@ void operator delete[] (void* memory, std::size_t) noexcept { std::free (memory)
 class XYPadEngineTestAccess
 {
 public:
+    static double liveYSpeedMultiplier (float y) noexcept { return XYPadEngine::liveYSpeedMultiplier (y); }
     static bool holdSnapshotBulkCopyMatchesRingAcrossWrap()
     {
         XYPadEngine engine;
@@ -228,28 +229,19 @@ public:
         constexpr double rate = 48000.0;
         constexpr int frames = 192000, blockSize = 256, latency = 1024;
         constexpr double samplesPerBar = rate * 240.0 / 130.0;
-        const char* names[] { "forward-neutral", "reverse-pitch-up", "hold", "fold-jump", "pitch-down",
-                              "bravo-accelerator-y-off", "bravo-accelerator-y-on" };
-        std::vector<float> bravoAcceleratorYOff;
-        bool bravoAcceleratorYChangesAudio = false;
-        for (int scenario = 0; scenario < 7; ++scenario)
+        const char* names[] { "horizontal-forward", "diagonal-reverse-accelerating", "vertical-speed-loop" };
+        std::vector<float> horizontalReference;
+        for (int scenario = 0; scenario < 3; ++scenario)
         {
             XYPadEngine engine;
             if (! engine.prepare (rate, blockSize, true, true)) return false;
-            const auto bravoAccelerator = scenario >= 5;
-            engine.setYAxisSpeedEnabled (scenario == 6);
-            const auto y = scenario == 1 ? 1.0f : scenario == 4 ? 0.0f : 0.5f;
             std::vector<PluginStateModel::MotionPoint> points;
-            if (bravoAccelerator) points = {{ 0.45f, 0.50f, 0.00 }, { 0.70f, 0.50f, 0.50 },
-                                            { 0.45f, 0.50f, 0.5001 }, { 0.70f, 0.65f, 0.70 },
-                                            { 0.45f, 0.65f, 0.7001 }, { 0.70f, 0.80f, 0.83 },
-                                            { 0.45f, 0.80f, 0.8301 }, { 0.70f, 0.93f, 0.92 },
-                                            { 0.45f, 0.93f, 0.9201 }, { 0.70f, 1.00f, 1.00 }};
-            else if (scenario == 2) points = {{ 0.5f, y, 0.0 }, { 0.5f, y, 1.0 }};
-            else if (scenario == 3) points = {{ 0.1f, y, 0.0 }, { 0.9f, y, 0.25 },
-                { 0.1f, y, 0.5 }, { 0.9f, y, 0.501 }, { 0.2f, y, 1.0 }};
-            else points = {{ scenario == 1 ? 0.9f : 0.1f, y, 0.0 },
-                           { scenario == 1 ? 0.1f : 0.9f, y, 1.0 }};
+            if (scenario == 0)
+                points = {{ 0.10f, 0.50f, 0.0 }, { 0.90f, 0.50f, 1.0 }};
+            else if (scenario == 1)
+                points = {{ 0.90f, 0.00f, 0.0 }, { 0.10f, 1.00f, 1.0 }};
+            else
+                points = {{ 0.50f, 0.00f, 0.0 }, { 0.50f, 1.00f, 1.0 }};
             for (int bar = 0; bar < 64; ++bar) engine.setTrajectory (bar, points, 2000u + static_cast<uint32_t> (bar));
             juce::AudioBuffer<float> input (2, blockSize), wet (2, blockSize), mask (1, blockSize);
             juce::AudioBuffer<float> dryDelay (2, latency), audio (2, frames);
@@ -292,17 +284,14 @@ public:
                     delayIndex = (delayIndex + 1) % latency;
                 }
             }
-            if (scenario == 5)
-                bravoAcceleratorYOff.assign (audio.getReadPointer (0), audio.getReadPointer (0) + frames);
-            if (scenario == 6 && bravoAcceleratorYOff.size() == static_cast<size_t> (frames))
+            double differenceFromHorizontal = 0.0;
+            if (scenario == 0)
+                horizontalReference.assign (audio.getReadPointer (0), audio.getReadPointer (0) + frames);
+            else if (horizontalReference.size() == static_cast<size_t> (frames))
             {
-                double absoluteDifference = 0.0;
                 for (int sample = 0; sample < frames; ++sample)
-                    absoluteDifference += std::abs (static_cast<double> (audio.getSample (0, sample))
-                                                    - bravoAcceleratorYOff[static_cast<size_t> (sample)]);
-                bravoAcceleratorYChangesAudio = absoluteDifference > 1.0;
-                std::cout << "METRIC bravo_accelerator_y_on_off absolute_difference="
-                          << absoluteDifference << " changed=" << bravoAcceleratorYChangesAudio << '\n';
+                    differenceFromHorizontal += std::abs (static_cast<double> (audio.getSample (0, sample))
+                                                          - horizontalReference[static_cast<size_t> (sample)]);
             }
             juce::WavAudioFormat format;
             const auto file = juce::File::getCurrentWorkingDirectory().getChildFile (
@@ -315,11 +304,15 @@ public:
             std::cout << "METRIC actual_live_wav scenario=" << names[scenario] << " first_bar=4"
                       << " frames=" << frames << " first_wet=" << firstWet << " peak=" << peak
                       << " rms=" << std::sqrt (energy / (frames * 2.0))
+                      << " speed_start=" << XYPadEngine::liveYSpeedMultiplier (points.front().y)
+                      << " speed_end=" << XYPadEngine::liveYSpeedMultiplier (points.back().y)
+                      << " difference_from_horizontal=" << differenceFromHorizontal
                       << " finite=" << finite << " written=" << written
                       << " path=processLive+mixLayers preset=OFF depth=1\n";
-            if (! written || ! finite || firstWet < 0 || firstWet > 3000) return false;
+            if (! written || ! finite || firstWet < 0 || firstWet > 3000
+                || (scenario > 0 && differenceFromHorizontal <= 1.0)) return false;
         }
-        return bravoAcceleratorYChangesAudio;
+        return true;
     }
     static bool liveSinCosMatchesStandardReference()
     {
@@ -350,7 +343,7 @@ public:
                   << " max_error=" << maximumError << " tolerance=2e-9 finite=" << finite << "\n";
         return finite && maximumError <= 2.0e-9;
     }
-    static bool yAxisSpeedIsOptInAndLockFree()
+    static bool yAxisSpeedCurveIsAlwaysAvailable()
     {
         for (const auto rate : { 44100.0, 48000.0, 96000.0 })
         {
@@ -358,13 +351,13 @@ public:
             if (! engine.prepare (rate, 64, true, true)) return false;
             const auto delayReady = engine.liveOutputDelay != nullptr
                 && engine.liveOutputMaskDelay != nullptr;
-            const auto defaultOff = ! engine.yAxisSpeed.load (std::memory_order_acquire);
-            engine.setYAxisSpeedEnabled (true);
-            const auto enabled = engine.yAxisSpeed.load (std::memory_order_acquire);
+            const auto curve = XYPadEngine::liveYSpeedMultiplier (0.0f) == 0.5
+                && XYPadEngine::liveYSpeedMultiplier (0.5f) == 1.0
+                && XYPadEngine::liveYSpeedMultiplier (1.0f) == 2.0;
             engine.release();
-            if (! delayReady || ! defaultOff || ! enabled) return false;
+            if (! delayReady || ! curve) return false;
         }
-        std::cout << "METRIC y_axis_speed opt_in_lock_free=1\n";
+        std::cout << "METRIC y_axis_speed always_active=1\n";
         return true;
     }
     static bool liveGrainWindowLutMatchesAnalytic()
@@ -540,11 +533,14 @@ public:
                     const auto grainSpan = static_cast<double> (engine.liveGrainFrames - 1);
                     const auto forwardLimit = (static_cast<double> (newest) - grain.startSerial) / grainSpan;
                     const auto reverseLimit = (grain.startSerial - static_cast<double> (oldest)) / grainSpan;
+                    // A Y value at the top of the pad runs at 2x.  Grain
+                    // launch therefore reserves twice the normal traversal
+                    // distance, while the centre (1x) remains readable.
                     const auto expectedIncrement = direction > 0
-                        ? juce::jmin (1.0, juce::jmax (0.0, forwardLimit))
-                        : -juce::jmin (1.0, juce::jmax (0.0, reverseLimit));
+                        ? juce::jmin (1.0, juce::jmax (0.0, forwardLimit) * 0.5)
+                        : -juce::jmin (1.0, juce::jmax (0.0, reverseLimit) * 0.5);
                     const auto endpoint = grain.startSerial
-                        + expectedIncrement * grainSpan;
+                        + expectedIncrement * grainSpan * 2.0;
                     valid = valid && grain.active
                         && grain.direction == (expectedIncrement >= 0.0 ? 1 : -1)
                         && std::abs (grain.readIncrement - expectedIncrement) <= 1.0e-12
@@ -866,6 +862,7 @@ public:
         engine.liveHoldReady = true;
         engine.liveHoldMix = 1.0f;
         engine.liveHoldPhase = engine.liveGrainFrames - 1;
+        engine.liveHoldReadPosition = static_cast<double> (engine.liveHoldPhase);
         XYPadEngine::Transport holdFold;
         holdFold.playing = true;
         holdFold.startBar = 0;
@@ -940,6 +937,8 @@ public:
                         + static_cast<double> ((direction > 0 ? -1 : 1) * seamOffset);
                     const auto currentSerial = seamBase + fraction;
                     grain.startSerial = currentSerial - static_cast<double> (direction * age);
+                    grain.readPosition = currentSerial;
+                    grain.readIncrement = static_cast<double> (direction);
                     grain.fadeInFrames = 0;
                     grain.fadeOutRemaining = 0;
                     engine.liveHoldReady = false;
@@ -955,8 +954,8 @@ public:
                         const auto sourceAge = age + frame;
                         const auto window = sourceAge >= 0 && sourceAge < engine.liveGrainFrames
                             ? engine.liveGrainWindow[static_cast<size_t> (sourceAge)] : 0.0f;
-                        const auto serial = grain.startSerial
-                            + static_cast<double> (direction * sourceAge);
+                        const auto serial = grain.readPosition
+                            + grain.readIncrement * static_cast<double> (frame);
                         float sampleL = 0.0f, sampleR = 0.0f;
                         const auto read = sourceAge < engine.liveGrainFrames
                             && engine.readLiveSample (serial, 0, 0, newest, sampleL)
@@ -1414,6 +1413,7 @@ public:
         engine.liveStationaryFrames = 96;
         engine.liveHoldReady = true; engine.liveHoldMix = 1.0f;
         engine.liveHoldPhase = engine.liveGrainFrames - 1;
+        engine.liveHoldReadPosition = static_cast<double> (engine.liveHoldPhase);
         for (int sample = 0; sample < engine.liveGrainFrames; ++sample)
         {
             engine.liveHoldSnapshot[static_cast<size_t> (sample) * 2u] = sample / 960.0f;
@@ -1423,8 +1423,8 @@ public:
         input.setSample (0, 0, 0.25f); input.setSample (1, 0, -0.25f);
         XYPadEngine::Transport transport; transport.playing = true; transport.startBar = 0;
         engine.processLive (input, output, mask, transport, 1);
-        std::cout << "METRIC live_transition post_seam_phase=" << engine.liveHoldPhase << " expected=96\n";
-        return engine.liveHoldPhase == 96;
+        std::cout << "METRIC live_transition post_seam_phase=" << engine.liveHoldPhase << " expected=0\n";
+        return engine.liveHoldPhase == 0;
     }
 
     static bool liveSourceEndedFadesAudioWithoutHardCut()
@@ -1486,7 +1486,6 @@ public:
         XYPadEngine engine;
         constexpr int blockSize = 256;
         if (! engine.prepare (rate, blockSize, true, true)) return result;
-        engine.setYAxisSpeedEnabled (yAxisSpeed);
 
         // A unit sweep is the complete legal Pad range, not a request beyond
         // its clamped 0..1 coordinates.
@@ -1738,11 +1737,13 @@ int main (int argc, char** argv)
     {
         const auto observation = XYPadEngineTestAccess::observeLiveVelocity (48000.0, 1.0,
                                                                                 yAndExpected.first, true);
-        const auto pass = std::abs (observation.signedReadIncrement - yAndExpected.second) <= 0.03;
+        const auto actual = XYPadEngineTestAccess::liveYSpeedMultiplier (yAndExpected.first);
+        const auto pass = observation.direction == 1
+            && std::abs (actual - yAndExpected.second) <= 1.0e-12;
         std::cout << "METRIC xy_y_axis_speed y=" << yAndExpected.first
                   << " expected=" << yAndExpected.second
-                  << " actual=" << observation.signedReadIncrement << '\n';
-        check (pass, "y-axis-speed-scales-x-derived-live-read-rate-without-changing-direction");
+                  << " actual=" << actual << '\n';
+        check (pass, "y-axis-speed-is-always-active-without-changing-x-direction");
     }
     for (const auto rate : { 44100.0, 48000.0, 96000.0 })
     {
@@ -1963,8 +1964,8 @@ int main (int argc, char** argv)
            "ac20-extreme-finite-history-keeps-reentry-tail-finite-safety-guard-enabled");
     check (XYPadEngineTestAccess::liveGrainWindowLutMatchesAnalytic(),
            "live-grain-window-lut-matches-analytic-hann");
-    check (XYPadEngineTestAccess::yAxisSpeedIsOptInAndLockFree(),
-           "y-axis-speed-is-an-opt-in-lock-free-live-audio-setting");
+    check (XYPadEngineTestAccess::yAxisSpeedCurveIsAlwaysAvailable(),
+           "y-axis-speed-is-always-active-and-has-the-specified-curve");
     check (XYPadEngineTestAccess::fixedOutputDelayIsExact(),
            "xy-output-path-retains-the-exact-1024-sample-fixed-delay");
     check (XYPadEngineTestAccess::repeatedReentryBlendIsFiniteAndPeakBounded(),
@@ -2069,7 +2070,7 @@ int main (int argc, char** argv)
     liveProbe.release();
 
     check (XYPadEngineTestAccess::writeActualLiveDiagnosticWavs(),
-           "five-actual-live-diagnostic-wavs-use-processLive-and-final-xy-only-mix");
+           "three-actual-live-direction-speed-wavs-use-processLive-and-final-xy-only-mix");
 
     juce::File wavFile = juce::File::getCurrentWorkingDirectory().getChildFile ("xy-diagnostic-forward-neutral.wav");
     auto stream = wavFile.createOutputStream();

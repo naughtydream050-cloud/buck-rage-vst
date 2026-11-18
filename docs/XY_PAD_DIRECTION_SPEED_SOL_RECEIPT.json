@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "status": "APPROVED",
+  "approved_by": "Sol",
+  "task_class": "CRITICAL",
+  "risk_class": "realtime-dsp",
+  "task_id": "TOYOTOMI-XY-DIRECTION-SPEED-20261118",
+  "repo_path": "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\worktrees\\toyotomi-xy-preset-priority",
+  "base_commit": "499466e978eda66bc4aa62cd88d2107a447d4616",
+  "plan_path": "docs/XY_PAD_DIRECTION_SPEED_PLAN.md",
+  "plan_sha256": "2b02b45bc5a9e6f3be2f3a70526c44ca1a17cde72723ec301f3f666d95312165",
+  "criteria_path": "docs/XY_PAD_DIRECTION_SPEED_AC.json",
+  "criteria_sha256": "071caab4d19bb5779d7e15a184c126fa2056e76b94881e45647217d3f7537865",
+  "task_spec_path": "docs/XY_PAD_DIRECTION_SPEED_GLM_TASK.md",
+  "task_spec_sha256": "c7f51cd576018e31c6c8eb5f167719fa4959e5671ec55f21cfdc0a99fa0391ec",
+  "allowed_paths": [
+    "Source/XYPadEngine.h",
+    "Source/XYPadEngine.cpp",
+    "Source/PluginStateModel.h",
+    "Source/PluginStateModel.cpp",
+    "Source/PluginProcessor.cpp",
+    "Source/PluginEditorV2.h",
+    "Source/PluginEditorV2.cpp",
+    "tests/XYPadEngineTests.cpp",
+    "tests/StateModelTests.cpp"
+  ]
+}

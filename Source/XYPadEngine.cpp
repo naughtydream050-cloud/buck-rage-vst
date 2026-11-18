@@ -108,6 +108,8 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     liveWriteSerial = liveHistoryValidFrames = 0;
     liveGrains.fill (LiveGrain {});
     liveStationaryFrames = liveHoldPhase = 0;
+    liveHoldReadPosition = 0.0;
+    liveHoldDirection = 1;
     liveHoldMix = 0.0f;
     liveHoldReady = false;
     liveActiveBar = -1;
@@ -262,6 +264,8 @@ void XYPadEngine::release() noexcept
     liveSilenceFramesCount = 0;
     liveGrains.fill (LiveGrain {});
     liveStationaryFrames = liveHoldPhase = 0;
+    liveHoldReadPosition = 0.0;
+    liveHoldDirection = 1;
     liveHoldMix = 0.0f;
     liveHoldReady = false;
     liveActiveBar = -1;
@@ -704,7 +708,9 @@ void XYPadEngine::launchLiveGrain (float x, double requestedIncrement, bool tran
         const auto reverseLimit = (start - static_cast<double> (oldestSerial)) / grainSpan;
         const auto limit = requested >= 0.0 ? juce::jmax (0.0, forwardLimit)
                                              : juce::jmax (0.0, reverseLimit);
-        increment = juce::jlimit (-limit, limit, requested);
+        // The live Y multiplier reaches 2x. Reserve that complete source span
+        // at launch so a later upward move remains inside the history ring.
+        increment = juce::jlimit (-limit * 0.5, limit * 0.5, requested);
     }
     else
     {
@@ -712,9 +718,9 @@ void XYPadEngine::launchLiveGrain (float x, double requestedIncrement, bool tran
         // Without this, Forward at the right edge begins at newest input and
         // clamps to zero; Reverse has the mirrored failure at the left edge.
         const auto maximumMagnitude = sourceSpan / grainSpan;
-        const auto magnitude = juce::jmin (std::abs (requested), maximumMagnitude);
+        const auto magnitude = juce::jmin (std::abs (requested), maximumMagnitude * 0.5);
         increment = requested < 0.0 ? -magnitude : magnitude;
-        const auto travel = magnitude * grainSpan;
+        const auto travel = magnitude * 2.0 * grainSpan;
         const auto placementSpan = juce::jmax (0.0, sourceSpan - travel);
         const auto directionOffset = increment < 0.0 ? travel : 0.0;
         const auto offset = directionOffset
@@ -732,6 +738,7 @@ void XYPadEngine::launchLiveGrain (float x, double requestedIncrement, bool tran
             if (grain.age > destination->age) destination = &grain;
     }
     destination->startSerial = start;
+    destination->readPosition = start;
     destination->readIncrement = increment;
     destination->direction = increment >= 0.0 ? 1 : -1;
     destination->age = 0;
@@ -777,8 +784,8 @@ void XYPadEngine::captureLiveContinuationTail() noexcept
             const auto age = grain.age + frame;
             float left = 0.0f, right = 0.0f;
             if (age > 0 && age < liveGrainFrames - 1)
-                valid = readLiveStereoSample (grain.startSerial
-                    + grain.readIncrement * static_cast<double> (age), oldestSerial, newestSerial, left, right);
+                valid = readLiveStereoSample (grain.readPosition
+                    + grain.readIncrement * static_cast<double> (frame), oldestSerial, newestSerial, left, right);
             if (! valid) break;
             if (previousTail != nullptr)
             {
@@ -1236,6 +1243,12 @@ void XYPadEngine::liveSinCos (double phase, double& sine, double& cosine) noexce
     cosine = sign * (1.0 + z * c);
 }
 
+double XYPadEngine::liveYSpeedMultiplier (float y) noexcept
+{
+    const auto position = static_cast<double> (juce::jlimit (0.0f, 1.0f, y));
+    return 0.5 + 0.5 * position + position * position;
+}
+
 void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                                juce::AudioBuffer<float>& rendered,
                                juce::AudioBuffer<float>& readyMask,
@@ -1272,6 +1285,8 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         liveHaveSignal = false;
         livePendingTransition = false;
         liveStationaryFrames = liveHoldPhase = 0;
+        liveHoldReadPosition = 0.0;
+        liveHoldDirection = 1;
         liveHoldMix = 0.0f;
         liveHoldReady = false;
         liveReentryTailActive = false;
@@ -1303,6 +1318,8 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         liveHaveSignal = false;
         livePendingTransition = false;
         liveStationaryFrames = liveHoldPhase = 0;
+        liveHoldReadPosition = 0.0;
+        liveHoldDirection = 1;
         liveHoldMix = 0.0f;
         liveHoldReady = false;
         liveReentryTailActive = false;
@@ -1359,6 +1376,8 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                 liveHoldReady = false;
                 liveHoldMix = 0.0f;
                 liveStationaryFrames = liveHoldPhase = 0;
+                liveHoldReadPosition = 0.0;
+                liveHoldDirection = 1;
                 liveSourceFadeActive = false;
             }
             liveHaveSignal = true;
@@ -1384,6 +1403,8 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             liveHavePreviousX = false;
             livePendingTransition = false;
             liveStationaryFrames = liveHoldPhase = 0;
+            liveHoldReadPosition = 0.0;
+            liveHoldDirection = 1;
             liveHoldMix = 0.0f;
             liveHoldReady = false;
             liveReentryTailActive = false;
@@ -1449,13 +1470,9 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         liveHavePreviousX = true;
         liveDirection = direction;
 
-        // Y is sampled only when a grain is launched: 0 -> 0.5x, 0.5 -> 1x,
-        // 1 -> 2x, yielding natural source-rate pitch without a pitch shifter.
-        // Calculate this after the X-only discontinuity correction above, so a
-        // jump's first grain retains both its direction and its Y speed.
-        const auto ySpeedMultiplier = yAxisSpeed.load (std::memory_order_acquire)
-            ? std::exp2 (2.0 * static_cast<double> (y) - 1.0) : 1.0;
-        const auto launchIncrement = requestedIncrement * ySpeedMultiplier;
+        // Y is always live.  It multiplies each source-read step, while X
+        // remains the sole owner of direction, source placement and hold.
+        const auto ySpeedMultiplier = liveYSpeedMultiplier (y);
 
         const auto hasHistory = liveHistoryValidFrames >= static_cast<uint64_t> (liveWarmupFrames)
                              && liveHistoryValidFrames >= static_cast<uint64_t> (liveGrainFrames);
@@ -1468,6 +1485,9 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             {
                 liveHoldReady = true;
                 liveHoldPhase = 0;
+                liveHoldReadPosition = liveDirection >= 0 ? 0.0
+                                                           : static_cast<double> (liveGrainFrames - 1);
+                liveHoldDirection = liveDirection;
             }
         }
         bool transitionInProgress = false;
@@ -1494,19 +1514,19 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             else
                 captureLiveContinuationTail();
             liveGrains.fill (LiveGrain {});
-            launchLiveGrain (x, launchIncrement, false, oldestSerial, newestSerial, true);
+            launchLiveGrain (x, requestedIncrement, false, oldestSerial, newestSerial, true);
             liveSamplesToLaunch = liveHopFrames;
         }
         else if (liveHaveSignal && targetJump && hasHistory && liveActiveTrajectory.count > 0)
         {
             liveSamplesToLaunch = 0;
-            launchLiveGrain (x, launchIncrement, true, oldestSerial, newestSerial, false);
+            launchLiveGrain (x, requestedIncrement, true, oldestSerial, newestSerial, false);
             liveSamplesToLaunch = liveHopFrames;
         }
         else if (liveHaveSignal && liveActiveTrajectory.count > 0 && hasHistory && liveSamplesToLaunch <= 0
                  && ! transitionInProgress)
         {
-            launchLiveGrain (x, launchIncrement, false, oldestSerial, newestSerial, false);
+            launchLiveGrain (x, requestedIncrement, false, oldestSerial, newestSerial, false);
             liveSamplesToLaunch = liveHopFrames;
         }
         if (liveSamplesToLaunch > 0) --liveSamplesToLaunch;
@@ -1525,7 +1545,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                 grain.active = false;
                 continue;
             }
-            const auto serial = grain.startSerial + grain.readIncrement * static_cast<double> (grain.age);
+            const auto serial = grain.readPosition;
             float left = 0.0f, right = 0.0f;
             if (! readLiveStereoSample (serial, oldestSerial, newestSerial, left, right))
             {
@@ -1572,6 +1592,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             }
             if (grain.fadeInFrames > 0 && grain.age + 1 >= grain.fadeInFrames)
                 grain.fadeInFrames = 0;
+            grain.readPosition += grain.readIncrement * ySpeedMultiplier;
             ++grain.age;
         }
 
@@ -1607,20 +1628,41 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             const auto seamFrames = juce::jlimit (1, liveGrainFrames / 2,
                                                    juce::roundToInt (sampleRate * 0.002));
             const auto seamStart = liveGrainFrames - seamFrames;
-            const auto phase = juce::jlimit (0, liveGrainFrames - 1, liveHoldPhase);
-            auto loopLeft = liveHoldSnapshot[static_cast<size_t> (phase) * 2u];
-            auto loopRight = liveHoldSnapshot[static_cast<size_t> (phase) * 2u + 1u];
-            if (phase >= seamStart)
+            const auto loopFrames = static_cast<double> (liveGrainFrames);
+            auto phase = std::fmod (liveHoldReadPosition, loopFrames);
+            if (phase < 0.0) phase += loopFrames;
+            const auto readLoop = [&] (double position, int channel) noexcept
             {
-                const auto blend = static_cast<double> (phase - seamStart)
+                auto wrapped = std::fmod (position, loopFrames);
+                if (wrapped < 0.0) wrapped += loopFrames;
+                const auto lower = static_cast<int> (std::floor (wrapped));
+                const auto upper = (lower + 1) % liveGrainFrames;
+                const auto fraction = static_cast<float> (wrapped - lower);
+                const auto a = liveHoldSnapshot[static_cast<size_t> (lower) * 2u + static_cast<size_t> (channel)];
+                const auto b = liveHoldSnapshot[static_cast<size_t> (upper) * 2u + static_cast<size_t> (channel)];
+                return a + (b - a) * fraction;
+            };
+            auto loopLeft = readLoop (phase, 0);
+            auto loopRight = readLoop (phase, 1);
+            if (liveHoldDirection >= 0 && phase >= static_cast<double> (seamStart))
+            {
+                const auto blend = (phase - static_cast<double> (seamStart))
                     / static_cast<double> (juce::jmax (1, seamFrames - 1));
-                const auto head = phase - seamStart;
+                const auto head = phase - static_cast<double> (seamStart);
                 double a = 0.0, b = 0.0;
                 liveSinCos (blend * kPi * 0.5, b, a);
-                loopLeft = static_cast<float> (loopLeft * a
-                    + liveHoldSnapshot[static_cast<size_t> (head) * 2u] * b);
-                loopRight = static_cast<float> (loopRight * a
-                    + liveHoldSnapshot[static_cast<size_t> (head) * 2u + 1u] * b);
+                loopLeft = static_cast<float> (loopLeft * a + readLoop (head, 0) * b);
+                loopRight = static_cast<float> (loopRight * a + readLoop (head, 1) * b);
+            }
+            else if (liveHoldDirection < 0 && phase < static_cast<double> (seamFrames))
+            {
+                const auto blend = (static_cast<double> (seamFrames) - phase)
+                    / static_cast<double> (juce::jmax (1, seamFrames));
+                const auto tail = static_cast<double> (seamStart) + phase;
+                double a = 0.0, b = 0.0;
+                liveSinCos (blend * kPi * 0.5, b, a);
+                loopLeft = static_cast<float> (loopLeft * a + readLoop (tail, 0) * b);
+                loopRight = static_cast<float> (loopRight * a + readLoop (tail, 1) * b);
             }
             const auto normalizedLeft = windowTotal > 1.0e-9 ? wetLeft / windowTotal : 0.0;
             const auto normalizedRight = windowTotal > 1.0e-9 ? wetRight / windowTotal : 0.0;
@@ -1629,8 +1671,10 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             wetLeft = normalizedLeft * cosine + static_cast<double> (loopLeft) * sine;
             wetRight = normalizedRight * cosine + static_cast<double> (loopRight) * sine;
             windowTotal = 1.0;
-            ++liveHoldPhase;
-            if (liveHoldPhase >= liveGrainFrames) liveHoldPhase = seamFrames;
+            liveHoldReadPosition += static_cast<double> (liveHoldDirection) * ySpeedMultiplier;
+            liveHoldReadPosition = std::fmod (liveHoldReadPosition, loopFrames);
+            if (liveHoldReadPosition < 0.0) liveHoldReadPosition += loopFrames;
+            liveHoldPhase = static_cast<int> (std::floor (liveHoldReadPosition));
             if (holdTarget == 0.0f && liveHoldMix == 0.0f)
                 liveHoldReady = false;
         }
@@ -1650,6 +1694,8 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             liveHoldReady = false;
             liveHoldMix = 0.0f;
             liveStationaryFrames = liveHoldPhase = 0;
+            liveHoldReadPosition = 0.0;
+            liveHoldDirection = 1;
             liveSourceFadeActive = false;
         }
 

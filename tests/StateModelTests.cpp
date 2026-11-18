@@ -14,42 +14,26 @@ int main()
 {
     {
         PluginStateModel trial;
-        const auto before = trial.toValueTree();
-        check (! trial.loadBravoXYAccelerator (4)
-               && trial.toValueTree().isEquivalentTo (before), "bravo-xy-requires-y-speed");
-        trial.setYAxisSpeedEnabled (true);
         trial.setProjectPresetId (2);
         trial.setSlotPreset (3, PluginStateModel::ScratchPreset::backspin);
         trial.setSlotPreset (4, PluginStateModel::ScratchPreset::baby);
         trial.setSlotDepth (4, 0.5f);
+        trial.beginSlotXYMotion (4, .45f, .25f);
+        trial.appendSlotXYMotion (4, .70f, .50f, .20);
+        trial.appendSlotXYMotion (4, .45f, 1.0f, .40);
         const auto untouched = trial.getSlot (3).xyMotion;
-        int publications = 0;
-        trial.setDspXYMotionChangedCallback ([&] (int bar, const auto&, uint32_t)
-        {
-            if (bar == 4) ++publications;
-        });
-        publications = 0;
-        check (! trial.loadBravoXYAccelerator (-1) && ! trial.loadBravoXYAccelerator (64)
-               && trial.loadBravoXYAccelerator (4), "bravo-xy-loads-only-valid-empty-bar");
         const auto points = trial.getSlot (4).xyMotion;
-        check (! trial.loadBravoXYAccelerator (4) && publications == 1
-               && trial.getSlot (4).xyMotion == points, "bravo-xy-single-publication-and-no-overwrite");
-        check (points.size() == 10 && points[2].timeSeconds == .5001
-               && points[4].timeSeconds == .7001 && points[6].timeSeconds == .8301
-               && points[8].timeSeconds == .9201 && points.back().y == 1.0f
-               && std::abs ((points[3].timeSeconds - points[1].timeSeconds) - .20) < 1.0e-9
-               && std::abs ((points[5].timeSeconds - points[3].timeSeconds) - .13) < 1.0e-9
-               && std::abs ((points[7].timeSeconds - points[5].timeSeconds) - .09) < 1.0e-9,
-               "bravo-xy-accelerating-steps");
+        auto legacy = trial.toValueTree();
+        legacy.getChild (0).setProperty ("yAxisSpeedEnabled", true, nullptr);
         PluginStateModel reread;
-        check (reread.fromValueTree (trial.toValueTree()) && reread.getSlot (4).xyMotion == points
+        check (reread.fromValueTree (legacy) && reread.getSlot (4).xyMotion == points
                && reread.getSlot (4).preset == PluginStateModel::ScratchPreset::baby
                && reread.getSlot (4).depth == 0.5f && reread.getSlot (3).xyMotion == untouched,
-               "bravo-xy-round-trip-keeps-count-and-neighbour-bar");
+               "legacy-y-speed-property-keeps-xy-and-neighbour-bar");
         check (reread.getSlot (3).preset == PluginStateModel::ScratchPreset::backspin
                && reread.getUiState().projectPresetId == 2
-               && reread.getUiState().yAxisSpeedEnabled,
-               "bravo-xy-load-preserves-project-preset-and-other-count-settings");
+               && ! reread.toValueTree().getChild (0).hasProperty ("yAxisSpeedEnabled"),
+               "legacy-y-speed-property-is-ignored-and-not-reemitted");
     }
     PluginStateModel model;
     check (model.getUiState().selectedBar == PluginStateModel::kNoSelectedBar,
@@ -112,8 +96,6 @@ int main()
     model.setInternalBpm (133.25);
     model.setInternalTimeSignature (6, 8);
     model.setProjectPresetId (0);
-    check (! model.getUiState().yAxisSpeedEnabled, "y-axis-speed-defaults-off");
-    model.setYAxisSpeedEnabled (true);
 
     const auto state = model.toValueTree();
     PluginStateModel restored;
@@ -125,8 +107,7 @@ int main()
     check (! restored.getUiState().hostSync && restored.getUiState().internalBpm == 133.25
            && restored.getUiState().internalTimeSigNumerator == 6
            && restored.getUiState().internalTimeSigDenominator == 8
-           && restored.getUiState().projectPresetId == 0
-           && restored.getUiState().yAxisSpeedEnabled,
+           && restored.getUiState().projectPresetId == 0,
            "top-controls-round-trip");
     for (int profileId = 1; profileId <= 2; ++profileId)
     {
@@ -257,9 +238,6 @@ int main()
     check (legacyTabRestored.fromValueTree (legacyTabState)
            && legacyTabRestored.getUiState().selectedTab == 2,
            "legacy-tab-page-restores-without-gold-highlight");
-    check (! legacyTabRestored.getUiState().yAxisSpeedEnabled,
-           "legacy-state-without-y-axis-speed-defaults-off");
-
     PluginStateModel preserved = restored;
     juce::ValueTree future ("ToyotomiHideyoshiState"); future.setProperty ("stateVersion", 99, nullptr);
     check (! restored.fromValueTree (future) && restored.getSlot (4).speed == preserved.getSlot (4).speed,
