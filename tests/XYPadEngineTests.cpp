@@ -311,6 +311,43 @@ public:
         return reversal && jumped && rangeSafe && exhausted && noAutoRepick
             && defaultForward && verticalRate;
     }
+    static bool continuousCursorNeverReselectsWithinBar()
+    {
+        XYPadEngine engine;
+        if (! engine.prepare (48000.0, 256, true, true)) return false;
+        engine.useContinuousLivePath (true);
+        engine.setTrajectory (0, {{0.1f, 0.5f, 0.0}, {0.9f, 0.5f, 1.0}}, 1u);
+        juce::AudioBuffer<float> input (2, 256), output (2, 256), mask (1, 256);
+        for (int channel = 0; channel < 2; ++channel)
+            for (int sample = 0; sample < 256; ++sample)
+                input.setSample (channel, sample, channel == 0 ? 0.2f : -0.2f);
+        XYPadEngine::Transport prime;
+        prime.playing = true; prime.startBar = 1;
+        for (int block = 0; block < 1875; ++block)
+            engine.processLive (input, output, mask, prime, 256);
+        double maximumStepError = 0.0;
+        int verifiedBlocks = 0;
+        for (int block = 0; block < 187; ++block)
+        {
+            XYPadEngine::Transport transport;
+            transport.playing = true; transport.startBar = 0;
+            transport.startPhase = static_cast<double> (block * 256) / 48000.0;
+            transport.phasePerSample = 1.0 / 48000.0;
+            const auto before = engine.continuousCursor;
+            engine.processLive (input, output, mask, transport, 256);
+            if (block >= 4)
+            {
+                if (! engine.continuousCursorValid) { engine.release(); return false; }
+                maximumStepError = std::max (maximumStepError,
+                    std::abs ((engine.continuousCursor - before) - 256.0));
+                ++verifiedBlocks;
+            }
+        }
+        engine.release();
+        std::cout << "METRIC continuous_full_bar blocks=" << verifiedBlocks
+                  << " max_cursor_step_error=" << maximumStepError << '\n';
+        return verifiedBlocks == 183 && maximumStepError < 1.0e-6;
+    }
     static double liveYSpeedMultiplier (float y) noexcept { return XYPadEngine::liveYSpeedMultiplier (y); }
     static bool holdSnapshotBulkCopyMatchesRingAcrossWrap()
     {
@@ -454,6 +491,16 @@ public:
                     differenceFromHorizontal += std::abs (static_cast<double> (audio.getSample (0, sample))
                                                           - horizontalReference[static_cast<size_t> (sample)]);
             }
+            const auto crossingFrequency = [&] (int begin, int end)
+            {
+                int crossings = 0;
+                for (int sample = begin + 1; sample < end; ++sample)
+                    if (audio.getSample (0, sample - 1) < 0.0f && audio.getSample (0, sample) >= 0.0f)
+                        ++crossings;
+                return static_cast<double> (crossings) * rate / static_cast<double> (end - begin);
+            };
+            const auto earlyHz = crossingFrequency (9600, 19200);
+            const auto lateHz = crossingFrequency (62400, 72000);
             juce::WavAudioFormat format;
             const auto file = juce::File::getCurrentWorkingDirectory().getChildFile (
                 juce::String ("xy-diagnostic-live-") + names[scenario] + ".wav");
@@ -467,10 +514,14 @@ public:
                       << " rms=" << std::sqrt (energy / (frames * 2.0))
                       << " speed_start=" << XYPadEngine::liveYSpeedMultiplier (points.front().y)
                       << " speed_end=" << XYPadEngine::liveYSpeedMultiplier (points.back().y)
+                      << " early_hz=" << earlyHz << " late_hz=" << lateHz
                       << " difference_from_horizontal=" << differenceFromHorizontal
                       << " finite=" << finite << " written=" << written
                       << " path=processLive+mixLayers preset=OFF depth=1\n";
             if (! written || ! finite || firstWet < 0 || firstWet > 3000
+                || (scenario == 0 && (earlyHz < 400.0 || earlyHz > 480.0
+                                      || lateHz < 400.0 || lateHz > 480.0))
+                || (scenario == 1 && lateHz <= earlyHz * 1.3)
                 || (scenario > 0 && differenceFromHorizontal <= 1.0)) return false;
         }
         return true;
@@ -2236,6 +2287,8 @@ int main (int argc, char** argv)
            "continuous-cursor-direction-is-x-only-and-rate-is-y-only");
     check (XYPadEngineTestAccess::continuousDirectionEventsAndVerticalSpeed(),
            "continuous-cursor-reversal-jump-vertical-and-history-bounds");
+    check (XYPadEngineTestAccess::continuousCursorNeverReselectsWithinBar(),
+           "continuous-cursor-does-not-reselect-through-a-full-bar");
     check (XYPadEngineTestAccess::writeActualLiveDiagnosticWavs(),
            "three-actual-live-direction-speed-wavs-use-processLive-and-final-xy-only-mix");
 
