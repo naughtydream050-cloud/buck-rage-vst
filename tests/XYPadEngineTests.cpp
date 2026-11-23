@@ -183,6 +183,14 @@ public:
             juce::AudioBuffer<float> input (2, 256), output (2, 256), mask (1, 256);
             for (int channel = 0; channel < 2; ++channel)
                 for (int sample = 0; sample < 256; ++sample) input.setSample (channel, sample, 0.1f);
+            // Prime the history on another BAR. A reverse read must not be
+            // judged against a cold 20-ms buffer that cannot hold the source.
+            for (int block = 0; block < 192; ++block)
+            {
+                XYPadEngine::Transport prime;
+                prime.playing = true; prime.startBar = 1;
+                engine.processLive (input, output, mask, prime, 256);
+            }
             double increment = 999.0;
             for (int block = 0; block < 8; ++block)
             {
@@ -263,6 +271,7 @@ public:
     {
         constexpr double rate = 48000.0;
         constexpr int frames = 192000, blockSize = 256, latency = 1024;
+        constexpr int preRollFrames = 480000;
         constexpr double samplesPerBar = rate * 240.0 / 130.0;
         const char* names[] { "horizontal-forward", "diagonal-reverse-accelerating", "vertical-speed-loop" };
         std::vector<float> horizontalReference;
@@ -285,13 +294,33 @@ public:
             int delayIndex = 0, firstWet = -1;
             bool finite = true;
             double peak = 0.0, energy = 0.0;
+            for (int start = 0; start < preRollFrames; start += blockSize)
+            {
+                for (int i = 0; i < blockSize; ++i)
+                {
+                    const auto at = start + i;
+                    const auto angle = 2.0 * 3.141592653589793 * at / rate;
+                    input.setSample (0, i, static_cast<float> (0.3 * std::sin (440.0 * angle) + 0.1 * std::sin (110.0 * angle)));
+                    input.setSample (1, i, static_cast<float> (0.3 * std::sin (440.0 * angle + 0.37) + 0.1 * std::sin (110.0 * angle + 0.2)));
+                }
+                XYPadEngine::Transport prime;
+                prime.playing = true; prime.startBar = 2;
+                engine.processLive (input, wet, mask, prime, blockSize);
+            }
+            for (int i = 0; i < latency; ++i)
+            {
+                const auto at = preRollFrames - latency + i;
+                const auto angle = 2.0 * 3.141592653589793 * at / rate;
+                dryDelay.setSample (0, i, static_cast<float> (0.3 * std::sin (440.0 * angle) + 0.1 * std::sin (110.0 * angle)));
+                dryDelay.setSample (1, i, static_cast<float> (0.3 * std::sin (440.0 * angle + 0.37) + 0.1 * std::sin (110.0 * angle + 0.2)));
+            }
             for (int start = 0; start < frames; start += blockSize)
             {
                 const auto count = juce::jmin (blockSize, frames - start);
                 for (int i = 0; i < count; ++i)
                 {
-                    const auto at = start + i;
-                    const auto muted = at >= 96000 && at < 98400;
+                    const auto at = preRollFrames + start + i;
+                    const auto muted = start + i >= 96000 && start + i < 98400;
                     const auto angle = 2.0 * 3.141592653589793 * at / rate;
                     input.setSample (0, i, muted ? 0.0f : static_cast<float> (0.3 * std::sin (440.0 * angle) + 0.1 * std::sin (110.0 * angle)));
                     input.setSample (1, i, muted ? 0.0f : static_cast<float> (0.3 * std::sin (440.0 * angle + 0.37) + 0.1 * std::sin (110.0 * angle + 0.2)));
@@ -1223,6 +1252,7 @@ public:
                 {
                     XYPadEngine engine;
                 if (! engine.prepare (rate, 1024, true, true)) return false;
+                engine.useContinuousLivePath (true);
                 std::vector<PluginStateModel::MotionPoint> points;
                 points.reserve (XYPadEngine::kMaxPoints);
                 for (int point = 0; point < XYPadEngine::kMaxPoints; ++point)
