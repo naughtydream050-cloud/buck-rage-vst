@@ -218,6 +218,99 @@ public:
             && std::abs (reverse + 2.0) < 1.0e-6 && std::abs (reverseSlow + 2.0) < 1.0e-6
             && std::abs (bottom - 0.5) < 1.0e-6;
     }
+    static bool continuousDirectionEventsAndVerticalSpeed()
+    {
+        const auto prime = [] (XYPadEngine& engine)
+        {
+            juce::AudioBuffer<float> input (2, 256), output (2, 256), mask (1, 256);
+            for (int channel = 0; channel < 2; ++channel)
+                for (int sample = 0; sample < 256; ++sample)
+                    input.setSample (channel, sample, channel == 0 ? 0.2f : -0.2f);
+            XYPadEngine::Transport transport;
+            transport.playing = true; transport.startBar = 1;
+            for (int block = 0; block < 192; ++block)
+                engine.processLive (input, output, mask, transport, 256);
+        };
+        const auto one = [] (XYPadEngine& engine, double phase)
+        {
+            juce::AudioBuffer<float> input (2, 1), output (2, 1), mask (1, 1);
+            input.setSample (0, 0, 0.2f); input.setSample (1, 0, -0.2f);
+            XYPadEngine::Transport transport;
+            transport.playing = true; transport.startBar = 0; transport.startPhase = phase;
+            engine.processLive (input, output, mask, transport, 1);
+        };
+        XYPadEngine reverse;
+        if (! reverse.prepare (48000.0, 256, true, true)) return false;
+        reverse.useContinuousLivePath (true);
+        reverse.setTrajectory (0, {{0.1f, 0.5f, 0.0}, {0.9f, 0.5f, 0.5},
+                                   {0.1f, 0.5f, 1.0}}, 1u);
+        prime (reverse);
+        one (reverse, 0.4999);
+        const auto beforeReverse = reverse.continuousCursor;
+        one (reverse, 0.5001);
+        const auto reversal = reverse.continuousCursorValid && reverse.liveDirection == -1
+            && reverse.continuousTransitionAge == 1
+            && reverse.continuousCursor < beforeReverse;
+        const auto newest = reverse.liveWriteSerial - 1u;
+        const auto oldest = newest + 1u - reverse.liveHistoryValidFrames;
+        float left = 0.0f, right = 0.0f;
+        const auto rangeSafe = reverse.liveHistoryRetentionFrames >= 480000
+            && ! reverse.readLiveStereoSample (static_cast<double> (oldest) - 1.0,
+                                               oldest, newest, left, right)
+            && ! reverse.readLiveStereoSample (static_cast<double> (newest) + 1.0,
+                                               oldest, newest, left, right);
+        reverse.continuousCursor = static_cast<double> (oldest) - 1.0;
+        one (reverse, 0.51);
+        const auto exhausted = reverse.continuousExhausted && ! reverse.continuousCursorValid;
+        one (reverse, 0.52);
+        const auto noAutoRepick = reverse.continuousExhausted && ! reverse.continuousCursorValid;
+        reverse.release();
+
+        XYPadEngine jump;
+        if (! jump.prepare (48000.0, 256, true, true)) return false;
+        jump.useContinuousLivePath (true);
+        jump.setTrajectory (0, {{0.1f, 0.5f, 0.0}, {0.2f, 0.5f, 0.5},
+                                {0.8f, 0.5f, 0.5001}, {0.9f, 0.5f, 1.0}}, 1u);
+        prime (jump);
+        one (jump, 0.4999);
+        const auto beforeJump = jump.continuousCursor;
+        one (jump, 0.5001);
+        const auto jumped = jump.continuousCursorValid && jump.liveDirection == 1
+            && jump.continuousTransitionAge == 1
+            && std::abs (jump.continuousCursor - beforeJump) > 1000.0;
+        jump.release();
+
+        XYPadEngine vertical;
+        if (! vertical.prepare (48000.0, 256, true, true)) return false;
+        vertical.useContinuousLivePath (true);
+        vertical.setTrajectory (0, {{0.5f, 0.0f, 0.0}, {0.5f, 1.0f, 1.0}}, 1u);
+        prime (vertical);
+        for (int sample = 0; sample < 100; ++sample) one (vertical, 0.0);
+        const auto defaultForward = vertical.liveHoldReady && vertical.continuousWasVertical
+            && vertical.liveHoldDirection == 1;
+        const auto loopStep = [&] (double phase)
+        {
+            const auto before = vertical.liveHoldReadPosition;
+            one (vertical, phase);
+            const auto length = static_cast<double> (vertical.liveGrainFrames);
+            return std::fmod (vertical.liveHoldReadPosition - before + length, length);
+        };
+        const auto low = loopStep (0.0);
+        const auto middle = loopStep (0.5);
+        const auto high = loopStep (0.999);
+        const auto verticalRate = std::abs (low - 0.5) < 1.0e-6
+            && std::abs (middle - 1.0) < 1.0e-6
+            && std::abs (high - XYPadEngine::liveYSpeedMultiplier (0.999f)) < 1.0e-5;
+        vertical.release();
+
+        std::cout << "METRIC continuous_events reversal=" << reversal
+                  << " jump=" << jumped << " range_safe=" << rangeSafe
+                  << " exhausted=" << exhausted << " no_auto_repick=" << noAutoRepick
+                  << " vertical_forward=" << defaultForward << " vertical_low=" << low
+                  << " vertical_mid=" << middle << " vertical_high=" << high << '\n';
+        return reversal && jumped && rangeSafe && exhausted && noAutoRepick
+            && defaultForward && verticalRate;
+    }
     static double liveYSpeedMultiplier (float y) noexcept { return XYPadEngine::liveYSpeedMultiplier (y); }
     static bool holdSnapshotBulkCopyMatchesRingAcrossWrap()
     {
@@ -2141,6 +2234,8 @@ int main (int argc, char** argv)
 
     check (XYPadEngineTestAccess::continuousCursorUsesOnlyYForRate(),
            "continuous-cursor-direction-is-x-only-and-rate-is-y-only");
+    check (XYPadEngineTestAccess::continuousDirectionEventsAndVerticalSpeed(),
+           "continuous-cursor-reversal-jump-vertical-and-history-bounds");
     check (XYPadEngineTestAccess::writeActualLiveDiagnosticWavs(),
            "three-actual-live-direction-speed-wavs-use-processLive-and-final-xy-only-mix");
 
