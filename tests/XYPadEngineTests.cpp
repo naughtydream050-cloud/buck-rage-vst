@@ -209,11 +209,14 @@ public:
         const auto fast = measure (0.1f, 0.9f, 0.5f);
         const auto slow = measure (0.1f, 0.5f, 0.5f);
         const auto reverse = measure (0.9f, 0.1f, 1.0f);
+        const auto reverseSlow = measure (0.9f, 0.5f, 1.0f);
         const auto bottom = measure (0.1f, 0.9f, 0.0f);
         std::cout << "METRIC continuous_cursor fast=" << fast << " slow=" << slow
-                  << " reverse=" << reverse << " bottom=" << bottom << '\n';
+                  << " reverse=" << reverse << " reverse_slow=" << reverseSlow
+                  << " bottom=" << bottom << '\n';
         return std::abs (fast - 1.0) < 1.0e-6 && std::abs (slow - 1.0) < 1.0e-6
-            && std::abs (reverse + 2.0) < 1.0e-6 && std::abs (bottom - 0.5) < 1.0e-6;
+            && std::abs (reverse + 2.0) < 1.0e-6 && std::abs (reverseSlow + 2.0) < 1.0e-6
+            && std::abs (bottom - 0.5) < 1.0e-6;
     }
     static double liveYSpeedMultiplier (float y) noexcept { return XYPadEngine::liveYSpeedMultiplier (y); }
     static bool holdSnapshotBulkCopyMatchesRingAcrossWrap()
@@ -660,9 +663,10 @@ public:
             engine.launchLiveGrain (0.0f, 1, false, 0, initialNewest);
             const auto grain = engine.liveGrains[0];
             const auto intendedSelection = static_cast<uint64_t> (
-                juce::roundToInt (rate * XYPadEngine::kLiveHistorySeconds) + 2);
+                juce::roundToInt (rate * XYPadEngine::kLiveSelectionSeconds) + 2);
             const auto selectedOldest = initialNewest + 1u - intendedSelection;
-            const auto retentionFrames = intendedSelection
+            const auto retentionFrames = static_cast<uint64_t> (
+                juce::roundToInt (rate * XYPadEngine::kLiveHistorySeconds) + 2)
                 + static_cast<uint64_t> (engine.liveGrainFrames);
             passed = passed && grain.active && grain.startSerial == static_cast<double> (selectedOldest)
                 && (capacity & (capacity - 1u)) == 0u
@@ -872,7 +876,7 @@ public:
                 if (grain.active && grain.direction == expectedDirection && grain.age == 1)
                 {
                     const auto selectionFrames = static_cast<uint64_t> (
-                        juce::roundToInt (engine.sampleRate * XYPadEngine::kLiveHistorySeconds) + 2);
+                        juce::roundToInt (engine.sampleRate * XYPadEngine::kLiveSelectionSeconds) + 2);
                     const auto selectionOldest = engine.liveWriteSerial - selectionFrames;
                     const auto span = static_cast<double> (selectionFrames
                         - static_cast<uint64_t> (engine.liveGrainFrames));
