@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "mode": "observe",
+  "bundles": [
+    {
+      "id": "toyotomi-xy-direction-governance",
+      "project_scope": "D:/Development/RAZOR_FACE_COMPANY/01_PLUGINS/worktrees/toyotomi-xy-preset-priority",
+      "task_kinds": ["xy-direction-only"],
+      "risk_level": "high",
+      "sensitive": false,
+      "minimal": true,
+      "purpose": "Approved direction and speed behavior plus project safety",
+      "freshness": {"reviewed_at": "2026-11-23T00:00:00Z", "expires_at": "2026-12-23T00:00:00Z"},
+      "file_refs": ["AGENTS.md", "docs/XY_DIRECTION_ONLY_PLAN.md"],
+      "summary_ref": "docs/XY_DIRECTION_ONLY_PLAN.md",
+      "allowed_tools": ["read"]
+    },
+    {
+      "id": "toyotomi-xy-direction-dsp",
+      "project_scope": "D:/Development/RAZOR_FACE_COMPANY/01_PLUGINS/worktrees/toyotomi-xy-preset-priority",
+      "task_kinds": ["xy-direction-only"],
+      "risk_level": "high",
+      "sensitive": false,
+      "purpose": "Continuous cursor audio implementation",
+      "freshness": {"reviewed_at": "2026-11-23T00:00:00Z", "expires_at": "2026-12-23T00:00:00Z"},
+      "file_refs": ["Source/XYPadEngine.h", "Source/XYPadEngine.cpp", "Source/PluginProcessor.cpp"],
+      "summary_ref": "docs/XY_DIRECTION_ONLY_PLAN.md",
+      "allowed_tools": ["read"]
+    },
+    {
+      "id": "toyotomi-xy-direction-verification",
+      "project_scope": "D:/Development/RAZOR_FACE_COMPANY/01_PLUGINS/worktrees/toyotomi-xy-preset-priority",
+      "task_kinds": ["xy-direction-only"],
+      "risk_level": "high",
+      "sensitive": false,
+      "purpose": "Sixteen acceptance checks and native validation",
+      "freshness": {"reviewed_at": "2026-11-23T00:00:00Z", "expires_at": "2026-12-23T00:00:00Z"},
+      "file_refs": ["docs/XY_DIRECTION_ONLY_AC.json", "tests/XYPadEngineTests.cpp"],
+      "summary_ref": "docs/XY_DIRECTION_ONLY_AC.json",
+      "allowed_tools": ["read"]
+    }
+  ]
+}
