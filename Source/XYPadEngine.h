@@ -213,8 +213,9 @@ private:
     bool liveWasPlaying = false;
     bool liveSourceFadeActive = false;
     bool continuousLivePath = false, continuousCursorValid = false, continuousWasVertical = false,
-         continuousExhausted = false;
+         continuousExhausted = false, continuousHasDiscontinuity = false;
     double continuousCursor = 0.0;
+    double continuousPreviousPhase = 0.0;
     float continuousLastLeft = 0.0f, continuousLastRight = 0.0f;
     float continuousTransitionLeft = 0.0f, continuousTransitionRight = 0.0f;
     int continuousTransitionAge = 0;

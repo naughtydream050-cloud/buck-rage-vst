@@ -251,6 +251,7 @@ public:
         const auto reversal = reverse.continuousCursorValid && reverse.liveDirection == -1
             && reverse.continuousTransitionAge == 1
             && reverse.continuousCursor < beforeReverse;
+        const auto transitionFrames = reverse.liveTransitionFrames;
         const auto newest = reverse.liveWriteSerial - 1u;
         const auto oldest = newest + 1u - reverse.liveHistoryValidFrames;
         float left = 0.0f, right = 0.0f;
@@ -270,7 +271,7 @@ public:
         if (! jump.prepare (48000.0, 256, true, true)) return false;
         jump.useContinuousLivePath (true);
         jump.setTrajectory (0, {{0.1f, 0.5f, 0.0}, {0.2f, 0.5f, 0.5},
-                                {0.8f, 0.5f, 0.5001}, {0.9f, 0.5f, 1.0}}, 1u);
+                                {0.8f, 0.5f, 0.5}, {0.9f, 0.5f, 1.0}}, 1u);
         prime (jump);
         one (jump, 0.4999);
         const auto beforeJump = jump.continuousCursor;
@@ -279,6 +280,20 @@ public:
             && jump.continuousTransitionAge == 1
             && std::abs (jump.continuousCursor - beforeJump) > 1000.0;
         jump.release();
+
+        XYPadEngine steep;
+        if (! steep.prepare (48000.0, 256, true, true)) return false;
+        steep.useContinuousLivePath (true);
+        steep.setTrajectory (0, {{0.1f, 0.5f, 0.0}, {0.2f, 0.5f, 0.5},
+                                 {0.8f, 0.5f, 0.5001}, {0.9f, 0.5f, 1.0}}, 1u);
+        prime (steep);
+        one (steep, 0.4999);
+        const auto beforeSteep = steep.continuousCursor;
+        one (steep, 0.5001);
+        const auto steepRemainsContinuous = steep.continuousCursorValid
+            && ! steep.continuousHasDiscontinuity
+            && std::abs ((steep.continuousCursor - beforeSteep) - 1.0) < 1.0e-6;
+        steep.release();
 
         XYPadEngine vertical;
         if (! vertical.prepare (48000.0, 256, true, true)) return false;
@@ -304,11 +319,14 @@ public:
         vertical.release();
 
         std::cout << "METRIC continuous_events reversal=" << reversal
-                  << " jump=" << jumped << " range_safe=" << rangeSafe
+                  << " jump=" << jumped << " steep_continuous_no_jump=" << steepRemainsContinuous
+                  << " transition_frames=" << transitionFrames
+                  << " range_safe=" << rangeSafe
                   << " exhausted=" << exhausted << " no_auto_repick=" << noAutoRepick
                   << " vertical_forward=" << defaultForward << " vertical_low=" << low
                   << " vertical_mid=" << middle << " vertical_high=" << high << '\n';
-        return reversal && jumped && rangeSafe && exhausted && noAutoRepick
+        return reversal && jumped && steepRemainsContinuous && transitionFrames == 144
+            && rangeSafe && exhausted && noAutoRepick
             && defaultForward && verticalRate;
     }
     static bool continuousCursorNeverReselectsWithinBar()
@@ -2194,6 +2212,7 @@ int main (int argc, char** argv)
            "live-source-ended-fades-actual-xy-contribution-without-a-hard-audio-cut");
     XYPadEngine liveProbe;
     const auto livePrepared = liveProbe.prepare (48000.0, 512);
+    liveProbe.useContinuousLivePath (true);
     std::vector<PluginStateModel::MotionPoint> liveBarFour {{ 0.0f, 0.5f, 0.0 },
                                                             { 1.0f, 0.5f, 1.0 }};
     liveProbe.setTrajectory (3, liveBarFour, 44);
@@ -2201,6 +2220,7 @@ int main (int argc, char** argv)
     int liveProcessed = 0;
     int firstFullWet = -1;
     bool liveFinite = livePrepared;
+    double continuousStereoError = 0.0;
     constexpr int liveTestFrames = 4200;
     AllocationAudit::count.store (0, std::memory_order_relaxed);
     AllocationAudit::enabled.store (true, std::memory_order_release);
@@ -2225,6 +2245,9 @@ int main (int argc, char** argv)
             liveFinite = liveFinite && std::isfinite (maskValue)
                 && std::isfinite (liveOutput.getSample (0, i))
                 && std::isfinite (liveOutput.getSample (1, i));
+            continuousStereoError = std::max (continuousStereoError,
+                std::abs (static_cast<double> (liveOutput.getSample (1, i))
+                          + 0.5 * static_cast<double> (liveOutput.getSample (0, i))));
             if (absolute < 960)
                 liveFinite = liveFinite && maskValue == 0.0f;
             if (firstFullWet < 0 && maskValue >= 0.99f)
@@ -2273,9 +2296,11 @@ int main (int argc, char** argv)
               << " expected_min=" << 2300 << " expected_max=" << 2800
               << " silence_final_mask=" << silenceFinalMask
               << " resumed_max_mask=" << resumedMaximumMask
+              << " continuous_stereo_error=" << continuousStereoError
               << " allocations=" << AllocationAudit::count.load (std::memory_order_relaxed)
               << " finite=" << liveFinite << "\n";
-    check (livePrepared && firstFullWet >= 2300 && firstFullWet <= 2800 && liveFinite,
+    check (livePrepared && firstFullWet >= 2300 && firstFullWet <= 2800 && liveFinite
+           && continuousStereoError < 1.0e-6,
            "first-visit-bar4-live-wet-after-20ms-history-plus-1024-sample-pipeline-and-8ms-ramp");
     check (livePrepared && silenceFinalMask == 0.0f && resumedMaximumMask >= 0.99f,
            "live-xy-source-silence-returns-dry-and-reacquires-within-same-bar");

@@ -1425,6 +1425,13 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
             else
                 liveActiveTrajectory = {};
             liveActiveRevision = liveActiveTrajectory.revision;
+            continuousHasDiscontinuity = false;
+            for (int point = 1; point < liveActiveTrajectory.count; ++point)
+                if (liveActiveTrajectory.time[static_cast<size_t> (point)]
+                        == liveActiveTrajectory.time[static_cast<size_t> (point - 1)]
+                    && std::abs (liveActiveTrajectory.x[static_cast<size_t> (point)]
+                               - liveActiveTrajectory.x[static_cast<size_t> (point - 1)]) > 0.05f)
+                    continuousHasDiscontinuity = true;
         }
 
         float x = 0.5f, y = 0.5f;
@@ -1440,13 +1447,32 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                 && liveHistoryValidFrames >= static_cast<uint64_t> (liveGrainFrames);
             const auto moving = std::isfinite (xSlopePerPhase) && std::abs (xSlopePerPhase) >= 0.002;
             const auto deltaX = liveHavePreviousX ? x - livePreviousX : 0.0f;
-            const auto jump = liveHavePreviousX && std::abs (deltaX) > 0.05f;
+            bool jump = false;
+            if (continuousHasDiscontinuity && liveHavePreviousX && std::abs (deltaX) > 0.05f)
+            {
+                const auto first = liveActiveTrajectory.time[0];
+                const auto last = liveActiveTrajectory.time[static_cast<size_t> (liveActiveTrajectory.count - 1)];
+                const auto span = juce::jmax (1.0e-9, last - first);
+                for (int point = 1; point < liveActiveTrajectory.count; ++point)
+                {
+                    const auto index = static_cast<size_t> (point);
+                    const auto at = (liveActiveTrajectory.time[index] - first) / span;
+                    if (liveActiveTrajectory.time[index] == liveActiveTrajectory.time[index - 1u]
+                        && std::abs (liveActiveTrajectory.x[index] - liveActiveTrajectory.x[index - 1u]) > 0.05f
+                        && continuousPreviousPhase <= at && phase > at)
+                    {
+                        jump = true;
+                        break;
+                    }
+                }
+            }
             const auto direction = moving ? (xSlopePerPhase > 0.0 ? 1 : -1)
                                           : jump ? (deltaX > 0.0f ? 1 : -1) : liveDirection;
             const auto reversal = liveHavePreviousX && direction != liveDirection;
             if (jump || reversal) continuousExhausted = false;
             liveDirection = direction;
             livePreviousX = x;
+            continuousPreviousPhase = phase;
             liveHavePreviousX = true;
             float wetLeft = continuousLastLeft, wetRight = continuousLastRight;
             bool valid = false;
