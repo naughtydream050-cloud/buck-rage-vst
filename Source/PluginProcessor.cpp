@@ -16,6 +16,7 @@ float dequantise (uint64_t value, float low, float high) noexcept
 ToyotomiHideyoshiAudioProcessor::ToyotomiHideyoshiAudioProcessor()
     : AudioProcessor(BusesProperties().withInput("Input",juce::AudioChannelSet::stereo(),true).withOutput("Output",juce::AudioChannelSet::stereo(),true))
 {
+    xyEngine.useContinuousLivePath (true);
     for (auto& slot : dspSlots) slot.store (packDspSlot (PluginStateModel::TimelineSlot {}), std::memory_order_relaxed);
     bravo1Slots = BravoProjectPresets::make (1);
     bravo2Slots = BravoProjectPresets::make (2);

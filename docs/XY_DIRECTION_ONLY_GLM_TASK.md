@@ -1,0 +1,4 @@
+# Bounded CRITICAL realtime DSP worker
+
+Implement docs/XY_DIRECTION_ONLY_PLAN.md and all docs/XY_DIRECTION_ONLY_AC.json criteria, starting from 414305cac99fd906e6d01e9a797b528f0e9825bf.
+Allowed source: Source/XYPadEngine.h, Source/XYPadEngine.cpp, Source/PluginProcessor.cpp (only the internal XY route connection); tests: tests/XYPadEngineTests.cpp, tests/StateModelTests.cpp. Do not edit other source, UI, state, Preset, BRAVO, COUNT, CMake or workflows. Do not commit, push, deploy, or write candidate/final. Preserve pre-existing dirty files. Add deterministic read-position trace tests and same-input comparison WAVs. If continuous playhead cannot satisfy safe 10-second history and 3-ms transition within this scope, report incomplete rather than broadening scope. Do not assert host listening.

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "status": "APPROVED",
+  "approved_by": "Sol",
+  "task_class": "CRITICAL",
+  "risk_class": "realtime-dsp",
+  "task_id": "TOYOTOMI-XY-DIRECTION-ONLY-20261123",
+  "repo_path": "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\worktrees\\toyotomi-xy-preset-priority",
+  "base_commit": "414305cac99fd906e6d01e9a797b528f0e9825bf",
+  "plan_path": "docs/XY_DIRECTION_ONLY_PLAN.md",
+  "plan_sha256": "48e702b86e247fd00497045b19b2fc3b4a43a2bbe952064f4c145cc48f423a49",
+  "criteria_path": "docs/XY_DIRECTION_ONLY_AC.json",
+  "criteria_sha256": "aa3c5b20ecc79bcdd2014cb6919197f8a676d1dc057ed2281a45d3aef0ed9f37",
+  "task_spec_path": "docs/XY_DIRECTION_ONLY_GLM_TASK.md",
+  "task_spec_sha256": "d1fc217fe63757590888b733505ca351e3e57517cc98e8f2a857f3849820fc8e",
+  "allowed_paths": ["Source/XYPadEngine.h", "Source/XYPadEngine.cpp", "Source/PluginProcessor.cpp", "tests/XYPadEngineTests.cpp", "tests/StateModelTests.cpp"],
+  "verification_command": ["git", "-C", "D:\\Development\\RAZOR_FACE_COMPANY\\01_PLUGINS\\worktrees\\toyotomi-xy-preset-priority", "diff", "--check"]
+}

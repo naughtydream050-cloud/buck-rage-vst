@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "criteria": [
+    {"id":"AC-01","requirement":"At constant Y, left-to-right X is forward and independent of X drawing rate.","check":"independent signed read-increment test for two X slopes"},
+    {"id":"AC-02","requirement":"At constant Y, right-to-left X is reverse and independent of X drawing rate.","check":"independent signed read-increment test for two X slopes"},
+    {"id":"AC-03","requirement":"Y alone produces 0.5, 1, 2 at bottom, centre, top and the exact quadratic intermediate values.","check":"numeric and actual read-position tests"},
+    {"id":"AC-04","requirement":"Y changes speed continuously during both forward and reverse reading with natural pitch, without an independent pitch shifter.","check":"tone-frequency and per-sample read-position trace"},
+    {"id":"AC-05","requirement":"Ordinary horizontal or diagonal motion never resets the source cursor every hop; read positions advance continuously.","check":"old RED trace then new GREEN full-BAR trace and WAV"},
+    {"id":"AC-06","requirement":"Actual X reversal starts a 3-ms bounded transition to reverse or forward on the event sample.","check":"transition/reference and peak tests"},
+    {"id":"AC-07","requirement":"Only a discontinuous X jump repositions the cursor with a safe transition; ordinary continuous travel does not.","check":"jump-vs-continuous trajectory tests"},
+    {"id":"AC-08","requirement":"Vertical motion loops an X-selected short slice, retains previous direction, and defaults forward on a first vertical stroke.","check":"forward/reverse/default hold read-position and seam tests"},
+    {"id":"AC-09","requirement":"XY history is preallocated for up to ten seconds; expired, future or uninitialised samples are never read.","check":"boundary, wrap, startup, maximum sample-rate and allocation tests"},
+    {"id":"AC-10","requirement":"History exhaustion or missing audio fades XY to aligned dry, and valid history reacquires without a position jump.","check":"silent/expiry/re-entry WAV and mask continuity tests"},
+    {"id":"AC-11","requirement":"Stereo channels share the exact same source position and remain finite and peak bounded.","check":"stereo phase/reference, finite and peak tests"},
+    {"id":"AC-12","requirement":"Existing trajectories round-trip unchanged; UI and state format and parameter IDs are unchanged.","check":"StateModel tests and diff scope"},
+    {"id":"AC-13","requirement":"BRAVO 1/2, COUNT 5, XY priority, manual BAR, DEPTH 0, bypass and 1024-sample delay retain previous behaviour.","check":"StateModel/RuntimeSmoke/XY regression and scope diff"},
+    {"id":"AC-14","requirement":"Audio callback introduces no allocation, lock, UI, ValueTree, I/O or logging.","check":"instrumented no-allocation test and source review"},
+    {"id":"AC-15","requirement":"All 18 benchmark conditions at 44.1/48/96k and fixed/variable blocks have p99 <= 50% and max <= 80% of deadline.","check":"same-source complete 18-condition benchmark evidence"},
+    {"id":"AC-16","requirement":"Same-SHA Windows CI, comparison WAVs, per-AC Jev PASS and Codex final review precede SHA-verified new D manual-test placement.","check":"CI run, artifact hash, WAV manifest and per-criterion review"}
+  ]
+}

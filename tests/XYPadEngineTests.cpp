@@ -172,6 +172,41 @@ void operator delete[] (void* memory, std::size_t) noexcept { std::free (memory)
 class XYPadEngineTestAccess
 {
 public:
+    static bool continuousCursorUsesOnlyYForRate()
+    {
+        const auto measure = [] (float firstX, float lastX, float y) -> double
+        {
+            XYPadEngine engine;
+            if (! engine.prepare (48000.0, 256, true, true)) return 999.0;
+            engine.useContinuousLivePath (true);
+            engine.setTrajectory (0, {{firstX, y, 0.0}, {lastX, y, 1.0}}, 1u);
+            juce::AudioBuffer<float> input (2, 256), output (2, 256), mask (1, 256);
+            for (int channel = 0; channel < 2; ++channel)
+                for (int sample = 0; sample < 256; ++sample) input.setSample (channel, sample, 0.1f);
+            double increment = 999.0;
+            for (int block = 0; block < 8; ++block)
+            {
+                XYPadEngine::Transport t;
+                t.playing = true; t.startBar = 0;
+                t.startPhase = static_cast<double> (block * 256) / 48000.0;
+                t.phasePerSample = 1.0 / 48000.0;
+                const auto before = engine.continuousCursor;
+                engine.processLive (input, output, mask, t, 256);
+                if (block == 4 && engine.continuousCursorValid)
+                    increment = (engine.continuousCursor - before) / 256.0;
+            }
+            engine.release();
+            return increment;
+        };
+        const auto fast = measure (0.1f, 0.9f, 0.5f);
+        const auto slow = measure (0.1f, 0.5f, 0.5f);
+        const auto reverse = measure (0.9f, 0.1f, 1.0f);
+        const auto bottom = measure (0.1f, 0.9f, 0.0f);
+        std::cout << "METRIC continuous_cursor fast=" << fast << " slow=" << slow
+                  << " reverse=" << reverse << " bottom=" << bottom << '\n';
+        return std::abs (fast - 1.0) < 1.0e-6 && std::abs (slow - 1.0) < 1.0e-6
+            && std::abs (reverse + 2.0) < 1.0e-6 && std::abs (bottom - 0.5) < 1.0e-6;
+    }
     static double liveYSpeedMultiplier (float y) noexcept { return XYPadEngine::liveYSpeedMultiplier (y); }
     static bool holdSnapshotBulkCopyMatchesRingAcrossWrap()
     {
@@ -235,6 +270,7 @@ public:
         {
             XYPadEngine engine;
             if (! engine.prepare (rate, blockSize, true, true)) return false;
+            engine.useContinuousLivePath (true);
             std::vector<PluginStateModel::MotionPoint> points;
             if (scenario == 0)
                 points = {{ 0.10f, 0.50f, 0.0 }, { 0.90f, 0.50f, 1.0 }};
@@ -2069,6 +2105,8 @@ int main (int argc, char** argv)
            "live-xy-processing-performs-no-heap-allocation");
     liveProbe.release();
 
+    check (XYPadEngineTestAccess::continuousCursorUsesOnlyYForRate(),
+           "continuous-cursor-direction-is-x-only-and-rate-is-y-only");
     check (XYPadEngineTestAccess::writeActualLiveDiagnosticWavs(),
            "three-actual-live-direction-speed-wavs-use-processLive-and-final-xy-only-mix");
 

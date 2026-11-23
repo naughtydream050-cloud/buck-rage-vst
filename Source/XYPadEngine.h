@@ -62,6 +62,8 @@ public:
                       juce::AudioBuffer<float>& rendered,
                       juce::AudioBuffer<float>& readyMask,
                       const Transport& transport, int frameCount) noexcept;
+    // Internal DSP route; the legacy grain renderer is retained for regression comparison.
+    void useContinuousLivePath (bool use) noexcept { continuousLivePath = use; }
 
     State getState (int bar) const noexcept;
     static float mixLayers (float dry, float presetOutput, float xyWet,
@@ -163,11 +165,12 @@ private:
     int activeBar = -1;
     uint32_t activeRevision = 0;
     std::unique_ptr<float[]> scratch;
-    static constexpr double kLiveHistorySeconds = 0.125;
+    static constexpr double kLiveHistorySeconds = 10.0;
+    static constexpr double kLiveSelectionSeconds = 0.125;
     static constexpr double kLiveWarmupSeconds = 0.020;
     static constexpr double kLiveGrainSeconds = 0.020;
     static constexpr double kLiveHopSeconds = 0.010;
-    static constexpr uint64_t kMaxLiveHistoryFrames = 13922;
+    static constexpr uint64_t kMaxLiveHistoryFrames = 960000u + 1922u;
     static constexpr int kLiveGrainCapacity = 8;
     std::unique_ptr<float[]> liveHistory;
     std::unique_ptr<float[]> liveHoldSnapshot;
@@ -209,6 +212,12 @@ private:
     bool liveHistoryHasUnsafeMagnitude = false;
     bool liveWasPlaying = false;
     bool liveSourceFadeActive = false;
+    bool continuousLivePath = false, continuousCursorValid = false, continuousWasVertical = false,
+         continuousExhausted = false;
+    double continuousCursor = 0.0;
+    float continuousLastLeft = 0.0f, continuousLastRight = 0.0f;
+    float continuousTransitionLeft = 0.0f, continuousTransitionRight = 0.0f;
+    int continuousTransitionAge = 0;
     std::atomic<bool> enabled { false }, workerExit { false };
     std::thread worker;
     std::mutex nonRealtimeLifecycleMutex;

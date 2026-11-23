@@ -107,6 +107,8 @@ bool XYPadEngine::prepare (double rate, int maximumBlockSize, bool allocateBank,
     liveReentryTailActive = false;
     liveWriteSerial = liveHistoryValidFrames = 0;
     liveGrains.fill (LiveGrain {});
+    continuousCursorValid = continuousWasVertical = continuousExhausted = false;
+    continuousTransitionAge = 0;
     liveStationaryFrames = liveHoldPhase = 0;
     liveHoldReadPosition = 0.0;
     liveHoldDirection = 1;
@@ -263,6 +265,8 @@ void XYPadEngine::release() noexcept
     liveSamplesToLaunch = 0;
     liveSilenceFramesCount = 0;
     liveGrains.fill (LiveGrain {});
+    continuousCursorValid = continuousWasVertical = continuousExhausted = false;
+    continuousTransitionAge = 0;
     liveStationaryFrames = liveHoldPhase = 0;
     liveHoldReadPosition = 0.0;
     liveHoldDirection = 1;
@@ -687,7 +691,7 @@ void XYPadEngine::launchLiveGrain (float x, double requestedIncrement, bool tran
         return;
     const auto retainedFrames = newestSerial - oldestSerial + 1u;
     const auto selectionFrames = juce::jmin (retainedFrames,
-        static_cast<uint64_t> (juce::jmax (1, juce::roundToInt (sampleRate * kLiveHistorySeconds) + 2)));
+        static_cast<uint64_t> (juce::jmax (1, juce::roundToInt (sampleRate * kLiveSelectionSeconds) + 2)));
     if (selectionFrames < static_cast<uint64_t> (liveGrainFrames))
         return;
 
@@ -1270,6 +1274,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
     {
         if (liveWasPlaying) clearLiveDelayState();
         liveGrains.fill (LiveGrain {});
+        continuousCursorValid = continuousWasVertical = continuousExhausted = false;
         liveHistoryValidFrames = 0;
         liveHistoryHasUnsafeMagnitude = false;
         liveWriteSerial = 0;
@@ -1304,6 +1309,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         // Keep the monotonic serial, but require new samples before any grain
         // can reference the ring again. Loop wraps deliberately retain it.
         liveGrains.fill (LiveGrain {});
+        continuousCursorValid = continuousWasVertical = continuousExhausted = false;
         liveHistoryValidFrames = 0;
         liveHistoryHasUnsafeMagnitude = false;
         liveSamplesToLaunch = 0;
@@ -1368,6 +1374,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
                 liveHistoryValidFrames = 1;
                 liveHistoryHasUnsafeMagnitude = currentSampleUnsafe;
                 liveGrains.fill (LiveGrain {});
+                continuousCursorValid = continuousWasVertical = continuousExhausted = false;
                 liveSamplesToLaunch = 0;
                 liveWetGain = 0.0f;
                 liveReentryTailActive = false;
@@ -1398,6 +1405,7 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         {
             liveActiveBar = bar;
             liveGrains.fill (LiveGrain {});
+            continuousCursorValid = continuousWasVertical = continuousExhausted = false;
             liveSamplesToLaunch = 0;
             liveWetGain = 0.0f;
             liveHavePreviousX = false;
@@ -1424,6 +1432,148 @@ void XYPadEngine::processLive (const juce::AudioBuffer<float>& source,
         interpolateTrajectory (liveActiveTrajectory, phase, x, y, &xSlopePerPhase);
         x = juce::jlimit (0.0f, 1.0f, x);
         y = juce::jlimit (0.0f, 1.0f, y);
+        if (continuousLivePath)
+        {
+            const auto rate = liveYSpeedMultiplier (y);
+            const auto historyReady = liveHaveSignal && liveActiveTrajectory.count > 0
+                && liveHistoryValidFrames >= static_cast<uint64_t> (liveWarmupFrames)
+                && liveHistoryValidFrames >= static_cast<uint64_t> (liveGrainFrames);
+            const auto moving = std::isfinite (xSlopePerPhase) && std::abs (xSlopePerPhase) >= 0.002;
+            const auto deltaX = liveHavePreviousX ? x - livePreviousX : 0.0f;
+            const auto jump = liveHavePreviousX && std::abs (deltaX) > 0.05f;
+            const auto direction = moving ? (xSlopePerPhase > 0.0 ? 1 : -1)
+                                          : jump ? (deltaX > 0.0f ? 1 : -1) : liveDirection;
+            const auto reversal = liveHavePreviousX && direction != liveDirection;
+            if (jump || reversal) continuousExhausted = false;
+            liveDirection = direction;
+            livePreviousX = x;
+            liveHavePreviousX = true;
+            float wetLeft = continuousLastLeft, wetRight = continuousLastRight;
+            bool valid = false;
+            if (historyReady && ! moving)
+            {
+                const auto minimum = juce::jmax (1, juce::roundToInt (sampleRate * 0.002));
+                liveStationaryFrames = juce::jmin (minimum, liveStationaryFrames + 1);
+                if (! liveHoldReady && liveStationaryFrames >= minimum)
+                {
+                    const auto span = liveHistoryValidFrames - static_cast<uint64_t> (liveGrainFrames);
+                    const auto start = oldestSerial + static_cast<uint64_t> (static_cast<double> (span) * x);
+                    liveHoldReady = copyLiveHoldSnapshot (start, start + static_cast<uint64_t> (liveGrainFrames - 1));
+                    liveHoldReadPosition = direction > 0 ? 0.0 : static_cast<double> (liveGrainFrames - 1);
+                    liveHoldDirection = direction;
+                    if (liveHoldReady && ! continuousWasVertical)
+                    {
+                        continuousTransitionLeft = continuousLastLeft;
+                        continuousTransitionRight = continuousLastRight;
+                        continuousTransitionAge = continuousCursorValid ? 0 : liveTransitionFrames;
+                    }
+                }
+                if (liveHoldReady)
+                {
+                    const auto length = static_cast<double> (liveGrainFrames);
+                    const auto at = liveHoldReadPosition;
+                    const auto lower = static_cast<int> (at);
+                    const auto upper = (lower + 1) % liveGrainFrames;
+                    const auto frac = static_cast<float> (at - static_cast<double> (lower));
+                    const auto offset = static_cast<size_t> (lower) * 2u;
+                    const auto next = static_cast<size_t> (upper) * 2u;
+                    wetLeft = liveHoldSnapshot[offset] + (liveHoldSnapshot[next] - liveHoldSnapshot[offset]) * frac;
+                    wetRight = liveHoldSnapshot[offset + 1u] + (liveHoldSnapshot[next + 1u] - liveHoldSnapshot[offset + 1u]) * frac;
+                    const auto seam = juce::jmax (1, juce::roundToInt (sampleRate * 0.002));
+                    const auto inSeam = liveHoldDirection > 0 ? at >= length - seam : at < seam;
+                    if (inSeam)
+                    {
+                        const auto other = liveHoldDirection > 0 ? at - (length - seam)
+                                                                 : at + (length - seam);
+                        const auto otherIndex = static_cast<int> (other);
+                        const auto otherNext = (otherIndex + 1) % liveGrainFrames;
+                        const auto otherFraction = static_cast<float> (other - otherIndex);
+                        const auto otherOffset = static_cast<size_t> (otherIndex) * 2u;
+                        const auto otherUpper = static_cast<size_t> (otherNext) * 2u;
+                        const auto otherLeft = liveHoldSnapshot[otherOffset]
+                            + (liveHoldSnapshot[otherUpper] - liveHoldSnapshot[otherOffset]) * otherFraction;
+                        const auto otherRight = liveHoldSnapshot[otherOffset + 1u]
+                            + (liveHoldSnapshot[otherUpper + 1u] - liveHoldSnapshot[otherOffset + 1u]) * otherFraction;
+                        const auto blend = liveHoldDirection > 0 ? (at - (length - seam)) / seam
+                                                                  : (seam - at) / seam;
+                        double sine = 0.0, cosine = 0.0;
+                        liveSinCos (juce::jlimit (0.0, 1.0, blend) * kPi * 0.5, sine, cosine);
+                        wetLeft = static_cast<float> (wetLeft * cosine + otherLeft * sine);
+                        wetRight = static_cast<float> (wetRight * cosine + otherRight * sine);
+                    }
+                    liveHoldReadPosition = std::fmod (at + static_cast<double> (liveHoldDirection) * rate + length, length);
+                    if (continuousTransitionAge < liveTransitionFrames)
+                    {
+                        const auto p = static_cast<double> (continuousTransitionAge++)
+                            / static_cast<double> (juce::jmax (1, liveTransitionFrames - 1));
+                        double sine = 0.0, cosine = 0.0;
+                        liveSinCos (p * kPi * 0.5, sine, cosine);
+                        wetLeft = static_cast<float> (continuousTransitionLeft * cosine + wetLeft * sine);
+                        wetRight = static_cast<float> (continuousTransitionRight * cosine + wetRight * sine);
+                    }
+                    valid = true;
+                    continuousWasVertical = true;
+                    continuousCursorValid = false;
+                }
+            }
+            else if (historyReady)
+            {
+                liveStationaryFrames = 0;
+                liveHoldReady = false;
+                const auto retarget = ! continuousExhausted
+                    && (! continuousCursorValid || continuousWasVertical || reversal || jump);
+                if (retarget)
+                {
+                    // A 20-ms lead protects forward reading at the right edge;
+                    // X selects a starting point, never the read increment.
+                    const auto lead = static_cast<uint64_t> (juce::jmin (liveWarmupFrames,
+                        static_cast<int> (liveHistoryValidFrames - 1u)));
+                    const auto span = liveHistoryValidFrames - lead - 1u;
+                    continuousCursor = static_cast<double> (oldestSerial)
+                        + static_cast<double> (span) * static_cast<double> (x);
+                    if (continuousCursorValid || continuousWasVertical)
+                    {
+                        continuousTransitionLeft = continuousLastLeft;
+                        continuousTransitionRight = continuousLastRight;
+                        continuousTransitionAge = 0;
+                    }
+                    else continuousTransitionAge = liveTransitionFrames;
+                    continuousCursorValid = true;
+                }
+                continuousWasVertical = false;
+                valid = continuousCursorValid
+                    && readLiveStereoSample (continuousCursor, oldestSerial, newestSerial, wetLeft, wetRight);
+                if (valid)
+                {
+                    continuousCursor += static_cast<double> (direction) * rate;
+                    if (continuousTransitionAge < liveTransitionFrames)
+                    {
+                        const auto p = static_cast<double> (continuousTransitionAge++)
+                            / static_cast<double> (juce::jmax (1, liveTransitionFrames - 1));
+                        double sine = 0.0, cosine = 0.0;
+                        liveSinCos (p * kPi * 0.5, sine, cosine);
+                        wetLeft = static_cast<float> (continuousTransitionLeft * cosine + wetLeft * sine);
+                        wetRight = static_cast<float> (continuousTransitionRight * cosine + wetRight * sine);
+                    }
+                }
+                else if (continuousCursorValid)
+                {
+                    continuousCursorValid = false;
+                    continuousExhausted = true;
+                }
+            }
+            const auto target = valid && ! sourceEnded ? 1.0f : 0.0f;
+            const auto step = 1.0f / static_cast<float> (rampFrames);
+            if (liveWetGain < target) liveWetGain = juce::jmin (target, liveWetGain + step);
+            else if (liveWetGain > target) liveWetGain = juce::jmax (target, liveWetGain - step);
+            if (valid) { continuousLastLeft = wetLeft; continuousLastRight = wetRight; }
+            float delayedLeft = 0.0f, delayedRight = 0.0f, delayedMask = 0.0f;
+            processLiveDelaySample (wetLeft, wetRight, liveWetGain, delayedLeft, delayedRight, delayedMask);
+            if (outputLeft != nullptr) outputLeft[i] = delayedLeft;
+            if (outputRight != nullptr) outputRight[i] = delayedRight;
+            mask[i] = delayedMask;
+            continue;
+        }
         // X slope is already expressed in complete PAD traversals per BAR.
         // Mapping it through the 125 ms source width and host phase-per-sample
         // made a left-to-right BAR gesture read at roughly 0.07x at 130 BPM:
