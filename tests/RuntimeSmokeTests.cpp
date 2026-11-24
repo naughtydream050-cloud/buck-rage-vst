@@ -364,6 +364,80 @@ XyIntegrationRender renderProcessorXyIntegration (bool addTrajectory,
     return result;
 }
 
+bool testXyDoesNotSpillIntoNextBar()
+{
+    constexpr double rate = 48000.0, bpm = 300.0;
+    constexpr int blockSize = 512, samplesPerBar = 38400, totalSamples = samplesPerBar * 2;
+    const auto render = [=] (bool withXy, PluginStateModel::ScratchPreset nextPreset)
+    {
+        ToyotomiHideyoshiAudioProcessor processor;
+        processor.prepareToPlay (rate, blockSize);
+        processor.setHostSyncEnabled (true);
+        auto& state = processor.getStateModel();
+        state.setSlotDepth (0, 1.0f);
+        state.setSlotDepth (1, 1.0f);
+        state.setSlotPreset (1, nextPreset);
+        if (withXy)
+        {
+            state.beginSlotXYMotion (0, 0.12f, 0.5f);
+            state.appendSlotXYMotion (0, 0.88f, 0.5f, 4.0 * 60.0 / bpm);
+        }
+        TestPlayHead playHead;
+        processor.setPlayHead (&playHead);
+        juce::MidiBuffer midi;
+        juce::AudioBuffer<float> audio (2, blockSize);
+        std::vector<float> result (static_cast<size_t> (totalSamples) * 2u);
+        for (int block = 0; block < totalSamples / blockSize; ++block)
+        {
+            const auto start = block * blockSize;
+            for (int i = 0; i < blockSize; ++i)
+            {
+                const auto signal = static_cast<float> (0.35 * std::sin
+                    (2.0 * 3.141592653589793 * 220.0 * (start + i) / rate));
+                audio.setSample (0, i, signal);
+                audio.setSample (1, i, signal * 0.7f);
+            }
+            playHead.set (true, static_cast<double> (start) * bpm / (60.0 * rate),
+                          bpm, 4, 4, start, false);
+            processor.processBlock (audio, midi);
+            for (int i = 0; i < blockSize; ++i)
+                for (int channel = 0; channel < 2; ++channel)
+                    result[static_cast<size_t> (start + i) * 2u + static_cast<size_t> (channel)]
+                        = audio.getSample (channel, i);
+        }
+        processor.setPlayHead (nullptr);
+        return result;
+    };
+    bool pass = true;
+    for (const auto preset : { PluginStateModel::ScratchPreset::off,
+                               PluginStateModel::ScratchPreset::drag })
+    {
+        const auto dry = render (false, preset);
+        const auto wet = render (true, preset);
+        double preDifference = 0.0, postDifference = 0.0, tailLastDifference = 0.0;
+        bool finite = dry.size() == wet.size();
+        for (int sample = 0; finite && sample < totalSamples; ++sample)
+            for (int channel = 0; channel < 2; ++channel)
+            {
+                const auto index = static_cast<size_t> (sample) * 2u + static_cast<size_t> (channel);
+                finite = std::isfinite (dry[index]) && std::isfinite (wet[index]);
+                const auto delta = std::abs (static_cast<double> (wet[index] - dry[index]));
+                if (sample >= 2048 && sample < samplesPerBar - 144)
+                    preDifference = std::max (preDifference, delta);
+                if (sample >= samplesPerBar && sample < samplesPerBar + 1024)
+                    postDifference = std::max (postDifference, delta);
+                if (sample == samplesPerBar - 1)
+                    tailLastDifference = std::max (tailLastDifference, delta);
+            }
+        std::cout << "METRIC xy_bar_boundary next_preset=" << (preset == PluginStateModel::ScratchPreset::off ? "none" : "drag")
+                  << " pre_difference=" << preDifference << " post_difference=" << postDifference
+                  << " tail_last_difference=" << tailLastDifference << " finite=" << finite << '\n';
+        pass &= finite && preDifference > 0.01 && postDifference < 1.0e-6
+             && tailLastDifference < 0.01;
+    }
+    return check (pass, "xy-bar-boundary-no-spill-to-next-preset-or-empty-bar");
+}
+
 bool testXyLayerIndependenceAtProcessorBoundary()
 {
     const auto baseline = renderProcessorXyIntegration (false, PluginStateModel::ScratchPreset::drag, true);
@@ -2005,6 +2079,7 @@ int main()
     pass &= testPredictedMotionLoopConfirmation();
     pass &= testMotionWetSurvivesThreeHostLoops();
     pass &= testXyLayerIndependenceAtProcessorBoundary();
+    pass &= testXyDoesNotSpillIntoNextBar();
     pass &= testUnavailableLiveXyPreservesPresetPerSample();
     pass &= testProcessorDeclaresAndImplementsFixed1024SampleLatency();
     pass &= testCountPresetEndTailMeasurementMatrix();

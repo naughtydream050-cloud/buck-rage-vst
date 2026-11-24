@@ -1,0 +1,9 @@
+{
+  "status": "APPROVED_FOR_SCOPED_IMPLEMENTATION",
+  "base_source_sha": "99dca1df8eb820e8b918c472bd480c50832adf5c",
+  "plan_sha256": "62e89ce690c3595fb49ab43b23845a2091568a84300d432979bceddf30d5190e",
+  "ac_sha256": "cc95135e1d8b5792f25eb13a4ae28b3542395465c0775302b8406284c5550d96",
+  "allowed_product_files": ["Source/PluginProcessor.cpp", "Source/PluginProcessor.h"],
+  "allowed_test_files": ["tests/RuntimeSmokeTests.cpp"],
+  "release_gate": "Native tests, exact-source Windows CI, 18-case performance, Jev four-AC PASS and Codex review before new D manual-test placement."
+}

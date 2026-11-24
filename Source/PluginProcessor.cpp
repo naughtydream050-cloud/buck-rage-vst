@@ -46,6 +46,7 @@ void ToyotomiHideyoshiAudioProcessor::prepareToPlay(double sampleRate, int maxim
     delayedDepth = {};
     delayedPresetActive = {};
     delayedXyBypass = {};
+    delayedXyBar.fill (255u);
     outputDelayWriteIndex = 0;
     scratchEngine.prepare (preparedSampleRate, maximumExpectedSamplesPerBlock, getTotalNumInputChannels());
     xyDryBuffer.setSize (2, maximumExpectedSamplesPerBlock, false, true, true);
@@ -464,6 +465,7 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
     const auto hasXyBlock = canRunXY && xyReadyMask.getNumSamples() >= buffer.getNumSamples()
                          && xyRenderedBuffer.getNumSamples() >= buffer.getNumSamples();
     const auto currentXyBypass = xyBypass.load (std::memory_order_relaxed);
+    const auto boundaryFadeFrames = juce::jmax (1, juce::roundToInt (preparedSampleRate * 0.003));
     for (int i = 0; i < buffer.getNumSamples(); ++i)
     {
         int bar = transport.startBar;
@@ -489,9 +491,19 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
         const auto delayedDepthValue = delayedDepth[readIndex];
         const auto delayedPresetValue = delayedPresetActive[readIndex] != 0;
         const auto delayedBypassValue = delayedXyBypass[readIndex] != 0;
+        const auto delayedBarValue = delayedXyBar[readIndex];
         delayedDepth[readIndex] = currentDepth;
         delayedPresetActive[readIndex] = currentPresetActive ? 1u : 0u;
         delayedXyBypass[readIndex] = currentXyBypass ? 1u : 0u;
+        delayedXyBar[readIndex] = hasCurrentBar ? static_cast<uint8_t> (bar) : 255u;
+        const auto phaseInBar = phase - static_cast<double> (crossed);
+        const auto fadePhase = transport.barPhasePerSample * boundaryFadeFrames;
+        const auto boundaryGain = fadePhase > 0.0
+            ? static_cast<float> (juce::jlimit (0.0, 1.0, (1.0 - phaseInBar) / fadePhase)) : 1.0f;
+        // PCM and mask are delayed together, but a prior BAR's XY must not
+        // override the next BAR's Preset or its unprocessed output.
+        const auto blend = delayedBypassValue || ! hasCurrentBar || delayedBarValue != bar
+            ? 0.0f : currentXyBlend * boundaryGain;
         for (int channel = 0; channel < channels; ++channel)
         {
             const auto inputDry = canCopyDry ? xyDryBuffer.getSample (channel, i) : 0.0f;
@@ -503,7 +515,6 @@ void ToyotomiHideyoshiAudioProcessor::processBlock (juce::AudioBuffer<float>& bu
             delayedPreset[static_cast<size_t> (channel)][readIndex] = inputPreset;
             // XY's ready mask is already delayed by its 1024-sample pitch
             // pipeline. Delaying it again here would misalign it with XY PCM.
-            const auto blend = delayedBypassValue ? 0.0f : currentXyBlend;
             buffer.setSample (channel, i, XYPadEngine::mixLayers (dry, preset, xy,
                 delayedDepthValue, delayedPresetValue, blend));
         }

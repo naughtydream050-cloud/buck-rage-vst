@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "criteria": [
+    {"id":"AC-01","requirement":"After a BAR with XY, the next BAR has no XY contribution from its first output sample, whether its Preset is OFF or active; compare actual processor output to a no-XY reference."},
+    {"id":"AC-02","requirement":"The previous BAR's XY exits over a bounded 3 ms fade, without a hard discontinuity or abnormal peak, and remains unchanged earlier in the BAR."},
+    {"id":"AC-03","requirement":"The 1024-sample reported latency, aligned Dry/Preset/XY, stereo, bypass, existing XY operation, BRAVO, COUNT, UI, state and parameter IDs remain unchanged; no audio-thread allocation or lock is added."},
+    {"id":"AC-04","requirement":"Exact-source native regressions, Windows CI, 18-condition performance, independent Jev per-AC PASS and Codex final review precede SHA-verified placement in a new D manual-test folder; old versions and release locations are untouched."}
+  ]
+}
