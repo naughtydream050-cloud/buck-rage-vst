@@ -445,6 +445,8 @@ bool testXyDoesNotSpillIntoNextBar()
                 const auto dry = render (false, rate, preset, crossing);
                 const auto wet = render (true, rate, preset, crossing);
                 double preDifference = 0.0, postDifference = 0.0, tailLastDifference = 0.0;
+                double justBeforeFadeDifference = 0.0, firstNextBarDifference = 0.0;
+                double boundaryExtraStep = 0.0;
                 bool finite = dry.size() == wet.size();
                 for (int sample = 0; finite && sample < totalSamples; ++sample)
                     for (int channel = 0; channel < 2; ++channel)
@@ -458,16 +460,31 @@ bool testXyDoesNotSpillIntoNextBar()
                             postDifference = std::max (postDifference, delta);
                         if (sample == samplesPerBar - 1)
                             tailLastDifference = std::max (tailLastDifference, delta);
+                        if (sample == samplesPerBar - fadeFrames - 1)
+                            justBeforeFadeDifference = std::max (justBeforeFadeDifference, delta);
+                        if (sample == samplesPerBar)
+                            firstNextBarDifference = std::max (firstNextBarDifference, delta);
+                        if (sample == samplesPerBar && sample > 0)
+                        {
+                            const auto previous = static_cast<size_t> (sample - 1) * 2u + static_cast<size_t> (channel);
+                            const auto wetStep = std::abs (static_cast<double> (wet[index] - wet[previous]));
+                            const auto dryStep = std::abs (static_cast<double> (dry[index] - dry[previous]));
+                            boundaryExtraStep = std::max (boundaryExtraStep, std::abs (wetStep - dryStep));
+                        }
                     }
                 std::cout << "METRIC xy_bar_boundary rate=" << rate
                           << " alignment=" << (crossing ? "crossing" : "aligned")
                           << " next_preset=" << (preset == PluginStateModel::ScratchPreset::off ? "none" : "drag")
                           << " pre_difference=" << preDifference
+                          << " pre_fade_last_difference=" << justBeforeFadeDifference
                           << " post_difference=" << postDifference
+                          << " first_next_bar_difference=" << firstNextBarDifference
                           << " tail_last_difference=" << tailLastDifference
+                          << " boundary_extra_step=" << boundaryExtraStep
                           << " finite=" << finite << '\n';
-                pass &= finite && preDifference > 0.01 && postDifference < 1.0e-6
-                     && tailLastDifference < 0.01;
+                pass &= finite && preDifference > 0.01 && justBeforeFadeDifference > 0.01
+                     && postDifference < 1.0e-6 && firstNextBarDifference < 1.0e-6
+                     && tailLastDifference < 0.01 && boundaryExtraStep < 0.01;
                 const auto prefix = juce::String ("xy-diagnostic-bar-boundary-")
                     + juce::String (static_cast<int> (rate)) + "-"
                     + (crossing ? "crossing-" : "aligned-")
