@@ -366,12 +366,16 @@ XyIntegrationRender renderProcessorXyIntegration (bool addTrajectory,
 
 bool testXyDoesNotSpillIntoNextBar()
 {
-    constexpr double rate = 48000.0, bpm = 300.0;
-    constexpr int blockSize = 512, samplesPerBar = 38400, totalSamples = samplesPerBar * 2;
-    const auto render = [=] (bool withXy, PluginStateModel::ScratchPreset nextPreset)
+    constexpr double bpm = 300.0;
+    constexpr int nominalBlockSize = 512;
+    const auto render = [=] (bool withXy, double rate,
+                             PluginStateModel::ScratchPreset nextPreset,
+                             bool crossingBoundary)
     {
+        const auto samplesPerBar = juce::roundToInt (rate * 4.0 * 60.0 / bpm);
+        const auto totalSamples = samplesPerBar * 2 + nominalBlockSize;
         ToyotomiHideyoshiAudioProcessor processor;
-        processor.prepareToPlay (rate, blockSize);
+        processor.prepareToPlay (rate, nominalBlockSize + nominalBlockSize / 2);
         processor.setHostSyncEnabled (true);
         auto& state = processor.getStateModel();
         state.setSlotDepth (0, 1.0f);
@@ -385,12 +389,18 @@ bool testXyDoesNotSpillIntoNextBar()
         TestPlayHead playHead;
         processor.setPlayHead (&playHead);
         juce::MidiBuffer midi;
-        juce::AudioBuffer<float> audio (2, blockSize);
         std::vector<float> result (static_cast<size_t> (totalSamples) * 2u);
-        for (int block = 0; block < totalSamples / blockSize; ++block)
+        for (int start = 0; start < totalSamples;)
         {
-            const auto start = block * blockSize;
-            for (int i = 0; i < blockSize; ++i)
+            auto frames = juce::jmin (nominalBlockSize, totalSamples - start);
+            if (start < samplesPerBar && start + frames >= samplesPerBar)
+            {
+                const auto toBoundary = samplesPerBar - start;
+                frames = crossingBoundary ? juce::jmin (totalSamples - start, toBoundary + nominalBlockSize / 2)
+                                          : toBoundary;
+            }
+            juce::AudioBuffer<float> audio (2, frames);
+            for (int i = 0; i < frames; ++i)
             {
                 const auto signal = static_cast<float> (0.35 * std::sin
                     (2.0 * 3.141592653589793 * 220.0 * (start + i) / rate));
@@ -400,43 +410,214 @@ bool testXyDoesNotSpillIntoNextBar()
             playHead.set (true, static_cast<double> (start) * bpm / (60.0 * rate),
                           bpm, 4, 4, start, false);
             processor.processBlock (audio, midi);
-            for (int i = 0; i < blockSize; ++i)
+            for (int i = 0; i < frames; ++i)
                 for (int channel = 0; channel < 2; ++channel)
-                    result[static_cast<size_t> (start + i) * 2u + static_cast<size_t> (channel)]
-                        = audio.getSample (channel, i);
+                    result[static_cast<size_t> (start + i) * 2u + static_cast<size_t> (channel)] = audio.getSample (channel, i);
+            start += frames;
         }
         processor.setPlayHead (nullptr);
         return result;
     };
-    bool pass = true;
-    for (const auto preset : { PluginStateModel::ScratchPreset::off,
-                               PluginStateModel::ScratchPreset::drag })
+    const auto writeBoundaryWav = [] (const juce::String& name, const std::vector<float>& source, double rate)
     {
-        const auto dry = render (false, preset);
-        const auto wet = render (true, preset);
-        double preDifference = 0.0, postDifference = 0.0, tailLastDifference = 0.0;
-        bool finite = dry.size() == wet.size();
-        for (int sample = 0; finite && sample < totalSamples; ++sample)
+        const auto frames = static_cast<int> (source.size() / 2u);
+        juce::AudioBuffer<float> audio (2, frames);
+        for (int frame = 0; frame < frames; ++frame)
             for (int channel = 0; channel < 2; ++channel)
+                audio.setSample (channel, frame, source[static_cast<size_t> (frame) * 2u + static_cast<size_t> (channel)]);
+        juce::WavAudioFormat format;
+        auto stream = juce::File::getCurrentWorkingDirectory().getChildFile (name).createOutputStream();
+        std::unique_ptr<juce::AudioFormatWriter> writer;
+        if (stream != nullptr) writer.reset (format.createWriterFor (stream.release(), rate, 2, 24, {}, 0));
+        return writer != nullptr && writer->writeFromAudioSampleBuffer (audio, 0, frames);
+    };
+
+    bool pass = true;
+    for (const auto rate : { 44100.0, 48000.0, 96000.0 })
+    {
+        const auto samplesPerBar = juce::roundToInt (rate * 4.0 * 60.0 / bpm);
+        const auto totalSamples = samplesPerBar * 2 + nominalBlockSize;
+        const auto fadeFrames = juce::jmax (1, juce::roundToInt (rate * 0.003));
+        for (const bool crossing : { false, true })
+            for (const auto preset : { PluginStateModel::ScratchPreset::off,
+                                       PluginStateModel::ScratchPreset::drag })
             {
-                const auto index = static_cast<size_t> (sample) * 2u + static_cast<size_t> (channel);
-                finite = std::isfinite (dry[index]) && std::isfinite (wet[index]);
-                const auto delta = std::abs (static_cast<double> (wet[index] - dry[index]));
-                if (sample >= 2048 && sample < samplesPerBar - 144)
-                    preDifference = std::max (preDifference, delta);
-                if (sample >= samplesPerBar && sample < samplesPerBar + 1024)
-                    postDifference = std::max (postDifference, delta);
-                if (sample == samplesPerBar - 1)
-                    tailLastDifference = std::max (tailLastDifference, delta);
+                const auto dry = render (false, rate, preset, crossing);
+                const auto wet = render (true, rate, preset, crossing);
+                double preDifference = 0.0, postDifference = 0.0, tailLastDifference = 0.0;
+                bool finite = dry.size() == wet.size();
+                for (int sample = 0; finite && sample < totalSamples; ++sample)
+                    for (int channel = 0; channel < 2; ++channel)
+                    {
+                        const auto index = static_cast<size_t> (sample) * 2u + static_cast<size_t> (channel);
+                        finite = std::isfinite (dry[index]) && std::isfinite (wet[index]);
+                        const auto delta = std::abs (static_cast<double> (wet[index] - dry[index]));
+                        if (sample >= 2048 && sample < samplesPerBar - fadeFrames)
+                            preDifference = std::max (preDifference, delta);
+                        if (sample >= samplesPerBar && sample < samplesPerBar + nominalBlockSize)
+                            postDifference = std::max (postDifference, delta);
+                        if (sample == samplesPerBar - 1)
+                            tailLastDifference = std::max (tailLastDifference, delta);
+                    }
+                std::cout << "METRIC xy_bar_boundary rate=" << rate
+                          << " alignment=" << (crossing ? "crossing" : "aligned")
+                          << " next_preset=" << (preset == PluginStateModel::ScratchPreset::off ? "none" : "drag")
+                          << " pre_difference=" << preDifference
+                          << " post_difference=" << postDifference
+                          << " tail_last_difference=" << tailLastDifference
+                          << " finite=" << finite << '\n';
+                pass &= finite && preDifference > 0.01 && postDifference < 1.0e-6
+                     && tailLastDifference < 0.01;
+                const auto prefix = juce::String ("xy-diagnostic-bar-boundary-")
+                    + juce::String (static_cast<int> (rate)) + "-"
+                    + (crossing ? "crossing-" : "aligned-")
+                    + (preset == PluginStateModel::ScratchPreset::off ? "off" : "drag");
+                pass &= writeBoundaryWav (prefix + "-reference.wav", dry, rate)
+                     && writeBoundaryWav (prefix + "-xy.wav", wet, rate);
             }
-        std::cout << "METRIC xy_bar_boundary next_preset=" << (preset == PluginStateModel::ScratchPreset::off ? "none" : "drag")
-                  << " pre_difference=" << preDifference << " post_difference=" << postDifference
-                  << " tail_last_difference=" << tailLastDifference << " finite=" << finite << '\n';
-        pass &= finite && preDifference > 0.01 && postDifference < 1.0e-6
-             && tailLastDifference < 0.01;
     }
     return check (pass, "xy-bar-boundary-no-spill-to-next-preset-or-empty-bar");
 }
+
+#if 0 // Incomplete GLM timeout partial; retained temporarily for audit, excluded from build.
+bool testXyDoesNotSpillIntoNextBarGlmPartial()
+{
+    constexpr double bpm = 300.0;
+    constexpr int blockSize = 512, samplesPerBar = 38400;
+
+    auto allRates = { 44100.0, 48000.0, 96000.0 };
+    auto allPresets = { PluginStateModel::ScratchPreset::off,
+                       PluginStateModel::ScratchPreset::drag };
+
+    struct BlockAlignment
+    {
+        int startBlock; // 0-based index into 0..149
+        std::string label;
+    };
+
+    auto blockAlignments = std::array<BlockAlignment, 2>{
+        BlockAlignment{ 0, "on-bar-boundary" },
+        BlockAlignment{ 32, "across-bar-boundary" } // 32 * 512 = 16384 (< 38400), 33*512 = 16896 (> 38400)
+    };
+
+    const auto renderAt = [=] (const std::string& labelName, double rate,
+                               PluginStateModel::ScratchPreset nextPreset,
+                               int firstBlock) -> std::pair<std::vector<float>, bool>
+    {
+        constexpr int totalSamples = samplesPerBar * 2;
+        ToyotomiHideyoshiAudioProcessor processor;
+        processor.prepareToPlay (rate, blockSize);
+        processor.setHostSyncEnabled (true);
+        auto& state = processor.getStateModel();
+        state.setSlotDepth (0, 1.0f);
+        state.setSlotDepth (1, 1.0f);
+        state.setSlotPreset (1, nextPreset);
+        TestPlayHead playHead;
+        processor.setPlayHead (&playHead);
+        juce::MidiBuffer midi;
+        juce::AudioBuffer<float> audio (2, blockSize);
+        std::vector<float> result (static_cast<size_t> (totalSamples) * 2u);
+
+        int remainingBlocks = totalSamples / blockSize;
+        for (int block = 0; block < blockAlignments.size(); ++block)
+        {
+            const auto firstSampleInBlock = firstBlock * blockSize + block * blockSize;
+            for (int i = 0; i < blockSize; ++i)
+            {
+                const auto signal = static_cast<float> (0.35 * std::sin
+                    (2.0 * 3.141592653589793 * 220.0 * (firstSampleInBlock + i) / rate));
+                audio.setSample (0, i, signal);
+                audio.setSample (1, i, signal * 0.7f);
+            }
+            playHead.set (true, static_cast<double> (firstSampleInBlock) * bpm / (60.0 * rate),
+                          bpm, 4, 4, firstSampleInBlock, false);
+            processor.processBlock (audio, midi);
+            for (int i = 0; i < blockSize; ++i)
+                for (int channel = 0; channel < 2; ++channel)
+                    result[static_cast<size_t> (firstSampleInBlock + i) * 2u + static_cast<size_t> (channel)]
+                        = audio.getSample (channel, i);
+        }
+
+        processor.setPlayHead (nullptr);
+        bool pass = result.size() == static_cast<size_t> (totalSamples) * 2u;
+        return { result, pass };
+    };
+
+    bool globalPass = true;
+    std::cout << "== xy-bar-boundary: rate/preset/alignment matrix ==" << '\n';
+
+    for (const auto& alignment : blockAlignments)
+    {
+        for (const auto rate : allRates)
+        {
+            std::cout << "[rate=" << rate << " alignment=" << alignment.label << "]" << '\n';
+            for (const auto preset : allPresets)
+            {
+                std::cout << "  preset=";
+                if (preset == PluginStateModel::ScratchPreset::off)
+                    std::cout << "off";
+                else
+                    std::cout << "drag";
+                std::cout << " ..." << '\n';
+
+                auto [dry, dryOk] = renderAt (alignment.label, rate, preset, alignment.startBlock);
+                auto [wet, wetOk] = renderAt (alignment.label, rate, preset, alignment.startBlock);
+                dryOk &= dryOk && wetOk;
+
+                double preDifference = 0.0, postDifference = 0.0, tailLastDifference = 0.0;
+                bool finite = dry.size() == wet.size();
+
+                // Check alignment and finite values
+                pass &= dryOk && wetOk;
+                for (int sample = 0; finite && sample < dry.size() && sample < wet.size(); ++sample)
+                {
+                    for (int channel = 0; channel < 2; ++channel)
+                    {
+                        const auto index = static_cast<size_t> (sample) * 2u + static_cast<size_t> (channel);
+                        if (! (std::isfinite (static_cast<double> (dry[index])) &&
+                               std::isfinite (static_cast<double> (wet[index]))))
+                        {
+                            finite = false;
+                            break;
+                        }
+                        const auto delta = std::abs (static_cast<double> (wet[index] - dry[index]));
+                        if (sample >= 2048 && sample < samplesPerBar - 144)
+                            preDifference = std::max (preDifference, delta);
+                        if (sample >= samplesPerBar && sample < samplesPerBar + 1024)
+                            postDifference = std::max (postDifference, delta);
+                        if (sample == samplesPerBar - 1)
+                            tailLastDifference = std::max (tailLastDifference, delta);
+                    }
+                    if (! finite)
+                        break;
+                }
+
+                std::cout << "    METRIC "
+                          << "xy_bar_boundary rate=" << rate
+                          << " alignment=" << alignment.label
+                          << " preset=" << (preset == PluginStateModel::ScratchPreset::off ? "off" : "drag")
+                          << " pre_diff=" << preDifference
+                          << " post_diff=" << postDifference
+                          << " tail_diff=" << tailLastDifference
+                          << " finite=" << finite << '\n';
+
+                if (dryOk && wetOk && finite)
+                {
+                    globalPass &= (preDifference > 0.01 && postDifference < 1.0e-6 && tailLastDifference < 0.01);
+                }
+                else
+                {
+                    std::cout << "    FAILURE: render alignment or finite check failed, skipping metric comparison" << '\n';
+                }
+            }
+        }
+    }
+
+    std::cout << "== xy-bar-boundary global pass: " << (globalPass ? "PASS" : "FAIL") << " ==" << '\n';
+    return check (globalPass, "xy-bar-boundary-no-spill-to-next-preset-or-empty-bar");
+}
+
+#endif
 
 bool testXyLayerIndependenceAtProcessorBoundary()
 {

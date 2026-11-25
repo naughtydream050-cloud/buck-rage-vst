@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "criteria": [
+    {"id":"AC-01","requirement":"Scope contains no Source/ DSP change.","check":["git diff --name-only"]},
+    {"id":"AC-02","requirement":"44.1 kHz OFF next BAR compares to no-XY reference from its first sample.","check":["RuntimeSmoke boundary render"]},
+    {"id":"AC-03","requirement":"44.1 kHz active next Preset compares to no-XY reference from its first sample.","check":["RuntimeSmoke boundary render"]},
+    {"id":"AC-04","requirement":"48 kHz OFF next BAR compares to no-XY reference from its first sample.","check":["RuntimeSmoke boundary render"]},
+    {"id":"AC-05","requirement":"48 kHz active next Preset compares to no-XY reference from its first sample.","check":["RuntimeSmoke boundary render"]},
+    {"id":"AC-06","requirement":"96 kHz OFF next BAR compares to no-XY reference from its first sample.","check":["RuntimeSmoke boundary render"]},
+    {"id":"AC-07","requirement":"96 kHz active next Preset compares to no-XY reference from its first sample.","check":["RuntimeSmoke boundary render"]},
+    {"id":"AC-08","requirement":"Aligned and boundary-crossing host blocks are both exercised.","check":["RuntimeSmoke boundary render"]},
+    {"id":"AC-09","requirement":"Stereo output remains finite in every case.","check":["RuntimeSmoke boundary render"]},
+    {"id":"AC-10","requirement":"The preceding XY fades only in the final 3 ms and has no hard boundary discontinuity.","check":["RuntimeSmoke metrics"]},
+    {"id":"AC-11","requirement":"Earlier-in-BAR XY remains observably active.","check":["RuntimeSmoke metrics"]},
+    {"id":"AC-12","requirement":"Paired boundary comparison WAVs are emitted for manual inspection.","check":["RuntimeSmoke WAV writer"]},
+    {"id":"AC-13","requirement":"Existing RuntimeSmoke cases remain enabled.","check":["RuntimeSmoke executable"]},
+    {"id":"AC-14","requirement":"Exact-source Windows CI succeeds.","check":["Windows CI"]},
+    {"id":"AC-15","requirement":"Existing 18-condition performance evidence is retained without excluding adverse runs.","check":["benchmark reports"]},
+    {"id":"AC-16","requirement":"Jev individually passes AC-01 through AC-16 and Codex reviews exact source/artifacts before D manual-test placement.","check":["Jev review","Codex review"]}
+  ]
+}

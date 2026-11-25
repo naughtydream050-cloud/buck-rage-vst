@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "status": "APPROVED",
+  "approved_by": "Sol",
+  "task_class": "CRITICAL",
+  "risk_class": "realtime-dsp",
+  "task_id": "TOYOTOMI-XY-BAR-BOUNDARY-TESTS-01-0567",
+  "repo_path": "D:/Development/RAZOR_FACE_COMPANY/01_PLUGINS/worktrees/toyotomi-xy-preset-priority",
+  "base_commit": "0567c88eeef75c7fb22bdc78e4c55e5f6c7b2d9f",
+  "plan_path": "docs/XY_BAR_BOUNDARY_VERIFICATION_PLAN.md",
+  "criteria_path": "docs/XY_BAR_BOUNDARY_VERIFICATION_AC.json",
+  "task_spec_path": "docs/XY_BAR_BOUNDARY_VERIFICATION_TESTS_01.md",
+  "plan_sha256": "2c6921bc15a71a3f08cfffe3a67a316ee8580b8c9288ee2ffc15aa7d0fef746b",
+  "criteria_sha256": "d1ed04eafdf64c46394b2c87bd3b4cf8afc4678f913ce2cdaa302710dbbeae8a",
+  "task_spec_sha256": "ab3f8c6dd58970c531383147925b814218700ed12fd9c835902ce04b9ba196d4",
+  "allowed_paths": ["tests/RuntimeSmokeTests.cpp"]
+}
