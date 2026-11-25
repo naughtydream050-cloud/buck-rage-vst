@@ -654,6 +654,66 @@ public:
         return std::abs (x - 0.7f) < 1.0e-6f && std::abs (y - 0.375f) < 1.0e-6f;
     }
 
+    static bool trajectoryLookupMatchesLinearReference()
+    {
+        int cases = 0;
+        for (const int count : { 0, 1, 2, 3, XYPadEngine::kMaxPoints })
+        {
+            XYPadEngine::Trajectory trajectory;
+            trajectory.count = count;
+            for (int point = 0; point < count; ++point)
+            {
+                trajectory.time[static_cast<size_t> (point)] = static_cast<double> (point / 4) * 0.125;
+                trajectory.x[static_cast<size_t> (point)] = static_cast<float> ((point * 37) % 101) / 100.0f;
+                trajectory.y[static_cast<size_t> (point)] = static_cast<float> ((point * 19) % 97) / 96.0f;
+            }
+            for (int step = 0; step <= 512; ++step)
+            {
+                const auto phase = step == 0 ? -0.1 : step == 512 ? 1.1
+                                 : static_cast<double> ((step * 239) % 511) / 510.0;
+                float expectedX = 0.0f, expectedY = 0.0f, actualX = 0.0f, actualY = 0.0f;
+                double expectedSlope = 0.0, actualSlope = 0.0;
+                if (count <= 0)
+                    expectedX = expectedY = 0.5f;
+                else if (count == 1 || phase <= 0.0)
+                {
+                    expectedX = trajectory.x[0];
+                    expectedY = trajectory.y[0];
+                }
+                else
+                {
+                    const auto first = trajectory.time[0];
+                    const auto last = trajectory.time[static_cast<size_t> (count - 1)];
+                    const auto span = juce::jmax (1.0e-9, last - first);
+                    const auto query = first + juce::jlimit (0.0, 1.0, phase) * span;
+                    int hi = 1;
+                    while (hi < count - 1 && trajectory.time[static_cast<size_t> (hi)] < query) ++hi;
+                    const auto lo = hi - 1;
+                    const auto t0 = trajectory.time[static_cast<size_t> (lo)];
+                    const auto t1 = trajectory.time[static_cast<size_t> (hi)];
+                    const auto mix = t1 > t0 ? static_cast<float> ((query - t0) / (t1 - t0)) : 1.0f;
+                    expectedX = trajectory.x[static_cast<size_t> (lo)]
+                        + (trajectory.x[static_cast<size_t> (hi)] - trajectory.x[static_cast<size_t> (lo)]) * mix;
+                    expectedY = trajectory.y[static_cast<size_t> (lo)]
+                        + (trajectory.y[static_cast<size_t> (hi)] - trajectory.y[static_cast<size_t> (lo)]) * mix;
+                    if (t1 > t0 && phase > 0.0 && phase < 1.0)
+                        expectedSlope = (static_cast<double> (trajectory.x[static_cast<size_t> (hi)])
+                                       - static_cast<double> (trajectory.x[static_cast<size_t> (lo)]))
+                                      / (t1 - t0) * span;
+                }
+                XYPadEngine::interpolateTrajectory (trajectory, phase, actualX, actualY, &actualSlope);
+                if (std::memcmp (&expectedX, &actualX, sizeof (float)) != 0
+                    || std::memcmp (&expectedY, &actualY, sizeof (float)) != 0
+                    || std::memcmp (&expectedSlope, &actualSlope, sizeof (double)) != 0)
+                    return false;
+                ++cases;
+            }
+        }
+        std::cout << "METRIC trajectory_lookup exact_cases=" << cases << " max_points="
+                  << XYPadEngine::kMaxPoints << '\n';
+        return cases == 2565;
+    }
+
     static float interpolateSource (const float* source, int frames, double position) noexcept
     {
         return XYPadEngine::interpolate (source, frames, position);
@@ -1928,6 +1988,8 @@ int main (int argc, char** argv)
         return XYPadEngineTestAccess::runControlledHostBenchmark (true) ? 0 : 1;
     check (sizeof (XYPadEngine) < 64u * 1024u,
            "fixed-64-bar-tables-do-not-consume-windows-thread-stack");
+    check (XYPadEngineTestAccess::trajectoryLookupMatchesLinearReference(),
+           "trajectory-binary-lookup-is-bit-exact-to-linear-reference");
     check (XYPadEngineTestAccess::holdSnapshotBulkCopyMatchesRingAcrossWrap(),
            "xy-live-hold-snapshot-bulk-copy-preserves-wrapped-stereo-history");
     check (XYPadEngineTestAccess::liveSinCosMatchesStandardReference(),

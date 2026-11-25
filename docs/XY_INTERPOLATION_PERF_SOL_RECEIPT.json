@@ -1,0 +1,9 @@
+{
+  "status": "APPROVED_FOR_SCOPED_IMPLEMENTATION",
+  "base_source_sha": "45398787674c32f05da6a0278ba1fce95e5c64e4",
+  "plan_sha256": "4a163cfbd82b9ff1e3316b71f8af484a5a9fbcbf18588e7ec4d8828b91485fd5",
+  "ac_sha256": "818c484d6f6109621c83769663691283cd4cdcce5ea0b600f3dce8659a7a9486",
+  "allowed_product_files": ["Source/XYPadEngine.cpp"],
+  "allowed_test_files": ["tests/XYPadEngineTests.cpp"],
+  "release_gate": "Exact-source Windows CI, two complete 18-case benchmarks, Jev five-AC PASS and Codex final review before new D manual-test placement."
+}

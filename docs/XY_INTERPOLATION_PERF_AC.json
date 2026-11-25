@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "criteria": [
+    {"id":"AC-01","requirement":"Bounded lookup returns exactly the legacy first timestamp >= query for all trajectory sizes and endpoint, duplicate, monotonic and non-monotonic phases; X, Y and slope outputs are bit-exact."},
+    {"id":"AC-02","requirement":"Only trajectory lookup changes; XY direction/speed, vertical loop, BAR-boundary suppression, preset routing, state, UI, COUNT, BRAVO and 1024-sample latency remain unchanged; audio callback adds no allocation, lock or I/O."},
+    {"id":"AC-03","requirement":"Same-source Windows CI passes all XY, StateModel, RuntimeSmoke and ScratchEngine regressions, including the BAR-boundary next-Preset/no-Preset output comparison."},
+    {"id":"AC-04","requirement":"Two fresh normal-priority 18-condition performance runs each have p99 <= 0.5 and maximum <= 0.8 of deadline, with 96 kHz/64 maximum <= 0.533 ms; all adverse values and OS waiting are retained."},
+    {"id":"AC-05","requirement":"Jev individually passes AC-01 through AC-05 and Codex reviews exact source, artifacts and hashes before placing a new D manual-test bundle; old versions, candidate, final and Program Files stay unchanged."}
+  ]
+}

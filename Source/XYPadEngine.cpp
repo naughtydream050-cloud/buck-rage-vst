@@ -418,9 +418,18 @@ void XYPadEngine::interpolateTrajectory (const Trajectory& trajectory, double ph
     double last = trajectory.time[static_cast<size_t> (trajectory.count - 1)];
     const auto span = juce::jmax (1.0e-9, last - first);
     const auto query = first + juce::jlimit (0.0, 1.0, phase) * span;
-    int hi = 1;
-    while (hi < trajectory.count - 1 && trajectory.time[static_cast<size_t> (hi)] < query)
-        ++hi;
+    // First timestamp >= query, matching the former linear scan even when
+    // timestamps are duplicated. Bound lookup work for a dense 256-point PAD.
+    int low = 1, high = trajectory.count - 1;
+    while (low < high)
+    {
+        const auto middle = low + (high - low) / 2;
+        if (trajectory.time[static_cast<size_t> (middle)] < query)
+            low = middle + 1;
+        else
+            high = middle;
+    }
+    const auto hi = low;
     const auto lo = hi - 1;
     const auto t0 = trajectory.time[static_cast<size_t> (lo)];
     const auto t1 = trajectory.time[static_cast<size_t> (hi)];
