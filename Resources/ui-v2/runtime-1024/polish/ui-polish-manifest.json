@@ -1385,13 +1385,13 @@
                    },
                    {
                        "file":  "ui_polish_host_sync_off.png",
-                       "bytes":  392,
-                       "sha256":  "317ADDD7A322ABC5462981CFF92C7004C78235C8BEDE0193D3A6D94C1BE0A0F8"
+                       "bytes":  487,
+                       "sha256":  "73FFD5E33628DAC802989265C0F2F174F8BDBA5B38771998465D0CDF84B8BF93"
                    },
                    {
                        "file":  "ui_polish_host_sync_on.png",
-                       "bytes":  558,
-                       "sha256":  "FBA0F60B010B3799694914F412111398A087059CD83BBDE6C3793F0E408CA725"
+                       "bytes":  544,
+                       "sha256":  "ADAE7464A3B5487C797B35D26C3ED856EAF57BC5F750BC9A0FC1A14B4F041C76"
                    },
                    {
                        "file":  "ui_polish_output_meter_left.png",

@@ -135,48 +135,16 @@ bool drawNativeValue (juce::Graphics& g, const NativeDisplayAssets& assets, cons
                       juce::Rectangle<int> bounds, const float targetHeight,
                       juce::Justification justification = juce::Justification::centred)
 {
-    // These bitmap glyphs are authored at their final 1024px faceplate size.
-    // Downscaling the 7x11 digits creates the square, crushed stems seen in
-    // the numeric readouts, so all display sprites remain native-pixel size.
-    juce::ignoreUnused (targetHeight);
-    const auto drawWhole = [&g, bounds, justification] (const juce::Image& image)
-    {
-        if (! image.isValid()) return false;
-        const auto target = justification.appliedToRectangle ({ 0, 0, image.getWidth(), image.getHeight() }, bounds);
-        g.drawImage (image, target.getX(), target.getY(), target.getWidth(), target.getHeight(),
-                     0, 0, image.getWidth(), image.getHeight(), false);
-        return true;
-    };
-    if (value == "Init") return drawWhole (assets.init);
-    if (value == "BRAVO 1") return drawWhole (assets.bravo1);
-    if (value == "BRAVO 2") return drawWhole (assets.bravo2);
-    if (value == "-Inf") return drawWhole (assets.minusInf);
-
-    struct Glyph { const juce::Image* image = nullptr; bool space = false; };
-    juce::Array<Glyph> glyphs; float maximumHeight = 0.0f;
-    for (auto characters = value.getCharPointer(); ! characters.isEmpty();)
-    {
-        const auto character = characters.getAndAdvance();
-        if (character == ' ') { glyphs.add ({ nullptr, true }); continue; }
-        const auto* image = assets.imageFor (character);
-        if (image == nullptr || ! image->isValid()) return false;
-        glyphs.add ({ image, false }); maximumHeight = juce::jmax (maximumHeight, (float) image->getHeight());
-    }
-    if (glyphs.isEmpty() || maximumHeight <= 0.0f) return false;
-    float width = 0.0f;
-    for (const auto& glyph : glyphs) width += glyph.space ? maximumHeight * 0.28f : glyph.image->getWidth();
-    const auto target = justification.appliedToRectangle ({ 0, 0, juce::roundToInt (width),
-        juce::roundToInt (maximumHeight) }, bounds);
-    float x = (float) target.getX();
-    for (const auto& glyph : glyphs)
-    {
-        if (glyph.space) { x += maximumHeight * 0.28f; continue; }
-        const auto glyphWidth = (float) glyph.image->getWidth();
-        g.drawImage (*glyph.image, juce::roundToInt (x), target.getY(), juce::roundToInt (glyphWidth),
-                     glyph.image->getHeight(), 0, 0,
-                     glyph.image->getWidth(), glyph.image->getHeight(), false);
-        x += glyphWidth;
-    }
+    // The former 7x11 bitmap glyphs and generated BRAVO words are visibly
+    // destroyed by host/DPI scaling.  Use one restrained, condensed Windows
+    // display face for every mutable readout so all values remain legible at
+    // the DAW's actual scale; the surrounding black-and-gold image assets
+    // retain the approved visual language.
+    juce::ignoreUnused (assets);
+    const auto height = juce::jlimit (9.0f, 13.0f, juce::jmax (targetHeight, (float) bounds.getHeight() - 4.0f));
+    g.setColour (juce::Colour (0xffe2d8c2));
+    g.setFont (juce::Font ("Bahnschrift SemiCondensed", height, juce::Font::bold));
+    g.drawFittedText (value, bounds.reduced (1, 1), justification, 1, 0.72f);
     return true;
 }
 

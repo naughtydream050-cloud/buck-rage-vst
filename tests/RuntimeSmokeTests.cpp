@@ -2512,18 +2512,20 @@ int main()
     const auto exactNativePresetGlyphs = countExactIvoryPixels (bravo2NativeHeader,
                                                                  GeneratedLayout::presetValueBounds()) >= 30;
     state.setProjectPresetId (0);
-    const auto hostLampBounds = GeneratedLayout::hostSyncLampBounds();
-    const std::array<juce::Point<int>, 4> hostLampCorners {{
-        hostLampBounds.getTopLeft(), hostLampBounds.getTopRight() - juce::Point<int> (1, 0),
-        hostLampBounds.getBottomLeft() - juce::Point<int> (0, 1), hostLampBounds.getBottomRight() - juce::Point<int> (1, 1)
-    }};
-    bool hostLampCornersKeepFaceplate = true;
-    for (const auto corner : hostLampCorners)
-        hostLampCornersKeepFaceplate &= freshImage.getPixelAt (corner.x, corner.y) == staticFaceplate.getPixelAt (corner.x, corner.y);
+    const auto isFullyOpaque = [] (const juce::Image& image)
+    {
+        if (! image.isValid()) return false;
+        for (int y = 0; y < image.getHeight(); ++y)
+            for (int x = 0; x < image.getWidth(); ++x)
+                if (image.getPixelAt (x, y).getAlpha() != 255) return false;
+        return true;
+    };
+    const auto hostLampBackdropComplete = isFullyOpaque (resourceImage ("ui_polish_host_sync_off_png"))
+        && isFullyOpaque (resourceImage ("ui_polish_host_sync_on_png"));
     pass &= check (exactNativeReadoutGlyphs && exactNativePresetGlyphs,
-                   "v2-native-display-glyphs-render-at-unscaled-pixel-edges");
-    pass &= check (hostLampCornersKeepFaceplate,
-                   "v2-host-sync-lamp-does-not-overlay-a-dark-rectangular-corner");
+                   "v2-display-glyphs-render-as-readable-ivory-text");
+    pass &= check (hostLampBackdropComplete,
+                   "v2-host-sync-lamp-states-cover-the-faceplate-hole-opaquely");
     // Measure the independent reference's bottom lit segments. Do not compare
     // implementation coordinates against constants from the same header.
     const std::array<juce::Rectangle<int>, 2> referenceSearch {{{936,592,24,1},{970,592,23,1}}};
