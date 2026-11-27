@@ -1345,13 +1345,13 @@
                    },
                    {
                        "file":  "ui_polish_display_bravo_1.png",
-                       "bytes":  370,
-                       "sha256":  "A53B76FFA8D363C86EC128C54582E2356D7213A8633DC88CB1666B8D90BEF3AD"
+                       "bytes":  230,
+                       "sha256":  "8D821FD9C88D5BA5FE73EAD0761E3C132E41DD388BA6EAE36FC5D77B7C5F14CC"
                    },
                    {
                        "file":  "ui_polish_display_bravo_2.png",
-                       "bytes":  397,
-                       "sha256":  "98DB3A1C3EAC819BFA981AC87D797A24703A9A9BBD3CEC88D5AA98B14ABF2BC5"
+                       "bytes":  233,
+                       "sha256":  "2129012E53169F2D96F92CFF8CECA97BB4F72CBC91B25E40EEC7E29F1B1B6956"
                    },
                    {
                        "file":  "ui_polish_display_minus.png",
