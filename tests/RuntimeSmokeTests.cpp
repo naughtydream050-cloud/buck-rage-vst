@@ -1801,6 +1801,20 @@ bool isIvoryGlyph (const juce::Image& image)
     return visible;
 }
 
+int countExactIvoryPixels (const juce::Image& image, juce::Rectangle<int> bounds)
+{
+    if (! image.isValid() || ! image.getBounds().contains (bounds)) return 0;
+    int count = 0;
+    for (int y = bounds.getY(); y < bounds.getBottom(); ++y)
+        for (int x = bounds.getX(); x < bounds.getRight(); ++x)
+        {
+            const auto c = image.getPixelAt (x, y);
+            if (c.getRed() == 226 && c.getGreen() == 216 && c.getBlue() == 194)
+                ++count;
+        }
+    return count;
+}
+
 bool hasTransparentGlyphBackground (const juce::Image& image)
 {
     if (! image.isValid()) return false;
@@ -2490,6 +2504,26 @@ int main()
     // values, but no BAR/PRESET/LENGTH state image may be gold.
     state.reset(); state.setBypass (false);
     const auto freshImage = render (*editor);
+    const auto exactNativeReadoutGlyphs = countExactIvoryPixels (freshImage, GeneratedLayout::speedReadoutBounds()) >= 18
+        && countExactIvoryPixels (freshImage, GeneratedLayout::pitchReadoutBounds()) >= 18
+        && countExactIvoryPixels (freshImage, GeneratedLayout::depthReadoutBounds()) >= 18;
+    state.setProjectPresetId (2);
+    const auto bravo2NativeHeader = render (*editor);
+    const auto exactNativePresetGlyphs = countExactIvoryPixels (bravo2NativeHeader,
+                                                                 GeneratedLayout::presetValueBounds()) >= 30;
+    state.setProjectPresetId (0);
+    const auto hostLampBounds = GeneratedLayout::hostSyncLampBounds();
+    const std::array<juce::Point<int>, 4> hostLampCorners {{
+        hostLampBounds.getTopLeft(), hostLampBounds.getTopRight() - juce::Point<int> (1, 0),
+        hostLampBounds.getBottomLeft() - juce::Point<int> (0, 1), hostLampBounds.getBottomRight() - juce::Point<int> (1, 1)
+    }};
+    bool hostLampCornersKeepFaceplate = true;
+    for (const auto corner : hostLampCorners)
+        hostLampCornersKeepFaceplate &= freshImage.getPixelAt (corner.x, corner.y) == staticFaceplate.getPixelAt (corner.x, corner.y);
+    pass &= check (exactNativeReadoutGlyphs && exactNativePresetGlyphs,
+                   "v2-native-display-glyphs-render-at-unscaled-pixel-edges");
+    pass &= check (hostLampCornersKeepFaceplate,
+                   "v2-host-sync-lamp-does-not-overlay-a-dark-rectangular-corner");
     // Measure the independent reference's bottom lit segments. Do not compare
     // implementation coordinates against constants from the same header.
     const std::array<juce::Rectangle<int>, 2> referenceSearch {{{936,592,24,1},{970,592,23,1}}};

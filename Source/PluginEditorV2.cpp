@@ -135,12 +135,14 @@ bool drawNativeValue (juce::Graphics& g, const NativeDisplayAssets& assets, cons
                       juce::Rectangle<int> bounds, const float targetHeight,
                       juce::Justification justification = juce::Justification::centred)
 {
-    const auto drawWhole = [&g, bounds, targetHeight, justification] (const juce::Image& image)
+    // These bitmap glyphs are authored at their final 1024px faceplate size.
+    // Downscaling the 7x11 digits creates the square, crushed stems seen in
+    // the numeric readouts, so all display sprites remain native-pixel size.
+    juce::ignoreUnused (targetHeight);
+    const auto drawWhole = [&g, bounds, justification] (const juce::Image& image)
     {
         if (! image.isValid()) return false;
-        const auto scale = juce::jmin (1.0f, targetHeight / (float) image.getHeight());
-        const auto target = justification.appliedToRectangle ({ 0, 0, juce::roundToInt (image.getWidth() * scale),
-            juce::roundToInt (image.getHeight() * scale) }, bounds);
+        const auto target = justification.appliedToRectangle ({ 0, 0, image.getWidth(), image.getHeight() }, bounds);
         g.drawImage (image, target.getX(), target.getY(), target.getWidth(), target.getHeight(),
                      0, 0, image.getWidth(), image.getHeight(), false);
         return true;
@@ -161,18 +163,17 @@ bool drawNativeValue (juce::Graphics& g, const NativeDisplayAssets& assets, cons
         glyphs.add ({ image, false }); maximumHeight = juce::jmax (maximumHeight, (float) image->getHeight());
     }
     if (glyphs.isEmpty() || maximumHeight <= 0.0f) return false;
-    const auto scale = juce::jmin (1.0f, targetHeight / maximumHeight);
     float width = 0.0f;
-    for (const auto& glyph : glyphs) width += glyph.space ? targetHeight * 0.28f : glyph.image->getWidth() * scale;
+    for (const auto& glyph : glyphs) width += glyph.space ? maximumHeight * 0.28f : glyph.image->getWidth();
     const auto target = justification.appliedToRectangle ({ 0, 0, juce::roundToInt (width),
-        juce::roundToInt (maximumHeight * scale) }, bounds);
+        juce::roundToInt (maximumHeight) }, bounds);
     float x = (float) target.getX();
     for (const auto& glyph : glyphs)
     {
-        if (glyph.space) { x += targetHeight * 0.28f; continue; }
-        const auto glyphWidth = glyph.image->getWidth() * scale;
+        if (glyph.space) { x += maximumHeight * 0.28f; continue; }
+        const auto glyphWidth = (float) glyph.image->getWidth();
         g.drawImage (*glyph.image, juce::roundToInt (x), target.getY(), juce::roundToInt (glyphWidth),
-                     juce::roundToInt (glyph.image->getHeight() * scale), 0, 0,
+                     glyph.image->getHeight(), 0, 0,
                      glyph.image->getWidth(), glyph.image->getHeight(), false);
         x += glyphWidth;
     }
@@ -549,14 +550,26 @@ public:
         drawNativeValue (g, assets.nativeDisplay, PluginStateModel::projectPresetText (ui.projectPresetId),
                          GeneratedLayout::presetValueBounds(), 10.0f, juce::Justification::centredLeft);
         const auto hostLampBounds = GeneratedLayout::hostSyncLampBounds();
-        drawNative (g, hostSync ? assets.hostSyncLampOn : assets.hostSyncLampOff, hostLampBounds);
+        // The native lamp is circular; clipping its own 11x12 canvas keeps
+        // the faceplate texture at the corners instead of exposing a dark
+        // rectangular image backing.
+        const auto drawHostLamp = [&] (const juce::Image& lamp)
+        {
+            g.saveState();
+            juce::Path circularLampMask;
+            circularLampMask.addEllipse (hostLampBounds.toFloat());
+            g.reduceClipRegion (circularLampMask);
+            drawNative (g, lamp, hostLampBounds);
+            g.restoreState();
+        };
+        drawHostLamp (hostSync ? assets.hostSyncLampOn : assets.hostSyncLampOff);
         if (hostSync && playing >= 0)
         {
             const auto phase = 0.5f + 0.5f * std::sin ((float) juce::Time::getMillisecondCounterHiRes()
                                                         * juce::MathConstants<float>::twoPi / 2000.0f);
             g.saveState();
             g.setOpacity (phase * 0.10f);
-            drawNative (g, assets.hostSyncLampOn, hostLampBounds);
+            drawHostLamp (assets.hostSyncLampOn);
             g.restoreState();
         }
         // The static faceplate owns the neutral XY panel and fixed labels.
@@ -833,7 +846,8 @@ void ToyotomiHideyoshiAudioProcessorEditorV2::showProjectPresetMenu()
     menu.addItem (1, "Init", true, selected);
     menu.addItem (2, "BRAVO 1", true, processor.getStateModel().getUiState().projectPresetId == 1);
     menu.addItem (3, "BRAVO 2", true, processor.getStateModel().getUiState().projectPresetId == 2);
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this),
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea (
+                            localAreaToGlobal (GeneratedLayout::presetSelectorBounds())),
                         [this] (int result)
                         {
                             if (result == 1) processor.getStateModel().setProjectPresetId (0);
