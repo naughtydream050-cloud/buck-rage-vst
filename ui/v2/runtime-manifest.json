@@ -5654,40 +5654,40 @@
     {
       "id": "bypass_off",
       "file": "Resources/ui-v2/runtime-1024/standalone/bypass_off.png",
-      "provenance": "approved-standalone",
+      "provenance": "generated-toolbar-comparison-approved-20261127",
       "width": 80,
       "height": 31,
       "alpha": [
         255,
         255
       ],
-      "state": "neutral",
+      "state": "bypass_off",
       "runtimeBounds": [
         0,
         0,
         80,
         31
       ],
-      "sha256": "EE2B81E6D24708733FC7581DDD4934756C08C05CFC9FD6F090AC8779E4F10D03"
+      "sha256": "743A75545C039DA5055B809369C1D1934508E5470FD748664FD5EC34A6559669"
     },
     {
       "id": "bypass_on",
       "file": "Resources/ui-v2/runtime-1024/standalone/bypass_on.png",
-      "provenance": "approved-standalone",
+      "provenance": "generated-toolbar-comparison-approved-20261127",
       "width": 80,
       "height": 31,
       "alpha": [
         255,
         255
       ],
-      "state": "neutral",
+      "state": "bypass_on",
       "runtimeBounds": [
         0,
         0,
         80,
         31
       ],
-      "sha256": "FB74BB3B25E3E2C99043071EFFB32F417332034D8CBB4941B25C5206019D2DED"
+      "sha256": "75E556D149386A62323AD5DEF97EDB234ED7AF36868FD4C0363F76023868DDDA"
     },
     {
       "id": "xy_neutral_base_288x256",

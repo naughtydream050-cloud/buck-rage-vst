@@ -1344,6 +1344,16 @@
                        "sha256":  "AC93228509C3A4A4F815877EE40287B56660FA1A7EC5D3F9273964394C813C7A"
                    },
                    {
+                       "file":  "ui_polish_display_bravo_1.png",
+                       "bytes":  407,
+                       "sha256":  "8704CB7F1795973F45DF7C1B94107306BA2712EF64F8325980EC3074463781C9"
+                   },
+                   {
+                       "file":  "ui_polish_display_bravo_2.png",
+                       "bytes":  435,
+                       "sha256":  "AC7B03DBA1A214F62B8E556A61CDA9232DB4C360B472BBFD890B62C06472FD9C"
+                   },
+                   {
                        "file":  "ui_polish_display_minus.png",
                        "bytes":  122,
                        "sha256":  "3D59F342FA236899B45CE3F3926FA512CA18271E004E56645314E92DBCBB9EE2"

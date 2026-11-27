@@ -2288,7 +2288,7 @@ int main()
     pass &= check(resourceIs("knob_ring_60_png",48,48) && resourceIs("knob_pointer_60_png",48,48),"v2-knob-assets-native");
     pass &= check(resourceIs("bypass_off_png",80,31) && resourceIs("bypass_on_png",80,31),"v2-bypass-native");
     pass &= check(resourceIs("meter_led_strip_png",12,204),"v2-output-meter-led-native");
-    const std::array<const char*, 18> nativeDisplayResources {{
+    const std::array<const char*, 20> nativeDisplayResources {{
         "toy_display_header_bpm_backing_png", "toy_display_header_timesig_backing_png",
         "toy_display_header_preset_backing_png", "ui_polish_host_sync_on_png",
         "ui_polish_host_sync_off_png", "toy_display_speed_readout_backing_png",
@@ -2296,7 +2296,8 @@ int main()
         "toy_display_output_l_readout_backing_png", "toy_display_output_r_readout_backing_png",
         "ui_polish_display_dot_png", "ui_polish_display_minus_png", "ui_polish_display_slash_png",
         "ui_polish_display_s_png", "ui_polish_display_t_png", "ui_polish_display_percent_png",
-        "ui_polish_display_init_png", "ui_polish_display_minus_inf_png"
+        "ui_polish_display_init_png", "ui_polish_display_bravo_1_png",
+        "ui_polish_display_bravo_2_png", "ui_polish_display_minus_inf_png"
     }};
     for (const auto* resource : nativeDisplayResources)
         pass &= check (resourceImage (resource).isValid(), "v2-native-display-sprite-present");
@@ -2312,7 +2313,8 @@ int main()
     for (const auto* glyph : { "ui_polish_display_dot_png", "ui_polish_display_minus_png",
                                "ui_polish_display_slash_png", "ui_polish_display_s_png",
                                "ui_polish_display_t_png", "ui_polish_display_percent_png",
-                               "ui_polish_display_init_png", "ui_polish_display_minus_inf_png" })
+                               "ui_polish_display_init_png", "ui_polish_display_bravo_1_png",
+                               "ui_polish_display_bravo_2_png", "ui_polish_display_minus_inf_png" })
         pass &= check (isIvoryGlyph (resourceImage (glyph)), "v2-native-display-symbol-is-ivory");
     for (int i = 1; i <= 64; ++i)
     {
@@ -2460,6 +2462,26 @@ int main()
                    && v2->debugClickAt (GeneratedLayout::presetNextBounds().getCentre())
                    && state.getUiState().projectPresetId == 0,
                    "v2-top-control-hit-routing-and-init-preset-bounds");
+    state.selectBar (8);
+    state.setSlotPreset (8, PluginStateModel::ScratchPreset::backspin);
+    const auto manualBarBeforePresetStep = state.getSlot (8);
+    state.setProjectPresetId (0);
+    const auto initPresetHeader = render (*editor);
+    const auto presetHeaderBounds = GeneratedLayout::presetValueBounds();
+    const auto prevToBravo2 = v2->debugClickAt (GeneratedLayout::presetPrevBounds().getCentre());
+    const auto bravo2PresetHeader = render (*editor);
+    const auto nextToInit = v2->debugClickAt (GeneratedLayout::presetNextBounds().getCentre());
+    const auto initAfterWrapHeader = render (*editor);
+    const auto nextToBravo1 = v2->debugClickAt (GeneratedLayout::presetNextBounds().getCentre());
+    const auto bravo1PresetHeader = render (*editor);
+    pass &= check (prevToBravo2 && nextToInit && nextToBravo1
+                   && state.getUiState().projectPresetId == 1
+                   && cropsDiffer (initPresetHeader, bravo2PresetHeader, presetHeaderBounds)
+                   && cropsDiffer (initPresetHeader, bravo1PresetHeader, presetHeaderBounds)
+                   && ! cropsDiffer (initPresetHeader, initAfterWrapHeader, presetHeaderBounds)
+                   && state.getSlot (8).preset == manualBarBeforePresetStep.preset
+                   && state.getSlot (8).motion == manualBarBeforePresetStep.motion,
+                   "v2-project-preset-arrows-wrap-render-text-and-preserve-manual-bar");
     topControlsPlayHead.set (false, 0.0);
     processor.processBlock (topControlsAudio, topControlsMidi);
     processor.setHostSyncEnabled (true);

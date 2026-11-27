@@ -106,7 +106,7 @@ CellState resolveCellState (bool selected, bool playing) noexcept
 struct NativeDisplayAssets final
 {
     std::array<juce::Image, 10> digits;
-    juce::Image dot, minus, slash, s, t, percent, init, minusInf;
+    juce::Image dot, minus, slash, s, t, percent, init, bravo1, bravo2, minusInf;
 
     void load()
     {
@@ -115,7 +115,10 @@ struct NativeDisplayAssets final
         dot = readAsset ("ui_polish_display_dot.png"); minus = readAsset ("ui_polish_display_minus.png");
         slash = readAsset ("ui_polish_display_slash.png"); s = readAsset ("ui_polish_display_s.png");
         t = readAsset ("ui_polish_display_t.png"); percent = readAsset ("ui_polish_display_percent.png");
-        init = readAsset ("ui_polish_display_init.png"); minusInf = readAsset ("ui_polish_display_minus_inf.png");
+        init = readAsset ("ui_polish_display_init.png");
+        bravo1 = readAsset ("ui_polish_display_bravo_1.png");
+        bravo2 = readAsset ("ui_polish_display_bravo_2.png");
+        minusInf = readAsset ("ui_polish_display_minus_inf.png");
     }
 
     const juce::Image* imageFor (juce_wchar character) const
@@ -143,6 +146,8 @@ bool drawNativeValue (juce::Graphics& g, const NativeDisplayAssets& assets, cons
         return true;
     };
     if (value == "Init") return drawWhole (assets.init);
+    if (value == "BRAVO 1") return drawWhole (assets.bravo1);
+    if (value == "BRAVO 2") return drawWhole (assets.bravo2);
     if (value == "-Inf") return drawWhole (assets.minusInf);
 
     struct Glyph { const juce::Image* image = nullptr; bool space = false; };
@@ -840,9 +845,10 @@ void ToyotomiHideyoshiAudioProcessorEditorV2::showProjectPresetMenu()
 
 void ToyotomiHideyoshiAudioProcessorEditorV2::stepProjectPreset (int direction)
 {
-    juce::ignoreUnused (direction);
-    // Init is deliberately the only item until factory preset contents exist.
-    processor.getStateModel().setProjectPresetId (0);
+    if (direction == 0) return;
+    const auto current = processor.getStateModel().getUiState().projectPresetId;
+    const auto next = (current + (direction > 0 ? 1 : 2)) % 3;
+    processor.getStateModel().setProjectPresetId (next);
     surface->repaint();
 }
 
